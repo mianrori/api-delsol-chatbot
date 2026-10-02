@@ -1,5 +1,8 @@
 import { getSalesRepository } from "../../repositories/sales/sales.repository.js";
+import { createSalesExport } from "../exports/salesExport.service.js";
 import { buildSalesInsights } from "./salesInsights.service.js";
+
+const AUTO_EXPORT_THRESHOLD = 20;
 
 const normalizeArray = (value) => {
   if (Array.isArray(value)) {
@@ -24,6 +27,7 @@ export const getSales = async (
     metrics,
   },
   connection,
+  username,
 ) => {
   const normalizedMetrics = normalizeArray(metrics);
 
@@ -51,12 +55,39 @@ export const getSales = async (
     metrics: args.metrics,
   });
 
-  if (!insights) {
-    return result;
+  const resultWithInsights = insights
+    ? {
+        ...result,
+        insights,
+      }
+    : result;
+
+  const rows = Array.isArray(result?.data) ? result.data : [];
+
+  if (rows.length <= AUTO_EXPORT_THRESHOLD) {
+    return resultWithInsights;
   }
 
-  return {
-    ...result,
-    insights,
-  };
+  try {
+    const exportDefinition = await createSalesExport({
+      username,
+      args,
+      totalRecords: rows.length,
+    });
+
+    return {
+      ...resultWithInsights,
+      export: {
+        available: true,
+        exportId: exportDefinition.exportId,
+        fileName: exportDefinition.fileName,
+        expiresAt: exportDefinition.expiresAt,
+        totalRecords: rows.length,
+        format: "xlsx",
+      },
+    };
+  } catch (error) {
+    console.error("No fue posible preparar la exportación de ventas:", error);
+    return resultWithInsights;
+  }
 };
