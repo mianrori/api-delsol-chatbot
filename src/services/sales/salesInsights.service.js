@@ -36,6 +36,8 @@ const TIME_DIMENSIONS = ["day", "month", "year"];
 
 const SUPPORTED_METRICS = ["totalAmount", "totalInvoices"];
 
+const DERIVED_METRIC_AVERAGE_TICKET = "averageTicket";
+
 /*
  * Cantidad mínima de puntos para intentar detectar anomalías.
  *
@@ -441,6 +443,29 @@ const calculateAnomalyDetection = ({
 |--------------------------------------------------------------------------
 */
 
+const withAverageTicket = (rows = []) => {
+  return rows.map((row) => {
+    const totalAmount = toNumber(row?.totalAmount);
+    const totalInvoices = toNumber(row?.totalInvoices);
+
+    if (
+      totalAmount === null ||
+      totalInvoices === null ||
+      totalInvoices <= 0
+    ) {
+      return {
+        ...row,
+        averageTicket: null,
+      };
+    }
+
+    return {
+      ...row,
+      averageTicket: round(totalAmount / totalInvoices, 4),
+    };
+  });
+};
+
 const calculateMetricInsights = ({ rows, metric, groupBy }) => {
   const points = rows
     .map((row, index) => {
@@ -603,6 +628,8 @@ export const buildSalesInsights = ({
     return null;
   }
 
+  const rowsWithDerivedMetrics = withAverageTicket(rows);
+
   const metricInsights = {};
 
   for (const metric of metrics) {
@@ -611,13 +638,30 @@ export const buildSalesInsights = ({
     }
 
     const insight = calculateMetricInsights({
-      rows,
+      rows: rowsWithDerivedMetrics,
       metric,
       groupBy,
     });
 
     if (insight) {
       metricInsights[metric] = insight;
+    }
+  }
+
+  const hasAverageTicketSeries = rowsWithDerivedMetrics.filter(
+    (row) => Number.isFinite(row.averageTicket),
+  ).length >= 2;
+
+  if (hasAverageTicketSeries) {
+    const averageTicketInsight = calculateMetricInsights({
+      rows: rowsWithDerivedMetrics,
+      metric: DERIVED_METRIC_AVERAGE_TICKET,
+      groupBy,
+    });
+
+    if (averageTicketInsight) {
+      metricInsights[DERIVED_METRIC_AVERAGE_TICKET] =
+        averageTicketInsight;
     }
   }
 
@@ -629,7 +673,7 @@ export const buildSalesInsights = ({
     groupBy.find((dimension) => TIME_DIMENSIONS.includes(dimension)) ?? null;
 
   return {
-    version: 2,
+    version: 3,
 
     scope: {
       groupBy: [...groupBy],
