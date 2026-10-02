@@ -7,6 +7,12 @@ const mapCustomer = (customer) => ({
   hasActiveContract: customer.CONTRATO_ACTIVO === "S",
 });
 
+const isExactMatch = (customer) =>
+  Number(customer?.SIMILARITY) === 100;
+
+const hasActiveContract = (customer) =>
+  customer?.CONTRATO_ACTIVO === "S";
+
 export const resolveCustomer = async (search, connection) => {
   const customers = await searchCustomersRepository(connection, search);
 
@@ -18,17 +24,67 @@ export const resolveCustomer = async (search, connection) => {
     };
   }
 
-  if (customers.length === 1 || Number(customers[0].SIMILARITY) === 100) {
+  /*
+   * Para resolver locales comerciales solo consideramos clientes
+   * con contrato activo.
+   *
+   * Esto evita que una coincidencia histórica/inactiva desplace
+   * a un local actualmente vigente con el mismo nombre comercial.
+   */
+  const activeCustomers = customers.filter(hasActiveContract);
+
+  if (activeCustomers.length === 0) {
+    return {
+      status: "NOT_FOUND",
+      reason: "NO_ACTIVE_CONTRACT",
+      query: search,
+      options: [],
+    };
+  }
+
+  /*
+   * Una coincidencia exacta solo puede resolverse automáticamente
+   * cuando existe exactamente una entre los clientes activos.
+   *
+   * Si existen dos o más coincidencias exactas (por ejemplo varios
+   * locales NIKE activos), debe mantenerse la ambigüedad.
+   */
+  const exactMatches = activeCustomers.filter(isExactMatch);
+
+  if (exactMatches.length === 1) {
     return {
       status: "RESOLVED",
-      customer: mapCustomer(customers[0]),
+      customer: mapCustomer(exactMatches[0]),
+    };
+  }
+
+  if (exactMatches.length > 1) {
+    return {
+      status: "AMBIGUOUS",
+      query: search,
+      options: exactMatches.map((customer, index) => ({
+        optionId: String(index + 1),
+        ...mapCustomer(customer),
+      })),
+    };
+  }
+
+  /*
+   * Sin coincidencias exactas:
+   * - una sola coincidencia activa puede resolverse;
+   * - varias coincidencias activas requieren selección del usuario.
+   */
+  if (activeCustomers.length === 1) {
+    return {
+      status: "RESOLVED",
+      customer: mapCustomer(activeCustomers[0]),
     };
   }
 
   return {
     status: "AMBIGUOUS",
     query: search,
-    options: customers.map((customer, index) => ({
+    options: activeCustomers.map((customer, index) => ({
       optionId: String(index + 1),
       ...mapCustomer(customer),
     })),
