@@ -11,13 +11,37 @@ import {
   setConversation,
 } from "../../state/conversation.store.js";
 import { trimConversation } from "./conversation.service.js";
-import { getSalesPilotPrompt } from "../../prompts/salesPilot.prompt.js";
+import { getSystemPrompt } from "../../prompts/system.prompt.js";
 
 const bedrockClient = new BedrockRuntimeClient({
   region: config.awsRegion || "us-east-1",
 });
 
 const MAX_TOOL_ITERATIONS = 8;
+
+const RUNTIME_CAPABILITIES_PROMPT = `
+## Capacidades disponibles en este servicio
+
+En esta etapa de migración, las únicas herramientas habilitadas son:
+- search_customers
+- search_categories
+- get_sales
+
+Aunque el prompt general pueda contener reglas para otros dominios del ERP, no afirmes que puedes consultar esos dominios ni intentes utilizar herramientas que no estén presentes en toolConfig.
+
+Para esta etapa:
+- puedes consultar ventas;
+- puedes resolver clientes, marcas o locales;
+- puedes resolver rubros comerciales.
+
+Si el usuario solicita información que requiere una herramienta todavía no habilitada en este servicio, indícale brevemente que esa consulta aún no está disponible en esta etapa de migración.
+
+Para marcas o nombres propios comerciales como Nike, Adidas, Zara o Cines, utiliza search_customers.
+Para rubros genéricos como librería, gastronomía, indumentaria o electrónica, utiliza search_categories.
+Si existe duda entre marca/local y rubro, intenta primero search_customers.
+
+Si get_sales devuelve un resultado sin registros y la moneda no está disponible, informa simplemente que no se encontraron ventas para el período solicitado. No presentes una moneda desconocida como un problema de datos.
+`.trim();
 
 const normalizeHistory = (history = []) => {
   return history
@@ -162,7 +186,7 @@ export const chatService = async ({ message, sessionId }) => {
     },
   ];
 
-  const systemPrompt = getSalesPilotPrompt({
+  const systemPrompt = getSystemPrompt({
     currentDate: getCurrentDateParaguay(),
   });
 
@@ -175,6 +199,9 @@ export const chatService = async ({ message, sessionId }) => {
         system: [
           {
             text: systemPrompt,
+          },
+          {
+            text: RUNTIME_CAPABILITIES_PROMPT,
           },
         ],
         messages,
