@@ -13,13 +13,23 @@ const normalizeArray = (value) => {
 };
 
 export const getSales = async (
-  { dateFrom, dateTo, dayType, groupBy, metrics },
+  {
+    customerIds,
+    categoryIds,
+    dateFrom,
+    dateTo,
+    dayType,
+    groupBy,
+    metrics,
+  },
   connection,
 ) => {
   const normalizedMetrics = normalizeArray(metrics);
 
   return getSalesRepository({
     connection,
+    customerIds: normalizeArray(customerIds),
+    categoryIds: normalizeArray(categoryIds),
     dateFrom,
     dateTo,
     dayType,
