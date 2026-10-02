@@ -19,6 +19,10 @@ const config = {
   pgOracleSessionsUser: process.env.PG_ORACLE_SESSIONS_USER,
   pgOracleSessionsPassword: process.env.PG_ORACLE_SESSIONS_PASSWORD,
 
+  // Búsquedas
+  minSimilarity: process.env.MIN_SIMILARITY,
+  limitFilter: process.env.LIMIT_FILTER,
+
   // AWS Bedrock
   awsRegion: process.env.AWS_REGION,
   awsBedrockModelId: process.env.AWS_BEDROCK_MODEL_ID,
