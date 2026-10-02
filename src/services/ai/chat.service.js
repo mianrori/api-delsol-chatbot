@@ -12,6 +12,12 @@ import {
 } from "../../state/conversation.store.js";
 import { trimConversation } from "./conversation.service.js";
 import { getSystemPrompt } from "../../prompts/system.prompt.js";
+import {
+  logBedrockRequest,
+  logBedrockResponse,
+  logToolCall,
+  logToolResult,
+} from "../../utils/debug.logger.js";
 
 const bedrockClient = new BedrockRuntimeClient({
   region: config.awsRegion || "us-east-1",
@@ -118,6 +124,12 @@ const executeToolRequests = async ({ content, sessionId }) => {
   for (const block of toolUses) {
     const { toolUseId, name, input = {} } = block.toolUse;
 
+    logToolCall({
+      name,
+      input,
+      sessionId,
+    });
+
     try {
       const result = await executeTool({
         name,
@@ -125,6 +137,11 @@ const executeToolRequests = async ({ content, sessionId }) => {
         context: {
           sessionId,
         },
+      });
+
+      logToolResult({
+        name,
+        result,
       });
 
       toolResults.push({
@@ -139,6 +156,11 @@ const executeToolRequests = async ({ content, sessionId }) => {
         },
       });
     } catch (error) {
+      logToolResult({
+        name,
+        error,
+      });
+
       console.error(`Error ejecutando tool "${name}":`, error);
 
       toolResults.push({
@@ -191,10 +213,12 @@ export const chatService = async ({ message, sessionId }) => {
   });
 
   let toolIterations = 0;
+  let bedrockIteration = 0;
 
   while (true) {
-    const response = await bedrockClient.send(
-      new ConverseCommand({
+    bedrockIteration += 1;
+
+    const commandInput = {
         modelId: config.awsBedrockModelId,
         system: [
           {
@@ -212,8 +236,22 @@ export const chatService = async ({ message, sessionId }) => {
           maxTokens: Number(config.awsBedrockMaxTokens || 8192),
           temperature: Number(config.awsBedrockTemperature || 0.1),
         },
-      }),
+      };
+
+    logBedrockRequest({
+      iteration: bedrockIteration,
+      modelId: config.awsBedrockModelId,
+      input: commandInput,
+    });
+
+    const response = await bedrockClient.send(
+      new ConverseCommand(commandInput),
     );
+
+    logBedrockResponse({
+      iteration: bedrockIteration,
+      response,
+    });
 
     const outputMessage = response.output?.message;
 
