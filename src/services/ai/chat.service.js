@@ -24,6 +24,7 @@ const bedrockClient = new BedrockRuntimeClient({
 });
 
 const MAX_TOOL_ITERATIONS = 8;
+const MAX_MODEL_ROWS_WITH_EXPORT = 12;
 
 const RUNTIME_CAPABILITIES_PROMPT = `
 ## Capacidades disponibles en este servicio
@@ -47,6 +48,17 @@ Para rubros genéricos como librería, gastronomía, indumentaria o electrónica
 Si existe duda entre marca/local y rubro, intenta primero search_customers.
 
 Si get_sales devuelve un resultado sin registros y la moneda no está disponible, informa simplemente que no se encontraron ventas para el período solicitado. No presentes una moneda desconocida como un problema de datos.
+
+Cuando get_sales incluya resultSet.truncated=true:
+- el conjunto completo contiene más registros que los enviados al modelo;
+- resultSet.totalRecords indica la cantidad total real;
+- presenta únicamente una muestra breve de los registros recibidos;
+- indica claramente que existe un conjunto completo disponible para exportación;
+- nunca afirmes que la muestra representa todos los resultados;
+- nunca sumes, promedies ni construyas totales a partir de la muestra;
+- nunca presentes totales aproximados;
+- nunca armes rankings, top N o conclusiones sobre máximos/mínimos globales usando solamente la muestra;
+- utiliza únicamente insights explícitos si necesitas destacar estadísticas globales.
 `.trim();
 
 const normalizeHistory = (history = []) => {
@@ -152,7 +164,27 @@ const removeClientOnlyMetadata = ({ name, result }) => {
     typeof result === "object" &&
     !Array.isArray(result)
   ) {
-    const { export: _export, ...resultForModel } = result;
+    const { export: exportMetadata, ...resultForModel } = result;
+
+    if (
+      exportMetadata?.available &&
+      Array.isArray(resultForModel.data) &&
+      resultForModel.data.length > MAX_MODEL_ROWS_WITH_EXPORT
+    ) {
+      return {
+        ...resultForModel,
+        data: resultForModel.data.slice(0, MAX_MODEL_ROWS_WITH_EXPORT),
+        resultSet: {
+          truncated: true,
+          totalRecords: Number(
+            exportMetadata.totalRecords ?? resultForModel.data.length,
+          ),
+          returnedRecords: MAX_MODEL_ROWS_WITH_EXPORT,
+          fullResultAvailableInExport: true,
+        },
+      };
+    }
+
     return resultForModel;
   }
 
