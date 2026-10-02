@@ -18,6 +18,13 @@ const config = {
   pgOracleSessionsDatabase: process.env.PG_ORACLE_SESSIONS_DATABASE,
   pgOracleSessionsUser: process.env.PG_ORACLE_SESSIONS_USER,
   pgOracleSessionsPassword: process.env.PG_ORACLE_SESSIONS_PASSWORD,
+
+  // AWS Bedrock
+  awsRegion: process.env.AWS_REGION,
+  awsBedrockModelId: process.env.AWS_BEDROCK_MODEL_ID,
+  awsBedrockMaxTokens: process.env.AWS_BEDROCK_MAX_TOKENS,
+  awsBedrockTemperature: process.env.AWS_BEDROCK_TEMPERATURE,
+  awsBearerTokenBedrock: process.env.AWS_BEARER_TOKEN_BEDROCK,
 };
 
 export default config;
