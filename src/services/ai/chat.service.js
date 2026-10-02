@@ -52,12 +52,20 @@ Si get_sales devuelve un resultado sin registros y la moneda no está disponible
 Cuando get_sales incluya resultSet.truncated=true:
 - el conjunto completo contiene más registros que los enviados al modelo;
 - resultSet.totalRecords indica la cantidad total real;
+- resultSet.returnedRecords indica cuántos registros de muestra recibiste;
+- resultSet.sampleType="FIRST_ROWS_IN_SOURCE_ORDER" significa que la muestra contiene únicamente las primeras filas según el orden original de la consulta;
+- resultSet.isRanking=false significa que la muestra NO es un ranking, Top N ni selección de mayores o menores valores;
 - presenta únicamente una muestra breve de los registros recibidos;
+- utiliza una frase como: "Se muestran 12 de 187 registros. El detalle completo está disponible para exportación.";
 - indica claramente que existe un conjunto completo disponible para exportación;
 - nunca afirmes que la muestra representa todos los resultados;
+- nunca describas la muestra como "los primeros por importe", "los de mayor venta", "Top", "ranking", "líderes" ni expresiones equivalentes;
 - nunca sumes, promedies ni construyas totales a partir de la muestra;
 - nunca presentes totales aproximados;
-- nunca armes rankings, top N o conclusiones sobre máximos/mínimos globales usando solamente la muestra;
+- nunca armes rankings, Top N o conclusiones sobre máximos/mínimos globales usando solamente la muestra;
+- nunca afirmes que "la mayoría" del conjunto cumple una condición utilizando solamente la muestra;
+- nunca afirmes concentración, distribución global o participación relativa utilizando solamente la muestra;
+- puedes describir literalmente los valores visibles de una fila concreta, pero no extrapolarlos al conjunto completo;
 - utiliza únicamente insights explícitos si necesitas destacar estadísticas globales.
 `.trim();
 
@@ -180,6 +188,8 @@ const removeClientOnlyMetadata = ({ name, result }) => {
             exportMetadata.totalRecords ?? resultForModel.data.length,
           ),
           returnedRecords: MAX_MODEL_ROWS_WITH_EXPORT,
+          sampleType: "FIRST_ROWS_IN_SOURCE_ORDER",
+          isRanking: false,
           fullResultAvailableInExport: true,
         },
       };
