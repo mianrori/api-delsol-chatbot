@@ -4,37 +4,44 @@ import { getSales } from "../sales/sales.service.js";
 import { withOracleProxySession } from "../sessions/oracleSession.service.js";
 
 const withAuthorizedOracle = async (sessionId, callback) => {
-  return withOracleProxySession(sessionId, async ({ connection }) => {
-    try {
-      return await callback(connection);
-    } catch (error) {
-      if (Number(error?.errorNum) === 942) {
-        throw new Error(
-          "El usuario no tiene permisos para consultar esta información.",
-        );
-      }
+  return withOracleProxySession(
+    sessionId,
+    async ({ connection, username }) => {
+      try {
+        return await callback({ connection, username });
+      } catch (error) {
+        if (Number(error?.errorNum) === 942) {
+          throw new Error(
+            "El usuario no tiene permisos para consultar esta información.",
+          );
+        }
 
-      throw error;
-    }
-  });
+        throw error;
+      }
+    },
+  );
 };
 
 const toolHandlers = {
   search_customers: async (args, context) => {
-    return withAuthorizedOracle(context.sessionId, (connection) =>
-      resolveCustomer(args.search, connection),
+    return withAuthorizedOracle(
+      context.sessionId,
+      ({ connection }) => resolveCustomer(args.search, connection),
     );
   },
 
   search_categories: async (args, context) => {
-    return withAuthorizedOracle(context.sessionId, (connection) =>
-      resolveCategory(args.search, connection),
+    return withAuthorizedOracle(
+      context.sessionId,
+      ({ connection }) => resolveCategory(args.search, connection),
     );
   },
 
   get_sales: async (args, context) => {
-    return withAuthorizedOracle(context.sessionId, (connection) =>
-      getSales(args, connection),
+    return withAuthorizedOracle(
+      context.sessionId,
+      ({ connection, username }) =>
+        getSales(args, connection, username),
     );
   },
 };
