@@ -2,8 +2,9 @@ export const searchCategoriesTool = {
   toolSpec: {
     name: "search_categories",
     description:
-      "Busca rubros comerciales por nombre. Debe utilizarse cuando el usuario menciona un rubro " +
-      "pero todavía no se conoce su código. Admite nombres incompletos y errores ortográficos.",
+      "Busca rubros o categorías comerciales por nombre, por ejemplo librería, gastronomía, indumentaria o electrónica. " +
+      "Debe utilizarse cuando el usuario habla explícitamente de un rubro, categoría o tipo de comercio. " +
+      "No debe utilizarse para resolver nombres propios de marcas o locales como Nike, Adidas, Zara o Cines.",
     inputSchema: {
       json: {
         type: "object",
@@ -11,7 +12,7 @@ export const searchCategoriesTool = {
           search: {
             type: "string",
             description:
-              "Nombre completo o parcial del rubro mencionado por el usuario.",
+              "Nombre completo o parcial del rubro o categoría mencionado por el usuario.",
           },
         },
         required: ["search"],
