@@ -1,4 +1,5 @@
 import { getSalesRepository } from "../../repositories/sales/sales.repository.js";
+import { buildSalesInsights } from "./salesInsights.service.js";
 
 const normalizeArray = (value) => {
   if (Array.isArray(value)) {
@@ -26,8 +27,7 @@ export const getSales = async (
 ) => {
   const normalizedMetrics = normalizeArray(metrics);
 
-  return getSalesRepository({
-    connection,
+  const args = {
     customerIds: normalizeArray(customerIds),
     categoryIds: normalizeArray(categoryIds),
     dateFrom,
@@ -38,5 +38,25 @@ export const getSales = async (
       normalizedMetrics.length > 0
         ? normalizedMetrics
         : ["totalAmount", "totalInvoices"],
+  };
+
+  const result = await getSalesRepository({
+    connection,
+    ...args,
   });
+
+  const insights = buildSalesInsights({
+    salesResult: result,
+    groupBy: args.groupBy,
+    metrics: args.metrics,
+  });
+
+  if (!insights) {
+    return result;
+  }
+
+  return {
+    ...result,
+    insights,
+  };
 };
