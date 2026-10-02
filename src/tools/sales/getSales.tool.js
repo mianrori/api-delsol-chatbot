@@ -2,11 +2,30 @@ export const getSalesTool = {
   toolSpec: {
     name: "get_sales",
     description:
-      "Consulta ventas para un período determinado y permite agrupar por día, mes o año.",
+      "Consulta ventas para un período determinado. Permite filtrar por IDs de clientes/locales " +
+      "y rubros previamente resueltos, y agrupar por día, mes, año, cliente o rubro.",
     inputSchema: {
       json: {
         type: "object",
         properties: {
+          customerIds: {
+            type: "array",
+            items: {
+              type: "string",
+            },
+            minItems: 1,
+            description:
+              "Códigos de clientes/locales obtenidos mediante search_customers.",
+          },
+          categoryIds: {
+            type: "array",
+            items: {
+              type: "string",
+            },
+            minItems: 1,
+            description:
+              "Códigos de rubros obtenidos mediante search_categories.",
+          },
           dateFrom: {
             type: "string",
             description: "Fecha inicial en formato DD/MM/YYYY.",
@@ -19,9 +38,10 @@ export const getSalesTool = {
             type: "array",
             items: {
               type: "string",
-              enum: ["day", "month", "year"],
+              enum: ["day", "month", "year", "customer", "category"],
             },
-            description: "Dimensiones temporales para agrupar las ventas.",
+            description:
+              "Dimensiones por las cuales agrupar los resultados.",
           },
           metrics: {
             type: "array",
