@@ -1,3 +1,11 @@
+const toBoolean = (value, fallback = false) => {
+  if (value === undefined || value === null || value === "") {
+    return fallback;
+  }
+
+  return String(value).toLowerCase() === "true";
+};
+
 const config = {
   port: Number(process.env.PORT || 5400),
   env: process.env.NODE_ENV || "development",
@@ -29,6 +37,15 @@ const config = {
   awsBedrockMaxTokens: process.env.AWS_BEDROCK_MAX_TOKENS,
   awsBedrockTemperature: process.env.AWS_BEDROCK_TEMPERATURE,
   awsBearerTokenBedrock: process.env.AWS_BEARER_TOKEN_BEDROCK,
+
+  // Debug de desarrollo
+  bedrockDebug: toBoolean(process.env.BEDROCK_DEBUG, false),
+  bedrockDebugPayloads: toBoolean(
+    process.env.BEDROCK_DEBUG_PAYLOADS,
+    false,
+  ),
+  piiDebug: toBoolean(process.env.PII_DEBUG, false),
+  piiDebugShowRaw: toBoolean(process.env.PII_DEBUG_SHOW_RAW, false),
 };
 
 export default config;
