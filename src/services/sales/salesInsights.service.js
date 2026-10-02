@@ -467,6 +467,9 @@ const withAverageTicket = (rows = []) => {
 };
 
 const calculateMetricInsights = ({ rows, metric, groupBy }) => {
+  const isTimeSeries = groupBy.some((dimension) =>
+    TIME_DIMENSIONS.includes(dimension),
+  );
   const points = rows
     .map((row, index) => {
       const value = toNumber(row?.[metric]);
@@ -510,46 +513,52 @@ const calculateMetricInsights = ({ rows, metric, groupBy }) => {
 
   const consecutiveChanges = [];
 
-  for (let index = 1; index < points.length; index += 1) {
-    const previous = points[index - 1];
-    const current = points[index];
+  if (isTimeSeries) {
+    for (let index = 1; index < points.length; index += 1) {
+      const previous = points[index - 1];
+      const current = points[index];
 
-    const absoluteChange = current.value - previous.value;
+      const absoluteChange = current.value - previous.value;
 
-    const percentageChange = getPercentageChange(previous.value, current.value);
+      const percentageChange = getPercentageChange(
+        previous.value,
+        current.value,
+      );
 
-    consecutiveChanges.push({
-      from: previous.label,
-      to: current.label,
-      previousValue: previous.value,
-      currentValue: current.value,
-      absoluteChange,
-      percentageChange:
-        percentageChange === null ? null : round(percentageChange),
-    });
+      consecutiveChanges.push({
+        from: previous.label,
+        to: current.label,
+        previousValue: previous.value,
+        currentValue: current.value,
+        absoluteChange,
+        percentageChange:
+          percentageChange === null ? null : round(percentageChange),
+      });
+    }
   }
 
   const changesWithPercentage = consecutiveChanges.filter((change) =>
     isFiniteNumber(change.percentageChange),
   );
 
-  const largestIncrease =
-    changesWithPercentage
-      .filter((change) => change.percentageChange > 0)
-      .sort((a, b) => b.percentageChange - a.percentageChange)[0] ?? null;
+  const largestIncrease = isTimeSeries
+    ? changesWithPercentage
+        .filter((change) => change.percentageChange > 0)
+        .sort((a, b) => b.percentageChange - a.percentageChange)[0] ?? null
+    : null;
 
-  const largestDecrease =
-    changesWithPercentage
-      .filter((change) => change.percentageChange < 0)
-      .sort((a, b) => a.percentageChange - b.percentageChange)[0] ?? null;
+  const largestDecrease = isTimeSeries
+    ? changesWithPercentage
+        .filter((change) => change.percentageChange < 0)
+        .sort((a, b) => a.percentageChange - b.percentageChange)[0] ?? null
+    : null;
 
   const firstPoint = points[0];
   const lastPoint = points[points.length - 1];
 
-  const firstToLastPercentageChange = getPercentageChange(
-    firstPoint.value,
-    lastPoint.value,
-  );
+  const firstToLastPercentageChange = isTimeSeries
+    ? getPercentageChange(firstPoint.value, lastPoint.value)
+    : null;
 
   const anomalyDetection = calculateAnomalyDetection({
     points,
@@ -581,27 +590,27 @@ const calculateMetricInsights = ({ rows, metric, groupBy }) => {
       },
     },
 
-    periodChange: {
-      from: firstPoint.label,
-      to: lastPoint.label,
-
-      absoluteChange: lastPoint.value - firstPoint.value,
-
-      percentageChange:
-        firstToLastPercentageChange === null
-          ? null
-          : round(firstToLastPercentageChange),
-    },
+    periodChange: isTimeSeries
+      ? {
+          from: firstPoint.label,
+          to: lastPoint.label,
+          absoluteChange: lastPoint.value - firstPoint.value,
+          percentageChange:
+            firstToLastPercentageChange === null
+              ? null
+              : round(firstToLastPercentageChange),
+        }
+      : null,
 
     largestIncrease,
 
     largestDecrease,
 
-    trend: calculateLinearTrend(values),
+    trend: isTimeSeries ? calculateLinearTrend(values) : null,
 
     anomalyDetection,
 
-    consecutiveChanges,
+    consecutiveChanges: isTimeSeries ? consecutiveChanges : [],
   };
 };
 
@@ -673,7 +682,7 @@ export const buildSalesInsights = ({
     groupBy.find((dimension) => TIME_DIMENSIONS.includes(dimension)) ?? null;
 
   return {
-    version: 3,
+    version: 4,
 
     scope: {
       groupBy: [...groupBy],
