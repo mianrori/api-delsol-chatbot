@@ -117,8 +117,51 @@ const getCurrentDateParaguay = () => {
   }).format(new Date());
 };
 
+const mergeActions = (currentActions, newActions) => ({
+  ...currentActions,
+  ...newActions,
+});
+
+const extractClientActions = ({ name, result }) => {
+  if (name !== "get_sales" || !result?.export?.available) {
+    return {};
+  }
+
+  const exportId = result.export.exportId ?? null;
+
+  return {
+    salesExport: {
+      eligible: true,
+      available: Boolean(exportId),
+      exportId,
+      totalRecords: Number(
+        result.export.totalRecords ??
+          (Array.isArray(result?.data) ? result.data.length : 0),
+      ),
+      format: result.export.format ?? "xlsx",
+      fileName: result.export.fileName ?? null,
+      expiresAt: result.export.expiresAt ?? null,
+    },
+  };
+};
+
+const removeClientOnlyMetadata = ({ name, result }) => {
+  if (
+    name === "get_sales" &&
+    result &&
+    typeof result === "object" &&
+    !Array.isArray(result)
+  ) {
+    const { export: _export, ...resultForModel } = result;
+    return resultForModel;
+  }
+
+  return result;
+};
+
 const executeToolRequests = async ({ content, sessionId }) => {
   const toolResults = [];
+  let actions = {};
   const toolUses = content.filter((block) => block.toolUse);
 
   for (const block of toolUses) {
@@ -144,13 +187,23 @@ const executeToolRequests = async ({ content, sessionId }) => {
         result,
       });
 
+      actions = mergeActions(
+        actions,
+        extractClientActions({ name, result }),
+      );
+
+      const resultForModel = removeClientOnlyMetadata({
+        name,
+        result,
+      });
+
       toolResults.push({
         toolResult: {
           toolUseId,
           status: "success",
           content: [
             {
-              json: normalizeToolResult(result),
+              json: normalizeToolResult(resultForModel),
             },
           ],
         },
@@ -182,7 +235,10 @@ const executeToolRequests = async ({ content, sessionId }) => {
     }
   }
 
-  return toolResults;
+  return {
+    toolResults,
+    actions,
+  };
 };
 
 export const chatService = async ({ message, sessionId }) => {
@@ -214,6 +270,7 @@ export const chatService = async ({ message, sessionId }) => {
 
   let toolIterations = 0;
   let bedrockIteration = 0;
+  let conversationActions = {};
 
   while (true) {
     bedrockIteration += 1;
@@ -270,10 +327,15 @@ export const chatService = async ({ message, sessionId }) => {
         );
       }
 
-      const toolResults = await executeToolRequests({
+      const { toolResults, actions } = await executeToolRequests({
         content: outputMessage.content ?? [],
         sessionId,
       });
+
+      conversationActions = mergeActions(
+        conversationActions,
+        actions,
+      );
 
       if (toolResults.length === 0) {
         throw new Error(
@@ -301,7 +363,7 @@ export const chatService = async ({ message, sessionId }) => {
 
     return {
       answer,
-      actions: {},
+      actions: conversationActions,
       stopReason: response.stopReason,
       toolIterations,
       usage: response.usage ?? null,
