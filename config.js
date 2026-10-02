@@ -38,6 +38,13 @@ const config = {
   awsBedrockTemperature: process.env.AWS_BEDROCK_TEMPERATURE,
   awsBearerTokenBedrock: process.env.AWS_BEARER_TOKEN_BEDROCK,
 
+  // Redis / exportaciones
+  redisHost: process.env.REDIS_HOST,
+  redisPort: process.env.REDIS_PORT,
+  redisPassword: process.env.REDIS_PASSWORD,
+  redisDb: process.env.REDIS_DB,
+  salesExportTtlSeconds: process.env.SALES_EXPORT_TTL_SECONDS,
+
   // Debug de desarrollo
   bedrockDebug: toBoolean(process.env.BEDROCK_DEBUG, false),
   bedrockDebugPayloads: toBoolean(
