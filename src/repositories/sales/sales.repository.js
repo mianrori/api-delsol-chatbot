@@ -65,6 +65,7 @@ const GROUP_BY_CONFIG = {
       };
     },
   },
+
   month: {
     select: "TO_CHAR(FECHA, 'MM') AS MONTH",
     groupBy: "TO_CHAR(FECHA, 'MM')",
@@ -73,6 +74,7 @@ const GROUP_BY_CONFIG = {
       month: row.MONTH,
     }),
   },
+
   year: {
     select: "TO_CHAR(FECHA, 'YYYY') AS YEAR",
     groupBy: "TO_CHAR(FECHA, 'YYYY')",
@@ -81,10 +83,60 @@ const GROUP_BY_CONFIG = {
       year: row.YEAR,
     }),
   },
+
+  customer: {
+    select: `
+      COD_CLIENTE AS CUSTOMER_ID,
+      NOMBRE_CLIENTE AS CUSTOMER_NAME
+    `,
+    groupBy: `
+      COD_CLIENTE,
+      NOMBRE_CLIENTE
+    `,
+    orderBy: "NOMBRE_CLIENTE",
+    map: (row) => ({
+      customerId: String(row.CUSTOMER_ID),
+      customerName: row.CUSTOMER_NAME,
+    }),
+  },
+
+  category: {
+    select: `
+      COD_RUBRO AS CATEGORY_ID,
+      DES_RUBRO AS CATEGORY_NAME
+    `,
+    groupBy: `
+      COD_RUBRO,
+      DES_RUBRO
+    `,
+    orderBy: "DES_RUBRO",
+    map: (row) => ({
+      categoryId: String(row.CATEGORY_ID),
+      categoryName: row.CATEGORY_NAME,
+    }),
+  },
+};
+
+const createInFilter = ({ column, values, bindPrefix, binds }) => {
+  if (!Array.isArray(values) || values.length === 0) {
+    return null;
+  }
+
+  const placeholders = values.map((value, index) => {
+    const bindName = `${bindPrefix}${index}`;
+
+    binds[bindName] = String(value);
+
+    return `:${bindName}`;
+  });
+
+  return `${column} IN (${placeholders.join(", ")})`;
 };
 
 export const getSalesRepository = async ({
   connection,
+  customerIds = [],
+  categoryIds = [],
   dateFrom,
   dateTo,
   dayType,
@@ -102,13 +154,17 @@ export const getSalesRepository = async ({
   const invalidGroups = groupBy.filter((item) => !GROUP_BY_CONFIG[item]);
 
   if (invalidGroups.length > 0) {
-    throw new Error(`Agrupaciones no soportadas: ${invalidGroups.join(", ")}`);
+    throw new Error(
+      `Agrupaciones no soportadas: ${invalidGroups.join(", ")}`,
+    );
   }
 
   const invalidMetrics = metrics.filter((item) => !METRIC_CONFIG[item]);
 
   if (invalidMetrics.length > 0) {
-    throw new Error(`Métricas no soportadas: ${invalidMetrics.join(", ")}`);
+    throw new Error(
+      `Métricas no soportadas: ${invalidMetrics.join(", ")}`,
+    );
   }
 
   if (metrics.length === 0) {
@@ -131,6 +187,28 @@ export const getSalesRepository = async ({
 
   if (dayType === "weekday") {
     filters.push("(TRUNC(FECHA) - TRUNC(FECHA, 'IW')) BETWEEN 0 AND 4");
+  }
+
+  const customerFilter = createInFilter({
+    column: "COD_CLIENTE",
+    values: customerIds,
+    bindPrefix: "customerId",
+    binds,
+  });
+
+  if (customerFilter) {
+    filters.push(customerFilter);
+  }
+
+  const categoryFilter = createInFilter({
+    column: "COD_RUBRO",
+    values: categoryIds,
+    bindPrefix: "categoryId",
+    binds,
+  });
+
+  if (categoryFilter) {
+    filters.push(categoryFilter);
   }
 
   const selectFields = [];
