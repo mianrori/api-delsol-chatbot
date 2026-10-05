@@ -15,17 +15,48 @@ const METRIC_CONFIG = {
   },
 };
 
+const normalizeCurrencyKey = (value) =>
+  String(value ?? "")
+    .trim()
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+const resolveCurrencySymbol = ({ description, abbreviation }) => {
+  const normalizedDescription = normalizeCurrencyKey(description);
+  const normalizedAbbreviation = normalizeCurrencyKey(abbreviation);
+
+  if (
+    normalizedDescription.includes("GUARANI") ||
+    normalizedAbbreviation === "PYG" ||
+    normalizedAbbreviation.includes("GUARANI")
+  ) {
+    return "₲";
+  }
+
+  return null;
+};
+
 const CURRENCY_CONFIG = {
   select: `
     MAX(DES_MONEDA) AS CURRENCY_DESCRIPTION,
     MAX(SIGLAS_MONEDA) AS CURRENCY_ABBREVIATION
   `,
-  map: (row) => ({
-    currency: {
-      description: row.CURRENCY_DESCRIPTION ?? null,
-      abbreviation: row.CURRENCY_ABBREVIATION ?? null,
-    },
-  }),
+  map: (row) => {
+    const description = row.CURRENCY_DESCRIPTION ?? null;
+    const abbreviation = row.CURRENCY_ABBREVIATION ?? null;
+
+    return {
+      currency: {
+        description,
+        abbreviation,
+        symbol: resolveCurrencySymbol({
+          description,
+          abbreviation,
+        }),
+      },
+    };
+  },
 };
 
 const VALID_DAY_TYPES = ["weekend", "weekday"];
@@ -282,6 +313,7 @@ export const getSalesRepository = async ({
         currency: {
           description: null,
           abbreviation: null,
+          symbol: null,
         },
         totalAmount: 0,
         totalInvoices: 0,
