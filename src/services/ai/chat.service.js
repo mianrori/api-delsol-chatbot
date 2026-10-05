@@ -65,8 +65,18 @@ Cuando get_sales incluya resultSet.truncated=true:
 - nunca armes rankings, Top N o conclusiones sobre máximos/mínimos globales usando solamente la muestra;
 - nunca afirmes que "la mayoría" del conjunto cumple una condición utilizando solamente la muestra;
 - nunca afirmes concentración, distribución global o participación relativa utilizando solamente la muestra;
-- puedes describir literalmente los valores visibles de una fila concreta, pero no extrapolarlos al conjunto completo;
-- utiliza únicamente insights explícitos si necesitas destacar estadísticas globales.
+- puedes describir literalmente los valores visibles de una fila concreta, pero no extrapolarlos al conjunto completo.
+
+Si resultSet.analysisPolicy="NO_ANALYSIS":
+- NO agregues secciones "Análisis", "Observación", "Conclusión" ni equivalentes;
+- NO calcules porcentajes, participaciones, sumas, promedios, comparaciones ni tendencias a partir de las filas de muestra;
+- NO identifiques líderes, mayores, menores, concentración, distribución ni comportamiento global;
+- limita la respuesta a presentar la muestra y señalar que el conjunto completo está disponible para exportación.
+
+Si resultSet.analysisPolicy="EXPLICIT_INSIGHTS_ONLY":
+- puedes agregar análisis únicamente a partir de valores presentes explícitamente en insights;
+- nunca derives análisis adicional desde las filas truncadas;
+- distingue claramente la muestra de datos de los insights globales calculados por el sistema.
 `.trim();
 
 const normalizeHistory = (history = []) => {
@@ -179,8 +189,18 @@ const removeClientOnlyMetadata = ({ name, result }) => {
       Array.isArray(resultForModel.data) &&
       resultForModel.data.length > MAX_MODEL_ROWS_WITH_EXPORT
     ) {
+      const hasTemporalInsights = Boolean(
+        resultForModel.insights?.scope?.timeDimension,
+      );
+
+      const {
+        insights,
+        ...resultWithoutInsights
+      } = resultForModel;
+
       return {
-        ...resultForModel,
+        ...resultWithoutInsights,
+        ...(hasTemporalInsights ? { insights } : {}),
         data: resultForModel.data.slice(0, MAX_MODEL_ROWS_WITH_EXPORT),
         resultSet: {
           truncated: true,
@@ -190,6 +210,9 @@ const removeClientOnlyMetadata = ({ name, result }) => {
           returnedRecords: MAX_MODEL_ROWS_WITH_EXPORT,
           sampleType: "FIRST_ROWS_IN_SOURCE_ORDER",
           isRanking: false,
+          analysisPolicy: hasTemporalInsights
+            ? "EXPLICIT_INSIGHTS_ONLY"
+            : "NO_ANALYSIS",
           fullResultAvailableInExport: true,
         },
       };
