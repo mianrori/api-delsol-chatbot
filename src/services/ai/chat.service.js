@@ -295,12 +295,23 @@ const executeToolRequests = async ({ content, sessionId }) => {
         },
       });
     } catch (error) {
+      const protectedErrorMessage = protectPiiText(
+        sessionId,
+        error?.message || "Error ejecutando la herramienta.",
+      );
+
       logToolResult({
         name,
-        error,
+        error: {
+          ...error,
+          message: protectedErrorMessage,
+        },
       });
 
-      console.error(`Error ejecutando tool "${name}":`, error);
+      console.error(
+        `Error ejecutando tool "${name}":`,
+        protectedErrorMessage,
+      );
 
       toolResults.push({
         toolResult: {
@@ -311,10 +322,7 @@ const executeToolRequests = async ({ content, sessionId }) => {
               json: {
                 success: false,
                 error: "TOOL_EXECUTION_ERROR",
-                message: protectPiiText(
-                  sessionId,
-                  error?.message || "Error ejecutando la herramienta.",
-                ),
+                message: protectedErrorMessage,
               },
             },
           ],
