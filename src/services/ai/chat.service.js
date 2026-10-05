@@ -18,6 +18,12 @@ import {
   logToolCall,
   logToolResult,
 } from "../../utils/debug.logger.js";
+import {
+  protectPiiDeep,
+  protectPiiText,
+  restorePiiDeep,
+  restorePiiText,
+} from "./pii.service.js";
 
 const bedrockClient = new BedrockRuntimeClient({
   region: config.awsRegion || "us-east-1",
@@ -245,17 +251,14 @@ const executeToolRequests = async ({ content, sessionId }) => {
     });
 
     try {
+      const restoredInput = restorePiiDeep(sessionId, input);
+
       const result = await executeTool({
         name,
-        arguments: input,
+        arguments: restoredInput,
         context: {
           sessionId,
         },
-      });
-
-      logToolResult({
-        name,
-        result,
       });
 
       actions = mergeActions(
@@ -268,13 +271,25 @@ const executeToolRequests = async ({ content, sessionId }) => {
         result,
       });
 
+      const protectedResultForModel = protectPiiDeep(
+        sessionId,
+        resultForModel,
+        null,
+        [name],
+      );
+
+      logToolResult({
+        name,
+        result: protectedResultForModel,
+      });
+
       toolResults.push({
         toolResult: {
           toolUseId,
           status: "success",
           content: [
             {
-              json: normalizeToolResult(resultForModel),
+              json: normalizeToolResult(protectedResultForModel),
             },
           ],
         },
@@ -296,8 +311,10 @@ const executeToolRequests = async ({ content, sessionId }) => {
               json: {
                 success: false,
                 error: "TOOL_EXECUTION_ERROR",
-                message:
+                message: protectPiiText(
+                  sessionId,
                   error?.message || "Error ejecutando la herramienta.",
+                ),
               },
             },
           ],
@@ -323,13 +340,18 @@ export const chatService = async ({ message, sessionId }) => {
 
   const history = getConversation(sessionId) ?? [];
 
+  const protectedHistory = protectPiiDeep(
+    sessionId,
+    normalizeHistory(history),
+  );
+
   const messages = [
-    ...normalizeHistory(history),
+    ...protectedHistory,
     {
       role: "user",
       content: [
         {
-          text: message.trim(),
+          text: protectPiiText(sessionId, message.trim()),
         },
       ],
     },
@@ -387,7 +409,12 @@ export const chatService = async ({ message, sessionId }) => {
       throw new Error("Amazon Bedrock no devolvió un mensaje.");
     }
 
-    messages.push(outputMessage);
+    const protectedOutputMessage = protectPiiDeep(
+      sessionId,
+      outputMessage,
+    );
+
+    messages.push(protectedOutputMessage);
 
     if (response.stopReason === "tool_use") {
       toolIterations += 1;
@@ -399,7 +426,7 @@ export const chatService = async ({ message, sessionId }) => {
       }
 
       const { toolResults, actions } = await executeToolRequests({
-        content: outputMessage.content ?? [],
+        content: protectedOutputMessage.content ?? [],
         sessionId,
       });
 
@@ -422,7 +449,10 @@ export const chatService = async ({ message, sessionId }) => {
       continue;
     }
 
-    const answer = extractText(outputMessage);
+    const answer = restorePiiText(
+      sessionId,
+      extractText(protectedOutputMessage),
+    );
 
     if (!answer) {
       throw new Error(
