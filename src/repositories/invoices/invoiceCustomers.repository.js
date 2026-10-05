@@ -27,6 +27,8 @@ const normalizeOracleText = (column) => `
 export const searchInvoiceCustomersRepository = async ({
   connection,
   query,
+  dateFrom,
+  dateTo,
   limit = 10,
   minSimilarity = Number(config.minSimilarity || 70),
 }) => {
@@ -34,6 +36,28 @@ export const searchInvoiceCustomersRepository = async ({
 
   if (!queryNormalized) {
     return [];
+  }
+
+  const binds = {
+    queryNormalized,
+    minSimilarity: Number(minSimilarity),
+    limit: Number(limit),
+  };
+
+  const baseWhere = ["NVL(USER_CAN_CONSULT, 'S') <> 'N'"];
+
+  if (dateFrom) {
+    binds.dateFrom = dateFrom;
+    baseWhere.push(
+      "FECHA_EMISION >= TO_DATE(:dateFrom, 'DD/MM/YYYY')",
+    );
+  }
+
+  if (dateTo) {
+    binds.dateTo = dateTo;
+    baseWhere.push(
+      "FECHA_EMISION < TO_DATE(:dateTo, 'DD/MM/YYYY') + 1",
+    );
   }
 
   const customerIdSql = normalizeOracleText("COD_CLIENTE");
@@ -100,7 +124,7 @@ export const searchInvoiceCustomersRepository = async ({
             RUC,
             MATRICULA
           FROM VW_BOT_FACTURAS
-          WHERE NVL(USER_CAN_CONSULT, 'S') <> 'N'
+          WHERE ${baseWhere.join("\n            AND ")}
         ) base
       ) ranked
       WHERE
@@ -115,17 +139,9 @@ export const searchInvoiceCustomersRepository = async ({
     WHERE ROWNUM <= :limit
   `;
 
-  const result = await connection.execute(
-    sql,
-    {
-      queryNormalized,
-      minSimilarity: Number(minSimilarity),
-      limit: Number(limit),
-    },
-    {
-      outFormat: 4002,
-    },
-  );
+  const result = await connection.execute(sql, binds, {
+    outFormat: 4002,
+  });
 
   return (result.rows ?? []).map((row) => ({
     customerId: row.COD_CLIENTE,
