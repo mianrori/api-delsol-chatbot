@@ -445,12 +445,17 @@ export const chatService = async ({ message, sessionId }) => {
       throw new Error("Amazon Bedrock no devolvió un mensaje.");
     }
 
-    const protectedOutputMessage = protectPiiDeep(
-      sessionId,
-      outputMessage,
-    );
+    /*
+     * El modelo solo recibe mensajes y toolResults previamente
+     * pseudonimizados, por lo que su salida ya opera sobre tokens [PII_*].
+     *
+     * No volvemos a ejecutar protectPiiDeep sobre texto generado por el
+     * asistente: hacerlo podría confundir lenguaje natural como
+     * "cliente seleccionado" con una entidad sensible real.
+     */
+    const safeOutputMessage = outputMessage;
 
-    messages.push(protectedOutputMessage);
+    messages.push(safeOutputMessage);
 
     if (response.stopReason === "tool_use") {
       toolIterations += 1;
@@ -462,7 +467,7 @@ export const chatService = async ({ message, sessionId }) => {
       }
 
       const { toolResults, actions } = await executeToolRequests({
-        content: protectedOutputMessage.content ?? [],
+        content: safeOutputMessage.content ?? [],
         sessionId,
       });
 
@@ -486,7 +491,7 @@ export const chatService = async ({ message, sessionId }) => {
     }
 
     const safeAssistantText = sanitizeAssistantTextForUser(
-      extractText(protectedOutputMessage),
+      extractText(safeOutputMessage),
     );
 
     const answer = restorePiiText(
