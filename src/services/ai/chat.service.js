@@ -35,23 +35,40 @@ const MAX_MODEL_ROWS_WITH_EXPORT = 12;
 const RUNTIME_CAPABILITIES_PROMPT = `
 ## Capacidades disponibles en este servicio
 
-En esta etapa de migración, las únicas herramientas habilitadas son:
+En esta etapa de migración, las herramientas habilitadas son:
 - search_customers
 - search_categories
 - get_sales
+- search_invoice_customers
+- search_invoice_concepts
+- get_invoices
 
 Aunque el prompt general pueda contener reglas para otros dominios del ERP, no afirmes que puedes consultar esos dominios ni intentes utilizar herramientas que no estén presentes en toolConfig.
 
 Para esta etapa:
 - puedes consultar ventas;
 - puedes resolver clientes, marcas o locales;
-- puedes resolver rubros comerciales.
+- puedes resolver rubros comerciales;
+- puedes consultar facturas emitidas;
+- puedes resolver clientes de facturación;
+- puedes resolver conceptos de facturación.
 
 Si el usuario solicita información que requiere una herramienta todavía no habilitada en este servicio, indícale brevemente que esa consulta aún no está disponible en esta etapa de migración.
 
 Para marcas o nombres propios comerciales como Nike, Adidas, Zara o Cines, utiliza search_customers.
 Para rubros genéricos como librería, gastronomía, indumentaria o electrónica, utiliza search_categories.
 Si existe duda entre marca/local y rubro, intenta primero search_customers.
+
+Para consultas de facturas:
+- usa search_invoice_customers cuando el usuario mencione un cliente de facturación por nombre, razón social, RUC, matrícula o texto identificador y todavía no tengas un customerId resuelto;
+- usa search_invoice_concepts cuando el usuario mencione un concepto de factura por texto y todavía no tengas un conceptId resuelto;
+- usa get_invoices para obtener detalle o resumen de facturas;
+- si el usuario solicita importes agregados o cantidad de facturas, prefiere mode="summary";
+- si solicita facturas específicas, conceptos, vencimientos, matrícula, contrato asociado o detalle de una factura, prefiere mode="detail";
+- nunca inventes customerIds, conceptIds, números de factura, matrículas ni referencias de contrato;
+- no expongas identificadores internos en la respuesta comercial;
+- si un concepto o cliente es ambiguo, presenta opciones y espera la selección del usuario;
+- las descripciones de conceptos y demás datos sensibles pueden llegar como tokens [PII_*]; consérvalos exactamente.
 
 Si get_sales devuelve un resultado sin registros y la moneda no está disponible, informa simplemente que no se encontraron ventas para el período solicitado. No presentes una moneda desconocida como un problema de datos.
 
