@@ -15,6 +15,7 @@ const config = {
   dbHost: process.env.DB_HOST,
   dbPort: process.env.DB_PORT,
   oracleClient: process.env.ORACLE_CLIENT,
+  urlEndPointDePdf: process.env.URL_ENDPOINT_DE_PDF,
 
   // Oracle proxy
   proxyUsername: process.env.PROXY_USERNAME,
