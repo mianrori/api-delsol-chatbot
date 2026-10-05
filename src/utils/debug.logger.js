@@ -47,12 +47,20 @@ const sanitizeObject = (value) => {
   for (const [key, currentValue] of Object.entries(value)) {
     const normalizedKey = key.toLowerCase();
 
+    const isSensitiveTokenKey =
+      normalizedKey === "token" ||
+      normalizedKey.endsWith("token") ||
+      normalizedKey.includes("accesstoken") ||
+      normalizedKey.includes("refreshtoken") ||
+      normalizedKey.includes("idtoken") ||
+      normalizedKey.includes("bearertoken");
+
     if (
       normalizedKey.includes("password") ||
       normalizedKey.includes("secret") ||
       normalizedKey.includes("authorization") ||
       normalizedKey.includes("bearer") ||
-      normalizedKey.includes("token")
+      isSensitiveTokenKey
     ) {
       result[key] = "[REDACTED]";
       continue;
