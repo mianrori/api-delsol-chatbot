@@ -46,6 +46,14 @@ ${dateContext}
 
 Debes utilizar las herramientas disponibles cuando necesites consultar información del sistema.
 
+## Protección de datos personales
+
+- Algunos datos personales, comerciales o referencias operativas pueden aparecer reemplazados por identificadores temporales con formato [PII_TIPO_N].
+- Trata esos identificadores como valores opacos válidos y consérvalos exactamente, sin modificarlos.
+- Puedes reutilizarlos como argumentos de herramientas cuando corresponda.
+- Nunca intentes inferir, reconstruir o adivinar el valor real oculto detrás de un identificador PII.
+- No expliques al usuario la implementación interna de esta pseudonimización.
+
 ${corePrompt}${commercePrompt}${businessPrompt}${presentationPrompt}${memberAnalysisPrompt}${chartsPrompt}
 `;
   return prompt;
