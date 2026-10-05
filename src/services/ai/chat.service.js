@@ -89,6 +89,13 @@ Si resultSet.analysisPolicy="EXPLICIT_INSIGHTS_ONLY":
 - puedes agregar análisis únicamente a partir de valores presentes explícitamente en insights;
 - nunca derives análisis adicional desde las filas truncadas;
 - distingue claramente la muestra de datos de los insights globales calculados por el sistema.
+
+## Presentación de identificadores protegidos
+- Los tokens [PII_*] son exclusivamente internos y nunca deben mostrarse literalmente al usuario.
+- Nunca presentes códigos, IDs ni identificadores internos de clientes o rubros en respuestas comerciales.
+- Para clientes/locales, presenta únicamente el nombre comercial cuando esté disponible.
+- Nunca escribas expresiones como "código de cliente", "ID de cliente", "customerId", "código de rubro" o equivalentes salvo que el usuario solicite explícitamente información técnica.
+- Un identificador interno puede reutilizarse silenciosamente como argumento de una herramienta, pero no debe formar parte del texto final.
 `.trim();
 
 const normalizeHistory = (history = []) => {
@@ -121,6 +128,27 @@ const extractText = (message) => {
     .filter((block) => typeof block.text === "string")
     .map((block) => block.text)
     .join("\n")
+    .trim();
+};
+
+const sanitizeAssistantTextForUser = (text) => {
+  if (typeof text !== "string") {
+    return text;
+  }
+
+  return text
+    .replace(
+      /\s*\((?:c[oó]digo\s+de\s+cliente|id\s+de\s+cliente|customer\s*id)\s*:\s*\[PII_CUSTOMER_ID_\d+\]\)/gi,
+      "",
+    )
+    .replace(
+      /(?:c[oó]digo\s+de\s+cliente|id\s+de\s+cliente|customer\s*id)\s*:?\s*\[PII_CUSTOMER_ID_\d+\]/gi,
+      "",
+    )
+    .replace(
+      /\s*\((?:c[oó]digo\s+de\s+rubro|id\s+de\s+rubro|category\s*id)\s*:\s*\[PII_[A-Z_]*CATEGORY_ID_\d+\]\)/gi,
+      "",
+    )
     .trim();
 };
 
@@ -457,9 +485,13 @@ export const chatService = async ({ message, sessionId }) => {
       continue;
     }
 
+    const safeAssistantText = sanitizeAssistantTextForUser(
+      extractText(protectedOutputMessage),
+    );
+
     const answer = restorePiiText(
       sessionId,
-      extractText(protectedOutputMessage),
+      safeAssistantText,
     );
 
     if (!answer) {
