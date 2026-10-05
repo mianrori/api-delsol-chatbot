@@ -94,7 +94,6 @@ export const searchInvoiceCustomersRepository = async ({
    */
   const strongBinds = {
     queryNormalized,
-    limit: Number(limit),
   };
 
   const strongWhere = buildBaseFilter({
