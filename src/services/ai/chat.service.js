@@ -49,6 +49,12 @@ Si existe duda entre marca/local y rubro, intenta primero search_customers.
 
 Si get_sales devuelve un resultado sin registros y la moneda no está disponible, informa simplemente que no se encontraron ventas para el período solicitado. No presentes una moneda desconocida como un problema de datos.
 
+Para importes monetarios:
+- respeta siempre currency.symbol y currency.symbolPosition cuando estén presentes;
+- si currency.symbolPosition="prefix", coloca el símbolo antes del importe y separado por un espacio;
+- para Guaraníes, presenta siempre el formato "₲ 329.378.000", nunca "329.378.000 ₲";
+- conserva el formato numérico paraguayo con punto como separador de miles y coma como separador decimal.
+
 Cuando get_sales incluya resultSet.truncated=true:
 - el conjunto completo contiene más registros que los enviados al modelo;
 - resultSet.totalRecords indica la cantidad total real;
