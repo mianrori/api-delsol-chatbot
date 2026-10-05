@@ -268,8 +268,19 @@ const protectKnownTextPatterns = (sessionId, text) => {
       `${prefix}${protectPiiValue(sessionId, "BUSINESS_ENTITY", value.trim())}`,
   );
 
+  /*
+   * Consultas analíticas del tipo:
+   *
+   *   "Ventas de Nike de enero a abril de 2023"
+   *   "Ventas de ALMACEN DE JUGUETES en 2023"
+   *   "Facturación de Nike por mes"
+   *
+   * Protegemos únicamente la entidad comercial. Los calificadores temporales
+   * y de agrupación deben permanecer visibles para que el modelo pueda
+   * construir correctamente dateFrom/dateTo/groupBy.
+   */
   protectedText = protectedText.replace(
-    /\b((?:ventas|facturaci[oó]n|compras)\s+de\s+)([A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9&.'’ -]{2,80})(?=\s*(?:[,.!?;:]|$))/gi,
+    /\b((?:ventas|facturaci[oó]n|compras)\s+de\s+)([A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9&.'’ -]{2,80}?)(?=\s+(?:(?:de|desde|durante|en)\s+(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre|20\d{2}|hoy|ayer|este|esta)|del\s+(?:20\d{2}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4})|por\s+(?:d[ií]a|mes|a[nñ]o|semana|local|rubro))|\s*(?:[,.!?;:]|$))/gi,
     (_match, prefix, value) =>
       `${prefix}${protectPiiValue(sessionId, "BUSINESS_ENTITY", value.trim())}`,
   );
