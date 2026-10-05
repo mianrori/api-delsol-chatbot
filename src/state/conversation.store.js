@@ -1,3 +1,5 @@
+import { clearPiiSession } from "./pii.store.js";
+
 const conversations = new Map();
 
 export const getConversation = (sessionId) => {
@@ -10,4 +12,5 @@ export const setConversation = (sessionId, messages) => {
 
 export const clearConversation = (sessionId) => {
   conversations.delete(sessionId);
+  clearPiiSession(sessionId);
 };
