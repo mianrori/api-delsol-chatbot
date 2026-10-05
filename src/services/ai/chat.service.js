@@ -64,6 +64,8 @@ Si existe duda entre marca/local y rubro dentro de una consulta de ventas, inten
 
 Para consultas de facturas:
 - usa search_invoice_customers cuando el usuario mencione un cliente de facturación por nombre, razón social, RUC, matrícula o texto identificador y todavía no tengas un customerId resuelto;
+- si la consulta de facturas incluye un período explícito, pasa ese mismo dateFrom/dateTo también a search_invoice_customers; la resolución del cliente debe hacerse dentro del mismo período que luego utilizará get_invoices;
+- no resuelvas globalmente un cliente de facturación y luego filtres otro período si el usuario ya proporcionó fechas;
 - usa search_invoice_concepts cuando el usuario mencione un concepto de factura por texto y todavía no tengas un conceptId resuelto;
 - usa get_invoices para obtener detalle o resumen de facturas;
 - si el usuario solicita importes agregados o cantidad de facturas, prefiere mode="summary";
