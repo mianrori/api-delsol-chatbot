@@ -1,6 +1,9 @@
 import { resolveCustomer } from "../customers/customer.resolver.js";
 import { resolveCategory } from "../categories/category.resolver.js";
 import { getSales } from "../sales/sales.service.js";
+import { searchInvoiceConcepts } from "../invoices/searchInvoiceConcepts.service.js";
+import { searchInvoiceCustomers } from "../invoices/searchInvoiceCustomers.service.js";
+import { getInvoices } from "../invoices/invoices.service.js";
 import { withOracleProxySession } from "../sessions/oracleSession.service.js";
 
 const withAuthorizedOracle = async (sessionId, callback) => {
@@ -42,6 +45,27 @@ const toolHandlers = {
       context.sessionId,
       ({ connection, username }) =>
         getSales(args, connection, username),
+    );
+  },
+
+  search_invoice_concepts: async (args, context) => {
+    return withAuthorizedOracle(
+      context.sessionId,
+      ({ connection }) => searchInvoiceConcepts(args, connection),
+    );
+  },
+
+  search_invoice_customers: async (args, context) => {
+    return withAuthorizedOracle(
+      context.sessionId,
+      ({ connection }) => searchInvoiceCustomers(args, connection),
+    );
+  },
+
+  get_invoices: async (args, context) => {
+    return withAuthorizedOracle(
+      context.sessionId,
+      ({ connection }) => getInvoices(args, connection),
     );
   },
 };
