@@ -54,6 +54,12 @@ const CURRENCY_CONFIG = {
           description,
           abbreviation,
         }),
+        symbolPosition: resolveCurrencySymbol({
+          description,
+          abbreviation,
+        })
+          ? "prefix"
+          : null,
       },
     };
   },
@@ -314,6 +320,7 @@ export const getSalesRepository = async ({
           description: null,
           abbreviation: null,
           symbol: null,
+          symbolPosition: null,
         },
         totalAmount: 0,
         totalInvoices: 0,
