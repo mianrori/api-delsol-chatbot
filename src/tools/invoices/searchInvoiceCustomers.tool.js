@@ -21,6 +21,18 @@ export const searchInvoiceCustomersTool = {
             description:
               "Nombre, razón social, RUC, matrícula o texto identificador proporcionado por el usuario.",
           },
+
+          dateFrom: {
+            type: "string",
+            description:
+              "Fecha inicial opcional en formato DD/MM/YYYY. Si la consulta del usuario incluye un período, debe utilizarse para resolver únicamente clientes con facturas en ese período.",
+          },
+
+          dateTo: {
+            type: "string",
+            description:
+              "Fecha final opcional en formato DD/MM/YYYY. Si la consulta del usuario incluye un período, debe utilizarse para resolver únicamente clientes con facturas en ese período.",
+          },
         },
 
         required: ["query"],
