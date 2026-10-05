@@ -68,6 +68,8 @@ const FIELD_TYPES = new Map([
   ["invoicenumber", "INVOICE_NUMBER"],
   ["transactionnumber", "TRANSACTION_NUMBER"],
   ["conceptdescription", "CONCEPT_DESCRIPTION"],
+  ["conceptid", "CONCEPT_ID"],
+  ["pdfurl", "PDF_URL"],
 
   // Promociones / campañas
   ["promotionid", "PROMOTION_ID"],
@@ -281,6 +283,21 @@ const protectKnownTextPatterns = (sessionId, text) => {
    */
   protectedText = protectedText.replace(
     /\b((?:ventas|facturaci[oó]n|compras)\s+de\s+)([A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9&.'’ -]{2,80}?)(?=\s+(?:(?:de|desde|durante|en)\s+(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre|20\d{2}|hoy|ayer|este|esta)|del\s+(?:20\d{2}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4})|por\s+(?:d[ií]a|mes|a[nñ]o|semana|local|rubro))|\s*(?:[,.!?;:]|$))/gi,
+    (_match, prefix, value) =>
+      `${prefix}${protectPiiValue(sessionId, "BUSINESS_ENTITY", value.trim())}`,
+  );
+
+
+  /*
+   * Consultas de facturas del tipo:
+   *
+   *   "Facturas de Nike de enero a abril de 2023"
+   *   "Mostrame las facturas de ALMACEN DE JUGUETES en 2023"
+   *
+   * No tratamos nombres de meses ni años como entidades comerciales.
+   */
+  protectedText = protectedText.replace(
+    /\b((?:facturas?|comprobantes?)\s+de\s+)(?!(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre|20\d{2})\b)([A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9&.'’ -]{2,80}?)(?=\s+(?:(?:de|desde|durante|en)\s+(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre|20\d{2}|hoy|ayer|este|esta)|del\s+(?:20\d{2}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4})|por\s+(?:d[ií]a|mes|a[nñ]o))|\s*(?:[,.!?;:]|$))/gi,
     (_match, prefix, value) =>
       `${prefix}${protectPiiValue(sessionId, "BUSINESS_ENTITY", value.trim())}`,
   );
