@@ -68,6 +68,9 @@ Para consultas de facturas:
 - nunca inventes customerIds, conceptIds, números de factura, matrículas ni referencias de contrato;
 - no expongas identificadores internos en la respuesta comercial;
 - si un concepto o cliente es ambiguo, presenta opciones y espera la selección del usuario;
+- en una ambigüedad de clientes de facturación muestra únicamente columnas comerciales útiles como "Opción", "Cliente" y "Razón social";
+- no muestres customerId, código de cliente ni ID de cliente en la tabla de opciones;
+- si varias opciones tienen el mismo nombre comercial, conserva las filas distintas pero no expongas identificadores internos;
 - las descripciones de conceptos y demás datos sensibles pueden llegar como tokens [PII_*]; consérvalos exactamente.
 
 Si get_sales devuelve un resultado sin registros y la moneda no está disponible, informa simplemente que no se encontraron ventas para el período solicitado. No presentes una moneda desconocida como un problema de datos.
@@ -148,12 +151,106 @@ const extractText = (message) => {
     .trim();
 };
 
+const removeMarkdownColumns = (text, forbiddenHeaders = []) => {
+  const lines = String(text ?? "").split("\n");
+  const result = [];
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const headerLine = lines[index];
+    const separatorLine = lines[index + 1];
+
+    const isTableHeader =
+      headerLine.includes("|") &&
+      typeof separatorLine === "string" &&
+      /^\s*\|?(?:\s*:?-{3,}:?\s*\|)+\s*:?-{3,}:?\s*\|?\s*$/.test(
+        separatorLine,
+      );
+
+    if (!isTableHeader) {
+      result.push(headerLine);
+      continue;
+    }
+
+    const parseCells = (line) =>
+      line
+        .trim()
+        .replace(/^\|/, "")
+        .replace(/\|$/, "")
+        .split("|")
+        .map((cell) => cell.trim());
+
+    const headers = parseCells(headerLine);
+    const forbiddenIndexes = headers
+      .map((header, columnIndex) => ({
+        columnIndex,
+        normalized: header
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^a-z0-9]/g, ""),
+      }))
+      .filter(({ normalized }) =>
+        forbiddenHeaders.some((forbidden) =>
+          normalized.includes(forbidden),
+        ),
+      )
+      .map(({ columnIndex }) => columnIndex);
+
+    if (forbiddenIndexes.length === 0) {
+      result.push(headerLine);
+      continue;
+    }
+
+    const keepIndexes = headers
+      .map((_header, columnIndex) => columnIndex)
+      .filter((columnIndex) => !forbiddenIndexes.includes(columnIndex));
+
+    const formatRow = (line) => {
+      const cells = parseCells(line);
+      return `| ${keepIndexes
+        .map((columnIndex) => cells[columnIndex] ?? "")
+        .join(" | ")} |`;
+    };
+
+    result.push(formatRow(headerLine));
+
+    const separatorCells = parseCells(separatorLine);
+    result.push(
+      `| ${keepIndexes
+        .map((columnIndex) => separatorCells[columnIndex] ?? "---")
+        .join(" | ")} |`,
+    );
+
+    index += 1;
+
+    while (
+      index + 1 < lines.length &&
+      lines[index + 1].includes("|") &&
+      lines[index + 1].trim() !== ""
+    ) {
+      result.push(formatRow(lines[index + 1]));
+      index += 1;
+    }
+  }
+
+  return result.join("\n");
+};
+
 const sanitizeAssistantTextForUser = (text) => {
   if (typeof text !== "string") {
     return text;
   }
 
-  return text
+  const withoutInternalColumns = removeMarkdownColumns(text, [
+    "codigodecliente",
+    "iddecliente",
+    "customerid",
+    "codigoderubro",
+    "idderubro",
+    "categoryid",
+  ]);
+
+  return withoutInternalColumns
     .replace(
       /\s*\((?:c[oó]digo\s+de\s+cliente|id\s+de\s+cliente|customer\s*id)\s*:\s*\[PII_CUSTOMER_ID_\d+\]\)/gi,
       "",
