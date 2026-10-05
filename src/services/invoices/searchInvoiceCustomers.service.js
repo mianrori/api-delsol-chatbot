@@ -31,7 +31,10 @@ const deduplicateCustomers = (results = []) => {
   return [...byCustomerId.values()];
 };
 
-export const searchInvoiceCustomers = async ({ query }, connection) => {
+export const searchInvoiceCustomers = async (
+  { query, dateFrom, dateTo },
+  connection,
+) => {
   /*
    * Pedimos más filas que las que mostraremos porque una misma identidad
    * puede aparecer varias veces en VW_BOT_FACTURAS. Luego deduplicamos
@@ -40,6 +43,8 @@ export const searchInvoiceCustomers = async ({ query }, connection) => {
   const rawResults = await searchInvoiceCustomersRepository({
     connection,
     query,
+    dateFrom,
+    dateTo,
     limit: 50,
   });
 
