@@ -70,7 +70,6 @@ const FIELD_TYPES = new Map([
   ["conceptdescription", "CONCEPT_DESCRIPTION"],
   ["conceptid", "CONCEPT_ID"],
   ["conceptcode", "CONCEPT_ID"],
-  ["description", "CONCEPT_DESCRIPTION"],
   ["pdfurl", "PDF_URL"],
 
   // Promociones / campañas
