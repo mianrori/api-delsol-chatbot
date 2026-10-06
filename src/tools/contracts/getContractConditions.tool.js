@@ -37,8 +37,9 @@ export const getContractConditionsTool = {
           },
 
           contractNumber: {
-            type: "integer",
-            description: "Número exacto del contrato previamente resuelto.",
+            type: "string",
+            description:
+              "Número exacto del contrato previamente resuelto. Puede recibirse como identificador protegido del sistema.",
           },
 
           includeConcepts: {
