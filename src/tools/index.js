@@ -4,6 +4,7 @@ import { getSalesTool } from "./sales/getSales.tool.js";
 import { searchInvoiceConceptsTool } from "./invoices/searchInvoiceConcepts.tool.js";
 import { searchInvoiceCustomersTool } from "./invoices/searchInvoiceCustomers.tool.js";
 import { getInvoicesTool } from "./invoices/getInvoices.tool.js";
+import { getContractConditionsTool } from "./contracts/getContractConditions.tool.js";
 
 export const tools = [
   searchCustomersTool,
@@ -12,4 +13,5 @@ export const tools = [
   searchInvoiceConceptsTool,
   searchInvoiceCustomersTool,
   getInvoicesTool,
+  getContractConditionsTool,
 ];
