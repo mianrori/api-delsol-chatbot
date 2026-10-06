@@ -69,6 +69,8 @@ const FIELD_TYPES = new Map([
   ["transactionnumber", "TRANSACTION_NUMBER"],
   ["conceptdescription", "CONCEPT_DESCRIPTION"],
   ["conceptid", "CONCEPT_ID"],
+  ["conceptcode", "CONCEPT_ID"],
+  ["description", "CONCEPT_DESCRIPTION"],
   ["pdfurl", "PDF_URL"],
 
   // Promociones / campañas
