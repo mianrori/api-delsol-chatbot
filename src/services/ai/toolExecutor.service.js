@@ -4,6 +4,7 @@ import { getSales } from "../sales/sales.service.js";
 import { searchInvoiceConcepts } from "../invoices/searchInvoiceConcepts.service.js";
 import { searchInvoiceCustomers } from "../invoices/searchInvoiceCustomers.service.js";
 import { getInvoices } from "../invoices/invoices.service.js";
+import { getContractConditions } from "../contracts/contractConditions.service.js";
 import { withOracleProxySession } from "../sessions/oracleSession.service.js";
 
 const withAuthorizedOracle = async (sessionId, callback) => {
@@ -66,6 +67,13 @@ const toolHandlers = {
     return withAuthorizedOracle(
       context.sessionId,
       ({ connection }) => getInvoices(args, connection),
+    );
+  },
+
+  get_contract_conditions: async (args, context) => {
+    return withAuthorizedOracle(
+      context.sessionId,
+      ({ connection }) => getContractConditions(args, connection),
     );
   },
 };
