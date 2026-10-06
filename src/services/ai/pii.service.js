@@ -1,7 +1,18 @@
 import { getPiiSession } from "../../state/pii.store.js";
 import { logPiiTransformation } from "../../utils/debug.logger.js";
 
-const TOKEN_PATTERN = /\[PII_[A-Z_]+_\d+\]/g;
+const TOKEN_PATTERN = /\[PII_([A-Z_]+)_\d+\]/g;
+
+const INTERNAL_ONLY_TOKEN_TYPES = new Set([
+  "CUSTOMER_ID",
+  "CONCEPT_ID",
+  "PROMOTION_ID",
+  "CAMPAIGN_ID",
+  "DESTINATION_CODE",
+  "USER_ID",
+  "CONTRACT_NUMBER",
+  "CONTRACT_SERIES",
+]);
 
 /*
 |--------------------------------------------------------------------------
@@ -116,7 +127,7 @@ const PATH_TYPES = [
   },
   {
     pattern:
-      /(?:^|\.)getcontractconditions\.concepts\.description$/,
+      /(?:^|\.)concepts?\.description$/,
     type: "CONCEPT_DESCRIPTION",
   },
   {
@@ -379,6 +390,27 @@ export const restorePiiText = (sessionId, text) => {
   return text.replace(TOKEN_PATTERN, (token) => {
     return state.tokenToValue.get(token) ?? token;
   });
+};
+
+export const restorePiiTextForUser = (sessionId, text) => {
+  if (!sessionId || typeof text !== "string") {
+    return text;
+  }
+
+  const state = getPiiSession(sessionId);
+
+  return text
+    .replace(TOKEN_PATTERN, (token, type) => {
+      if (INTERNAL_ONLY_TOKEN_TYPES.has(type)) {
+        return "";
+      }
+
+      return state.tokenToValue.get(token) ?? "";
+    })
+    .replace(/\(\s*\)/g, "")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/ +\n/g, "\n")
+    .trim();
 };
 
 export const restorePiiDeep = (sessionId, value) => {
