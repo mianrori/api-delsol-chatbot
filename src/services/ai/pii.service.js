@@ -277,7 +277,32 @@ const protectKnownTextPatterns = (sessionId, text) => {
   );
 
   protectedText = protectedText.replace(
-    /\b((?:contrato|condiciones\s+del\s+contrato)\s+de\s+)([A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9&.'’ -]{2,80})(?=\s*(?:[,.!?;:]|$))/gi,
+    /\b((?:contrato|condiciones(?:\s+contractuales|\s+del\s+contrato))\s+de\s+)([A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9&.'’ -]{2,80})(?=\s*(?:[,.!?;:]|$))/gi,
+    (_match, prefix, value) =>
+      `${prefix}${protectPiiValue(sessionId, "BUSINESS_ENTITY", value.trim())}`,
+  );
+
+  /*
+   * Consultas contractuales donde la entidad aparece entre la intención
+   * y la métrica, por ejemplo:
+   *
+   *   "¿Cuánto paga Nike por metro cuadrado de arrendamiento mínimo?"
+   *   "¿Cuál es el alquiler Nike por metro cuadrado?"
+   *
+   * El nombre comercial se pseudonimiza antes de Bedrock y se restaura
+   * únicamente al ejecutar la herramienta interna.
+   */
+  protectedText = protectedText.replace(
+    /\b((?:cu[aá]nto\s+paga|cu[aá]l\s+es\s+el\s+(?:costo|alquiler)|costo(?:\s+contractual)?|alquiler)\s+)([A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9&.'’ -]{2,80}?)(?=\s+(?:por\s+(?:metro\s+cuadrado|m(?:2|²))|de\s+(?:alquiler|arrendamiento)|en\s+(?:d[oó]lares|usd))|\s*(?:[,.!?;:]|$))/gi,
+    (_match, prefix, value) =>
+      `${prefix}${protectPiiValue(sessionId, "BUSINESS_ENTITY", value.trim())}`,
+  );
+
+  /*
+   * Consultas de superficie de un local.
+   */
+  protectedText = protectedText.replace(
+    /\b((?:cu[aá]ntos?\s+metros?\s+cuadrados?\s+tiene|qu[eé]\s+superficie\s+tiene)\s+)([A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9&.'’ -]{2,80})(?=\s*(?:[,.!?;:]|$))/gi,
     (_match, prefix, value) =>
       `${prefix}${protectPiiValue(sessionId, "BUSINESS_ENTITY", value.trim())}`,
   );
