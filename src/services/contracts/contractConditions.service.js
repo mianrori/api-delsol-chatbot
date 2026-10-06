@@ -43,13 +43,80 @@ const formatYesNo = (value) => {
   return null;
 };
 
-const attachLastBilledAmounts = ({ concepts, billedAmounts }) => {
+const normalizeCurrencySymbol = (value) => {
+  if (value === undefined || value === null || value === "") {
+    return value ?? null;
+  }
+
+  const normalized = String(value).trim().toUpperCase();
+
+  if (
+    ["PYG", "GS", "GS.", "GUARANI", "GUARANIES"].includes(normalized)
+  ) {
+    return "₲";
+  }
+
+  return value;
+};
+
+const toTimestamp = (value) => {
+  if (!value) {
+    return null;
+  }
+
+  const timestamp = new Date(value).getTime();
+
+  return Number.isFinite(timestamp) ? timestamp : null;
+};
+
+const isBilledAmountApplicable = ({
+  billed,
+  contractDate,
+  effectiveFrom,
+}) => {
+  if (!billed?.invoiceDate) {
+    return false;
+  }
+
+  const invoiceTimestamp = toTimestamp(billed.invoiceDate);
+
+  if (invoiceTimestamp === null) {
+    return false;
+  }
+
+  const validityDates = [contractDate, effectiveFrom]
+    .map(toTimestamp)
+    .filter((value) => value !== null);
+
+  if (validityDates.length === 0) {
+    return true;
+  }
+
+  const validFrom = Math.max(...validityDates);
+
+  return invoiceTimestamp >= validFrom;
+};
+
+const attachLastBilledAmounts = ({
+  concepts,
+  billedAmounts,
+  contractDate,
+}) => {
   const billedMap = new Map(
     billedAmounts.map((item) => [String(item.conceptCode), item]),
   );
 
   return concepts.map((concept) => {
-    const billed = billedMap.get(String(concept.conceptCode)) ?? null;
+    const billedCandidate =
+      billedMap.get(String(concept.conceptCode)) ?? null;
+
+    const billed = isBilledAmountApplicable({
+      billed: billedCandidate,
+      contractDate,
+      effectiveFrom: concept.effectiveFrom,
+    })
+      ? billedCandidate
+      : null;
 
     return {
       ...concept,
@@ -63,7 +130,9 @@ const attachLastBilledAmounts = ({ concepts, billedAmounts }) => {
             amountExcludingTax: billed.amountExcludingTax,
             amountIncludingTax: billed.amountIncludingTax,
             taxAmount: billed.taxAmount,
-            currencySymbol: billed.currencySymbol,
+            currencySymbol: normalizeCurrencySymbol(
+              billed.currencySymbol,
+            ),
             billingPeriod: billed.billingPeriod,
             invoiceDate: billed.invoiceDate,
             invoiceNumber: billed.invoiceNumber,
@@ -177,6 +246,7 @@ export const getContractConditions = async (
     resolvedConcepts = attachLastBilledAmounts({
       concepts,
       billedAmounts,
+      contractDate: contract.contractDate,
     });
   }
 
@@ -189,7 +259,7 @@ export const getContractConditions = async (
 
     queryContext: {
       billedAmountRule: includeLastBilledAmounts
-        ? "latestInvoiceByCustomerAndConceptExcludingTax"
+        ? "latestInvoiceByCustomerAndConceptFromCurrentContractValidityExcludingTax"
         : null,
     },
   };
