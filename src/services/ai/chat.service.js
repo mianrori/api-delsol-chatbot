@@ -22,7 +22,7 @@ import {
   protectPiiDeep,
   protectPiiText,
   restorePiiDeep,
-  restorePiiText,
+  restorePiiTextForUser,
 } from "./pii.service.js";
 
 const bedrockClient = new BedrockRuntimeClient({
@@ -767,7 +767,7 @@ export const chatService = async ({ message, sessionId }) => {
       extractText(safeOutputMessage),
     );
 
-    const answer = restorePiiText(
+    const answer = restorePiiTextForUser(
       sessionId,
       safeAssistantText,
     );
