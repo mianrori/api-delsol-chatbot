@@ -84,18 +84,36 @@ const enrichRow = (row, exchangeRate) => {
     },
   };
 
-  if (status !== "OK") {
+  /*
+   * Las ventas totales siguen siendo válidas aunque no exista una
+   * superficie contractual aplicable. AREA_NOT_AVAILABLE limita
+   * únicamente el cálculo de ventas por m².
+   *
+   * En cambio, si no hay ventas, existen monedas mezcladas o la moneda
+   * no puede identificarse, no exponemos importes convertidos.
+   */
+  if (
+    status === "NO_SALES" ||
+    status === "MIXED_CURRENCY" ||
+    status === "CURRENCY_NOT_SUPPORTED"
+  ) {
     return result;
   }
 
   if (currencyCode === "PYG") {
     result.sales.pyg = row.totalSales;
-    result.salesPerSqm.pyg = row.sourceSalesPerSqm;
 
     if (exchangeRate?.sellRate) {
       result.sales.usd = row.totalSales / exchangeRate.sellRate;
-      result.salesPerSqm.usd =
-        row.sourceSalesPerSqm / exchangeRate.sellRate;
+    }
+
+    if (status === "OK") {
+      result.salesPerSqm.pyg = row.sourceSalesPerSqm;
+
+      if (exchangeRate?.sellRate) {
+        result.salesPerSqm.usd =
+          row.sourceSalesPerSqm / exchangeRate.sellRate;
+      }
     }
 
     return result;
@@ -103,7 +121,10 @@ const enrichRow = (row, exchangeRate) => {
 
   if (currencyCode === "USD") {
     result.sales.usd = row.totalSales;
-    result.salesPerSqm.usd = row.sourceSalesPerSqm;
+
+    if (status === "OK") {
+      result.salesPerSqm.usd = row.sourceSalesPerSqm;
+    }
   }
 
   return result;
