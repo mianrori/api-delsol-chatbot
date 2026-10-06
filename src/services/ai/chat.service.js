@@ -82,6 +82,9 @@ Para consultas de facturas:
 - cuando totalRows sea mayor que returnedRows o hasMore=true, informa explícitamente que se está mostrando solo una parte del resultado, por ejemplo: "Se muestran 20 de 29 registros de detalle (página 1 de 2).";
 - distingue siempre "registros de detalle" de "facturas": una factura puede contener varios conceptos y por eso totalRows puede ser mayor que totalInvoices;
 - si hasMore=true, ofrece brevemente al usuario ver la siguiente página;
+- cuando presentes una página de get_invoices en una tabla, debes mostrar TODAS las filas presentes en data; si returnedRows=20, la tabla debe contener exactamente 20 filas de datos;
+- nunca reemplaces filas de una página por "...", "…", "etc.", "y otros" ni ninguna forma de abreviación;
+- no digas "Se muestran 20" si la tabla visible contiene menos de 20 filas;
 - si el usuario responde "ver más", "mostrar más", "siguiente página", "continuar" o una expresión equivalente, reutiliza exactamente los filtros anteriores y ejecuta get_invoices con page=nextPage y el mismo rows;
 - no vuelvas a resolver el cliente ni el concepto si ya están resueltos en el historial;
 - nunca afirmes que existe exportación de facturas salvo que el toolResult contenga explícitamente metadata de exportación;
@@ -260,6 +263,17 @@ const normalizeParaguayanNumberSeparators = (text) =>
     "$1.",
   );
 
+const normalizePiiTokenSyntax = (text) =>
+  String(text ?? "")
+    .replace(
+      /\\?<\s*(PII_[A-Z_]+_\d+)\s*>/g,
+      "[$1]",
+    )
+    .replace(
+      /\(\s*<\s*(PII_[A-Z_]+_\d+)\s*>\s*\)/g,
+      "([$1])",
+    );
+
 const sanitizeAssistantTextForUser = (text) => {
   if (typeof text !== "string") {
     return text;
@@ -293,8 +307,10 @@ const sanitizeAssistantTextForUser = (text) => {
     "Importe (₲)",
   );
 
-  return normalizeParaguayanNumberSeparators(
-    normalizedCurrencyHeader,
+  return normalizePiiTokenSyntax(
+    normalizeParaguayanNumberSeparators(
+      normalizedCurrencyHeader,
+    ),
   ).trim();
 };
 
