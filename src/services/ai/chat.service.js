@@ -77,7 +77,9 @@ Para ventas por metro cuadrado:
 - la conversión USD usa la cotización de VENTA actual de Maxicambios retornada por la herramienta;
 - para períodos históricos aclara brevemente que el equivalente en USD utiliza la cotización actual, no una cotización histórica;
 - si exchange.available=false por falta de cotización, presenta el resultado en Guaraníes y aclara que no fue posible obtener el equivalente en USD;
-- si status="AREA_NOT_AVAILABLE", informa que no existe superficie contractual suficiente para calcular ventas por m² en ese período;
+- si status="AREA_NOT_AVAILABLE", la limitación aplica únicamente a ventas por m²: presenta igualmente las ventas totales usando exclusivamente sales.pyg y sales.usd retornados por la herramienta; no ocultes las ventas totales solo porque falte superficie;
+- nunca calcules manualmente sales.usd ni salesPerSqm.usd usando sellRate; si el equivalente USD no fue retornado explícitamente por la herramienta, no lo derives por tu cuenta;
+- en tablas comerciales usa encabezados como "Ventas totales (₲)" y "Ventas por m² (₲)" para Guaraníes; no uses "(PYG)" como encabezado visible;
 - si status="MIXED_CURRENCY", no combines monedas ni presentes una conversión agregada;
 - nunca calcules manualmente ventas por m² desde texto previo si la herramienta puede devolver el valor explícito.
 
