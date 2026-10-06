@@ -77,7 +77,13 @@ Para consultas de facturas:
 - no muestres customerId, código de cliente ni ID de cliente en la tabla de opciones;
 - si varias opciones tienen el mismo nombre comercial, conserva las filas distintas pero no expongas identificadores internos;
 - las descripciones de conceptos y demás datos sensibles pueden llegar como tokens [PII_*]; consérvalos exactamente;
-- get_invoices en mode="detail" es paginado: page y rows describen únicamente la página retornada;
+- get_invoices en mode="detail" es paginado;
+- page indica la página actual, rows el tamaño solicitado, returnedRows las filas realmente retornadas, totalRows la cantidad total de filas de detalle/conceptos, totalInvoices la cantidad real de facturas distintas, totalPages la cantidad de páginas y hasMore si existen más resultados;
+- cuando totalRows sea mayor que returnedRows o hasMore=true, informa explícitamente que se está mostrando solo una parte del resultado, por ejemplo: "Se muestran 20 de 29 registros de detalle (página 1 de 2).";
+- distingue siempre "registros de detalle" de "facturas": una factura puede contener varios conceptos y por eso totalRows puede ser mayor que totalInvoices;
+- si hasMore=true, ofrece brevemente al usuario ver la siguiente página;
+- si el usuario responde "ver más", "mostrar más", "siguiente página", "continuar" o una expresión equivalente, reutiliza exactamente los filtros anteriores y ejecuta get_invoices con page=nextPage y el mismo rows;
+- no vuelvas a resolver el cliente ni el concepto si ya están resueltos en el historial;
 - nunca afirmes que existe exportación de facturas salvo que el toolResult contenga explícitamente metadata de exportación;
 - nunca uses frases como "el conjunto completo está disponible para exportación" para get_invoices si esa metadata no existe;
 - si recibes una página de detalle, presenta solo las filas recibidas y, cuando sea útil, indica que corresponde a la página consultada sin afirmar cuántas filas totales existen;
@@ -317,26 +323,59 @@ const mergeActions = (currentActions, newActions) => ({
 });
 
 const extractClientActions = ({ name, result }) => {
-  if (name !== "get_sales" || !result?.export?.available) {
-    return {};
+  if (name === "get_sales" && result?.export?.available) {
+    const exportId = result.export.exportId ?? null;
+
+    return {
+      salesExport: {
+        eligible: true,
+        available: Boolean(exportId),
+        exportId,
+        totalRecords: Number(
+          result.export.totalRecords ??
+            (Array.isArray(result?.data) ? result.data.length : 0),
+        ),
+        format: result.export.format ?? "xlsx",
+        fileName: result.export.fileName ?? null,
+        expiresAt: result.export.expiresAt ?? null,
+      },
+    };
   }
 
-  const exportId = result.export.exportId ?? null;
+  if (
+    name === "get_invoices" &&
+    Array.isArray(result?.data) &&
+    Number(result?.page ?? 0) >= 1
+  ) {
+    const page = Number(result.page ?? 1);
+    const rows = Number(result.rows ?? result.data.length ?? 20);
+    const totalRows = Number(result.totalRows ?? result.data.length ?? 0);
+    const totalInvoices = Number(result.totalInvoices ?? 0);
+    const totalPages = Number(result.totalPages ?? 0);
+    const hasMore = Boolean(result.hasMore);
+    const nextPage =
+      result.nextPage === null || result.nextPage === undefined
+        ? null
+        : Number(result.nextPage);
 
-  return {
-    salesExport: {
-      eligible: true,
-      available: Boolean(exportId),
-      exportId,
-      totalRecords: Number(
-        result.export.totalRecords ??
-          (Array.isArray(result?.data) ? result.data.length : 0),
-      ),
-      format: result.export.format ?? "xlsx",
-      fileName: result.export.fileName ?? null,
-      expiresAt: result.export.expiresAt ?? null,
-    },
-  };
+    return {
+      invoicePagination: {
+        available: true,
+        page,
+        rows,
+        returnedRows: Number(
+          result.returnedRows ?? result.data.length ?? 0,
+        ),
+        totalRows,
+        totalInvoices,
+        totalPages,
+        hasMore,
+        nextPage,
+      },
+    };
+  }
+
+  return {};
 };
 
 const removeClientOnlyMetadata = ({ name, result }) => {
