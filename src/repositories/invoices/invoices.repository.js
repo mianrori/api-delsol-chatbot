@@ -162,12 +162,43 @@ export const getInvoicesRepository = async ({
 
     const safeRows = Math.max(Number(rows) || 20, 1);
 
+    /*
+     * El total se obtiene con exactamente los mismos filtros que el detalle.
+     * COUNT(*) representa filas de detalle/concepto.
+     * COUNT(DISTINCT NRO_FACTURA) representa facturas reales.
+     */
+    const countSql = `
+      SELECT
+        COUNT(*) AS TOTAL_ROWS,
+        COUNT(DISTINCT NRO_FACTURA) AS TOTAL_INVOICES
+      FROM VW_BOT_FACTURAS
+      ${whereSql}
+    `;
+
+    const countResult = await connection.execute(countSql, binds, {
+      outFormat: 4002,
+    });
+
+    const totalRows = Number(
+      countResult.rows?.[0]?.TOTAL_ROWS ?? 0,
+    );
+
+    const totalInvoices = Number(
+      countResult.rows?.[0]?.TOTAL_INVOICES ?? 0,
+    );
+
+    const totalPages =
+      totalRows > 0 ? Math.ceil(totalRows / safeRows) : 0;
+
     const offset = (safePage - 1) * safeRows;
 
     const maxRow = offset + safeRows;
 
-    binds.offset = offset;
-    binds.maxRow = maxRow;
+    const detailBinds = {
+      ...binds,
+      offset,
+      maxRow,
+    };
 
     const sql = `
       SELECT
@@ -244,15 +275,11 @@ export const getInvoicesRepository = async ({
       ORDER BY RN
     `;
 
-    const result = await connection.execute(sql, binds, {
+    const result = await connection.execute(sql, detailBinds, {
       outFormat: 4002,
     });
 
-    return {
-      page: safePage,
-      rows: safeRows,
-
-      data: (result.rows ?? []).map((row) => ({
+    const data = (result.rows ?? []).map((row) => ({
         issueDate: row.FECHA_EMISION ?? null,
 
         invoiceNumber: row.NRO_FACTURA ?? null,
@@ -310,7 +337,22 @@ export const getInvoicesRepository = async ({
         amount: row.IMPORTE ?? null,
 
         plate: row.MATRICULA ?? null,
-      })),
+      }));
+
+    const returnedRows = data.length;
+    const hasMore = safePage < totalPages;
+
+    return {
+      page: safePage,
+      rows: safeRows,
+      returnedRows,
+      totalRows,
+      totalInvoices,
+      totalPages,
+      hasMore,
+      nextPage: hasMore ? safePage + 1 : null,
+      previousPage: safePage > 1 ? safePage - 1 : null,
+      data,
     };
   }
 
