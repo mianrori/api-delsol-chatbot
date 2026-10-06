@@ -59,7 +59,7 @@ Para esta etapa:
 
 Si el usuario solicita información que requiere una herramienta todavía no habilitada en este servicio, indícale brevemente que esa consulta aún no está disponible en esta etapa de migración.
 
-Para marcas o nombres propios comerciales como Nike, Adidas, Zara o Cines:
+Para marcas o nombres propios comerciales:
 - si la intención principal es ventas u otra consulta comercial general, utiliza search_customers;
 - si la intención principal es facturas emitidas por delSol, utiliza search_invoice_customers y NO search_customers.
 
