@@ -73,6 +73,7 @@ Para consultas contractuales:
 - no expongas contractType, contractSeries, contractNumber, conceptCode ni otros identificadores internos salvo solicitud técnica explícita;
 - en respuestas contractuales resueltas no muestres filas "Número de contrato", "Serie del contrato" ni "Tipo de contrato";
 - si lastBilled es null, significa que no existe una facturación válida del concepto dentro de la vigencia del contrato/concepto actual; no reutilices ni presentes importes históricos anteriores;
+- nunca menciones al usuario el nombre interno lastBilled ni expresiones como "campo lastBilled"; si todos los conceptos carecen de facturación válida, indica únicamente que no se dispone de último importe facturado sin IVA para esos conceptos;
 - para importes en Guaraníes presenta siempre "₲ 123.456", con el símbolo delante del importe;
 - si el usuario pregunta genéricamente por "alquiler" y existen varios conceptos aplicables, presenta los conceptos y solicita cuál desea consultar; no asumas automáticamente arrendamiento mínimo.
 Si existe duda entre marca/local y rubro dentro de una consulta de ventas, intenta primero search_customers.
@@ -363,10 +364,20 @@ const sanitizeAssistantTextForUser = (text) => {
     "Importe (₲)",
   );
 
+  const withoutInternalContractTerms = normalizedCurrencyHeader
+    .replace(
+      /\s*\(\s*campo\s+\*?lastBilled\*?\s+es\s+nulo\s*\)/gi,
+      "",
+    )
+    .replace(
+      /\bcampo\s+\*?lastBilled\*?\s+es\s+nulo\b/gi,
+      "",
+    );
+
   return normalizePiiTokenSyntax(
     normalizeGuaraniCurrencyPlacement(
       normalizeParaguayanNumberSeparators(
-        normalizedCurrencyHeader,
+        withoutInternalContractTerms,
       ),
     ),
   ).trim();
