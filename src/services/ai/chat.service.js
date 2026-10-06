@@ -71,6 +71,9 @@ Para consultas contractuales:
 - para condiciones generales usa includeConcepts=true e includeLastBilledAmounts=true;
 - si get_contract_conditions devuelve AMBIGUOUS, presenta las opciones comerciales y espera selección;
 - no expongas contractType, contractSeries, contractNumber, conceptCode ni otros identificadores internos salvo solicitud técnica explícita;
+- en respuestas contractuales resueltas no muestres filas "Número de contrato", "Serie del contrato" ni "Tipo de contrato";
+- si lastBilled es null, significa que no existe una facturación válida del concepto dentro de la vigencia del contrato/concepto actual; no reutilices ni presentes importes históricos anteriores;
+- para importes en Guaraníes presenta siempre "₲ 123.456", con el símbolo delante del importe;
 - si el usuario pregunta genéricamente por "alquiler" y existen varios conceptos aplicables, presenta los conceptos y solicita cuál desea consultar; no asumas automáticamente arrendamiento mínimo.
 Si existe duda entre marca/local y rubro dentro de una consulta de ventas, intenta primero search_customers.
 
@@ -275,6 +278,38 @@ const normalizeParaguayanNumberSeparators = (text) =>
     "$1.",
   );
 
+const normalizeGuaraniCurrencyPlacement = (text) =>
+  String(text ?? "").replace(
+    /(\d[\d.]*?(?:,\d+)?)[ \u00A0\u202F]*₲/g,
+    "₲ $1",
+  );
+
+const removeMarkdownRowsByLabels = (text, forbiddenLabels = []) =>
+  String(text ?? "")
+    .split("\n")
+    .filter((line) => {
+      const trimmed = line.trim();
+
+      if (!trimmed.startsWith("|")) {
+        return true;
+      }
+
+      const firstCell = trimmed
+        .replace(/^\|/, "")
+        .split("|")[0]
+        .replace(/\*\*/g, "")
+        .trim()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]/g, "");
+
+      return !forbiddenLabels.some((label) =>
+        firstCell.includes(label),
+      );
+    })
+    .join("\n");
+
 const normalizePiiTokenSyntax = (text) =>
   String(text ?? "")
     .replace(
@@ -300,7 +335,16 @@ const sanitizeAssistantTextForUser = (text) => {
     "categoryid",
   ]);
 
-  const withoutInternalIds = withoutInternalColumns
+  const withoutInternalContractRows = removeMarkdownRowsByLabels(
+    withoutInternalColumns,
+    [
+      "numerodecontrato",
+      "seriedelcontrato",
+      "tipodecontrato",
+    ],
+  );
+
+  const withoutInternalIds = withoutInternalContractRows
     .replace(
       /\s*\((?:c[oó]digo\s+de\s+cliente|id\s+de\s+cliente|customer\s*id)\s*:\s*\[PII_CUSTOMER_ID_\d+\]\)/gi,
       "",
@@ -320,8 +364,10 @@ const sanitizeAssistantTextForUser = (text) => {
   );
 
   return normalizePiiTokenSyntax(
-    normalizeParaguayanNumberSeparators(
-      normalizedCurrencyHeader,
+    normalizeGuaraniCurrencyPlacement(
+      normalizeParaguayanNumberSeparators(
+        normalizedCurrencyHeader,
+      ),
     ),
   ).trim();
 };
