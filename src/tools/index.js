@@ -5,6 +5,7 @@ import { searchInvoiceConceptsTool } from "./invoices/searchInvoiceConcepts.tool
 import { searchInvoiceCustomersTool } from "./invoices/searchInvoiceCustomers.tool.js";
 import { getInvoicesTool } from "./invoices/getInvoices.tool.js";
 import { getContractConditionsTool } from "./contracts/getContractConditions.tool.js";
+import { getContractCostPerSqmTool } from "./contracts/getContractCostPerSqm.tool.js";
 
 export const tools = [
   searchCustomersTool,
@@ -14,4 +15,5 @@ export const tools = [
   searchInvoiceCustomersTool,
   getInvoicesTool,
   getContractConditionsTool,
+  getContractCostPerSqmTool,
 ];
