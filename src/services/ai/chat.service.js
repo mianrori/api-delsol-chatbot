@@ -94,8 +94,10 @@ Si get_sales devuelve un resultado sin registros y la moneda no está disponible
 Para importes monetarios:
 - respeta siempre currency.symbol y currency.symbolPosition cuando estén presentes;
 - si currency.symbolPosition="prefix", coloca el símbolo antes del importe y separado por un espacio;
-- para Guaraníes, presenta siempre el formato "₲ 329.378.000", nunca "329.378.000 ₲";
-- conserva el formato numérico paraguayo con punto como separador de miles y coma como separador decimal.
+- para Guaraníes, presenta siempre el símbolo "₲"; no uses "PYG" como encabezado comercial cuando el importe ya está identificado como Guaraníes;
+- presenta siempre el formato "₲ 329.378.000", nunca "329.378.000 ₲";
+- conserva el formato numérico paraguayo con punto como separador de miles y coma como separador decimal;
+- nunca utilices espacios, espacios no separables ni espacios finos como separador de miles.
 
 Cuando get_sales incluya resultSet.truncated=true:
 - el conjunto completo contiene más registros que los enviados al modelo;
@@ -252,6 +254,12 @@ const removeMarkdownColumns = (text, forbiddenHeaders = []) => {
   return result.join("\n");
 };
 
+const normalizeParaguayanNumberSeparators = (text) =>
+  String(text ?? "").replace(
+    /(\d)[ \u00A0\u202F](?=\d{3}(?:\D|$))/g,
+    "$1.",
+  );
+
 const sanitizeAssistantTextForUser = (text) => {
   if (typeof text !== "string") {
     return text;
@@ -266,7 +274,7 @@ const sanitizeAssistantTextForUser = (text) => {
     "categoryid",
   ]);
 
-  return withoutInternalColumns
+  const withoutInternalIds = withoutInternalColumns
     .replace(
       /\s*\((?:c[oó]digo\s+de\s+cliente|id\s+de\s+cliente|customer\s*id)\s*:\s*\[PII_CUSTOMER_ID_\d+\]\)/gi,
       "",
@@ -278,8 +286,16 @@ const sanitizeAssistantTextForUser = (text) => {
     .replace(
       /\s*\((?:c[oó]digo\s+de\s+rubro|id\s+de\s+rubro|category\s*id)\s*:\s*\[PII_[A-Z_]*CATEGORY_ID_\d+\]\)/gi,
       "",
-    )
-    .trim();
+    );
+
+  const normalizedCurrencyHeader = withoutInternalIds.replace(
+    /Importe\s*\(\s*PYG\s*\)/gi,
+    "Importe (₲)",
+  );
+
+  return normalizeParaguayanNumberSeparators(
+    normalizedCurrencyHeader,
+  ).trim();
 };
 
 const normalizeToolResult = (value) => {
@@ -360,7 +376,7 @@ const extractClientActions = ({ name, result }) => {
 
     return {
       invoicePagination: {
-        available: true,
+        available: hasMore,
         page,
         rows,
         returnedRows: Number(
