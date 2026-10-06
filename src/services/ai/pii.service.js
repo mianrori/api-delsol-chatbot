@@ -308,6 +308,18 @@ const protectKnownTextPatterns = (sessionId, text) => {
   );
 
   /*
+   * Consultas de ventas por superficie:
+   *
+   *   "Ventas por metro cuadrado de Marca Ejemplo en 2023"
+   *   "Ventas por m² de Local Ejemplo por mes"
+   */
+  protectedText = protectedText.replace(
+    /\b((?:ventas\s+por\s+(?:metro\s+cuadrado|m(?:2|²))\s+de\s+))([A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9&.'’ -]{2,80}?)(?=\s+(?:(?:de|desde|durante|en)\s+(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre|20\d{2}|hoy|ayer|este|esta)|por\s+(?:d[ií]a|mes|a[nñ]o))|\s*(?:[,.!?;:]|$))/gi,
+    (_match, prefix, value) =>
+      `${prefix}${protectPiiValue(sessionId, "BUSINESS_ENTITY", value.trim())}`,
+  );
+
+  /*
    * Consultas analíticas del tipo:
    *
    *   "Ventas de Nike de enero a abril de 2023"

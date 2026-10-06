@@ -1,6 +1,7 @@
 import { resolveCustomer } from "../customers/customer.resolver.js";
 import { resolveCategory } from "../categories/category.resolver.js";
 import { getSales } from "../sales/sales.service.js";
+import { getSalesPerSqm } from "../sales/salesPerSqm.service.js";
 import { searchInvoiceConcepts } from "../invoices/searchInvoiceConcepts.service.js";
 import { searchInvoiceCustomers } from "../invoices/searchInvoiceCustomers.service.js";
 import { getInvoices } from "../invoices/invoices.service.js";
@@ -47,6 +48,13 @@ const toolHandlers = {
       context.sessionId,
       ({ connection, username }) =>
         getSales(args, connection, username),
+    );
+  },
+
+  get_sales_per_sqm: async (args, context) => {
+    return withAuthorizedOracle(
+      context.sessionId,
+      ({ connection }) => getSalesPerSqm(args, connection),
     );
   },
 
