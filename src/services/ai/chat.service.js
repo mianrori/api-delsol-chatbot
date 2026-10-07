@@ -627,9 +627,65 @@ const validateProtectedToolInput = ({ name, input = {} }) => {
   }
 };
 
+const formatPygInteger = (value) =>
+  new Intl.NumberFormat("es-PY", {
+    maximumFractionDigits: 0,
+  }).format(Math.abs(Number(value ?? 0)));
+
+const containsNumericValue = (text, value) => {
+  const numericValue = Math.abs(Number(value ?? 0));
+
+  if (!Number.isFinite(numericValue)) {
+    return false;
+  }
+
+  const compactText = String(text ?? "").replace(
+    /[.\s\u00A0\u202F]/g,
+    "",
+  );
+  const compactValue = String(Math.round(numericValue));
+
+  return compactValue.length > 0 && compactText.includes(compactValue);
+};
+
+const ensureSqmTwoPeriodAbsoluteDifference = ({
+  text,
+  internalContext,
+}) => {
+  const comparison =
+    internalContext?.salesPerSqmTwoPeriodComparison ?? null;
+
+  if (!comparison) {
+    return text;
+  }
+
+  const absoluteDifferencePyg = Number(
+    comparison.absoluteDifferencePyg ?? 0,
+  );
+
+  if (
+    !Number.isFinite(absoluteDifferencePyg) ||
+    containsNumericValue(text, absoluteDifferencePyg)
+  ) {
+    return text;
+  }
+
+  const fromPeriod = comparison.fromPeriod ?? null;
+  const toPeriod = comparison.toPeriod ?? null;
+  const periodLabel =
+    fromPeriod && toPeriod
+      ? ` entre ${fromPeriod} y ${toPeriod}`
+      : "";
+
+  return `${String(text ?? "").trim()}\n\n**Diferencia absoluta de ventas:** ₲ ${formatPygInteger(
+    absoluteDifferencePyg,
+  )}${periodLabel}.`;
+};
+
 const executeToolRequests = async ({ content, sessionId }) => {
   const toolResults = [];
   let actions = {};
+  let internalContext = {};
   const toolUses = content.filter((block) => block.toolUse);
 
   for (const block of toolUses) {
@@ -658,6 +714,30 @@ const executeToolRequests = async ({ content, sessionId }) => {
         actions,
         extractClientActions({ name, result }),
       );
+
+      if (
+        name === "get_sales_per_sqm" &&
+        Array.isArray(result?.data)
+      ) {
+        const rowsWithSales = result.data.filter(
+          (row) =>
+            Number(row?.sales?.pyg ?? row?.totalSales ?? 0) > 0,
+        );
+        const totalSalesChange =
+          result?.analysisSummary?.totalSalesChange ?? null;
+
+        if (rowsWithSales.length === 2 && totalSalesChange) {
+          internalContext = {
+            ...internalContext,
+            salesPerSqmTwoPeriodComparison: {
+              fromPeriod: totalSalesChange.fromPeriod ?? null,
+              toPeriod: totalSalesChange.toPeriod ?? null,
+              absoluteDifferencePyg:
+                totalSalesChange.absoluteDifferencePyg ?? null,
+            },
+          };
+        }
+      }
 
       const resultForModel = removeClientOnlyMetadata({
         name,
@@ -727,6 +807,7 @@ const executeToolRequests = async ({ content, sessionId }) => {
   return {
     toolResults,
     actions,
+    internalContext,
   };
 };
 
@@ -765,6 +846,7 @@ export const chatService = async ({ message, sessionId }) => {
   let toolIterations = 0;
   let bedrockIteration = 0;
   let conversationActions = {};
+  let conversationInternalContext = {};
 
   while (true) {
     bedrockIteration += 1;
@@ -831,7 +913,11 @@ export const chatService = async ({ message, sessionId }) => {
         );
       }
 
-      const { toolResults, actions } = await executeToolRequests({
+      const {
+        toolResults,
+        actions,
+        internalContext,
+      } = await executeToolRequests({
         content: safeOutputMessage.content ?? [],
         sessionId,
       });
@@ -840,6 +926,10 @@ export const chatService = async ({ message, sessionId }) => {
         conversationActions,
         actions,
       );
+      conversationInternalContext = {
+        ...conversationInternalContext,
+        ...internalContext,
+      };
 
       if (toolResults.length === 0) {
         throw new Error(
@@ -859,9 +949,15 @@ export const chatService = async ({ message, sessionId }) => {
       extractText(safeOutputMessage),
     );
 
+    const completedAssistantText =
+      ensureSqmTwoPeriodAbsoluteDifference({
+        text: safeAssistantText,
+        internalContext: conversationInternalContext,
+      });
+
     const answer = restorePiiTextForUser(
       sessionId,
-      safeAssistantText,
+      completedAssistantText,
     );
 
     if (!answer) {
