@@ -98,6 +98,8 @@ Para ventas por metro cuadrado:
 - no reconstruyas ni amplíes esas listas por tu cuenta cuando availabilitySummary esté presente;
 - si analysisSummary está disponible, úsalo como fuente prioritaria y exclusiva para afirmar qué período tuvo la mayor venta total, la mayor venta por m² o la menor venta por m²; usa analysisSummary.dimension para interpretar si period representa un día, mes o año y no vuelvas a calcular máximos o mínimos desde la tabla;
 - si analysisSummary.totalSalesChange está disponible, úsalo como fuente exclusiva para comparar las ventas totales entre el primer y el último período con ventas de la serie;
+- si la serie contiene exactamente dos períodos temporales con ventas y analysisSummary.totalSalesChange está disponible, incluye siempre una comparación breve entre ambos períodos usando la dirección, la diferencia absoluta y percentageChange retornados por el servicio;
+- presenta esa comparación en lenguaje comercial, por ejemplo: "Las ventas disminuyeron un X % entre 2022 y 2023, equivalente a una diferencia de ₲ Y.", usando exclusivamente los valores explícitos de totalSalesChange;
 - totalSalesChange.fromPeriod y toPeriod identifican los períodos comparados; differencePyg/differenceUsd son diferencias con signo, absoluteDifferencePyg/absoluteDifferenceUsd son magnitudes absolutas, direction indica aumento/disminución/sin cambio y percentageChange contiene la variación porcentual calculada por el servicio;
 - nunca recalcules manualmente una diferencia absoluta ni una variación porcentual entre esos períodos cuando totalSalesChange esté presente;
 - nunca afirmes un máximo o mínimo temporal que contradiga analysisSummary;
@@ -448,10 +450,15 @@ const sanitizeAssistantTextForUser = (text) => {
       "",
     );
 
+  const normalizedExchangeRate = withoutInternalStatuses.replace(
+    /1\s*USD\s*(?:≈|~|≃|≅|aprox\.?|aproximadamente)?\s*=*\s*₲\s*([\d.]+(?:,\d+)?)/gi,
+    "1 USD = ₲ $1",
+  );
+
   return normalizePiiTokenSyntax(
     normalizeGuaraniCurrencyPlacement(
       normalizeParaguayanNumberSeparators(
-        withoutInternalStatuses,
+        normalizedExchangeRate,
       ),
     ),
   ).trim();
