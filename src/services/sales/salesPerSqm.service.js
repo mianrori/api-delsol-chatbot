@@ -7,6 +7,106 @@ const normalizeArray = (value) => {
   return [value];
 };
 
+const parseDate = (value) => {
+  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(
+    String(value ?? ""),
+  );
+
+  if (!match) return null;
+
+  const [, dayText, monthText, yearText] = match;
+  const day = Number(dayText);
+  const month = Number(monthText);
+  const year = Number(yearText);
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return null;
+  }
+
+  return date;
+};
+
+const formatMonth = (date) =>
+  `${String(date.getUTCMonth() + 1).padStart(2, "0")}/${date.getUTCFullYear()}`;
+
+const createNoSalesRow = ({ month }) => ({
+  month,
+  totalSales: 0,
+  totalInvoices: 0,
+  sourceSalesPerSqm: null,
+  area: {
+    min: null,
+    max: null,
+    changedWithinPeriod: false,
+    distinctValues: 0,
+    missingSalesRows: 0,
+    complete: false,
+  },
+  currency: {
+    description: null,
+    abbreviation: null,
+    distinctCurrencyCount: 0,
+  },
+});
+
+const completeMonthlySeries = ({
+  rows,
+  dateFrom,
+  dateTo,
+  groupBy,
+}) => {
+  if (groupBy.length !== 1 || groupBy[0] !== "month") {
+    return rows;
+  }
+
+  const startDate = parseDate(dateFrom);
+  const endDate = parseDate(dateTo);
+
+  if (!startDate || !endDate || startDate > endDate) {
+    return rows;
+  }
+
+  const rowsByMonth = new Map(
+    rows
+      .filter((row) => row?.month)
+      .map((row) => [row.month, row]),
+  );
+
+  const result = [];
+  const cursor = new Date(
+    Date.UTC(
+      startDate.getUTCFullYear(),
+      startDate.getUTCMonth(),
+      1,
+    ),
+  );
+  const lastMonth = new Date(
+    Date.UTC(
+      endDate.getUTCFullYear(),
+      endDate.getUTCMonth(),
+      1,
+    ),
+  );
+
+  while (cursor <= lastMonth) {
+    const month = formatMonth(cursor);
+
+    result.push(
+      rowsByMonth.get(month) ??
+        createNoSalesRow({ month }),
+    );
+
+    cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+  }
+
+  return result;
+};
+
 const normalizeCurrencyCode = (currency) => {
   const values = [
     currency?.abbreviation,
@@ -159,9 +259,18 @@ export const getSalesPerSqm = async (
     groupBy: normalizedGroupBy,
   });
 
-  const rows = Array.isArray(repositoryResult?.data)
+  const repositoryRows = Array.isArray(repositoryResult?.data)
     ? repositoryResult.data
     : [repositoryResult];
+
+  const rows = Array.isArray(repositoryResult?.data)
+    ? completeMonthlySeries({
+        rows: repositoryRows,
+        dateFrom,
+        dateTo,
+        groupBy: normalizedGroupBy,
+      })
+    : repositoryRows;
 
   let exchangeRate = null;
   let exchangeRateError = null;
@@ -206,7 +315,9 @@ export const getSalesPerSqm = async (
 
   if (Array.isArray(repositoryResult?.data)) {
     return {
-      status: enrichedRows.length > 0 ? "OK" : "NO_SALES",
+      status: enrichedRows.some((row) => row.status !== "NO_SALES")
+        ? "OK"
+        : "NO_SALES",
       dateFrom,
       dateTo,
       exchange,
