@@ -177,6 +177,68 @@ const buildMonthlyAvailabilitySummary = (rows, groupBy) => {
   };
 };
 
+const buildMonthlyAnalysisSummary = (rows, groupBy) => {
+  if (groupBy.length !== 1 || groupBy[0] !== "month") {
+    return null;
+  }
+
+  const rowsWithSales = rows.filter((row) => hasSales(row));
+  const rowsWithSqm = rows.filter(
+    (row) =>
+      row.status === "OK" &&
+      Number(row.salesPerSqm?.pyg ?? 0) > 0,
+  );
+
+  const highestBy = (items, selector) =>
+    items.reduce((best, current) => {
+      if (!best) return current;
+      return selector(current) > selector(best) ? current : best;
+    }, null);
+
+  const lowestBy = (items, selector) =>
+    items.reduce((best, current) => {
+      if (!best) return current;
+      return selector(current) < selector(best) ? current : best;
+    }, null);
+
+  const highestTotalSalesRow = highestBy(
+    rowsWithSales,
+    (row) => Number(row.sales?.pyg ?? row.totalSales ?? 0),
+  );
+  const highestSalesPerSqmRow = highestBy(
+    rowsWithSqm,
+    (row) => Number(row.salesPerSqm?.pyg ?? 0),
+  );
+  const lowestSalesPerSqmRow = lowestBy(
+    rowsWithSqm,
+    (row) => Number(row.salesPerSqm?.pyg ?? 0),
+  );
+
+  return {
+    highestTotalSales: highestTotalSalesRow
+      ? {
+          month: highestTotalSalesRow.month,
+          pyg: highestTotalSalesRow.sales?.pyg ?? null,
+          usd: highestTotalSalesRow.sales?.usd ?? null,
+        }
+      : null,
+    highestSalesPerSqm: highestSalesPerSqmRow
+      ? {
+          month: highestSalesPerSqmRow.month,
+          pyg: highestSalesPerSqmRow.salesPerSqm?.pyg ?? null,
+          usd: highestSalesPerSqmRow.salesPerSqm?.usd ?? null,
+        }
+      : null,
+    lowestSalesPerSqm: lowestSalesPerSqmRow
+      ? {
+          month: lowestSalesPerSqmRow.month,
+          pyg: lowestSalesPerSqmRow.salesPerSqm?.pyg ?? null,
+          usd: lowestSalesPerSqmRow.salesPerSqm?.usd ?? null,
+        }
+      : null,
+  };
+};
+
 const enrichRow = (row, exchangeRate) => {
   const currencyCode = normalizeCurrencyCode(row.currency);
 
@@ -344,6 +406,10 @@ export const getSalesPerSqm = async (
       dateTo,
       exchange,
       availabilitySummary: buildMonthlyAvailabilitySummary(
+        enrichedRows,
+        normalizedGroupBy,
+      ),
+      analysisSummary: buildMonthlyAnalysisSummary(
         enrichedRows,
         normalizedGroupBy,
       ),
