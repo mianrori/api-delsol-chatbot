@@ -263,7 +263,14 @@ const enrichRow = (row, exchangeRate) => {
   } else if (Number(row.currency?.distinctCurrencyCount ?? 0) > 1) {
     status = "MIXED_CURRENCY";
   } else if (!row.area?.complete || row.sourceSalesPerSqm === null) {
-    status = "AREA_NOT_AVAILABLE";
+    const hasSomeApplicableArea =
+      row.area?.min !== null &&
+      row.area?.min !== undefined &&
+      Number(row.area?.missingSalesRows ?? 0) > 0;
+
+    status = hasSomeApplicableArea
+      ? "AREA_PARTIALLY_AVAILABLE"
+      : "AREA_NOT_AVAILABLE";
   } else if (!currencyCode) {
     status = "CURRENCY_NOT_SUPPORTED";
   }
