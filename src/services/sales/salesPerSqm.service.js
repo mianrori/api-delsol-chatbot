@@ -155,6 +155,28 @@ const rowNeedsUsdConversion = (row) =>
   hasSales(row) &&
   normalizeCurrencyCode(row?.currency) === "PYG";
 
+const buildMonthlyAvailabilitySummary = (rows, groupBy) => {
+  if (groupBy.length !== 1 || groupBy[0] !== "month") {
+    return null;
+  }
+
+  return {
+    monthsWithArea: rows
+      .filter(
+        (row) =>
+          row.status === "OK" &&
+          row.area?.complete === true,
+      )
+      .map((row) => row.month),
+    monthsWithSalesWithoutArea: rows
+      .filter((row) => row.status === "AREA_NOT_AVAILABLE")
+      .map((row) => row.month),
+    monthsWithoutSales: rows
+      .filter((row) => row.status === "NO_SALES")
+      .map((row) => row.month),
+  };
+};
+
 const enrichRow = (row, exchangeRate) => {
   const currencyCode = normalizeCurrencyCode(row.currency);
 
@@ -321,6 +343,10 @@ export const getSalesPerSqm = async (
       dateFrom,
       dateTo,
       exchange,
+      availabilitySummary: buildMonthlyAvailabilitySummary(
+        enrichedRows,
+        normalizedGroupBy,
+      ),
       data: enrichedRows,
     };
   }
