@@ -31,11 +31,18 @@ const parseDate = (value) => {
   return date;
 };
 
+const formatDate = (date) =>
+  `${String(date.getUTCDate()).padStart(2, "0")}/${String(
+    date.getUTCMonth() + 1,
+  ).padStart(2, "0")}/${date.getUTCFullYear()}`;
+
 const formatMonth = (date) =>
   `${String(date.getUTCMonth() + 1).padStart(2, "0")}/${date.getUTCFullYear()}`;
 
-const createNoSalesRow = ({ month }) => ({
-  month,
+const createNoSalesRow = ({ date, month, year }) => ({
+  ...(date ? { date } : {}),
+  ...(month ? { month } : {}),
+  ...(year ? { year } : {}),
   totalSales: 0,
   totalInvoices: 0,
   sourceSalesPerSqm: null,
@@ -53,6 +60,46 @@ const createNoSalesRow = ({ month }) => ({
     distinctCurrencyCount: 0,
   },
 });
+
+const completeDailySeries = ({
+  rows,
+  dateFrom,
+  dateTo,
+  groupBy,
+}) => {
+  if (groupBy.length !== 1 || groupBy[0] !== "day") {
+    return rows;
+  }
+
+  const startDate = parseDate(dateFrom);
+  const endDate = parseDate(dateTo);
+
+  if (!startDate || !endDate || startDate > endDate) {
+    return rows;
+  }
+
+  const rowsByDate = new Map(
+    rows
+      .filter((row) => row?.date)
+      .map((row) => [row.date, row]),
+  );
+
+  const result = [];
+  const cursor = new Date(startDate);
+
+  while (cursor <= endDate) {
+    const date = formatDate(cursor);
+
+    result.push(
+      rowsByDate.get(date) ??
+        createNoSalesRow({ date }),
+    );
+
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+
+  return result;
+};
 
 const completeMonthlySeries = ({
   rows,
@@ -155,32 +202,43 @@ const rowNeedsUsdConversion = (row) =>
   hasSales(row) &&
   normalizeCurrencyCode(row?.currency) === "PYG";
 
-const buildMonthlyAvailabilitySummary = (rows, groupBy) => {
-  if (groupBy.length !== 1 || groupBy[0] !== "month") {
+const TEMPORAL_DIMENSION_FIELDS = {
+  day: "date",
+  month: "month",
+  year: "year",
+};
+
+const buildTemporalAvailabilitySummary = (rows, groupBy) => {
+  if (groupBy.length !== 1) {
+    return null;
+  }
+
+  const dimension = groupBy[0];
+  const periodField = TEMPORAL_DIMENSION_FIELDS[dimension];
+
+  if (!periodField) {
     return null;
   }
 
   return {
-    monthsWithArea: rows
+    dimension,
+    periodsWithArea: rows
       .filter(
         (row) =>
           row.status === "OK" &&
           row.area?.complete === true,
       )
-      .map((row) => row.month),
-    monthsWithSalesWithoutArea: rows
+      .map((row) => row[periodField]),
+    periodsWithSalesWithoutArea: rows
       .filter((row) => row.status === "AREA_NOT_AVAILABLE")
-      .map((row) => row.month),
-    monthsWithoutSales: rows
+      .map((row) => row[periodField]),
+    periodsWithPartialArea: rows
+      .filter((row) => row.status === "AREA_PARTIALLY_AVAILABLE")
+      .map((row) => row[periodField]),
+    periodsWithoutSales: rows
       .filter((row) => row.status === "NO_SALES")
-      .map((row) => row.month),
+      .map((row) => row[periodField]),
   };
-};
-
-const TEMPORAL_DIMENSION_FIELDS = {
-  day: "date",
-  month: "month",
-  year: "year",
 };
 
 const buildTemporalAnalysisSummary = (rows, groupBy) => {
@@ -369,8 +427,13 @@ export const getSalesPerSqm = async (
     : [repositoryResult];
 
   const rows = Array.isArray(repositoryResult?.data)
-    ? completeMonthlySeries({
-        rows: repositoryRows,
+    ? completeDailySeries({
+        rows: completeMonthlySeries({
+          rows: repositoryRows,
+          dateFrom,
+          dateTo,
+          groupBy: normalizedGroupBy,
+        }),
         dateFrom,
         dateTo,
         groupBy: normalizedGroupBy,
@@ -426,7 +489,7 @@ export const getSalesPerSqm = async (
       dateFrom,
       dateTo,
       exchange,
-      availabilitySummary: buildMonthlyAvailabilitySummary(
+      availabilitySummary: buildTemporalAvailabilitySummary(
         enrichedRows,
         normalizedGroupBy,
       ),
