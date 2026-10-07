@@ -1,0 +1,1133 @@
+import {
+  BedrockRuntimeClient,
+  ConverseCommand,
+} from "@aws-sdk/client-bedrock-runtime";
+
+import config from "../../../config.js";
+import { tools } from "../../tools/index.js";
+import { executeTool } from "./toolExecutor.service.js";
+import {
+  getConversation,
+  setConversation,
+} from "../../state/conversation.store.js";
+import { trimConversation } from "./conversation.service.js";
+import { getSystemPrompt } from "../../prompts/system.prompt.js";
+import {
+  logBedrockRequest,
+  logBedrockResponse,
+  logToolCall,
+  logToolResult,
+} from "../../utils/debug.logger.js";
+import {
+  protectPiiDeep,
+  protectPiiText,
+  restorePiiDeep,
+  restorePiiTextForUser,
+} from "./pii.service.js";
+
+const bedrockClient = new BedrockRuntimeClient({
+  region: config.awsRegion || "us-east-1",
+});
+
+const MAX_TOOL_ITERATIONS = 8;
+const MAX_MODEL_ROWS_WITH_EXPORT = 12;
+
+const RUNTIME_CAPABILITIES_PROMPT = `
+## Capacidades disponibles en este servicio
+
+En esta etapa de migración, las herramientas habilitadas son:
+- search_customers
+- search_categories
+- get_sales
+- get_sales_per_sqm
+- search_invoice_customers
+- search_invoice_concepts
+- get_invoices
+- get_contract_conditions
+- get_contract_cost_per_sqm
+
+Aunque el prompt general pueda contener reglas para otros dominios del ERP, no afirmes que puedes consultar esos dominios ni intentes utilizar herramientas que no estén presentes en toolConfig.
+
+Para esta etapa:
+- puedes consultar ventas;
+- puedes calcular ventas por metro cuadrado con superficie contractual histórica y conversión a USD cuando corresponda;
+- puedes resolver clientes, marcas o locales;
+- puedes resolver rubros comerciales;
+- puedes consultar facturas emitidas;
+- puedes resolver clientes de facturación;
+- puedes resolver conceptos de facturación;
+- puedes consultar condiciones contractuales de locales con contrato activo;
+- puedes calcular costo contractual por metro cuadrado en PYG o USD cuando exista un último importe facturado válido dentro de la vigencia actual.
+
+Si el usuario solicita información que requiere una herramienta todavía no habilitada en este servicio, indícale brevemente que esa consulta aún no está disponible en esta etapa de migración.
+
+Para marcas o nombres propios comerciales:
+- si la intención principal es ventas u otra consulta comercial general, utiliza search_customers;
+- un token [PII_BUSINESS_ENTITY_*], [PII_CUSTOMER_NAME_*] u otro token PII que represente un nombre comercial NO es un customerId y nunca debe enviarse dentro de customerIds;
+- para herramientas de ventas que requieren customerIds, primero resuelve el nombre comercial mediante search_customers y utiliza exclusivamente el codCliente/customerId retornado por esa resolución;
+- un token [PII_CUSTOMER_ID_*] sí puede reutilizarse como customerId porque representa un identificador de cliente previamente resuelto;
+- si la intención principal es facturas emitidas por delSol, utiliza search_invoice_customers y NO search_customers.
+
+Para rubros genéricos como librería, gastronomía, indumentaria o electrónica, utiliza search_categories.
+
+Para ventas por metro cuadrado:
+- usa get_sales_per_sqm cuando el usuario pregunte por ventas por m², ventas por metro cuadrado o equivalentes;
+- resuelve primero el local mediante search_customers si todavía no existe un cliente inequívocamente resuelto; nunca interpretes [PII_BUSINESS_ENTITY_*] ni [PII_CUSTOMER_NAME_*] como customerId;
+- para una serie mensual usa groupBy=["month"]; para una serie anual usa groupBy=["year"]; para detalle diario usa groupBy=["day"];
+- la herramienta determina la superficie contractual aplicable en cada fecha de venta; no sustituyas esa superficie por la del contrato actual;
+- si la superficie cambia dentro de un período, conserva el cálculo explícito devuelto por la herramienta y puedes indicar que hubo más de una superficie aplicable;
+- para ventas originalmente en Guaraníes, presenta siempre ventas y ventas por m² en ₲ y, si exchange.available=true, también sus equivalentes en USD;
+- la conversión USD usa la cotización de VENTA actual de Maxicambios retornada por la herramienta;
+- si exchange.sellRate está disponible, preséntalo como una equivalencia exacta del tipo "1 USD = ₲ X (Maxicambios)"; no uses "≈", "aproximadamente" ni otros símbolos de estimación para la cotización;
+- para períodos históricos aclara brevemente que el equivalente en USD utiliza la cotización actual, no una cotización histórica;
+- si exchange.available=false por falta de cotización, presenta el resultado en Guaraníes y aclara que no fue posible obtener el equivalente en USD;
+- si status="AREA_NOT_AVAILABLE", significa que ninguna venta del período tiene una superficie contractual aplicable; presenta igualmente las ventas totales usando exclusivamente sales.pyg y sales.usd retornados por la herramienta y explica comercialmente que no se dispone de una superficie contractual aplicable para las ventas registradas en ese período;
+- si status="AREA_PARTIALLY_AVAILABLE", significa que algunas ventas del período sí tienen una superficie contractual aplicable y otras no; presenta las ventas totales, pero no presentes ventas por m² como representativas de todo el período; explica que la cobertura de superficie es parcial y que por eso no es posible calcular un indicador de ventas por m² para el período completo;
+- si status="NO_SALES", indica en lenguaje comercial que en ese período no se registraron ventas; no atribuyas ese caso a falta de superficie contractual;
+- los valores internos de status como "OK", "AREA_NOT_AVAILABLE", "AREA_PARTIALLY_AVAILABLE", "NO_SALES", "MIXED_CURRENCY" o "CURRENCY_NOT_SUPPORTED" son exclusivamente técnicos y nunca deben mostrarse literalmente al usuario, ni siquiera entre paréntesis ni en frases como "status = OK" o "estado NO_SALES";
+- no incluyas una columna "Estado" en tablas comerciales de ventas por m²; representa las situaciones mediante valores visibles y observaciones en lenguaje comercial;
+- cuando una serie mensual contenga meses con NO_SALES y otros con AREA_NOT_AVAILABLE, distingue ambos casos explícitamente en la tabla y en las observaciones;
+- nunca escribas una observación agrupando un mes NO_SALES junto con meses AREA_NOT_AVAILABLE bajo una misma explicación de falta de superficie;
+- si mencionas qué meses tienen superficie disponible o permiten calcular ventas por m², incluye únicamente períodos cuyo status sea "OK" y cuya area.complete sea true; nunca incluyas un período AREA_NOT_AVAILABLE en esa lista;
+- antes de redactar una observación que enumere meses, verifica que cada mes citado cumpla exactamente la condición descrita; evita frases contradictorias con la tabla;
+- si availabilitySummary está disponible, úsalo como fuente prioritaria y exclusiva para enumerar períodos; availabilitySummary.dimension indica si se trata de días, meses o años;
+- periodsWithArea contiene únicamente períodos con superficie válida;
+- periodsWithSalesWithoutArea contiene períodos con ventas pero sin superficie aplicable;
+- periodsWithPartialArea contiene períodos con cobertura parcial de superficie;
+- periodsWithoutSales contiene períodos sin ventas;
+- no reconstruyas ni amplíes esas listas por tu cuenta cuando availabilitySummary esté presente;
+- si analysisSummary está disponible, úsalo como fuente prioritaria y exclusiva para afirmar qué período tuvo la mayor venta total, la mayor venta por m² o la menor venta por m²; usa analysisSummary.dimension para interpretar si period representa un día, mes o año y no vuelvas a calcular máximos o mínimos desde la tabla;
+- si analysisSummary.totalSalesChange está disponible, úsalo como fuente exclusiva para comparar las ventas totales entre el primer y el último período con ventas de la serie;
+- si la serie contiene exactamente dos períodos temporales con ventas y analysisSummary.totalSalesChange está disponible, incluye siempre una comparación breve entre ambos períodos usando la dirección, la diferencia absoluta y percentageChange retornados por el servicio;
+- presenta esa comparación en lenguaje comercial, por ejemplo: "Las ventas disminuyeron un X % entre 2022 y 2023, equivalente a una diferencia de ₲ Y.", usando exclusivamente los valores explícitos de totalSalesChange;
+- totalSalesChange.fromPeriod y toPeriod identifican los períodos comparados; differencePyg/differenceUsd son diferencias con signo, absoluteDifferencePyg/absoluteDifferenceUsd son magnitudes absolutas, direction indica aumento/disminución/sin cambio y percentageChange contiene la variación porcentual calculada por el servicio;
+- nunca recalcules manualmente una diferencia absoluta ni una variación porcentual entre esos períodos cuando totalSalesChange esté presente;
+- nunca afirmes un máximo o mínimo temporal que contradiga analysisSummary;
+- si un período tiene status="AREA_NOT_AVAILABLE", no afirmes en ninguna otra observación que ese mismo período dispone de superficie contractual;
+- evita expresiones ambiguas como "la superficie contractual no estaba disponible" cuando puedan interpretarse como ausencia de dato en el contrato; utiliza preferentemente "no se dispone de una superficie contractual aplicable para ese período";
+- una disminución de ventas o ventas por m² puede describirse como una caída del indicador; no la conviertas automáticamente en una afirmación sobre disminución de actividad comercial, flujo de clientes, demanda, eficiencia comercial u otra causa no demostrada por los datos;
+- no describas una serie como "incremento sostenido", "caída sostenida", "tendencia ascendente" o "tendencia descendente" si existen observaciones intermedias que contradigan esa dirección; si no existe una tendencia monotónica clara, limita el análisis a máximos, mínimos y variaciones observadas;
+- no calcules variaciones porcentuales, diferencias porcentuales ni porcentajes aproximados entre períodos a partir de sales, salesPerSqm o texto previo; utiliza únicamente percentageChange de analysisSummary.totalSalesChange cuando esté disponible; si no está disponible, limita la descripción a los valores explícitos retornados sin derivar porcentajes;
+- nunca calcules manualmente sales.usd ni salesPerSqm.usd usando sellRate; si el equivalente USD no fue retornado explícitamente por la herramienta, no lo derives por tu cuenta;
+- los importes sales.usd y salesPerSqm.usd retornados explícitamente por la herramienta son valores calculados por el servicio con la cotización indicada; preséntalos directamente y nunca antepongas "≈", "aprox.", "aproximadamente" ni expresiones equivalentes a esos importes;
+- en tablas comerciales usa encabezados como "Ventas totales (₲)" y "Ventas por m² (₲)" para Guaraníes; no uses "(PYG)" como encabezado visible;
+- si status="MIXED_CURRENCY", no combines monedas ni presentes una conversión agregada;
+- nunca calcules manualmente ventas por m² desde texto previo si la herramienta puede devolver el valor explícito.
+
+Para consultas contractuales:
+- resuelve primero el local mediante search_customers si todavía no existe un cliente inequívocamente resuelto;
+- reutiliza el codCliente resuelto como customerId de get_contract_conditions;
+- usa get_contract_conditions para superficie, vencimiento, plazo, IPC, observaciones, conceptos configurados y último importe facturado sin IVA;
+- para una consulta solo de superficie/vencimiento/cabecera usa includeConcepts=false;
+- para condiciones generales usa includeConcepts=true e includeLastBilledAmounts=true;
+- si get_contract_conditions devuelve AMBIGUOUS, presenta las opciones comerciales y espera selección;
+- no expongas contractType, contractSeries, contractNumber, conceptCode ni otros identificadores internos salvo solicitud técnica explícita;
+- en respuestas contractuales resueltas no muestres filas "Número de contrato", "Serie del contrato" ni "Tipo de contrato";
+- si lastBilled es null, significa que no existe una facturación válida del concepto dentro de la vigencia del contrato/concepto actual; no reutilices ni presentes importes históricos anteriores;
+- nunca menciones al usuario el nombre interno lastBilled ni expresiones como "campo lastBilled"; si todos los conceptos carecen de facturación válida, indica únicamente que no se dispone de último importe facturado sin IVA para esos conceptos;
+- para importes en Guaraníes presenta siempre "₲ 123.456", con el símbolo delante del importe;
+- si el usuario pregunta genéricamente por "alquiler" y existen varios conceptos aplicables, presenta los conceptos y solicita cuál desea consultar; no asumas automáticamente arrendamiento mínimo;
+- para costo por m², usa get_contract_cost_per_sqm únicamente después de tener cliente y concepto inequívocamente resueltos;
+- si el último resultado contractual ya contiene los conceptos, reutilízalos y no vuelvas a resolver el cliente;
+- si el usuario pide el costo por m² en USD, usa targetCurrency="USD";
+- si el usuario no especifica moneda objetivo, usa targetCurrency="PYG";
+- si get_contract_cost_per_sqm devuelve BILLED_AMOUNT_NOT_FOUND, informa que no existe un último importe facturado válido dentro de la vigencia actual para calcular el costo por m²;
+- nunca calcules manualmente el costo por m² a partir de texto previo si la herramienta puede devolverlo explícitamente;
+- si existe exchangeRate, presenta únicamente la cotización de venta utilizada y su fuente en lenguaje comercial; no menciones nombres internos de campos.
+Si existe duda entre marca/local y rubro dentro de una consulta de ventas, intenta primero search_customers.
+
+Para consultas de facturas:
+- usa search_invoice_customers cuando el usuario mencione un cliente de facturación por nombre, razón social, RUC, matrícula o texto identificador y todavía no tengas un customerId resuelto;
+- si la consulta de facturas incluye un período explícito, pasa ese mismo dateFrom/dateTo también a search_invoice_customers; la resolución del cliente debe hacerse dentro del mismo período que luego utilizará get_invoices;
+- no resuelvas globalmente un cliente de facturación y luego filtres otro período si el usuario ya proporcionó fechas;
+- usa search_invoice_concepts cuando el usuario mencione un concepto de factura por texto y todavía no tengas un conceptId resuelto;
+- usa get_invoices para obtener detalle o resumen de facturas;
+- si el usuario solicita importes agregados o cantidad de facturas, prefiere mode="summary";
+- si solicita facturas específicas, conceptos, vencimientos, matrícula, contrato asociado o detalle de una factura, prefiere mode="detail";
+- nunca inventes customerIds, conceptIds, números de factura, matrículas ni referencias de contrato;
+- no expongas identificadores internos en la respuesta comercial;
+- si un concepto o cliente es ambiguo, presenta opciones y espera la selección del usuario;
+- en una ambigüedad de clientes de facturación muestra únicamente columnas comerciales útiles como "Opción", "Cliente" y "Razón social";
+- no muestres customerId, código de cliente ni ID de cliente en la tabla de opciones;
+- si varias opciones tienen el mismo nombre comercial, conserva las filas distintas pero no expongas identificadores internos;
+- las descripciones de conceptos y demás datos sensibles pueden llegar como tokens [PII_*]; consérvalos exactamente;
+- get_invoices en mode="detail" es paginado;
+- page indica la página actual, rows el tamaño solicitado, returnedRows las filas realmente retornadas, totalRows la cantidad total de filas de detalle/conceptos, totalInvoices la cantidad real de facturas distintas, totalPages la cantidad de páginas y hasMore si existen más resultados;
+- cuando totalRows sea mayor que returnedRows o hasMore=true, informa explícitamente que se está mostrando solo una parte del resultado, por ejemplo: "Se muestran 20 de 29 registros de detalle (página 1 de 2).";
+- distingue siempre "registros de detalle" de "facturas": una factura puede contener varios conceptos y por eso totalRows puede ser mayor que totalInvoices;
+- si hasMore=true, ofrece brevemente al usuario ver la siguiente página;
+- cuando presentes una página de get_invoices en una tabla, debes mostrar TODAS las filas presentes en data; si returnedRows=20, la tabla debe contener exactamente 20 filas de datos;
+- nunca reemplaces filas de una página por "...", "…", "etc.", "y otros" ni ninguna forma de abreviación;
+- no digas "Se muestran 20" si la tabla visible contiene menos de 20 filas;
+- si el usuario responde "ver más", "mostrar más", "siguiente página", "continuar" o una expresión equivalente, reutiliza exactamente los filtros anteriores y ejecuta get_invoices con page=nextPage y el mismo rows;
+- no vuelvas a resolver el cliente ni el concepto si ya están resueltos en el historial;
+- nunca afirmes que existe exportación de facturas salvo que el toolResult contenga explícitamente metadata de exportación;
+- nunca uses frases como "el conjunto completo está disponible para exportación" para get_invoices si esa metadata no existe;
+- si recibes una página de detalle, presenta solo las filas recibidas y, cuando sea útil, indica que corresponde a la página consultada sin afirmar cuántas filas totales existen;
+- nunca inventes total de facturas a partir de la cantidad de filas del detalle, porque una factura puede contener varios conceptos.
+
+Si get_sales devuelve un resultado sin registros y la moneda no está disponible, informa simplemente que no se encontraron ventas para el período solicitado. No presentes una moneda desconocida como un problema de datos.
+
+Para importes monetarios:
+- respeta siempre currency.symbol y currency.symbolPosition cuando estén presentes;
+- si currency.symbolPosition="prefix", coloca el símbolo antes del importe y separado por un espacio;
+- para Guaraníes, presenta siempre el símbolo "₲"; no uses "PYG" como encabezado comercial cuando el importe ya está identificado como Guaraníes;
+- presenta siempre el formato "₲ 329.378.000", nunca "329.378.000 ₲";
+- conserva el formato numérico paraguayo con punto como separador de miles y coma como separador decimal;
+- nunca utilices espacios, espacios no separables ni espacios finos como separador de miles.
+
+Cuando get_sales incluya resultSet.truncated=true:
+- el conjunto completo contiene más registros que los enviados al modelo;
+- resultSet.totalRecords indica la cantidad total real;
+- resultSet.returnedRecords indica cuántos registros de muestra recibiste;
+- resultSet.sampleType="FIRST_ROWS_IN_SOURCE_ORDER" significa que la muestra contiene únicamente las primeras filas según el orden original de la consulta;
+- resultSet.isRanking=false significa que la muestra NO es un ranking, Top N ni selección de mayores o menores valores;
+- presenta únicamente una muestra breve de los registros recibidos;
+- utiliza una frase como: "Se muestran 12 de 187 registros. El detalle completo está disponible para exportación.";
+- indica claramente que existe un conjunto completo disponible para exportación;
+- nunca afirmes que la muestra representa todos los resultados;
+- nunca describas la muestra como "los primeros por importe", "los de mayor venta", "Top", "ranking", "líderes" ni expresiones equivalentes;
+- nunca sumes, promedies ni construyas totales a partir de la muestra;
+- nunca presentes totales aproximados;
+- nunca armes rankings, Top N o conclusiones sobre máximos/mínimos globales usando solamente la muestra;
+- nunca afirmes que "la mayoría" del conjunto cumple una condición utilizando solamente la muestra;
+- nunca afirmes concentración, distribución global o participación relativa utilizando solamente la muestra;
+- puedes describir literalmente los valores visibles de una fila concreta, pero no extrapolarlos al conjunto completo.
+
+Si resultSet.analysisPolicy="NO_ANALYSIS":
+- NO agregues secciones "Análisis", "Observación", "Conclusión" ni equivalentes;
+- NO calcules porcentajes, participaciones, sumas, promedios, comparaciones ni tendencias a partir de las filas de muestra;
+- NO identifiques líderes, mayores, menores, concentración, distribución ni comportamiento global;
+- limita la respuesta a presentar la muestra y señalar que el conjunto completo está disponible para exportación.
+
+Si resultSet.analysisPolicy="EXPLICIT_INSIGHTS_ONLY":
+- puedes agregar análisis únicamente a partir de valores presentes explícitamente en insights;
+- nunca derives análisis adicional desde las filas truncadas;
+- distingue claramente la muestra de datos de los insights globales calculados por el sistema.
+
+## Presentación de identificadores protegidos
+- Los tokens [PII_*] son exclusivamente internos y nunca deben mostrarse literalmente al usuario.
+- Nunca presentes códigos, IDs ni identificadores internos de clientes o rubros en respuestas comerciales.
+- Para clientes/locales, presenta únicamente el nombre comercial cuando esté disponible.
+- Nunca escribas expresiones como "código de cliente", "ID de cliente", "customerId", "código de rubro" o equivalentes salvo que el usuario solicite explícitamente información técnica.
+- Un identificador interno puede reutilizarse silenciosamente como argumento de una herramienta, pero no debe formar parte del texto final.
+`.trim();
+
+const normalizeHistory = (history = []) => {
+  return history
+    .filter(
+      (message) => message && ["user", "assistant"].includes(message.role),
+    )
+    .map((message) => {
+      if (Array.isArray(message.content)) {
+        return message;
+      }
+
+      return {
+        role: message.role,
+        content: [
+          {
+            text: String(message.content ?? ""),
+          },
+        ],
+      };
+    });
+};
+
+const extractText = (message) => {
+  if (!Array.isArray(message?.content)) {
+    return "";
+  }
+
+  return message.content
+    .filter((block) => typeof block.text === "string")
+    .map((block) => block.text)
+    .join("\n")
+    .trim();
+};
+
+const removeMarkdownColumns = (text, forbiddenHeaders = []) => {
+  const lines = String(text ?? "").split("\n");
+  const result = [];
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const headerLine = lines[index];
+    const separatorLine = lines[index + 1];
+
+    const isTableHeader =
+      headerLine.includes("|") &&
+      typeof separatorLine === "string" &&
+      /^\s*\|?(?:\s*:?-{3,}:?\s*\|)+\s*:?-{3,}:?\s*\|?\s*$/.test(
+        separatorLine,
+      );
+
+    if (!isTableHeader) {
+      result.push(headerLine);
+      continue;
+    }
+
+    const parseCells = (line) =>
+      line
+        .trim()
+        .replace(/^\|/, "")
+        .replace(/\|$/, "")
+        .split("|")
+        .map((cell) => cell.trim());
+
+    const headers = parseCells(headerLine);
+    const forbiddenIndexes = headers
+      .map((header, columnIndex) => ({
+        columnIndex,
+        normalized: header
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^a-z0-9]/g, ""),
+      }))
+      .filter(({ normalized }) =>
+        forbiddenHeaders.some((forbidden) =>
+          normalized.includes(forbidden),
+        ),
+      )
+      .map(({ columnIndex }) => columnIndex);
+
+    if (forbiddenIndexes.length === 0) {
+      result.push(headerLine);
+      continue;
+    }
+
+    const keepIndexes = headers
+      .map((_header, columnIndex) => columnIndex)
+      .filter((columnIndex) => !forbiddenIndexes.includes(columnIndex));
+
+    const formatRow = (line) => {
+      const cells = parseCells(line);
+      return `| ${keepIndexes
+        .map((columnIndex) => cells[columnIndex] ?? "")
+        .join(" | ")} |`;
+    };
+
+    result.push(formatRow(headerLine));
+
+    const separatorCells = parseCells(separatorLine);
+    result.push(
+      `| ${keepIndexes
+        .map((columnIndex) => separatorCells[columnIndex] ?? "---")
+        .join(" | ")} |`,
+    );
+
+    index += 1;
+
+    while (
+      index + 1 < lines.length &&
+      lines[index + 1].includes("|") &&
+      lines[index + 1].trim() !== ""
+    ) {
+      result.push(formatRow(lines[index + 1]));
+      index += 1;
+    }
+  }
+
+  return result.join("\n");
+};
+
+const normalizeParaguayanNumberSeparators = (text) =>
+  String(text ?? "").replace(
+    /(\d)[ \u00A0\u202F](?=\d{3}(?:\D|$))/g,
+    "$1.",
+  );
+
+const normalizeGuaraniCurrencyPlacement = (text) =>
+  String(text ?? "").replace(
+    /(\d[\d.]*?(?:,\d+)?)[ \u00A0\u202F]*₲/g,
+    "₲ $1",
+  );
+
+const removeMarkdownRowsByLabels = (text, forbiddenLabels = []) =>
+  String(text ?? "")
+    .split("\n")
+    .filter((line) => {
+      const trimmed = line.trim();
+
+      if (!trimmed.startsWith("|")) {
+        return true;
+      }
+
+      const firstCell = trimmed
+        .replace(/^\|/, "")
+        .split("|")[0]
+        .replace(/\*\*/g, "")
+        .trim()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]/g, "");
+
+      return !forbiddenLabels.some((label) =>
+        firstCell.includes(label),
+      );
+    })
+    .join("\n");
+
+const normalizePiiTokenSyntax = (text) =>
+  String(text ?? "")
+    .replace(
+      /\\?<\s*(PII_[A-Z_]+_\d+)\s*>/g,
+      "[$1]",
+    )
+    .replace(
+      /\(\s*<\s*(PII_[A-Z_]+_\d+)\s*>\s*\)/g,
+      "([$1])",
+    );
+
+const sanitizeAssistantTextForUser = (text) => {
+  if (typeof text !== "string") {
+    return text;
+  }
+
+  const withoutInternalColumns = removeMarkdownColumns(text, [
+    "codigodecliente",
+    "iddecliente",
+    "customerid",
+    "codigoderubro",
+    "idderubro",
+    "categoryid",
+  ]);
+
+  const withoutInternalContractRows = removeMarkdownRowsByLabels(
+    withoutInternalColumns,
+    [
+      "numerodecontrato",
+      "seriedelcontrato",
+      "tipodecontrato",
+    ],
+  );
+
+  const withoutInternalIds = withoutInternalContractRows
+    .replace(
+      /\s*\((?:c[oó]digo\s+de\s+cliente|id\s+de\s+cliente|customer\s*id)\s*:\s*\[PII_CUSTOMER_ID_\d+\]\)/gi,
+      "",
+    )
+    .replace(
+      /(?:c[oó]digo\s+de\s+cliente|id\s+de\s+cliente|customer\s*id)\s*:?\s*\[PII_CUSTOMER_ID_\d+\]/gi,
+      "",
+    )
+    .replace(
+      /\s*\((?:c[oó]digo\s+de\s+rubro|id\s+de\s+rubro|category\s*id)\s*:\s*\[PII_[A-Z_]*CATEGORY_ID_\d+\]\)/gi,
+      "",
+    );
+
+  const normalizedCurrencyHeader = withoutInternalIds.replace(
+    /Importe\s*\(\s*PYG\s*\)/gi,
+    "Importe (₲)",
+  );
+
+  const withoutInternalContractTerms = normalizedCurrencyHeader
+    .replace(
+      /\s*\(\s*campo\s+\*?lastBilled\*?\s+es\s+nulo\s*\)/gi,
+      "",
+    )
+    .replace(
+      /\bcampo\s+\*?lastBilled\*?\s+es\s+nulo\b/gi,
+      "",
+    );
+
+  const withoutInternalStatuses = withoutInternalContractTerms
+    .replace(
+      /\s*\(\s*status\s*=\s*(?:OK|AREA_NOT_AVAILABLE|AREA_PARTIALLY_AVAILABLE|NO_SALES|MIXED_CURRENCY|CURRENCY_NOT_SUPPORTED)\s*\)/gi,
+      "",
+    )
+    .replace(
+      /\bstatus\s*=\s*(?:OK|AREA_NOT_AVAILABLE|AREA_PARTIALLY_AVAILABLE|NO_SALES|MIXED_CURRENCY|CURRENCY_NOT_SUPPORTED)\b/gi,
+      "",
+    )
+    .replace(
+      /\s*\(\s*estado\s+\*{0,2}(?:OK|AREA_NOT_AVAILABLE|AREA_PARTIALLY_AVAILABLE|NO_SALES|MIXED_CURRENCY|CURRENCY_NOT_SUPPORTED)\*{0,2}\s*\)/gi,
+      "",
+    )
+    .replace(
+      /\bestado\s+\*{0,2}(?:OK|AREA_NOT_AVAILABLE|AREA_PARTIALLY_AVAILABLE|NO_SALES|MIXED_CURRENCY|CURRENCY_NOT_SUPPORTED)\*{0,2}\b/gi,
+      "",
+    );
+
+  const normalizedExchangeRate = withoutInternalStatuses.replace(
+    /1\s*USD\s*(?:≈|~|≃|≅|aprox\.?|aproximadamente)?\s*=*\s*₲\s*([\d.]+(?:,\d+)?)/gi,
+    "1 USD = ₲ $1",
+  );
+
+  return normalizePiiTokenSyntax(
+    normalizeGuaraniCurrencyPlacement(
+      normalizeParaguayanNumberSeparators(
+        normalizedExchangeRate,
+      ),
+    ),
+  ).trim();
+};
+
+const normalizeToolResult = (value) => {
+  if (value === undefined) {
+    return { success: true };
+  }
+
+  const json = JSON.stringify(value, (_key, currentValue) =>
+    typeof currentValue === "bigint" ? currentValue.toString() : currentValue,
+  );
+
+  if (json === undefined) {
+    return { success: true };
+  }
+
+  const normalized = JSON.parse(json);
+
+  if (Array.isArray(normalized)) {
+    return { data: normalized };
+  }
+
+  if (normalized !== null && typeof normalized === "object") {
+    return normalized;
+  }
+
+  return { value: normalized };
+};
+
+const getCurrentDateParaguay = () => {
+  return new Intl.DateTimeFormat("es-PY", {
+    timeZone: "America/Asuncion",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(new Date());
+};
+
+const mergeActions = (currentActions, newActions) => ({
+  ...currentActions,
+  ...newActions,
+});
+
+const extractClientActions = ({ name, result }) => {
+  if (name === "get_sales" && result?.export?.available) {
+    const exportId = result.export.exportId ?? null;
+
+    return {
+      salesExport: {
+        eligible: true,
+        available: Boolean(exportId),
+        exportId,
+        totalRecords: Number(
+          result.export.totalRecords ??
+            (Array.isArray(result?.data) ? result.data.length : 0),
+        ),
+        format: result.export.format ?? "xlsx",
+        fileName: result.export.fileName ?? null,
+        expiresAt: result.export.expiresAt ?? null,
+      },
+    };
+  }
+
+  if (
+    name === "get_invoices" &&
+    Array.isArray(result?.data) &&
+    Number(result?.page ?? 0) >= 1
+  ) {
+    const page = Number(result.page ?? 1);
+    const rows = Number(result.rows ?? result.data.length ?? 20);
+    const totalRows = Number(result.totalRows ?? result.data.length ?? 0);
+    const totalInvoices = Number(result.totalInvoices ?? 0);
+    const totalPages = Number(result.totalPages ?? 0);
+    const hasMore = Boolean(result.hasMore);
+    const nextPage =
+      result.nextPage === null || result.nextPage === undefined
+        ? null
+        : Number(result.nextPage);
+
+    return {
+      invoicePagination: {
+        available: hasMore,
+        page,
+        rows,
+        returnedRows: Number(
+          result.returnedRows ?? result.data.length ?? 0,
+        ),
+        totalRows,
+        totalInvoices,
+        totalPages,
+        hasMore,
+        nextPage,
+      },
+    };
+  }
+
+  return {};
+};
+
+const removeClientOnlyMetadata = ({ name, result }) => {
+  if (
+    name === "get_sales" &&
+    result &&
+    typeof result === "object" &&
+    !Array.isArray(result)
+  ) {
+    const { export: exportMetadata, ...resultForModel } = result;
+
+    if (
+      exportMetadata?.available &&
+      Array.isArray(resultForModel.data) &&
+      resultForModel.data.length > MAX_MODEL_ROWS_WITH_EXPORT
+    ) {
+      const hasTemporalInsights = Boolean(
+        resultForModel.insights?.scope?.timeDimension,
+      );
+
+      const {
+        insights,
+        ...resultWithoutInsights
+      } = resultForModel;
+
+      return {
+        ...resultWithoutInsights,
+        ...(hasTemporalInsights ? { insights } : {}),
+        data: resultForModel.data.slice(0, MAX_MODEL_ROWS_WITH_EXPORT),
+        resultSet: {
+          truncated: true,
+          totalRecords: Number(
+            exportMetadata.totalRecords ?? resultForModel.data.length,
+          ),
+          returnedRecords: MAX_MODEL_ROWS_WITH_EXPORT,
+          sampleType: "FIRST_ROWS_IN_SOURCE_ORDER",
+          isRanking: false,
+          analysisPolicy: hasTemporalInsights
+            ? "EXPLICIT_INSIGHTS_ONLY"
+            : "NO_ANALYSIS",
+          fullResultAvailableInExport: true,
+        },
+      };
+    }
+
+    return resultForModel;
+  }
+
+  return result;
+};
+
+const validateProtectedToolInput = ({ name, input = {} }) => {
+  if (
+    name === "get_sales_per_sqm" &&
+    Array.isArray(input.customerIds)
+  ) {
+    const invalidProtectedCustomerId = input.customerIds.find((value) => {
+      const match = /^\[PII_([A-Z_]+)_\d+\]$/.exec(String(value ?? ""));
+      return match && match[1] !== "CUSTOMER_ID";
+    });
+
+    if (invalidProtectedCustomerId) {
+      throw new Error(
+        "CUSTOMER_NOT_RESOLVED: customerIds debe contener únicamente identificadores de cliente previamente resueltos mediante search_customers. Resuelve primero el nombre comercial y vuelve a ejecutar get_sales_per_sqm con el customerId retornado.",
+      );
+    }
+  }
+};
+
+const formatPygInteger = (value) =>
+  new Intl.NumberFormat("es-PY", {
+    maximumFractionDigits: 0,
+  }).format(Math.abs(Number(value ?? 0)));
+
+const containsNumericValue = (text, value) => {
+  const numericValue = Math.abs(Number(value ?? 0));
+
+  if (!Number.isFinite(numericValue)) {
+    return false;
+  }
+
+  const compactText = String(text ?? "").replace(
+    /[.\s\u00A0\u202F]/g,
+    "",
+  );
+  const compactValue = String(Math.round(numericValue));
+
+  return compactValue.length > 0 && compactText.includes(compactValue);
+};
+
+const formatPercentage = (value) =>
+  new Intl.NumberFormat("es-PY", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(Math.abs(Number(value ?? 0)));
+
+const containsPercentageValue = (text, value) => {
+  const numericValue = Math.abs(Number(value ?? 0));
+
+  if (!Number.isFinite(numericValue)) {
+    return false;
+  }
+
+  const candidates = [
+    numericValue.toFixed(2),
+    numericValue.toFixed(1),
+    String(Math.round(numericValue)),
+  ].map((candidate) => candidate.replace(".", ","));
+
+  const normalizedText = String(text ?? "")
+    .replace(/[\u00A0\u202F]/g, " ")
+    .replace(/\./g, ",");
+
+  return candidates.some((candidate) =>
+    normalizedText.includes(`${candidate} %`) ||
+    normalizedText.includes(`${candidate}%`),
+  );
+};
+
+const getTemporalSortValue = (dimension, period) => {
+  const value = String(period ?? "");
+
+  if (dimension === "year") {
+    return Number(value) || 0;
+  }
+
+  if (dimension === "month") {
+    const [month, year] = value.split("/").map(Number);
+    return (year || 0) * 100 + (month || 0);
+  }
+
+  if (dimension === "day") {
+    const [day, month, year] = value.split("/").map(Number);
+    return (year || 0) * 10000 + (month || 0) * 100 + (day || 0);
+  }
+
+  return 0;
+};
+
+const buildSqmTwoPeriodComparison = (internalContext) => {
+  const periods = Array.isArray(internalContext?.salesPerSqmPeriods)
+    ? internalContext.salesPerSqmPeriods
+    : [];
+
+  const uniquePeriods = Array.from(
+    new Map(
+      periods
+        .filter(
+          (item) =>
+            item?.dimension &&
+            item?.period &&
+            Number(item?.pyg ?? 0) > 0,
+        )
+        .map((item) => [
+          `${item.dimension}:${item.period}`,
+          item,
+        ]),
+    ).values(),
+  );
+
+  if (
+    uniquePeriods.length !== 2 ||
+    uniquePeriods[0].dimension !== uniquePeriods[1].dimension
+  ) {
+    return null;
+  }
+
+  const ordered = [...uniquePeriods].sort(
+    (a, b) =>
+      getTemporalSortValue(a.dimension, a.period) -
+      getTemporalSortValue(b.dimension, b.period),
+  );
+
+  const [from, to] = ordered;
+  const fromPyg = Number(from.pyg ?? 0);
+  const toPyg = Number(to.pyg ?? 0);
+  const differencePyg = toPyg - fromPyg;
+  const percentageChange =
+    fromPyg !== 0
+      ? Number(((differencePyg / fromPyg) * 100).toFixed(2))
+      : null;
+
+  return {
+    fromPeriod: from.period,
+    toPeriod: to.period,
+    absoluteDifferencePyg: Math.abs(differencePyg),
+    percentageChange,
+    direction:
+      differencePyg > 0
+        ? "INCREASE"
+        : differencePyg < 0
+          ? "DECREASE"
+          : "UNCHANGED",
+  };
+};
+
+const ensureSqmTwoPeriodComparison = ({
+  text,
+  internalContext,
+}) => {
+  const comparison = buildSqmTwoPeriodComparison(internalContext);
+
+  if (!comparison) {
+    return text;
+  }
+
+  const absoluteDifferencePyg = Number(
+    comparison.absoluteDifferencePyg ?? 0,
+  );
+  const percentageChange =
+    comparison.percentageChange === null ||
+    comparison.percentageChange === undefined
+      ? null
+      : Number(comparison.percentageChange);
+
+  const hasAbsoluteDifference = containsNumericValue(
+    text,
+    absoluteDifferencePyg,
+  );
+  const hasPercentage =
+    percentageChange === null
+      ? true
+      : containsPercentageValue(text, percentageChange);
+
+  if (hasAbsoluteDifference && hasPercentage) {
+    return text;
+  }
+
+  const fromPeriod = comparison.fromPeriod ?? null;
+  const toPeriod = comparison.toPeriod ?? null;
+  const periodLabel =
+    fromPeriod && toPeriod
+      ? ` entre ${fromPeriod} y ${toPeriod}`
+      : "";
+
+  const directionText =
+    comparison.direction === "INCREASE"
+      ? "aumentaron"
+      : comparison.direction === "DECREASE"
+        ? "disminuyeron"
+        : "no variaron";
+
+  if (!hasAbsoluteDifference && !hasPercentage && percentageChange !== null) {
+    return `${String(text ?? "").trim()}\n\n**Comparación de ventas:** las ventas ${directionText} ${formatPercentage(
+      percentageChange,
+    )} %${periodLabel}, con una diferencia absoluta de ₲ ${formatPygInteger(
+      absoluteDifferencePyg,
+    )}.`;
+  }
+
+  if (!hasAbsoluteDifference) {
+    return `${String(text ?? "").trim()}\n\n**Diferencia absoluta de ventas:** ₲ ${formatPygInteger(
+      absoluteDifferencePyg,
+    )}${periodLabel}.`;
+  }
+
+  return `${String(text ?? "").trim()}\n\n**Variación de ventas:** las ventas ${directionText} ${formatPercentage(
+    percentageChange,
+  )} %${periodLabel}.`;
+};
+
+const executeToolRequests = async ({ content, sessionId }) => {
+  const toolResults = [];
+  let actions = {};
+  let internalContext = {};
+  const toolUses = content.filter((block) => block.toolUse);
+
+  for (const block of toolUses) {
+    const { toolUseId, name, input = {} } = block.toolUse;
+
+    logToolCall({
+      name,
+      input,
+      sessionId,
+    });
+
+    try {
+      validateProtectedToolInput({ name, input });
+
+      const restoredInput = restorePiiDeep(sessionId, input);
+
+      const result = await executeTool({
+        name,
+        arguments: restoredInput,
+        context: {
+          sessionId,
+        },
+      });
+
+      actions = mergeActions(
+        actions,
+        extractClientActions({ name, result }),
+      );
+
+      if (
+        name === "get_sales_per_sqm" &&
+        Array.isArray(result?.data)
+      ) {
+        const dimension =
+          result?.analysisSummary?.dimension ??
+          result?.availabilitySummary?.dimension ??
+          null;
+        const periodField = {
+          day: "date",
+          month: "month",
+          year: "year",
+        }[dimension];
+
+        if (periodField) {
+          const periodsWithSales = result.data
+            .filter(
+              (row) =>
+                row?.[periodField] &&
+                Number(row?.sales?.pyg ?? row?.totalSales ?? 0) > 0,
+            )
+            .map((row) => ({
+              dimension,
+              period: row[periodField],
+              pyg: Number(row?.sales?.pyg ?? row?.totalSales ?? 0),
+            }));
+
+          internalContext = {
+            ...internalContext,
+            salesPerSqmPeriods: [
+              ...(internalContext.salesPerSqmPeriods ?? []),
+              ...periodsWithSales,
+            ],
+          };
+        }
+      }
+
+      const resultForModel = removeClientOnlyMetadata({
+        name,
+        result,
+      });
+
+      const protectedResultForModel = protectPiiDeep(
+        sessionId,
+        resultForModel,
+        null,
+        [name],
+      );
+
+      logToolResult({
+        name,
+        result: protectedResultForModel,
+      });
+
+      toolResults.push({
+        toolResult: {
+          toolUseId,
+          status: "success",
+          content: [
+            {
+              json: normalizeToolResult(protectedResultForModel),
+            },
+          ],
+        },
+      });
+    } catch (error) {
+      const protectedErrorMessage = protectPiiText(
+        sessionId,
+        error?.message || "Error ejecutando la herramienta.",
+      );
+
+      logToolResult({
+        name,
+        error: {
+          ...error,
+          message: protectedErrorMessage,
+        },
+      });
+
+      console.error(
+        `Error ejecutando tool "${name}":`,
+        protectedErrorMessage,
+      );
+
+      toolResults.push({
+        toolResult: {
+          toolUseId,
+          status: "error",
+          content: [
+            {
+              json: {
+                success: false,
+                error: "TOOL_EXECUTION_ERROR",
+                message: protectedErrorMessage,
+              },
+            },
+          ],
+        },
+      });
+    }
+  }
+
+  return {
+    toolResults,
+    actions,
+    internalContext,
+  };
+};
+
+export const chatService = async ({ message, sessionId }) => {
+  if (!message?.trim()) {
+    throw new Error("El mensaje del usuario es obligatorio.");
+  }
+
+  if (!sessionId) {
+    throw new Error("El sessionId es obligatorio.");
+  }
+
+  const history = getConversation(sessionId) ?? [];
+
+  const protectedHistory = protectPiiDeep(
+    sessionId,
+    normalizeHistory(history),
+  );
+
+  const messages = [
+    ...protectedHistory,
+    {
+      role: "user",
+      content: [
+        {
+          text: protectPiiText(sessionId, message.trim()),
+        },
+      ],
+    },
+  ];
+
+  const systemPrompt = getSystemPrompt({
+    currentDate: getCurrentDateParaguay(),
+  });
+
+  let toolIterations = 0;
+  let bedrockIteration = 0;
+  let conversationActions = {};
+  let conversationInternalContext = {};
+
+  while (true) {
+    bedrockIteration += 1;
+
+    const commandInput = {
+        modelId: config.awsBedrockModelId,
+        system: [
+          {
+            text: systemPrompt,
+          },
+          {
+            text: RUNTIME_CAPABILITIES_PROMPT,
+          },
+        ],
+        messages,
+        toolConfig: {
+          tools,
+        },
+        inferenceConfig: {
+          maxTokens: Number(config.awsBedrockMaxTokens || 8192),
+          temperature: Number(config.awsBedrockTemperature || 0.1),
+        },
+      };
+
+    logBedrockRequest({
+      iteration: bedrockIteration,
+      modelId: config.awsBedrockModelId,
+      input: commandInput,
+    });
+
+    const response = await bedrockClient.send(
+      new ConverseCommand(commandInput),
+    );
+
+    logBedrockResponse({
+      iteration: bedrockIteration,
+      response,
+    });
+
+    const outputMessage = response.output?.message;
+
+    if (!outputMessage) {
+      throw new Error("Amazon Bedrock no devolvió un mensaje.");
+    }
+
+    /*
+     * El modelo solo recibe mensajes y toolResults previamente
+     * pseudonimizados, por lo que su salida ya opera sobre tokens [PII_*].
+     *
+     * No volvemos a ejecutar protectPiiDeep sobre texto generado por el
+     * asistente: hacerlo podría confundir lenguaje natural como
+     * "cliente seleccionado" con una entidad sensible real.
+     */
+    const safeOutputMessage = outputMessage;
+
+    messages.push(safeOutputMessage);
+
+    if (response.stopReason === "tool_use") {
+      toolIterations += 1;
+
+      if (toolIterations > MAX_TOOL_ITERATIONS) {
+        throw new Error(
+          `Se alcanzó el máximo de ${MAX_TOOL_ITERATIONS} iteraciones de herramientas.`,
+        );
+      }
+
+      const {
+        toolResults,
+        actions,
+        internalContext,
+      } = await executeToolRequests({
+        content: safeOutputMessage.content ?? [],
+        sessionId,
+      });
+
+      conversationActions = mergeActions(
+        conversationActions,
+        actions,
+      );
+      conversationInternalContext = {
+        ...conversationInternalContext,
+        ...internalContext,
+        salesPerSqmPeriods: [
+          ...(conversationInternalContext.salesPerSqmPeriods ?? []),
+          ...(internalContext.salesPerSqmPeriods ?? []),
+        ],
+      };
+
+      if (toolResults.length === 0) {
+        throw new Error(
+          "Bedrock indicó tool_use pero no devolvió ninguna herramienta.",
+        );
+      }
+
+      messages.push({
+        role: "user",
+        content: toolResults,
+      });
+
+      continue;
+    }
+
+    const safeAssistantText = sanitizeAssistantTextForUser(
+      extractText(safeOutputMessage),
+    );
+
+    const completedAssistantText =
+      ensureSqmTwoPeriodComparison({
+        text: safeAssistantText,
+        internalContext: conversationInternalContext,
+      });
+
+    const answer = restorePiiTextForUser(
+      sessionId,
+      completedAssistantText,
+    );
+
+    if (!answer) {
+      throw new Error(
+        `Bedrock finalizó con stopReason="${response.stopReason}" sin texto.`,
+      );
+    }
+
+    setConversation(sessionId, trimConversation(messages, 10));
+
+    return {
+      answer,
+      actions: conversationActions,
+      stopReason: response.stopReason,
+      toolIterations,
+      usage: response.usage ?? null,
+    };
+  }
+};
