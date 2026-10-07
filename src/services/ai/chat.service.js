@@ -63,13 +63,16 @@ Si el usuario solicita información que requiere una herramienta todavía no hab
 
 Para marcas o nombres propios comerciales:
 - si la intención principal es ventas u otra consulta comercial general, utiliza search_customers;
+- un token [PII_BUSINESS_ENTITY_*], [PII_CUSTOMER_NAME_*] u otro token PII que represente un nombre comercial NO es un customerId y nunca debe enviarse dentro de customerIds;
+- para herramientas de ventas que requieren customerIds, primero resuelve el nombre comercial mediante search_customers y utiliza exclusivamente el codCliente/customerId retornado por esa resolución;
+- un token [PII_CUSTOMER_ID_*] sí puede reutilizarse como customerId porque representa un identificador de cliente previamente resuelto;
 - si la intención principal es facturas emitidas por delSol, utiliza search_invoice_customers y NO search_customers.
 
 Para rubros genéricos como librería, gastronomía, indumentaria o electrónica, utiliza search_categories.
 
 Para ventas por metro cuadrado:
 - usa get_sales_per_sqm cuando el usuario pregunte por ventas por m², ventas por metro cuadrado o equivalentes;
-- resuelve primero el local mediante search_customers si todavía no existe un cliente inequívocamente resuelto;
+- resuelve primero el local mediante search_customers si todavía no existe un cliente inequívocamente resuelto; nunca interpretes [PII_BUSINESS_ENTITY_*] ni [PII_CUSTOMER_NAME_*] como customerId;
 - para una serie mensual usa groupBy=["month"]; para una serie anual usa groupBy=["year"]; para detalle diario usa groupBy=["day"];
 - la herramienta determina la superficie contractual aplicable en cada fecha de venta; no sustituyas esa superficie por la del contrato actual;
 - si la superficie cambia dentro de un período, conserva el cálculo explícito devuelto por la herramienta y puedes indicar que hubo más de una superficie aplicable;
@@ -596,6 +599,24 @@ const removeClientOnlyMetadata = ({ name, result }) => {
   return result;
 };
 
+const validateProtectedToolInput = ({ name, input = {} }) => {
+  if (
+    name === "get_sales_per_sqm" &&
+    Array.isArray(input.customerIds)
+  ) {
+    const invalidProtectedCustomerId = input.customerIds.find((value) => {
+      const match = /^\[PII_([A-Z_]+)_\d+\]$/.exec(String(value ?? ""));
+      return match && match[1] !== "CUSTOMER_ID";
+    });
+
+    if (invalidProtectedCustomerId) {
+      throw new Error(
+        "CUSTOMER_NOT_RESOLVED: customerIds debe contener únicamente identificadores de cliente previamente resueltos mediante search_customers. Resuelve primero el nombre comercial y vuelve a ejecutar get_sales_per_sqm con el customerId retornado.",
+      );
+    }
+  }
+};
+
 const executeToolRequests = async ({ content, sessionId }) => {
   const toolResults = [];
   let actions = {};
@@ -611,6 +632,8 @@ const executeToolRequests = async ({ content, sessionId }) => {
     });
 
     try {
+      validateProtectedToolInput({ name, input });
+
       const restoredInput = restorePiiDeep(sessionId, input);
 
       const result = await executeTool({
