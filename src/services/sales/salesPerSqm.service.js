@@ -303,11 +303,70 @@ const buildTemporalAnalysisSummary = (rows, groupBy) => {
         }
       : null;
 
+  const buildTotalSalesChange = () => {
+    if (rowsWithSales.length < 2) {
+      return null;
+    }
+
+    const firstRow = rowsWithSales[0];
+    const lastRow = rowsWithSales[rowsWithSales.length - 1];
+
+    const fromPyg = Number(
+      firstRow.sales?.pyg ?? firstRow.totalSales ?? 0,
+    );
+    const toPyg = Number(
+      lastRow.sales?.pyg ?? lastRow.totalSales ?? 0,
+    );
+    const differencePyg = toPyg - fromPyg;
+
+    const fromUsd =
+      firstRow.sales?.usd === null ||
+      firstRow.sales?.usd === undefined
+        ? null
+        : Number(firstRow.sales.usd);
+    const toUsd =
+      lastRow.sales?.usd === null ||
+      lastRow.sales?.usd === undefined
+        ? null
+        : Number(lastRow.sales.usd);
+    const differenceUsd =
+      fromUsd !== null && toUsd !== null
+        ? toUsd - fromUsd
+        : null;
+
+    const percentageChange =
+      fromPyg !== 0
+        ? Number(((differencePyg / fromPyg) * 100).toFixed(2))
+        : null;
+
+    return {
+      fromPeriod: firstRow[periodField] ?? null,
+      toPeriod: lastRow[periodField] ?? null,
+      fromPyg,
+      toPyg,
+      differencePyg,
+      absoluteDifferencePyg: Math.abs(differencePyg),
+      fromUsd,
+      toUsd,
+      differenceUsd,
+      absoluteDifferenceUsd:
+        differenceUsd === null ? null : Math.abs(differenceUsd),
+      direction:
+        differencePyg > 0
+          ? "INCREASE"
+          : differencePyg < 0
+            ? "DECREASE"
+            : "UNCHANGED",
+      percentageChange,
+    };
+  };
+
   return {
     dimension,
     highestTotalSales: mapSalesRow(highestTotalSalesRow),
     highestSalesPerSqm: mapSalesPerSqmRow(highestSalesPerSqmRow),
     lowestSalesPerSqm: mapSalesPerSqmRow(lowestSalesPerSqmRow),
+    totalSalesChange: buildTotalSalesChange(),
   };
 };
 
