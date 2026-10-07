@@ -177,8 +177,21 @@ const buildMonthlyAvailabilitySummary = (rows, groupBy) => {
   };
 };
 
-const buildMonthlyAnalysisSummary = (rows, groupBy) => {
-  if (groupBy.length !== 1 || groupBy[0] !== "month") {
+const TEMPORAL_DIMENSION_FIELDS = {
+  day: "date",
+  month: "month",
+  year: "year",
+};
+
+const buildTemporalAnalysisSummary = (rows, groupBy) => {
+  if (groupBy.length !== 1) {
+    return null;
+  }
+
+  const dimension = groupBy[0];
+  const periodField = TEMPORAL_DIMENSION_FIELDS[dimension];
+
+  if (!periodField) {
     return null;
   }
 
@@ -214,28 +227,29 @@ const buildMonthlyAnalysisSummary = (rows, groupBy) => {
     (row) => Number(row.salesPerSqm?.pyg ?? 0),
   );
 
+  const mapSalesRow = (row) =>
+    row
+      ? {
+          period: row[periodField] ?? null,
+          pyg: row.sales?.pyg ?? null,
+          usd: row.sales?.usd ?? null,
+        }
+      : null;
+
+  const mapSalesPerSqmRow = (row) =>
+    row
+      ? {
+          period: row[periodField] ?? null,
+          pyg: row.salesPerSqm?.pyg ?? null,
+          usd: row.salesPerSqm?.usd ?? null,
+        }
+      : null;
+
   return {
-    highestTotalSales: highestTotalSalesRow
-      ? {
-          month: highestTotalSalesRow.month,
-          pyg: highestTotalSalesRow.sales?.pyg ?? null,
-          usd: highestTotalSalesRow.sales?.usd ?? null,
-        }
-      : null,
-    highestSalesPerSqm: highestSalesPerSqmRow
-      ? {
-          month: highestSalesPerSqmRow.month,
-          pyg: highestSalesPerSqmRow.salesPerSqm?.pyg ?? null,
-          usd: highestSalesPerSqmRow.salesPerSqm?.usd ?? null,
-        }
-      : null,
-    lowestSalesPerSqm: lowestSalesPerSqmRow
-      ? {
-          month: lowestSalesPerSqmRow.month,
-          pyg: lowestSalesPerSqmRow.salesPerSqm?.pyg ?? null,
-          usd: lowestSalesPerSqmRow.salesPerSqm?.usd ?? null,
-        }
-      : null,
+    dimension,
+    highestTotalSales: mapSalesRow(highestTotalSalesRow),
+    highestSalesPerSqm: mapSalesPerSqmRow(highestSalesPerSqmRow),
+    lowestSalesPerSqm: mapSalesPerSqmRow(lowestSalesPerSqmRow),
   };
 };
 
@@ -409,7 +423,7 @@ export const getSalesPerSqm = async (
         enrichedRows,
         normalizedGroupBy,
       ),
-      analysisSummary: buildMonthlyAnalysisSummary(
+      analysisSummary: buildTemporalAnalysisSummary(
         enrichedRows,
         normalizedGroupBy,
       ),
