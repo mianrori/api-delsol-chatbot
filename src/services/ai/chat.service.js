@@ -95,6 +95,7 @@ Para ventas por metro cuadrado:
 - una disminución de ventas o ventas por m² puede describirse como una caída del indicador; no la conviertas automáticamente en una afirmación sobre disminución de actividad comercial, flujo de clientes, demanda u otra causa no demostrada por los datos;
 - no calcules variaciones porcentuales, diferencias porcentuales ni porcentajes aproximados entre meses a partir de sales, salesPerSqm o texto previo, salvo que la herramienta los devuelva explícitamente; describe la variación solo en términos de aumento, disminución o valores absolutos explícitos;
 - nunca calcules manualmente sales.usd ni salesPerSqm.usd usando sellRate; si el equivalente USD no fue retornado explícitamente por la herramienta, no lo derives por tu cuenta;
+- los importes sales.usd y salesPerSqm.usd retornados explícitamente por la herramienta son valores calculados por el servicio con la cotización indicada; preséntalos directamente y nunca antepongas "≈", "aprox.", "aproximadamente" ni expresiones equivalentes a esos importes;
 - en tablas comerciales usa encabezados como "Ventas totales (₲)" y "Ventas por m² (₲)" para Guaraníes; no uses "(PYG)" como encabezado visible;
 - si status="MIXED_CURRENCY", no combines monedas ni presentes una conversión agregada;
 - nunca calcules manualmente ventas por m² desde texto previo si la herramienta puede devolver el valor explícito.
@@ -417,10 +418,20 @@ const sanitizeAssistantTextForUser = (text) => {
       "",
     );
 
+  const withoutInternalStatuses = withoutInternalContractTerms
+    .replace(
+      /\s*\(\s*status\s*=\s*(?:OK|AREA_NOT_AVAILABLE|NO_SALES|MIXED_CURRENCY|CURRENCY_NOT_SUPPORTED)\s*\)/gi,
+      "",
+    )
+    .replace(
+      /\bstatus\s*=\s*(?:OK|AREA_NOT_AVAILABLE|NO_SALES|MIXED_CURRENCY|CURRENCY_NOT_SUPPORTED)\b/gi,
+      "",
+    );
+
   return normalizePiiTokenSyntax(
     normalizeGuaraniCurrencyPlacement(
       normalizeParaguayanNumberSeparators(
-        withoutInternalContractTerms,
+        withoutInternalStatuses,
       ),
     ),
   ).trim();
