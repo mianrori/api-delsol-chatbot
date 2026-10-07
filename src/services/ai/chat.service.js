@@ -78,6 +78,9 @@ Para ventas por metro cuadrado:
 - para períodos históricos aclara brevemente que el equivalente en USD utiliza la cotización actual, no una cotización histórica;
 - si exchange.available=false por falta de cotización, presenta el resultado en Guaraníes y aclara que no fue posible obtener el equivalente en USD;
 - si status="AREA_NOT_AVAILABLE", la limitación aplica únicamente a ventas por m²: presenta igualmente las ventas totales usando exclusivamente sales.pyg y sales.usd retornados por la herramienta; no ocultes las ventas totales solo porque falte superficie;
+- si status="NO_SALES", indica que en ese período no hubo ventas registradas; no atribuyas ese caso a falta de superficie contractual;
+- cuando una serie mensual contenga meses con NO_SALES y otros con AREA_NOT_AVAILABLE, distingue ambos casos explícitamente en la tabla y en las observaciones;
+- nunca escribas una observación agrupando un mes NO_SALES junto con meses AREA_NOT_AVAILABLE bajo una misma explicación de falta de superficie;
 - nunca calcules manualmente sales.usd ni salesPerSqm.usd usando sellRate; si el equivalente USD no fue retornado explícitamente por la herramienta, no lo derives por tu cuenta;
 - en tablas comerciales usa encabezados como "Ventas totales (₲)" y "Ventas por m² (₲)" para Guaraníes; no uses "(PYG)" como encabezado visible;
 - si status="MIXED_CURRENCY", no combines monedas ni presentes una conversión agregada;
