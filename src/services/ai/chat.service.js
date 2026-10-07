@@ -81,7 +81,7 @@ Para ventas por metro cuadrado:
 - si status="AREA_NOT_AVAILABLE", significa que ninguna venta del período tiene una superficie contractual aplicable; presenta igualmente las ventas totales usando exclusivamente sales.pyg y sales.usd retornados por la herramienta y explica comercialmente que no se dispone de una superficie contractual aplicable para las ventas registradas en ese período;
 - si status="AREA_PARTIALLY_AVAILABLE", significa que algunas ventas del período sí tienen una superficie contractual aplicable y otras no; presenta las ventas totales, pero no presentes ventas por m² como representativas de todo el período; explica que la cobertura de superficie es parcial y que por eso no es posible calcular un indicador de ventas por m² para el período completo;
 - si status="NO_SALES", indica en lenguaje comercial que en ese período no se registraron ventas; no atribuyas ese caso a falta de superficie contractual;
-- los valores internos de status como "OK", "AREA_NOT_AVAILABLE", "AREA_PARTIALLY_AVAILABLE", "NO_SALES", "MIXED_CURRENCY" o "CURRENCY_NOT_SUPPORTED" son exclusivamente técnicos y nunca deben mostrarse literalmente al usuario, ni siquiera entre paréntesis o en frases como "status = OK";
+- los valores internos de status como "OK", "AREA_NOT_AVAILABLE", "AREA_PARTIALLY_AVAILABLE", "NO_SALES", "MIXED_CURRENCY" o "CURRENCY_NOT_SUPPORTED" son exclusivamente técnicos y nunca deben mostrarse literalmente al usuario, ni siquiera entre paréntesis ni en frases como "status = OK" o "estado NO_SALES";
 - no incluyas una columna "Estado" en tablas comerciales de ventas por m²; representa las situaciones mediante valores visibles y observaciones en lenguaje comercial;
 - cuando una serie mensual contenga meses con NO_SALES y otros con AREA_NOT_AVAILABLE, distingue ambos casos explícitamente en la tabla y en las observaciones;
 - nunca escribas una observación agrupando un mes NO_SALES junto con meses AREA_NOT_AVAILABLE bajo una misma explicación de falta de superficie;
@@ -431,6 +431,14 @@ const sanitizeAssistantTextForUser = (text) => {
     )
     .replace(
       /\bstatus\s*=\s*(?:OK|AREA_NOT_AVAILABLE|AREA_PARTIALLY_AVAILABLE|NO_SALES|MIXED_CURRENCY|CURRENCY_NOT_SUPPORTED)\b/gi,
+      "",
+    )
+    .replace(
+      /\s*\(\s*estado\s+\*{0,2}(?:OK|AREA_NOT_AVAILABLE|AREA_PARTIALLY_AVAILABLE|NO_SALES|MIXED_CURRENCY|CURRENCY_NOT_SUPPORTED)\*{0,2}\s*\)/gi,
+      "",
+    )
+    .replace(
+      /\bestado\s+\*{0,2}(?:OK|AREA_NOT_AVAILABLE|AREA_PARTIALLY_AVAILABLE|NO_SALES|MIXED_CURRENCY|CURRENCY_NOT_SUPPORTED)\*{0,2}\b/gi,
       "",
     );
 
