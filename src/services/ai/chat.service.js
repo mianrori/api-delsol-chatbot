@@ -648,12 +648,117 @@ const containsNumericValue = (text, value) => {
   return compactValue.length > 0 && compactText.includes(compactValue);
 };
 
-const ensureSqmTwoPeriodAbsoluteDifference = ({
+const formatPercentage = (value) =>
+  new Intl.NumberFormat("es-PY", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(Math.abs(Number(value ?? 0)));
+
+const containsPercentageValue = (text, value) => {
+  const numericValue = Math.abs(Number(value ?? 0));
+
+  if (!Number.isFinite(numericValue)) {
+    return false;
+  }
+
+  const candidates = [
+    numericValue.toFixed(2),
+    numericValue.toFixed(1),
+    String(Math.round(numericValue)),
+  ].map((candidate) => candidate.replace(".", ","));
+
+  const normalizedText = String(text ?? "")
+    .replace(/[\u00A0\u202F]/g, " ")
+    .replace(/\./g, ",");
+
+  return candidates.some((candidate) =>
+    normalizedText.includes(`${candidate} %`) ||
+    normalizedText.includes(`${candidate}%`),
+  );
+};
+
+const getTemporalSortValue = (dimension, period) => {
+  const value = String(period ?? "");
+
+  if (dimension === "year") {
+    return Number(value) || 0;
+  }
+
+  if (dimension === "month") {
+    const [month, year] = value.split("/").map(Number);
+    return (year || 0) * 100 + (month || 0);
+  }
+
+  if (dimension === "day") {
+    const [day, month, year] = value.split("/").map(Number);
+    return (year || 0) * 10000 + (month || 0) * 100 + (day || 0);
+  }
+
+  return 0;
+};
+
+const buildSqmTwoPeriodComparison = (internalContext) => {
+  const periods = Array.isArray(internalContext?.salesPerSqmPeriods)
+    ? internalContext.salesPerSqmPeriods
+    : [];
+
+  const uniquePeriods = Array.from(
+    new Map(
+      periods
+        .filter(
+          (item) =>
+            item?.dimension &&
+            item?.period &&
+            Number(item?.pyg ?? 0) > 0,
+        )
+        .map((item) => [
+          `${item.dimension}:${item.period}`,
+          item,
+        ]),
+    ).values(),
+  );
+
+  if (
+    uniquePeriods.length !== 2 ||
+    uniquePeriods[0].dimension !== uniquePeriods[1].dimension
+  ) {
+    return null;
+  }
+
+  const ordered = [...uniquePeriods].sort(
+    (a, b) =>
+      getTemporalSortValue(a.dimension, a.period) -
+      getTemporalSortValue(b.dimension, b.period),
+  );
+
+  const [from, to] = ordered;
+  const fromPyg = Number(from.pyg ?? 0);
+  const toPyg = Number(to.pyg ?? 0);
+  const differencePyg = toPyg - fromPyg;
+  const percentageChange =
+    fromPyg !== 0
+      ? Number(((differencePyg / fromPyg) * 100).toFixed(2))
+      : null;
+
+  return {
+    fromPeriod: from.period,
+    toPeriod: to.period,
+    absoluteDifferencePyg: Math.abs(differencePyg),
+    percentageChange,
+    direction:
+      differencePyg > 0
+        ? "INCREASE"
+        : differencePyg < 0
+          ? "DECREASE"
+          : "UNCHANGED",
+  };
+};
+
+const ensureSqmTwoPeriodComparison = ({
   text,
   internalContext,
 }) => {
-  const comparison =
-    internalContext?.salesPerSqmTwoPeriodComparison ?? null;
+  const comparison = buildSqmTwoPeriodComparison(internalContext);
 
   if (!comparison) {
     return text;
@@ -662,11 +767,22 @@ const ensureSqmTwoPeriodAbsoluteDifference = ({
   const absoluteDifferencePyg = Number(
     comparison.absoluteDifferencePyg ?? 0,
   );
+  const percentageChange =
+    comparison.percentageChange === null ||
+    comparison.percentageChange === undefined
+      ? null
+      : Number(comparison.percentageChange);
 
-  if (
-    !Number.isFinite(absoluteDifferencePyg) ||
-    containsNumericValue(text, absoluteDifferencePyg)
-  ) {
+  const hasAbsoluteDifference = containsNumericValue(
+    text,
+    absoluteDifferencePyg,
+  );
+  const hasPercentage =
+    percentageChange === null
+      ? true
+      : containsPercentageValue(text, percentageChange);
+
+  if (hasAbsoluteDifference && hasPercentage) {
     return text;
   }
 
@@ -677,9 +793,30 @@ const ensureSqmTwoPeriodAbsoluteDifference = ({
       ? ` entre ${fromPeriod} y ${toPeriod}`
       : "";
 
-  return `${String(text ?? "").trim()}\n\n**Diferencia absoluta de ventas:** ₲ ${formatPygInteger(
-    absoluteDifferencePyg,
-  )}${periodLabel}.`;
+  const directionText =
+    comparison.direction === "INCREASE"
+      ? "aumentaron"
+      : comparison.direction === "DECREASE"
+        ? "disminuyeron"
+        : "no variaron";
+
+  if (!hasAbsoluteDifference && !hasPercentage && percentageChange !== null) {
+    return `${String(text ?? "").trim()}\n\n**Comparación de ventas:** las ventas ${directionText} ${formatPercentage(
+      percentageChange,
+    )} %${periodLabel}, con una diferencia absoluta de ₲ ${formatPygInteger(
+      absoluteDifferencePyg,
+    )}.`;
+  }
+
+  if (!hasAbsoluteDifference) {
+    return `${String(text ?? "").trim()}\n\n**Diferencia absoluta de ventas:** ₲ ${formatPygInteger(
+      absoluteDifferencePyg,
+    )}${periodLabel}.`;
+  }
+
+  return `${String(text ?? "").trim()}\n\n**Variación de ventas:** las ventas ${directionText} ${formatPercentage(
+    percentageChange,
+  )} %${periodLabel}.`;
 };
 
 const executeToolRequests = async ({ content, sessionId }) => {
@@ -719,22 +856,35 @@ const executeToolRequests = async ({ content, sessionId }) => {
         name === "get_sales_per_sqm" &&
         Array.isArray(result?.data)
       ) {
-        const rowsWithSales = result.data.filter(
-          (row) =>
-            Number(row?.sales?.pyg ?? row?.totalSales ?? 0) > 0,
-        );
-        const totalSalesChange =
-          result?.analysisSummary?.totalSalesChange ?? null;
+        const dimension =
+          result?.analysisSummary?.dimension ??
+          result?.availabilitySummary?.dimension ??
+          null;
+        const periodField = {
+          day: "date",
+          month: "month",
+          year: "year",
+        }[dimension];
 
-        if (rowsWithSales.length === 2 && totalSalesChange) {
+        if (periodField) {
+          const periodsWithSales = result.data
+            .filter(
+              (row) =>
+                row?.[periodField] &&
+                Number(row?.sales?.pyg ?? row?.totalSales ?? 0) > 0,
+            )
+            .map((row) => ({
+              dimension,
+              period: row[periodField],
+              pyg: Number(row?.sales?.pyg ?? row?.totalSales ?? 0),
+            }));
+
           internalContext = {
             ...internalContext,
-            salesPerSqmTwoPeriodComparison: {
-              fromPeriod: totalSalesChange.fromPeriod ?? null,
-              toPeriod: totalSalesChange.toPeriod ?? null,
-              absoluteDifferencePyg:
-                totalSalesChange.absoluteDifferencePyg ?? null,
-            },
+            salesPerSqmPeriods: [
+              ...(internalContext.salesPerSqmPeriods ?? []),
+              ...periodsWithSales,
+            ],
           };
         }
       }
@@ -929,6 +1079,10 @@ export const chatService = async ({ message, sessionId }) => {
       conversationInternalContext = {
         ...conversationInternalContext,
         ...internalContext,
+        salesPerSqmPeriods: [
+          ...(conversationInternalContext.salesPerSqmPeriods ?? []),
+          ...(internalContext.salesPerSqmPeriods ?? []),
+        ],
       };
 
       if (toolResults.length === 0) {
@@ -950,7 +1104,7 @@ export const chatService = async ({ message, sessionId }) => {
     );
 
     const completedAssistantText =
-      ensureSqmTwoPeriodAbsoluteDifference({
+      ensureSqmTwoPeriodComparison({
         text: safeAssistantText,
         internalContext: conversationInternalContext,
       });
