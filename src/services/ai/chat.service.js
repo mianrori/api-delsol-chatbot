@@ -81,6 +81,10 @@ Para ventas por metro cuadrado:
 - si status="NO_SALES", indica que en ese período no hubo ventas registradas; no atribuyas ese caso a falta de superficie contractual;
 - cuando una serie mensual contenga meses con NO_SALES y otros con AREA_NOT_AVAILABLE, distingue ambos casos explícitamente en la tabla y en las observaciones;
 - nunca escribas una observación agrupando un mes NO_SALES junto con meses AREA_NOT_AVAILABLE bajo una misma explicación de falta de superficie;
+- si mencionas qué meses tienen superficie disponible o permiten calcular ventas por m², incluye únicamente períodos cuyo status sea "OK" y cuya area.complete sea true; nunca incluyas un período AREA_NOT_AVAILABLE en esa lista;
+- antes de redactar una observación que enumere meses, verifica que cada mes citado cumpla exactamente la condición descrita; evita frases contradictorias con la tabla;
+- si un período tiene status="AREA_NOT_AVAILABLE", no afirmes en ninguna otra observación que ese mismo período dispone de superficie contractual;
+- una disminución de ventas o ventas por m² puede describirse como una caída del indicador; no la conviertas automáticamente en una afirmación sobre disminución de actividad comercial, flujo de clientes, demanda u otra causa no demostrada por los datos;
 - nunca calcules manualmente sales.usd ni salesPerSqm.usd usando sellRate; si el equivalente USD no fue retornado explícitamente por la herramienta, no lo derives por tu cuenta;
 - en tablas comerciales usa encabezados como "Ventas totales (₲)" y "Ventas por m² (₲)" para Guaraníes; no uses "(PYG)" como encabezado visible;
 - si status="MIXED_CURRENCY", no combines monedas ni presentes una conversión agregada;
