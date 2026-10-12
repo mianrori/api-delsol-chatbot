@@ -128,10 +128,11 @@ Para consultas contractuales:
 - los elementos de shoppingCost.missingConcepts o conceptBreakdownByPeriod[].missingConcepts representan conceptos sin importe facturado disponible para ese período; preséntalos como faltantes, no como importe cero;
 - nunca asignes el costo total shopping a un concepto específico, nunca distribuyas ese total entre conceptos y nunca completes con "—", cero u otro importe para conceptos cuyo importe individual no esté explícitamente retornado;
 - si el resultado summary corresponde a un único mes y shoppingCost.concepts está disponible, usa ese arreglo como fuente exclusiva del detalle por concepto;
-- cuando groupBy="month", muestra siempre el detalle de composición del costo shopping para cada mes utilizando exclusivamente data[].shoppingCost.concepts y data[].shoppingCost.missingConcepts;
-- en una consulta mensual de incidencia no presentes solamente Mes, Ventas, Costo shopping e Incidencia: agrega debajo del resumen mensual un detalle por mes con los conceptos facturados que forman el costo;
-- para cada concepto facturado muestra, cuando estén explícitamente disponibles, Concepto, Importe, Factura y Período de facturación;
-- después del detalle de cada mes, muestra el total de costo shopping retornado para ese mismo mes, de modo que el usuario pueda verificar cómo se compone el cálculo de incidencia;
+- cuando groupBy="month", presenta los conceptos como COLUMNAS y los meses como FILAS para facilitar la comparación visual;
+- la tabla mensual debe incluir: Mes, una columna por cada concepto oficial configurado, Total costo shopping, Ventas auditadas e Incidencia;
+- el valor de cada columna de concepto debe provenir exclusivamente de data[].shoppingCost.concepts[].amountExcludingTax del mismo mes;
+- si un concepto oficial está en data[].shoppingCost.missingConcepts, presenta "Sin importe" en su columna; no presentes cero;
+- conserva aparte, cuando estén disponibles, los datos de factura y período de facturación asociados a los conceptos utilizados;
 - si un concepto aparece en data[].shoppingCost.missingConcepts, indícalo expresamente como concepto sin importe facturado disponible para ese mes y no lo incluyas en la suma visible de conceptos facturados;
 - conserva el resumen mensual con ventas auditadas, costo shopping e incidencia, pero el detalle por conceptos es obligatorio para que la composición del costo sea verificable;
 - si status="CURRENCY_MISMATCH", no presentes una incidencia monetaria válida;
@@ -971,33 +972,52 @@ const buildMonthlyIncidenceResponse = (result) => {
     result?.customer?.businessName ??
     "local seleccionado";
 
+  const configuredConcepts = Array.isArray(result?.configuredCostConcepts)
+    ? result.configuredCostConcepts
+    : [];
+
+  const conceptColumns = configuredConcepts.length > 0
+    ? configuredConcepts
+    : Array.from(
+        new Map(
+          result.data
+            .flatMap((period) => period?.shoppingCost?.concepts ?? [])
+            .map((concept) => [
+              String(concept?.conceptCode ?? concept?.description ?? ""),
+              {
+                conceptCode: concept?.conceptCode ?? null,
+                description:
+                  concept?.description ?? "Concepto no identificado",
+              },
+            ]),
+        ).values(),
+      );
+
   const lines = [
     `**Incidencia del costo total shopping de ${customerName}**`,
     "",
     `**Período:** ${result.dateFrom} al ${result.dateTo}`,
     "",
-    "| Mes | Ventas auditadas | Costo shopping | Incidencia |",
-    "|---|---:|---:|---:|",
+    "## Composición mensual del costo shopping",
+    "",
   ];
 
-  for (const period of result.data) {
-    const salesAmount = Number(period?.sales?.amount ?? 0);
-    const incidence = formatIncidencePercentage(
-      period?.incidencePercentage,
-    );
+  const headers = [
+    "Mes",
+    ...conceptColumns.map(
+      (concept) => concept?.description ?? "Concepto no identificado",
+    ),
+    "Total costo shopping",
+    "Ventas auditadas",
+    "Incidencia",
+  ];
 
-    lines.push(
-      `| ${period?.month ?? "—"} | ${formatIncidenceMoney(
-        salesAmount,
-        period?.sales?.currency,
-      )} | ${formatIncidenceMoney(
-        period?.shoppingCost?.amount,
-        period?.shoppingCost?.currency,
-      )} | ${incidence === null ? "—" : `**${incidence} %**`} |`,
-    );
-  }
-
-  lines.push("", "## Detalle del costo shopping por mes");
+  lines.push(
+    `| ${headers.join(" | ")} |`,
+    `|${headers
+      .map((_, index) => (index === 0 ? "---" : "---:"))
+      .join("|")}|`,
+  );
 
   for (const period of result.data) {
     const concepts = Array.isArray(period?.shoppingCost?.concepts)
@@ -1009,52 +1029,105 @@ const buildMonthlyIncidenceResponse = (result) => {
       ? period.shoppingCost.missingConcepts
       : [];
 
-    lines.push("", `### ${period?.month ?? "Período"}`);
+    const conceptByCode = new Map(
+      concepts.map((concept) => [
+        String(concept?.conceptCode ?? ""),
+        concept,
+      ]),
+    );
+    const missingCodes = new Set(
+      missingConcepts.map((concept) =>
+        String(concept?.conceptCode ?? ""),
+      ),
+    );
 
-    if (concepts.length > 0) {
-      lines.push(
-        "",
-        "| Concepto | Importe | Factura | Período de facturación |",
-        "|---|---:|---|---|",
-      );
+    const conceptValues = conceptColumns.map((configuredConcept) => {
+      const code = String(configuredConcept?.conceptCode ?? "");
+      const concept = conceptByCode.get(code);
 
-      for (const concept of concepts) {
-        lines.push(
-          `| ${concept?.description ?? "Concepto no identificado"} | ${formatIncidenceMoney(
-            concept?.amountExcludingTax,
-            concept?.currency,
-          )} | ${concept?.invoiceNumber ?? "—"} | ${concept?.billingPeriod ?? "—"} |`,
+      if (concept) {
+        return formatIncidenceMoney(
+          concept?.amountExcludingTax,
+          concept?.currency,
         );
       }
 
-      lines.push(
-        `| **Total costo shopping** | **${formatIncidenceMoney(
+      if (missingCodes.has(code)) {
+        return "Sin importe";
+      }
+
+      return "—";
+    });
+
+    const incidence = formatIncidencePercentage(
+      period?.incidencePercentage,
+    );
+
+    lines.push(
+      `| ${[
+        period?.month ?? "—",
+        ...conceptValues,
+        formatIncidenceMoney(
           period?.shoppingCost?.amount,
           period?.shoppingCost?.currency,
-        )}** | — | — |`,
-      );
-    } else {
-      lines.push("", "No se dispone de conceptos facturados para este mes.");
+        ),
+        formatIncidenceMoney(
+          Number(period?.sales?.amount ?? 0),
+          period?.sales?.currency,
+        ),
+        incidence === null ? "—" : `**${incidence} %**`,
+      ].join(" | ")} |`,
+    );
+  }
+
+  lines.push(
+    "",
+    "**Detalle de facturación de los conceptos utilizados:**",
+  );
+
+  for (const period of result.data) {
+    const concepts = Array.isArray(period?.shoppingCost?.concepts)
+      ? period.shoppingCost.concepts
+      : [];
+    const missingConcepts = Array.isArray(
+      period?.shoppingCost?.missingConcepts,
+    )
+      ? period.shoppingCost.missingConcepts
+      : [];
+
+    const invoiceDetails = concepts
+      .map((concept) => {
+        const description =
+          concept?.description ?? "Concepto no identificado";
+        const invoice = concept?.invoiceNumber ?? "—";
+        const billingPeriod = concept?.billingPeriod ?? "—";
+
+        return `${description}: factura ${invoice}, período ${billingPeriod}`;
+      })
+      .join("; ");
+
+    if (invoiceDetails) {
+      lines.push(`- **${period?.month ?? "Período"}:** ${invoiceDetails}.`);
     }
 
     if (missingConcepts.length > 0) {
       lines.push(
-        "",
-        `**Conceptos sin importe facturado disponible:** ${missingConcepts
-          .map((concept) => concept?.description ?? "Concepto no identificado")
+        `- **${period?.month ?? "Período"} — sin importe facturado:** ${missingConcepts
+          .map(
+            (concept) =>
+              concept?.description ?? "Concepto no identificado",
+          )
           .join(", ")}.`,
       );
     }
 
     if (Number(period?.sales?.amount ?? 0) === 0) {
       lines.push(
-        "",
-        "No se registraron ventas auditadas en este mes, por lo que no corresponde calcular una incidencia.",
+        `- **${period?.month ?? "Período"}:** no se registraron ventas auditadas, por lo que no corresponde calcular una incidencia.`,
       );
     } else if (period?.shoppingCost?.complete === false) {
       lines.push(
-        "",
-        "La incidencia de este mes corresponde al costo disponible, porque faltan uno o más conceptos oficiales con importe facturado.",
+        `- **${period?.month ?? "Período"}:** la incidencia corresponde al costo disponible porque faltan uno o más conceptos oficiales con importe facturado.`,
       );
     }
   }
