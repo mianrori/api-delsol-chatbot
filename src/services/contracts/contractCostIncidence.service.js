@@ -297,6 +297,17 @@ const buildSummary = (periods) => {
       },
       complete: costComplete,
       missingConceptsByPeriod,
+      conceptBreakdownByPeriod: periods.map((item) => ({
+        month: item.month,
+        concepts: item.shoppingCost.concepts,
+        missingConcepts: item.shoppingCost.missingConcepts,
+      })),
+      ...(periods.length === 1
+        ? {
+            concepts: periods[0].shoppingCost.concepts,
+            missingConcepts: periods[0].shoppingCost.missingConcepts,
+          }
+        : {}),
     },
     incidencePercentage,
     incidenceBasis:
