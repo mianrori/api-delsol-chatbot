@@ -685,6 +685,13 @@ const containsNumericValue = (text, value) => {
 
 const formatPercentage = (value) =>
   new Intl.NumberFormat("es-PY", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Math.abs(Number(value ?? 0)));
+
+const escapeRegex = (value) =>
+  String(value).replace(/[.*+?^$(){}|[\]\\]/g, "\\const formatPercentage = (value) =>
+  new Intl.NumberFormat("es-PY", {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   }).format(Math.abs(Number(value ?? 0)));
@@ -709,6 +716,61 @@ const containsPercentageValue = (text, value) => {
   return candidates.some((candidate) =>
     normalizedText.includes(`${candidate} %`) ||
     normalizedText.includes(`${candidate}%`),
+  );
+};");
+
+const normalizePercentagePrecision = (text, value) => {
+  const numericValue = Math.abs(Number(value ?? 0));
+
+  if (!Number.isFinite(numericValue)) {
+    return String(text ?? "");
+  }
+
+  const exactValue = formatPercentage(numericValue);
+  const approximateValues = Array.from(
+    new Set([
+      numericValue.toFixed(1).replace(".", ","),
+      String(Math.round(numericValue)),
+      numericValue.toFixed(1),
+    ]),
+  ).filter((candidate) => candidate !== exactValue);
+
+  let normalizedText = String(text ?? "");
+
+  for (const candidate of approximateValues) {
+    const pattern = new RegExp(
+      `(^|[^\\d])${escapeRegex(candidate)}\\s*%`,
+      "g",
+    );
+
+    normalizedText = normalizedText.replace(
+      pattern,
+      (_match, prefix) => `${prefix}${exactValue} %`,
+    );
+  }
+
+  return normalizedText;
+};
+
+const containsPercentageValue = (text, value) => {
+  const numericValue = Math.abs(Number(value ?? 0));
+
+  if (!Number.isFinite(numericValue)) {
+    return false;
+  }
+
+  const exactValue = formatPercentage(numericValue);
+  const exactDotValue = exactValue.replace(",", ".");
+  const normalizedText = String(text ?? "").replace(
+    /[\u00A0\u202F]/g,
+    " ",
+  );
+
+  return (
+    normalizedText.includes(`${exactValue} %`) ||
+    normalizedText.includes(`${exactValue}%`) ||
+    normalizedText.includes(`${exactDotValue} %`) ||
+    normalizedText.includes(`${exactDotValue}%`)
   );
 };
 
@@ -808,17 +870,22 @@ const ensureSqmTwoPeriodComparison = ({
       ? null
       : Number(comparison.percentageChange);
 
+  const normalizedText =
+    percentageChange === null
+      ? String(text ?? "")
+      : normalizePercentagePrecision(text, percentageChange);
+
   const hasAbsoluteDifference = containsNumericValue(
-    text,
+    normalizedText,
     absoluteDifferencePyg,
   );
   const hasPercentage =
     percentageChange === null
       ? true
-      : containsPercentageValue(text, percentageChange);
+      : containsPercentageValue(normalizedText, percentageChange);
 
   if (hasAbsoluteDifference && hasPercentage) {
-    return text;
+    return normalizedText;
   }
 
   const fromPeriod = comparison.fromPeriod ?? null;
@@ -836,7 +903,7 @@ const ensureSqmTwoPeriodComparison = ({
         : "no variaron";
 
   if (!hasAbsoluteDifference && !hasPercentage && percentageChange !== null) {
-    return `${String(text ?? "").trim()}\n\n**Comparación de ventas:** las ventas ${directionText} ${formatPercentage(
+    return `${String(normalizedText ?? "").trim()}\n\n**Comparación de ventas:** las ventas ${directionText} ${formatPercentage(
       percentageChange,
     )} %${periodLabel}, con una diferencia absoluta de ₲ ${formatPygInteger(
       absoluteDifferencePyg,
@@ -844,12 +911,12 @@ const ensureSqmTwoPeriodComparison = ({
   }
 
   if (!hasAbsoluteDifference) {
-    return `${String(text ?? "").trim()}\n\n**Diferencia absoluta de ventas:** ₲ ${formatPygInteger(
+    return `${String(normalizedText ?? "").trim()}\n\n**Diferencia absoluta de ventas:** ₲ ${formatPygInteger(
       absoluteDifferencePyg,
     )}${periodLabel}.`;
   }
 
-  return `${String(text ?? "").trim()}\n\n**Variación de ventas:** las ventas ${directionText} ${formatPercentage(
+  return `${String(normalizedText ?? "").trim()}\n\n**Variación de ventas:** las ventas ${directionText} ${formatPercentage(
     percentageChange,
   )} %${periodLabel}.`;
 };
