@@ -68,7 +68,7 @@ const normalizePeriodMonth = (value) => {
   }
 
   return formatMonth(
-    new Date(Date.UTC(date.getFullYear(), date.getMonth(), 1)),
+    new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1)),
   );
 };
 
