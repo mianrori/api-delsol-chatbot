@@ -124,6 +124,10 @@ Para consultas contractuales:
 - usa groupBy="summary" para el período completo y groupBy="month" cuando el usuario solicite desglose mensual;
 - la incidencia utiliza únicamente los conceptos oficiales configurados para Costo Total Shopping, los importes facturados sin IVA y las ventas auditadas del mismo período;
 - si shoppingCost.complete=false o status="PARTIAL_COST", aclara que faltan uno o más conceptos oficiales y no presentes la incidencia calculada sobre conceptos disponibles como si fuera el costo total completo;
+- para presentar importes por concepto en una incidencia, utiliza exclusivamente shoppingCost.concepts o conceptBreakdownByPeriod[].concepts; cada importe individual debe provenir explícitamente de amountExcludingTax del mismo concepto;
+- los elementos de shoppingCost.missingConcepts o conceptBreakdownByPeriod[].missingConcepts representan conceptos sin importe facturado disponible para ese período; preséntalos como faltantes, no como importe cero;
+- nunca asignes el costo total shopping a un concepto específico, nunca distribuyas ese total entre conceptos y nunca completes con "—", cero u otro importe para conceptos cuyo importe individual no esté explícitamente retornado;
+- si el resultado summary corresponde a un único mes y shoppingCost.concepts está disponible, usa ese arreglo como fuente exclusiva del detalle por concepto;
 - si status="CURRENCY_MISMATCH", no presentes una incidencia monetaria válida;
 - si status="COST_NOT_AVAILABLE" o status="COST_CONCEPTS_NOT_CONFIGURED", informa que no existe información suficiente para calcular la incidencia;
 - no recalcules incidencePercentage si la herramienta ya la devuelve;
