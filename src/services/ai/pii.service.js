@@ -283,6 +283,21 @@ const protectKnownTextPatterns = (sessionId, text) => {
   );
 
   /*
+   * Consultas de incidencia del costo total shopping:
+   *
+   *   "Mostrame la incidencia del costo total shopping de Óptica Valerio en marzo de 2023"
+   *   "Incidencia del costo shopping de Marca Ejemplo por mes en 2023"
+   *
+   * Protegemos únicamente el nombre comercial y preservamos el período y
+   * la agrupación para que Bedrock pueda construir dateFrom/dateTo/groupBy.
+   */
+  protectedText = protectedText.replace(
+    /\b((?:incidencia\s+(?:del\s+)?costo(?:\s+total)?\s+shopping(?:\s+sobre\s+(?:las\s+)?ventas)?\s+de\s+))([A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9&.'’ -]{2,80}?)(?=\s+(?:(?:de|desde|durante|en)\s+(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre|20\d{2}|hoy|ayer|este|esta)|del\s+(?:20\d{2}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4})|por\s+(?:d[ií]a|mes|a[nñ]o))|\s*(?:[,.!?;:]|$))/gi,
+    (_match, prefix, value) =>
+      `${prefix}${protectPiiValue(sessionId, "BUSINESS_ENTITY", value.trim())}`,
+  );
+
+  /*
    * Consultas contractuales donde la entidad aparece entre la intención
    * y la métrica, por ejemplo:
    *
@@ -293,7 +308,7 @@ const protectKnownTextPatterns = (sessionId, text) => {
    * únicamente al ejecutar la herramienta interna.
    */
   protectedText = protectedText.replace(
-    /\b((?:cu[aá]nto\s+paga|cu[aá]l\s+es\s+el\s+(?:costo|alquiler)|costo(?:\s+contractual)?|alquiler)\s+)([A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9&.'’ -]{2,80}?)(?=\s+(?:por\s+(?:metro\s+cuadrado|m(?:2|²))|de\s+(?:alquiler|arrendamiento)|en\s+(?:d[oó]lares|usd))|\s*(?:[,.!?;:]|$))/gi,
+    /\b((?:cu[aá]nto\s+paga|cu[aá]l\s+es\s+el\s+(?:costo|alquiler)|costo(?:\s+contractual)?|alquiler)\s+)([A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9&.'’ -]{2,80}?)(?=\s+(?:por\s+(?:metro\s+cuadrado|m(?:2|²))|de\s+(?:alquiler|arrendamiento)|en\s+(?:d[oó]lares|usd)))/gi,
     (_match, prefix, value) =>
       `${prefix}${protectPiiValue(sessionId, "BUSINESS_ENTITY", value.trim())}`,
   );
