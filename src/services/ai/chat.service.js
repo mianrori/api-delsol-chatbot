@@ -45,6 +45,7 @@ En esta etapa de migración, las herramientas habilitadas son:
 - get_invoices
 - get_contract_conditions
 - get_contract_cost_per_sqm
+- analyze_contract_cost_incidence
 
 Aunque el prompt general pueda contener reglas para otros dominios del ERP, no afirmes que puedes consultar esos dominios ni intentes utilizar herramientas que no estén presentes en toolConfig.
 
@@ -57,7 +58,8 @@ Para esta etapa:
 - puedes resolver clientes de facturación;
 - puedes resolver conceptos de facturación;
 - puedes consultar condiciones contractuales de locales con contrato activo;
-- puedes calcular costo contractual por metro cuadrado en PYG o USD cuando exista un último importe facturado válido dentro de la vigencia actual.
+- puedes calcular costo contractual por metro cuadrado en PYG o USD cuando exista un último importe facturado válido dentro de la vigencia actual;
+- puedes analizar la incidencia del costo total shopping sobre las ventas auditadas del mismo período, tanto como resumen como por mes.
 
 Si el usuario solicita información que requiere una herramienta todavía no habilitada en este servicio, indícale brevemente que esa consulta aún no está disponible en esta etapa de migración.
 
@@ -118,6 +120,14 @@ Para ventas por metro cuadrado:
 
 Para consultas contractuales:
 - resuelve primero el local mediante search_customers si todavía no existe un cliente inequívocamente resuelto;
+- para consultas de incidencia del costo total shopping sobre ventas utiliza analyze_contract_cost_incidence;
+- usa groupBy="summary" para el período completo y groupBy="month" cuando el usuario solicite desglose mensual;
+- la incidencia utiliza únicamente los conceptos oficiales configurados para Costo Total Shopping, los importes facturados sin IVA y las ventas auditadas del mismo período;
+- si shoppingCost.complete=false o status="PARTIAL_COST", aclara que faltan uno o más conceptos oficiales y no presentes la incidencia calculada sobre conceptos disponibles como si fuera el costo total completo;
+- si status="CURRENCY_MISMATCH", no presentes una incidencia monetaria válida;
+- si status="COST_NOT_AVAILABLE" o status="COST_CONCEPTS_NOT_CONFIGURED", informa que no existe información suficiente para calcular la incidencia;
+- no recalcules incidencePercentage si la herramienta ya la devuelve;
+- en el detalle por concepto prioriza description como nombre comercial y no muestres conceptCode salvo solicitud técnica explícita;
 - reutiliza el codCliente resuelto como customerId de get_contract_conditions;
 - usa get_contract_conditions para superficie, vencimiento, plazo, IPC, observaciones, conceptos configurados y último importe facturado sin IVA;
 - para una consulta solo de superficie/vencimiento/cabecera usa includeConcepts=false;
@@ -657,6 +667,25 @@ const validateProtectedToolInput = ({ name, input = {} }) => {
     if (invalidProtectedCustomerId) {
       throw new Error(
         "CUSTOMER_NOT_RESOLVED: customerIds debe contener únicamente identificadores de cliente previamente resueltos mediante search_customers. Resuelve primero el nombre comercial y vuelve a ejecutar get_sales_per_sqm con el customerId retornado.",
+      );
+    }
+  }
+
+  if (
+    [
+      "get_contract_conditions",
+      "get_contract_cost_per_sqm",
+      "analyze_contract_cost_incidence",
+    ].includes(name) &&
+    input.customerId
+  ) {
+    const match = /^\[PII_([A-Z_]+)_\d+\]$/.exec(
+      String(input.customerId ?? ""),
+    );
+
+    if (match && match[1] !== "CUSTOMER_ID") {
+      throw new Error(
+        "CUSTOMER_NOT_RESOLVED: customerId debe ser un identificador de cliente previamente resuelto mediante search_customers. Resuelve primero el nombre comercial y vuelve a ejecutar la herramienta con el customerId retornado.",
       );
     }
   }
