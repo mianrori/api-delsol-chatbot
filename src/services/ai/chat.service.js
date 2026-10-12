@@ -690,34 +690,7 @@ const formatPercentage = (value) =>
   }).format(Math.abs(Number(value ?? 0)));
 
 const escapeRegex = (value) =>
-  String(value).replace(/[.*+?^$(){}|[\]\\]/g, "\\const formatPercentage = (value) =>
-  new Intl.NumberFormat("es-PY", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(Math.abs(Number(value ?? 0)));
-
-const containsPercentageValue = (text, value) => {
-  const numericValue = Math.abs(Number(value ?? 0));
-
-  if (!Number.isFinite(numericValue)) {
-    return false;
-  }
-
-  const candidates = [
-    numericValue.toFixed(2),
-    numericValue.toFixed(1),
-    String(Math.round(numericValue)),
-  ].map((candidate) => candidate.replace(".", ","));
-
-  const normalizedText = String(text ?? "")
-    .replace(/[\u00A0\u202F]/g, " ")
-    .replace(/\./g, ",");
-
-  return candidates.some((candidate) =>
-    normalizedText.includes(`${candidate} %`) ||
-    normalizedText.includes(`${candidate}%`),
-  );
-};");
+  String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const normalizePercentagePrecision = (text, value) => {
   const numericValue = Math.abs(Number(value ?? 0));
