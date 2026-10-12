@@ -1,5 +1,6 @@
 import { contractBusinessConfig } from "../../config/contractBusiness.config.js";
 import { getMonthlyBilledAmountsByConceptRepository } from "../../repositories/contracts/contractInvoiceAmounts.repository.js";
+import { getContractAreaByMonthRepository } from "../../repositories/contracts/contractAreaByPeriod.repository.js";
 import { getSalesRepository } from "../../repositories/sales/sales.repository.js";
 import { getContractConditions } from "./contractConditions.service.js";
 
@@ -130,6 +131,7 @@ const buildPeriodResult = ({
   salesRow,
   billedRows,
   configuredConcepts,
+  areaRow,
 }) => {
   const salesAmount = Number(salesRow?.totalAmount ?? 0);
   const salesCurrency = getSalesCurrency(salesRow);
@@ -181,6 +183,16 @@ const buildPeriodResult = ({
         code: salesCurrency,
         symbol: currencySymbol(salesCurrency),
       },
+    },
+    area: {
+      min: areaRow?.minArea ?? null,
+      max: areaRow?.maxArea ?? null,
+      distinctValues: Number(areaRow?.distinctValues ?? 0),
+      changedWithinPeriod: Number(areaRow?.distinctValues ?? 0) > 1,
+      available:
+        areaRow?.minArea !== null &&
+        areaRow?.minArea !== undefined,
+      unit: "m2",
     },
     shoppingCost: {
       amount: totalCost,
@@ -384,7 +396,7 @@ export const analyzeContractCostIncidence = async (
     String(concept.conceptCode),
   );
 
-  const [billedRows, salesResult] = await Promise.all([
+  const [billedRows, salesResult, areaRows] = await Promise.all([
     getMonthlyBilledAmountsByConceptRepository({
       connection,
       customerId,
@@ -399,6 +411,12 @@ export const analyzeContractCostIncidence = async (
       dateTo,
       groupBy: ["year", "month"],
       metrics: ["totalAmount"],
+    }),
+    getContractAreaByMonthRepository({
+      connection,
+      customerId,
+      dateFrom,
+      dateTo,
     }),
   ]);
 
@@ -426,12 +444,20 @@ export const analyzeContractCostIncidence = async (
     billedByMonth.get(month).push(row);
   }
 
+  const areaByMonth = new Map(
+    (areaRows ?? []).map((row) => [
+      normalizePeriodMonth(row.periodMonth),
+      row,
+    ]),
+  );
+
   const periods = months.map((month) =>
     buildPeriodResult({
       month,
       salesRow: salesByMonth.get(month) ?? null,
       billedRows: billedByMonth.get(month) ?? [],
       configuredConcepts,
+      areaRow: areaByMonth.get(month) ?? null,
     }),
   );
 
