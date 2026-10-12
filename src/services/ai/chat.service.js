@@ -128,6 +128,12 @@ Para consultas contractuales:
 - los elementos de shoppingCost.missingConcepts o conceptBreakdownByPeriod[].missingConcepts representan conceptos sin importe facturado disponible para ese período; preséntalos como faltantes, no como importe cero;
 - nunca asignes el costo total shopping a un concepto específico, nunca distribuyas ese total entre conceptos y nunca completes con "—", cero u otro importe para conceptos cuyo importe individual no esté explícitamente retornado;
 - si el resultado summary corresponde a un único mes y shoppingCost.concepts está disponible, usa ese arreglo como fuente exclusiva del detalle por concepto;
+- cuando groupBy="month", muestra siempre el detalle de composición del costo shopping para cada mes utilizando exclusivamente data[].shoppingCost.concepts y data[].shoppingCost.missingConcepts;
+- en una consulta mensual de incidencia no presentes solamente Mes, Ventas, Costo shopping e Incidencia: agrega debajo del resumen mensual un detalle por mes con los conceptos facturados que forman el costo;
+- para cada concepto facturado muestra, cuando estén explícitamente disponibles, Concepto, Importe, Factura y Período de facturación;
+- después del detalle de cada mes, muestra el total de costo shopping retornado para ese mismo mes, de modo que el usuario pueda verificar cómo se compone el cálculo de incidencia;
+- si un concepto aparece en data[].shoppingCost.missingConcepts, indícalo expresamente como concepto sin importe facturado disponible para ese mes y no lo incluyas en la suma visible de conceptos facturados;
+- conserva el resumen mensual con ventas auditadas, costo shopping e incidencia, pero el detalle por conceptos es obligatorio para que la composición del costo sea verificable;
 - si status="CURRENCY_MISMATCH", no presentes una incidencia monetaria válida;
 - si status="COST_NOT_AVAILABLE" o status="COST_CONCEPTS_NOT_CONFIGURED", informa que no existe información suficiente para calcular la incidencia;
 - no recalcules incidencePercentage si la herramienta ya la devuelve;
