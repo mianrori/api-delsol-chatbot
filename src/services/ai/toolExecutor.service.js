@@ -7,6 +7,7 @@ import { searchInvoiceCustomers } from "../invoices/searchInvoiceCustomers.servi
 import { getInvoices } from "../invoices/invoices.service.js";
 import { getContractConditions } from "../contracts/contractConditions.service.js";
 import { getContractCostPerSqm } from "../contracts/contractCostPerSqm.service.js";
+import { analyzeContractCostIncidence } from "../contracts/contractCostIncidence.service.js";
 import { withOracleProxySession } from "../sessions/oracleSession.service.js";
 
 const withAuthorizedOracle = async (sessionId, callback) => {
@@ -90,6 +91,13 @@ const toolHandlers = {
     return withAuthorizedOracle(
       context.sessionId,
       ({ connection }) => getContractCostPerSqm(args, connection),
+    );
+  },
+
+  analyze_contract_cost_incidence: async (args, context) => {
+    return withAuthorizedOracle(
+      context.sessionId,
+      ({ connection }) => analyzeContractCostIncidence(args, connection),
     );
   },
 };
