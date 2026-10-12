@@ -83,6 +83,8 @@ Para ventas por metro cuadrado:
 - si exchange.available=false por falta de cotización, presenta el resultado en Guaraníes y aclara que no fue posible obtener el equivalente en USD;
 - si status="AREA_NOT_AVAILABLE", significa que ninguna venta del período tiene una superficie contractual aplicable; presenta igualmente las ventas totales usando exclusivamente sales.pyg y sales.usd retornados por la herramienta y explica comercialmente que no se dispone de una superficie contractual aplicable para las ventas registradas en ese período;
 - si status="AREA_PARTIALLY_AVAILABLE", significa que algunas ventas del período sí tienen una superficie contractual aplicable y otras no; presenta las ventas totales, pero no presentes ventas por m² como representativas de todo el período; explica que la cobertura de superficie es parcial y que por eso no es posible calcular un indicador de ventas por m² para el período completo;
+- nunca conviertas conteos técnicos de filas de ventas o registros en días, meses o cantidad de períodos con superficie; solo afirma una cantidad exacta de días/meses con o sin superficie cuando la herramienta la devuelva explícitamente como una métrica temporal;
+- ante AREA_PARTIALLY_AVAILABLE, si no existe una métrica temporal explícita de cobertura, limita la explicación a "superficie contractual disponible solo parcialmente" sin cuantificar días, meses ni porcentaje de cobertura;
 - si status="NO_SALES", indica en lenguaje comercial que en ese período no se registraron ventas; no atribuyas ese caso a falta de superficie contractual;
 - los valores internos de status como "OK", "AREA_NOT_AVAILABLE", "AREA_PARTIALLY_AVAILABLE", "NO_SALES", "MIXED_CURRENCY" o "CURRENCY_NOT_SUPPORTED" son exclusivamente técnicos y nunca deben mostrarse literalmente al usuario, ni siquiera entre paréntesis ni en frases como "status = OK" o "estado NO_SALES";
 - no incluyas una columna "Estado" en tablas comerciales de ventas por m²; representa las situaciones mediante valores visibles y observaciones en lenguaje comercial;
@@ -561,6 +563,39 @@ const extractClientActions = ({ name, result }) => {
 };
 
 const removeClientOnlyMetadata = ({ name, result }) => {
+  if (
+    name === "get_sales_per_sqm" &&
+    result &&
+    typeof result === "object" &&
+    !Array.isArray(result)
+  ) {
+    const sanitizeAreaMetadata = (row) => {
+      if (!row || typeof row !== "object" || Array.isArray(row)) {
+        return row;
+      }
+
+      const { area, ...rest } = row;
+
+      if (!area || typeof area !== "object" || Array.isArray(area)) {
+        return row;
+      }
+
+      const { missingSalesRows: _missingSalesRows, ...safeArea } = area;
+
+      return {
+        ...rest,
+        area: safeArea,
+      };
+    };
+
+    return {
+      ...result,
+      ...(Array.isArray(result.data)
+        ? { data: result.data.map(sanitizeAreaMetadata) }
+        : sanitizeAreaMetadata(result)),
+    };
+  }
+
   if (
     name === "get_sales" &&
     result &&
