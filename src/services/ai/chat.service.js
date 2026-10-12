@@ -455,6 +455,7 @@ const sanitizeAssistantTextForUser = (text) => {
     );
 
   const withoutInternalStatuses = withoutInternalContractTerms
+    .replace(/\b(?:AVAILABLE_COST_ONLY|COMPLETE_COST|PARTIAL_COST|COST_NOT_AVAILABLE|COST_CONCEPTS_NOT_CONFIGURED)\b/gi, "")
     .replace(
       /\s*\(\s*status\s*=\s*(?:OK|AREA_NOT_AVAILABLE|AREA_PARTIALLY_AVAILABLE|NO_SALES|MIXED_CURRENCY|CURRENCY_NOT_SUPPORTED)\s*\)/gi,
       "",
@@ -933,6 +934,134 @@ const ensureSqmTwoPeriodComparison = ({
   )} %${periodLabel}.`;
 };
 
+const formatIncidencePercentage = (value) => {
+  const numericValue = Number(value);
+
+  if (!Number.isFinite(numericValue)) {
+    return null;
+  }
+
+  return new Intl.NumberFormat("es-PY", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  }).format(numericValue);
+};
+
+const formatIncidenceMoney = (amount, currency = {}) => {
+  const numericAmount = Number(amount ?? 0);
+  const formatted = new Intl.NumberFormat("es-PY", {
+    maximumFractionDigits: 2,
+  }).format(numericAmount);
+  const symbol = currency?.symbol ?? currency?.code ?? "";
+
+  return symbol ? `${symbol} ${formatted}` : formatted;
+};
+
+const buildMonthlyIncidenceResponse = (result) => {
+  if (
+    result?.groupBy !== "month" ||
+    !Array.isArray(result?.data) ||
+    result.data.length === 0
+  ) {
+    return null;
+  }
+
+  const customerName =
+    result?.customer?.name ??
+    result?.customer?.businessName ??
+    "local seleccionado";
+
+  const lines = [
+    `**Incidencia del costo total shopping de ${customerName}**`,
+    "",
+    `**Período:** ${result.dateFrom} al ${result.dateTo}`,
+    "",
+    "| Mes | Ventas auditadas | Costo shopping | Incidencia |",
+    "|---|---:|---:|---:|",
+  ];
+
+  for (const period of result.data) {
+    const salesAmount = Number(period?.sales?.amount ?? 0);
+    const incidence = formatIncidencePercentage(
+      period?.incidencePercentage,
+    );
+
+    lines.push(
+      `| ${period?.month ?? "—"} | ${formatIncidenceMoney(
+        salesAmount,
+        period?.sales?.currency,
+      )} | ${formatIncidenceMoney(
+        period?.shoppingCost?.amount,
+        period?.shoppingCost?.currency,
+      )} | ${incidence === null ? "—" : `**${incidence} %**`} |`,
+    );
+  }
+
+  lines.push("", "## Detalle del costo shopping por mes");
+
+  for (const period of result.data) {
+    const concepts = Array.isArray(period?.shoppingCost?.concepts)
+      ? period.shoppingCost.concepts
+      : [];
+    const missingConcepts = Array.isArray(
+      period?.shoppingCost?.missingConcepts,
+    )
+      ? period.shoppingCost.missingConcepts
+      : [];
+
+    lines.push("", `### ${period?.month ?? "Período"}`);
+
+    if (concepts.length > 0) {
+      lines.push(
+        "",
+        "| Concepto | Importe | Factura | Período de facturación |",
+        "|---|---:|---|---|",
+      );
+
+      for (const concept of concepts) {
+        lines.push(
+          `| ${concept?.description ?? "Concepto no identificado"} | ${formatIncidenceMoney(
+            concept?.amountExcludingTax,
+            concept?.currency,
+          )} | ${concept?.invoiceNumber ?? "—"} | ${concept?.billingPeriod ?? "—"} |`,
+        );
+      }
+
+      lines.push(
+        `| **Total costo shopping** | **${formatIncidenceMoney(
+          period?.shoppingCost?.amount,
+          period?.shoppingCost?.currency,
+        )}** | — | — |`,
+      );
+    } else {
+      lines.push("", "No se dispone de conceptos facturados para este mes.");
+    }
+
+    if (missingConcepts.length > 0) {
+      lines.push(
+        "",
+        `**Conceptos sin importe facturado disponible:** ${missingConcepts
+          .map((concept) => concept?.description ?? "Concepto no identificado")
+          .join(", ")}.`,
+      );
+    }
+
+    if (Number(period?.sales?.amount ?? 0) === 0) {
+      lines.push(
+        "",
+        "No se registraron ventas auditadas en este mes, por lo que no corresponde calcular una incidencia.",
+      );
+    } else if (period?.shoppingCost?.complete === false) {
+      lines.push(
+        "",
+        "La incidencia de este mes corresponde al costo disponible, porque faltan uno o más conceptos oficiales con importe facturado.",
+      );
+    }
+  }
+
+  return lines.join("\n");
+};
+
 const executeToolRequests = async ({ content, sessionId }) => {
   const toolResults = [];
   let actions = {};
@@ -1014,6 +1143,17 @@ const executeToolRequests = async ({ content, sessionId }) => {
         null,
         [name],
       );
+
+      if (
+        name === "analyze_contract_cost_incidence" &&
+        protectedResultForModel?.groupBy === "month" &&
+        Array.isArray(protectedResultForModel?.data)
+      ) {
+        internalContext = {
+          ...internalContext,
+          monthlyIncidenceResult: protectedResultForModel,
+        };
+      }
 
       logToolResult({
         name,
@@ -1217,7 +1357,12 @@ export const chatService = async ({ message, sessionId }) => {
       extractText(safeOutputMessage),
     );
 
+    const monthlyIncidenceText = buildMonthlyIncidenceResponse(
+      conversationInternalContext.monthlyIncidenceResult,
+    );
+
     const completedAssistantText =
+      monthlyIncidenceText ??
       ensureSqmTwoPeriodComparison({
         text: safeAssistantText,
         internalContext: conversationInternalContext,
