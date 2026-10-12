@@ -129,7 +129,9 @@ Para consultas contractuales:
 - nunca asignes el costo total shopping a un concepto específico, nunca distribuyas ese total entre conceptos y nunca completes con "—", cero u otro importe para conceptos cuyo importe individual no esté explícitamente retornado;
 - si el resultado summary corresponde a un único mes y shoppingCost.concepts está disponible, usa ese arreglo como fuente exclusiva del detalle por concepto;
 - cuando groupBy="month", presenta los conceptos como COLUMNAS y los meses como FILAS para facilitar la comparación visual;
-- la tabla mensual debe incluir: Mes, una columna por cada concepto oficial configurado, Total costo shopping, Ventas auditadas e Incidencia;
+- la tabla mensual debe incluir: Mes, una columna por cada concepto oficial configurado, Total costo shopping, Superficie contractual aplicable, Ventas auditadas e Incidencia;
+- la superficie mensual debe provenir exclusivamente del campo area retornado por analyze_contract_cost_incidence; no uses la superficie actual del contrato para completar períodos históricos;
+- si area.changedWithinPeriod=true y min/max son distintos, muestra el rango de superficies del período; si area.available=false, muestra que no hay superficie contractual aplicable;
 - el valor de cada columna de concepto debe provenir exclusivamente de data[].shoppingCost.concepts[].amountExcludingTax del mismo mes;
 - si un concepto oficial está en data[].shoppingCost.missingConcepts, presenta "Sin importe" en su columna; no presentes cero;
 - conserva aparte, cuando estén disponibles, los datos de factura y período de facturación asociados a los conceptos utilizados;
@@ -936,6 +938,10 @@ const ensureSqmTwoPeriodComparison = ({
 };
 
 const formatIncidencePercentage = (value) => {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
   const numericValue = Number(value);
 
   if (!Number.isFinite(numericValue)) {
@@ -946,6 +952,29 @@ const formatIncidencePercentage = (value) => {
     minimumFractionDigits: 2,
     maximumFractionDigits: 4,
   }).format(numericValue);
+};
+
+const formatIncidenceArea = (area = {}) => {
+  if (!area?.available || area?.min === null || area?.min === undefined) {
+    return "—";
+  }
+
+  const formatAreaValue = (value) =>
+    new Intl.NumberFormat("es-PY", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(Number(value));
+
+  if (
+    area?.changedWithinPeriod &&
+    area?.max !== null &&
+    area?.max !== undefined &&
+    Number(area.max) !== Number(area.min)
+  ) {
+    return `${formatAreaValue(area.min)}–${formatAreaValue(area.max)} m²`;
+  }
+
+  return `${formatAreaValue(area.min)} m²`;
 };
 
 const formatIncidenceMoney = (amount, currency = {}) => {
@@ -1008,6 +1037,7 @@ const buildMonthlyIncidenceResponse = (result) => {
       (concept) => concept?.description ?? "Concepto no identificado",
     ),
     "Total costo shopping",
+    "Superficie",
     "Ventas auditadas",
     "Incidencia",
   ];
@@ -1071,6 +1101,7 @@ const buildMonthlyIncidenceResponse = (result) => {
           period?.shoppingCost?.amount,
           period?.shoppingCost?.currency,
         ),
+        formatIncidenceArea(period?.area),
         formatIncidenceMoney(
           Number(period?.sales?.amount ?? 0),
           period?.sales?.currency,
