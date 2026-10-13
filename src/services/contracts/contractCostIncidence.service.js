@@ -1,8 +1,8 @@
 import { contractBusinessConfig } from "../../config/contractBusiness.config.js";
 import { getMonthlyBilledAmountsByConceptRepository } from "../../repositories/contracts/contractInvoiceAmounts.repository.js";
-import { getContractAreaByMonthRepository } from "../../repositories/contracts/contractAreaByPeriod.repository.js";
+import { getHistoricalContractByMonthRepository } from "../../repositories/contracts/contractHistoryByPeriod.repository.js";
+import { getContractConceptsRepository } from "../../repositories/contracts/contractConcepts.repository.js";
 import { getSalesRepository } from "../../repositories/sales/sales.repository.js";
-import { getContractConditions } from "./contractConditions.service.js";
 
 const parseDate = (value) => {
   const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(value ?? ""));
@@ -131,7 +131,7 @@ const buildPeriodResult = ({
   salesRow,
   billedRows,
   configuredConcepts,
-  areaRow,
+  contractRow,
 }) => {
   const salesAmount = Number(salesRow?.totalAmount ?? 0);
   const salesCurrency = getSalesCurrency(salesRow);
@@ -184,14 +184,28 @@ const buildPeriodResult = ({
         symbol: currencySymbol(salesCurrency),
       },
     },
+    contract: contractRow?.contract
+      ? {
+          type: contractRow.contract.type,
+          series: contractRow.contract.series,
+          number: contractRow.contract.number,
+          contractDate: contractRow.contractDate ?? null,
+          expirationDate: contractRow.expirationDate ?? null,
+          localNumber: contractRow.localNumber ?? null,
+        }
+      : null,
     area: {
-      min: areaRow?.minArea ?? null,
-      max: areaRow?.maxArea ?? null,
-      distinctValues: Number(areaRow?.distinctValues ?? 0),
-      changedWithinPeriod: Number(areaRow?.distinctValues ?? 0) > 1,
+      min: contractRow?.totalLocalArea ?? null,
+      max: contractRow?.totalLocalArea ?? null,
+      distinctValues:
+        contractRow?.totalLocalArea === null ||
+        contractRow?.totalLocalArea === undefined
+          ? 0
+          : 1,
+      changedWithinPeriod: false,
       available:
-        areaRow?.minArea !== null &&
-        areaRow?.minArea !== undefined,
+        contractRow?.totalLocalArea !== null &&
+        contractRow?.totalLocalArea !== undefined,
       unit: "m2",
     },
     shoppingCost: {
@@ -357,46 +371,76 @@ export const analyzeContractCostIncidence = async (
   }
 
   const months = enumerateMonths(dateFrom, dateTo);
-
-  const contractResult = await getContractConditions(
-    {
-      customerId,
-      localNumber,
-      contractType,
-      contractSeries,
-      contractNumber,
-      includeConcepts: true,
-      includeLastBilledAmounts: false,
-    },
-    connection,
-  );
-
-  if (contractResult.status !== "RESOLVED") {
-    return contractResult;
-  }
-
   const incidenceCodes = new Set(
     contractBusinessConfig.incidenceConceptCodes.map(String),
   );
-  const configuredConcepts = (contractResult.concepts ?? []).filter((concept) =>
-    incidenceCodes.has(String(concept.conceptCode)),
+
+  const historicalContracts = await getHistoricalContractByMonthRepository({
+    connection,
+    customerId,
+    dateFrom,
+    dateTo,
+    localNumber,
+    contractType,
+    contractSeries,
+    contractNumber,
+  });
+
+  const contractByMonth = new Map(
+    (historicalContracts ?? []).map((row) => [
+      normalizePeriodMonth(row.periodMonth),
+      row,
+    ]),
   );
 
-  if (configuredConcepts.length === 0) {
-    return {
-      status: "COST_CONCEPTS_NOT_CONFIGURED",
-      contract: contractResult.contract,
-      dateFrom,
-      dateTo,
-      groupBy,
-    };
-  }
+  const contractIdentityKey = (contract) =>
+    contract
+      ? `${contract.type}|${contract.series}|${contract.number}`
+      : null;
 
-  const conceptCodes = configuredConcepts.map((concept) =>
-    String(concept.conceptCode),
+  const uniqueContracts = Array.from(
+    new Map(
+      (historicalContracts ?? [])
+        .filter((row) => row?.contract)
+        .map((row) => [contractIdentityKey(row.contract), row.contract]),
+    ).values(),
   );
 
-  const [billedRows, salesResult, areaRows] = await Promise.all([
+  const conceptsByContract = new Map();
+
+  await Promise.all(
+    uniqueContracts.map(async (contract) => {
+      const concepts = await getContractConceptsRepository({
+        connection,
+        contractType: contract.type,
+        contractSeries: contract.series,
+        contractNumber: contract.number,
+        conceptCodes: contractBusinessConfig.incidenceConceptCodes,
+      });
+
+      conceptsByContract.set(
+        contractIdentityKey(contract),
+        (concepts ?? []).filter((concept) =>
+          incidenceCodes.has(String(concept.conceptCode)),
+        ),
+      );
+    }),
+  );
+
+  const allConfiguredConcepts = Array.from(
+    new Map(
+      Array.from(conceptsByContract.values())
+        .flat()
+        .map((concept) => [String(concept.conceptCode), concept]),
+    ).values(),
+  );
+
+  const conceptCodes =
+    allConfiguredConcepts.length > 0
+      ? allConfiguredConcepts.map((concept) => String(concept.conceptCode))
+      : contractBusinessConfig.incidenceConceptCodes.map(String);
+
+  const [billedRows, salesResult] = await Promise.all([
     getMonthlyBilledAmountsByConceptRepository({
       connection,
       customerId,
@@ -411,12 +455,6 @@ export const analyzeContractCostIncidence = async (
       dateTo,
       groupBy: ["year", "month"],
       metrics: ["totalAmount"],
-    }),
-    getContractAreaByMonthRepository({
-      connection,
-      customerId,
-      dateFrom,
-      dateTo,
     }),
   ]);
 
@@ -444,36 +482,45 @@ export const analyzeContractCostIncidence = async (
     billedByMonth.get(month).push(row);
   }
 
-  const areaByMonth = new Map(
-    (areaRows ?? []).map((row) => [
-      normalizePeriodMonth(row.periodMonth),
-      row,
-    ]),
-  );
+  const periods = months.map((month) => {
+    const contractRow = contractByMonth.get(month) ?? null;
+    const configuredConcepts = contractRow?.contract
+      ? conceptsByContract.get(contractIdentityKey(contractRow.contract)) ?? []
+      : [];
+    const configuredCodes = new Set(
+      configuredConcepts.map((concept) => String(concept.conceptCode)),
+    );
+    const monthlyBilledRows = (billedByMonth.get(month) ?? []).filter((row) =>
+      configuredCodes.has(String(row.conceptCode)),
+    );
 
-  const periods = months.map((month) =>
-    buildPeriodResult({
+    return buildPeriodResult({
       month,
       salesRow: salesByMonth.get(month) ?? null,
-      billedRows: billedByMonth.get(month) ?? [],
+      billedRows: monthlyBilledRows,
       configuredConcepts,
-      areaRow: areaByMonth.get(month) ?? null,
-    }),
-  );
+      contractRow,
+    });
+  });
+
+  const identitySource =
+    (historicalContracts ?? []).find((row) => row?.customerId) ?? null;
 
   const common = {
     customer: {
-      id: String(contractResult.contract.customerId),
-      name: contractResult.contract.customerName ?? null,
-      businessName: contractResult.contract.businessName ?? null,
+      id: String(customerId),
+      name: identitySource?.customerName ?? null,
+      businessName: identitySource?.businessName ?? null,
     },
     dateFrom,
     dateTo,
     groupBy,
-    configuredCostConcepts: configuredConcepts.map(mapConcept),
+    configuredCostConcepts: allConfiguredConcepts.map(mapConcept),
     queryContext: {
-      costDefinition: "officialConfiguredConcepts",
-      billedAmountRule: "latestInvoiceByCustomerConceptAndMonthExcludingTax",
+      costDefinition: "officialConfiguredConceptsByHistoricalContract",
+      contractRule: "contractApplicableByMonth",
+      billedAmountRule:
+        "latestInvoiceByCustomerConfiguredConceptAndInvoiceMonthExcludingTax",
       salesRule: "auditedSalesSamePeriod",
     },
   };
