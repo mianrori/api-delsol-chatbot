@@ -131,6 +131,8 @@ Para consultas contractuales:
 - cuando groupBy="month", presenta los conceptos como COLUMNAS y los meses como FILAS para facilitar la comparación visual;
 - la tabla mensual debe incluir: Mes, una columna por cada concepto oficial configurado, Total costo shopping, Superficie contractual aplicable, Ventas auditadas e Incidencia;
 - la superficie mensual debe provenir exclusivamente del campo area retornado por analyze_contract_cost_incidence; no uses la superficie actual del contrato para completar períodos históricos;
+- si un período no tiene contrato histórico aplicable, no presentes costo shopping cero ni incidencia parcial: muestra costo e incidencia como no disponibles y explica que no existe contrato aplicable para ese período;
+- los conceptos e importes de cada mes deben corresponder únicamente al contrato histórico retornado para ese mismo mes; nunca reutilices los conceptos del contrato actual para meses anteriores;
 - si area.changedWithinPeriod=true y min/max son distintos, muestra el rango de superficies del período; si area.available=false, muestra que no hay superficie contractual aplicable;
 - el valor de cada columna de concepto debe provenir exclusivamente de data[].shoppingCost.concepts[].amountExcludingTax del mismo mes;
 - si un concepto oficial está en data[].shoppingCost.missingConcepts, presenta "Sin importe" en su columna; no presentes cero;
@@ -1097,10 +1099,12 @@ const buildMonthlyIncidenceResponse = (result) => {
       `| ${[
         period?.month ?? "—",
         ...conceptValues,
-        formatIncidenceMoney(
-          period?.shoppingCost?.amount,
-          period?.shoppingCost?.currency,
-        ),
+        period?.status === "COST_NOT_AVAILABLE"
+          ? "—"
+          : formatIncidenceMoney(
+              period?.shoppingCost?.amount,
+              period?.shoppingCost?.currency,
+            ),
         formatIncidenceArea(period?.area),
         formatIncidenceMoney(
           Number(period?.sales?.amount ?? 0),
@@ -1152,7 +1156,15 @@ const buildMonthlyIncidenceResponse = (result) => {
       );
     }
 
-    if (Number(period?.sales?.amount ?? 0) === 0) {
+    if (!period?.contract) {
+      lines.push(
+        `- **${period?.month ?? "Período"}:** no existe un contrato aplicable para este período; por lo tanto, no corresponde determinar costo shopping ni incidencia contractual.`,
+      );
+    } else if (period?.status === "COST_NOT_AVAILABLE") {
+      lines.push(
+        `- **${period?.month ?? "Período"}:** existe un contrato aplicable, pero no se dispone de importes facturados de los conceptos oficiales para calcular la incidencia.`,
+      );
+    } else if (Number(period?.sales?.amount ?? 0) === 0) {
       lines.push(
         `- **${period?.month ?? "Período"}:** no se registraron ventas auditadas, por lo que no corresponde calcular una incidencia.`,
       );
