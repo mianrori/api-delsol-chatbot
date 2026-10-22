@@ -192,6 +192,8 @@ const buildPeriodResult = ({
           contractDate: contractRow.contractDate ?? null,
           expirationDate: contractRow.expirationDate ?? null,
           localNumber: contractRow.localNumber ?? null,
+          resolution: contractRow.resolution ?? null,
+          applicable: contractRow.applicable === true,
         }
       : null,
     area: {
@@ -483,9 +485,11 @@ export const analyzeContractCostIncidence = async (
   }
 
   const periods = months.map((month) => {
-    const contractRow = contractByMonth.get(month) ?? null;
-    const configuredConcepts = contractRow?.contract
-      ? conceptsByContract.get(contractIdentityKey(contractRow.contract)) ?? []
+    const resolvedContractRow = contractByMonth.get(month) ?? null;
+    const configuredConcepts = resolvedContractRow?.contract
+      ? conceptsByContract.get(
+          contractIdentityKey(resolvedContractRow.contract),
+        ) ?? []
       : [];
     const configuredCodes = new Set(
       configuredConcepts.map((concept) => String(concept.conceptCode)),
@@ -494,11 +498,26 @@ export const analyzeContractCostIncidence = async (
       configuredCodes.has(String(row.conceptCode)),
     );
 
+    const useNearestContractFallback =
+      resolvedContractRow?.resolution === "NEAREST" &&
+      monthlyBilledRows.length > 0;
+
+    const contractRow =
+      resolvedContractRow?.applicable === true ||
+      useNearestContractFallback
+        ? {
+            ...resolvedContractRow,
+            resolution: useNearestContractFallback
+              ? "NEAREST_BILLED_FALLBACK"
+              : "APPLICABLE",
+          }
+        : null;
+
     return buildPeriodResult({
       month,
       salesRow: salesByMonth.get(month) ?? null,
-      billedRows: monthlyBilledRows,
-      configuredConcepts,
+      billedRows: contractRow ? monthlyBilledRows : [],
+      configuredConcepts: contractRow ? configuredConcepts : [],
       contractRow,
     });
   });
@@ -518,7 +537,7 @@ export const analyzeContractCostIncidence = async (
     configuredCostConcepts: allConfiguredConcepts.map(mapConcept),
     queryContext: {
       costDefinition: "officialConfiguredConceptsByHistoricalContract",
-      contractRule: "contractApplicableByMonth",
+      contractRule: "applicableContractByMonthOrNearestWhenOfficialConceptsWereBilled",
       billedAmountRule:
         "latestInvoiceByCustomerConfiguredConceptAndInvoiceMonthExcludingTax",
       salesRule: "auditedSalesSamePeriod",
