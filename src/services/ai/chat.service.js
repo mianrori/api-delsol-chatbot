@@ -131,8 +131,9 @@ Para consultas contractuales:
 - cuando groupBy="month", presenta los conceptos como COLUMNAS y los meses como FILAS para facilitar la comparación visual;
 - la tabla mensual debe incluir: Mes, una columna por cada concepto oficial configurado, Total costo shopping, Superficie contractual aplicable, Ventas auditadas e Incidencia;
 - la superficie mensual debe provenir exclusivamente del campo area retornado por analyze_contract_cost_incidence; no uses la superficie actual del contrato para completar períodos históricos;
-- si un período no tiene contrato histórico aplicable, no presentes costo shopping cero ni incidencia parcial: muestra costo e incidencia como no disponibles y explica que no existe contrato aplicable para ese período;
-- los conceptos e importes de cada mes deben corresponder únicamente al contrato histórico retornado para ese mismo mes; nunca reutilices los conceptos del contrato actual para meses anteriores;
+- si un período no tiene contrato histórico aplicable pero existen importes facturados de los conceptos oficiales, considera esos importes y utiliza la superficie del contrato más próximo al período; explica que se trata de una referencia contractual próxima y no de un contrato vigente;
+- si un período no tiene contrato histórico aplicable y tampoco existen importes facturados de los conceptos oficiales, muestra costo, superficie e incidencia como no disponibles;
+- los conceptos e importes de cada mes deben corresponder al contrato aplicable o, únicamente en el fallback anterior, al contrato más próximo usado como referencia; nunca reutilices indiscriminadamente el contrato actual para meses anteriores;
 - si area.changedWithinPeriod=true y min/max son distintos, muestra el rango de superficies del período; si area.available=false, muestra que no hay superficie contractual aplicable;
 - el valor de cada columna de concepto debe provenir exclusivamente de data[].shoppingCost.concepts[].amountExcludingTax del mismo mes;
 - si un concepto oficial está en data[].shoppingCost.missingConcepts, presenta "Sin importe" en su columna; no presentes cero;
@@ -1158,7 +1159,11 @@ const buildMonthlyIncidenceResponse = (result) => {
 
     if (!period?.contract) {
       lines.push(
-        `- **${period?.month ?? "Período"}:** no existe un contrato aplicable para este período; por lo tanto, no corresponde determinar costo shopping ni incidencia contractual.`,
+        `- **${period?.month ?? "Período"}:** no existe un contrato aplicable ni facturación de conceptos oficiales que justifique utilizar un contrato próximo como referencia.`,
+      );
+    } else if (period?.contract?.resolution === "NEAREST_BILLED_FALLBACK") {
+      lines.push(
+        `- **${period?.month ?? "Período"}:** no había un contrato vigente en el período; como existen conceptos oficiales facturados, la superficie se obtuvo del contrato más próximo al período.`,
       );
     } else if (period?.status === "COST_NOT_AVAILABLE") {
       lines.push(
