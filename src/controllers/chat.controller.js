@@ -1,6 +1,17 @@
 import { chatService } from "../services/ai/chat.service.js";
 import { getValidOracleSession } from "../services/sessions/oracleSession.service.js";
 
+const parseParaguayanNumber = (value) => {
+  const normalized = String(value ?? "")
+    .replace(/\*\*/g, "")
+    .replace(/[^\d.,-]/g, "")
+    .replace(/\./g, "")
+    .replace(",", ".");
+
+  const number = Number(normalized);
+  return Number.isFinite(number) ? number : null;
+};
+
 const normalizeIncidencePresentation = (answer) => {
   let text = String(answer ?? "");
 
@@ -13,17 +24,7 @@ const normalizeIncidencePresentation = (answer) => {
     "| Costo shopping disponible |",
   );
 
-  text = text
-    .split("\n")
-    .filter(
-      (line) =>
-        !/^- \*\*\d{2}\/\d{4}:\*\* la incidencia corresponde al costo disponible porque faltan uno o más conceptos oficiales con importe facturado\.$/.test(
-          line,
-        ),
-    )
-    .join("\n");
-
-  const notes = [];
+  const rows = [];
 
   for (const line of text.split("\n")) {
     if (!/^\|\s*\d{2}\/\d{4}\s*\|/.test(line)) {
@@ -35,27 +36,53 @@ const normalizeIncidencePresentation = (answer) => {
       .slice(1, -1)
       .map((cell) => cell.trim());
 
-    const month = cells[0] ?? null;
-    const incidence = cells[cells.length - 1] ?? "—";
-    const hasMissingConcept = cells.some((cell) => cell === "Sin importe");
-
-    if (
-      month &&
-      hasMissingConcept &&
-      incidence !== "—" &&
-      incidence.includes("%")
-    ) {
-      const note =
-        `- **${month}:** la incidencia fue calculada únicamente sobre los conceptos disponibles porque faltan uno o más conceptos oficiales con importe facturado.`;
-
-      if (!text.includes(note)) {
-        notes.push(note);
-      }
-    }
+    rows.push({
+      month: cells[0] ?? null,
+      sales: parseParaguayanNumber(cells[cells.length - 2]),
+      incidence: parseParaguayanNumber(cells[cells.length - 1]),
+      hasMissingConcept: cells.some((cell) => cell === "Sin importe"),
+    });
   }
 
-  if (notes.length > 0) {
-    text = `${text.trim()}\n${notes.join("\n")}`;
+  const observationsIndex = text.indexOf("\n\n**Observaciones:**");
+
+  if (observationsIndex >= 0) {
+    text = text.slice(0, observationsIndex).trim();
+  }
+
+  const analysis = [];
+  const rowsWithIncidence = rows.filter((row) => row.incidence !== null);
+  const rowsWithoutSales = rows.filter((row) => Number(row.sales ?? 0) === 0);
+
+  if (rowsWithIncidence.length > 0) {
+    const highest = [...rowsWithIncidence].sort(
+      (a, b) => b.incidence - a.incidence,
+    )[0];
+
+    analysis.push(
+      `La mayor incidencia del período se registró en **${highest.month}**, con **${new Intl.NumberFormat("es-PY", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 4,
+      }).format(highest.incidence)} %**.`,
+    );
+  }
+
+  if (rowsWithoutSales.length > 0) {
+    analysis.push(
+      `No se registraron ventas auditadas en **${rowsWithoutSales
+        .map((row) => row.month)
+        .join(" y ")}**, por lo que no corresponde calcular incidencia en esos meses.`,
+    );
+  }
+
+  if (rows.some((row) => row.hasMissingConcept)) {
+    analysis.push(
+      "Los porcentajes de incidencia corresponden al **costo shopping disponible**, ya que faltan importes de uno o más conceptos oficiales en el período.",
+    );
+  }
+
+  if (analysis.length > 0) {
+    text = `${text}\n\n## Análisis\n\n${analysis.join(" ")}`;
   }
 
   return text;
