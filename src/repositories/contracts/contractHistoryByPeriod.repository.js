@@ -19,8 +19,6 @@ export const getHistoricalContractByMonthRepository = async ({
   const contractFilters = [
     "C.COD_CLIENTE = :customerId",
     "C.TIP_CONTRATO = :contractType",
-    "C.FEC_CONTRATO <= LAST_DAY(M.MONTH_START)",
-    "(C.FEC_VENCIMIENTO IS NULL OR C.FEC_VENCIMIENTO >= M.MONTH_START)",
   ];
 
   if (localNumber !== undefined && localNumber !== null && localNumber !== "") {
@@ -50,9 +48,32 @@ export const getHistoricalContractByMonthRepository = async ({
         M.MONTH_START, C.COD_CLIENTE, C.NOM_CLIENTE, C.RAZON_SOCIAL, C.NRO_LOCAL,
         C.TIP_CONTRATO, C.SER_CONTRATO, C.NRO_CONTRATO, C.FEC_CONTRATO,
         C.FEC_VENCIMIENTO, C.TOTAL_SUP_LOCAL,
+        CASE
+          WHEN C.FEC_CONTRATO <= LAST_DAY(M.MONTH_START)
+           AND (C.FEC_VENCIMIENTO IS NULL OR C.FEC_VENCIMIENTO >= M.MONTH_START)
+          THEN 1
+          ELSE 0
+        END AS IS_APPLICABLE,
         ROW_NUMBER() OVER (
           PARTITION BY M.MONTH_START
-          ORDER BY C.FEC_CONTRATO DESC NULLS LAST, C.NRO_CONTRATO DESC, C.SER_CONTRATO DESC
+          ORDER BY
+            CASE
+              WHEN C.FEC_CONTRATO <= LAST_DAY(M.MONTH_START)
+               AND (C.FEC_VENCIMIENTO IS NULL OR C.FEC_VENCIMIENTO >= M.MONTH_START)
+              THEN 0
+              ELSE 1
+            END,
+            CASE
+              WHEN C.FEC_CONTRATO > LAST_DAY(M.MONTH_START)
+              THEN C.FEC_CONTRATO - LAST_DAY(M.MONTH_START)
+              WHEN C.FEC_VENCIMIENTO IS NOT NULL
+               AND C.FEC_VENCIMIENTO < M.MONTH_START
+              THEN M.MONTH_START - C.FEC_VENCIMIENTO
+              ELSE 0
+            END,
+            C.FEC_CONTRATO DESC NULLS LAST,
+            C.NRO_CONTRATO DESC,
+            C.SER_CONTRATO DESC
         ) AS RN
       FROM MONTHS M
       LEFT JOIN VW_BOT_CONTRATOS_LOCALES C
@@ -60,7 +81,8 @@ export const getHistoricalContractByMonthRepository = async ({
     )
     SELECT TO_CHAR(MONTH_START, 'MM/YYYY') AS PERIOD_MONTH,
       COD_CLIENTE, NOM_CLIENTE, RAZON_SOCIAL, NRO_LOCAL,
-      TIP_CONTRATO, SER_CONTRATO, NRO_CONTRATO, FEC_CONTRATO, FEC_VENCIMIENTO, TOTAL_SUP_LOCAL
+      TIP_CONTRATO, SER_CONTRATO, NRO_CONTRATO, FEC_CONTRATO, FEC_VENCIMIENTO, TOTAL_SUP_LOCAL,
+      IS_APPLICABLE
     FROM CONTRACTS_BY_MONTH
     WHERE RN = 1
     ORDER BY MONTH_START
@@ -79,5 +101,11 @@ export const getHistoricalContractByMonthRepository = async ({
     contractDate: row.FEC_CONTRATO ?? null,
     expirationDate: row.FEC_VENCIMIENTO ?? null,
     totalLocalArea: row.TOTAL_SUP_LOCAL == null ? null : Number(row.TOTAL_SUP_LOCAL),
+    applicable: Number(row.IS_APPLICABLE ?? 0) === 1,
+    resolution: Number(row.IS_APPLICABLE ?? 0) === 1
+      ? "APPLICABLE"
+      : row.TIP_CONTRATO
+        ? "NEAREST"
+        : "NONE",
   }));
 };
