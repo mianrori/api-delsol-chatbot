@@ -77,7 +77,7 @@ const normalizeIncidencePresentation = (answer) => {
 
   if (rows.some((row) => row.hasMissingConcept)) {
     analysis.push(
-      "Los porcentajes de incidencia corresponden al **costo shopping disponible**, ya que faltan importes de uno o más conceptos oficiales en el período.",
+      "Los porcentajes de incidencia corresponden al **costo shopping disponible**, ya que no se dispone del importe de todos los conceptos oficiales en los meses analizados.",
     );
   }
 
