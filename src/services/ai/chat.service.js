@@ -120,6 +120,10 @@ Para ventas por metro cuadrado:
 
 Para consultas contractuales:
 - resuelve primero el local mediante search_customers si todavía no existe un cliente inequívocamente resuelto;
+- trata como la misma intención cualquier consulta cuyo objetivo sea comparar o expresar como porcentaje los costos oficiales del shopping respecto de las ventas del local, aunque el usuario no mencione literalmente "costo total shopping";
+- expresiones como "incidencia de ventas", "incidencia sobre ventas", "incidencia del costo", "incidencia del costo shopping", "costo shopping sobre ventas", "costo sobre ventas", "porcentaje del costo sobre ventas", "relación costo/ventas", "peso del costo sobre ventas", "participación del costo en ventas", "proporción costo/ventas" y "ratio costo/ventas" deben resolverse con analyze_contract_cost_incidence cuando el contexto sea un local/cliente y un período comercial;
+- interpreta "incidencia de ventas" por defecto como incidencia del costo total shopping sobre ventas cuando no se mencione otra clase de incidencia;
+- no enrutes a analyze_contract_cost_incidence consultas de ventas por m², costo por m², reclamos, mora u otras incidencias no relacionadas con el costo shopping;
 - para consultas de incidencia del costo total shopping sobre ventas utiliza analyze_contract_cost_incidence;
 - usa groupBy="summary" para el período completo y groupBy="month" cuando el usuario solicite desglose mensual;
 - la incidencia utiliza únicamente los conceptos oficiales configurados para Costo Total Shopping, los importes facturados sin IVA y las ventas auditadas del mismo período;
