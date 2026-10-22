@@ -3,8 +3,15 @@ export const analyzeContractCostIncidenceTool = {
     name: "analyze_contract_cost_incidence",
     description:
       "Analiza la incidencia del costo total shopping sobre las ventas auditadas " +
-      "de un cliente/local para un período. Utiliza exclusivamente los conceptos " +
-      "oficiales configurados, importes facturados sin IVA y ventas del mismo período.",
+      "de un cliente/local para un período. Úsala también cuando el usuario se refiera " +
+      "a esta métrica como incidencia de ventas, incidencia sobre ventas, incidencia " +
+      "del costo, costo shopping sobre ventas, costo sobre ventas, porcentaje del costo " +
+      "sobre ventas, relación costo/ventas, peso del costo sobre ventas, participación " +
+      "del costo en ventas, proporción costo/ventas, ratio costo/ventas o expresiones " +
+      "semánticamente equivalentes cuyo objetivo sea saber cuánto representan los costos " +
+      "oficiales del shopping respecto de las ventas. No usar para ventas por m², costo " +
+      "por m² ni otras incidencias ajenas al costo shopping. Utiliza exclusivamente los " +
+      "conceptos oficiales configurados, importes facturados sin IVA y ventas del mismo período.",
     inputSchema: {
       json: {
         type: "object",
