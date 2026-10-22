@@ -13,6 +13,16 @@ const normalizeIncidencePresentation = (answer) => {
     "| Costo shopping disponible |",
   );
 
+  text = text
+    .split("\n")
+    .filter(
+      (line) =>
+        !/^- \*\*\d{2}\/\d{4}:\*\* la incidencia corresponde al costo disponible porque faltan uno o más conceptos oficiales con importe facturado\.$/.test(
+          line,
+        ),
+    )
+    .join("\n");
+
   const notes = [];
 
   for (const line of text.split("\n")) {
