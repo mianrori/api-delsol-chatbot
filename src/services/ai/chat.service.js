@@ -141,7 +141,7 @@ Para consultas contractuales:
 - si area.changedWithinPeriod=true y min/max son distintos, muestra el rango de superficies del período; si area.available=false, muestra que no hay superficie contractual aplicable;
 - el valor de cada columna de concepto debe provenir exclusivamente de data[].shoppingCost.concepts[].amountExcludingTax del mismo mes;
 - si un concepto oficial está en data[].shoppingCost.missingConcepts, presenta "Sin importe" en su columna; no presentes cero;
-- conserva aparte, cuando estén disponibles, los datos de factura y período de facturación asociados a los conceptos utilizados;
+- no muestres números de factura ni períodos de facturación en la respuesta comercial de incidencia, salvo que el usuario los solicite explícitamente;
 - si un concepto aparece en data[].shoppingCost.missingConcepts, indícalo expresamente como concepto sin importe facturado disponible para ese mes y no lo incluyas en la suma visible de conceptos facturados;
 - conserva el resumen mensual con ventas auditadas, costo shopping e incidencia, pero el detalle por conceptos es obligatorio para que la composición del costo sea verificable;
 - si status="CURRENCY_MISMATCH", no presentes una incidencia monetaria válida;
@@ -1122,33 +1122,15 @@ const buildMonthlyIncidenceResponse = (result) => {
 
   lines.push(
     "",
-    "**Detalle de facturación de los conceptos utilizados:**",
+    "**Observaciones:**",
   );
 
   for (const period of result.data) {
-    const concepts = Array.isArray(period?.shoppingCost?.concepts)
-      ? period.shoppingCost.concepts
-      : [];
     const missingConcepts = Array.isArray(
       period?.shoppingCost?.missingConcepts,
     )
       ? period.shoppingCost.missingConcepts
       : [];
-
-    const invoiceDetails = concepts
-      .map((concept) => {
-        const description =
-          concept?.description ?? "Concepto no identificado";
-        const invoice = concept?.invoiceNumber ?? "—";
-        const billingPeriod = concept?.billingPeriod ?? "—";
-
-        return `${description}: factura ${invoice}, período ${billingPeriod}`;
-      })
-      .join("; ");
-
-    if (invoiceDetails) {
-      lines.push(`- **${period?.month ?? "Período"}:** ${invoiceDetails}.`);
-    }
 
     if (missingConcepts.length > 0) {
       lines.push(
