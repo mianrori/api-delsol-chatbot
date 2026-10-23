@@ -72,7 +72,8 @@ export const getMemberPurchasesRepository = async ({
   mode = "summary",
   groupBy = [],
   metrics = ["totalAmount", "purchaseCount"],
-  limit = 50,
+  page = 1,
+  rows = 50,
 }) => {
   if (!documentNumber) {
     throw new Error("documentNumber es obligatorio.");
@@ -143,62 +144,118 @@ export const getMemberPurchasesRepository = async ({
   }
 
   if (mode === "detail") {
-    const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 100);
-    binds.limit = safeLimit;
+    const safePage = Math.max(Number(page) || 1, 1);
+    const safeRows = Math.min(Math.max(Number(rows) || 50, 1), 100);
+    const offset = (safePage - 1) * safeRows;
+    const maxRow = offset + safeRows;
+
+    const countSql = `
+      SELECT COUNT(*) AS TOTAL_ROWS
+      FROM VW_BOT_COMPRAS_SOCIO
+      WHERE ${filters.join("\nAND ")}
+    `;
+
+    const countResult = await executeOracleQuery(
+      connection,
+      countSql,
+      binds,
+    );
+    const totalRows = Number(countResult?.[0]?.TOTAL_ROWS ?? 0);
+    const totalPages =
+      totalRows === 0 ? 0 : Math.ceil(totalRows / safeRows);
+
+    const detailBinds = {
+      ...binds,
+      minRow: offset + 1,
+      maxRow,
+    };
 
     const sql = `
       SELECT *
       FROM (
         SELECT
-          TO_CHAR(FECHA, 'DD/MM/YYYY') AS REGISTER_DATE,
-          TO_CHAR(FECHA_COMPRA, 'DD/MM/YYYY') AS PURCHASE_DATE,
-          COD_CLIENTE AS CUSTOMER_ID,
-          LOCAL AS CUSTOMER_NAME,
-          COD_RUBRO AS CATEGORY_ID,
-          RUBRO AS CATEGORY_NAME,
-          MONEDA AS CURRENCY_DESCRIPTION,
-          SIMBOLO_MONEDA AS CURRENCY_SYMBOL,
-          TO_CHAR(NRO_FACTURA) AS INVOICE_NUMBER,
-          IMPORTE AS AMOUNT
-        FROM VW_BOT_COMPRAS_SOCIO
-        WHERE ${filters.join("\nAND ")}
-        ORDER BY FECHA_COMPRA DESC, NRO_FACTURA DESC
+          detail_rows.*,
+          ROW_NUMBER() OVER (
+            ORDER BY
+              FECHA_COMPRA DESC,
+              NRO_FACTURA DESC,
+              FECHA DESC,
+              COD_CLIENTE,
+              COD_RUBRO
+          ) AS RN
+        FROM (
+          SELECT
+            FECHA,
+            FECHA_COMPRA,
+            COD_CLIENTE,
+            LOCAL,
+            COD_RUBRO,
+            RUBRO,
+            MONEDA,
+            SIMBOLO_MONEDA,
+            NRO_FACTURA,
+            IMPORTE
+          FROM VW_BOT_COMPRAS_SOCIO
+          WHERE ${filters.join("\nAND ")}
+        ) detail_rows
       )
-      WHERE ROWNUM <= :limit
+      WHERE RN BETWEEN :minRow AND :maxRow
+      ORDER BY RN
     `;
 
-    const result = await executeOracleQuery(connection, sql, binds);
-    const rows = Array.isArray(result) ? result : [];
+    const result = await executeOracleQuery(
+      connection,
+      sql,
+      detailBinds,
+    );
+    const detailRows = Array.isArray(result) ? result : [];
 
     return {
       documentNumber: String(documentNumber),
       mode: "detail",
-      data: rows.map((row) => ({
-        purchaseDate: row.PURCHASE_DATE,
-        registerDate: row.REGISTER_DATE,
+      page: safePage,
+      rows: safeRows,
+      returnedRows: detailRows.length,
+      totalRows,
+      totalPages,
+      hasMore: safePage < totalPages,
+      nextPage: safePage < totalPages ? safePage + 1 : null,
+      data: detailRows.map((row) => ({
+        purchaseDate: row.PURCHASE_DATE
+          ? new Date(row.PURCHASE_DATE).toLocaleDateString("es-PY", {
+              timeZone: "UTC",
+            })
+          : null,
+        registerDate: row.FECHA
+          ? new Date(row.FECHA).toLocaleDateString("es-PY", {
+              timeZone: "UTC",
+            })
+          : null,
         customer: {
           id:
-            row.CUSTOMER_ID != null
-              ? String(row.CUSTOMER_ID)
+            row.COD_CLIENTE != null
+              ? String(row.COD_CLIENTE)
               : null,
-          name: row.CUSTOMER_NAME,
+          name: row.LOCAL,
         },
         category: {
           id:
-            row.CATEGORY_ID != null
-              ? String(row.CATEGORY_ID)
+            row.COD_RUBRO != null
+              ? String(row.COD_RUBRO)
               : null,
-          name: row.CATEGORY_NAME,
+          name: row.RUBRO,
         },
         currency: {
-          description: row.CURRENCY_DESCRIPTION,
-          symbol: row.CURRENCY_SYMBOL,
+          description: row.MONEDA,
+          symbol: row.SIMBOLO_MONEDA,
           symbolPosition: "prefix",
         },
-        invoiceNumber: row.INVOICE_NUMBER,
-        amount: Number(row.AMOUNT ?? 0),
+        invoiceNumber:
+          row.NRO_FACTURA != null
+            ? String(row.NRO_FACTURA)
+            : null,
+        amount: Number(row.IMPORTE ?? 0),
       })),
-      limit: safeLimit,
     };
   }
 
