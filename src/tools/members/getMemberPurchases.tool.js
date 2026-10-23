@@ -69,7 +69,7 @@ export const getMemberPurchasesTool = {
             minimum: 1,
             maximum: 100,
             description:
-              "Cantidad de registros por página cuando mode es detail. Por defecto 50.",
+              "Cantidad de registros por página cuando mode es detail. Por defecto 20.",
           },
         },
         required: ["documentNumber"],
