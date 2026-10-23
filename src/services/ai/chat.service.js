@@ -10,7 +10,10 @@ import {
   getConversation,
   setConversation,
 } from "../../state/conversation.store.js";
-import { trimConversation } from "./conversation.service.js";
+import {
+  compactMemberPurchasePaginationHistory,
+  trimConversation,
+} from "./conversation.service.js";
 import { getSystemPrompt } from "../../prompts/system.prompt.js";
 import {
   logBedrockRequest,
@@ -1524,7 +1527,13 @@ export const chatService = async ({ message, sessionId }) => {
       );
     }
 
-    setConversation(sessionId, trimConversation(messages, 10));
+    const compactedMessages =
+      compactMemberPurchasePaginationHistory(messages);
+
+    setConversation(
+      sessionId,
+      trimConversation(compactedMessages, 10),
+    );
 
     return {
       answer,
