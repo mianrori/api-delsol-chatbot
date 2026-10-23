@@ -73,7 +73,7 @@ export const getMemberPurchasesRepository = async ({
   groupBy = [],
   metrics = ["totalAmount", "purchaseCount"],
   page = 1,
-  rows = 50,
+  rows = 20,
 }) => {
   if (!documentNumber) {
     throw new Error("documentNumber es obligatorio.");
@@ -145,7 +145,7 @@ export const getMemberPurchasesRepository = async ({
 
   if (mode === "detail") {
     const safePage = Math.max(Number(page) || 1, 1);
-    const safeRows = Math.min(Math.max(Number(rows) || 50, 1), 100);
+    const safeRows = Math.min(Math.max(Number(rows) || 20, 1), 100);
     const offset = (safePage - 1) * safeRows;
     const maxRow = offset + safeRows;
 
