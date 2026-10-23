@@ -150,17 +150,29 @@ export const getMemberPurchasesRepository = async ({
     const maxRow = offset + safeRows;
 
     const countSql = `
-      SELECT COUNT(*) AS TOTAL_ROWS
+      SELECT
+        MONEDA,
+        SIMBOLO_MONEDA,
+        COUNT(*) AS PURCHASE_COUNT
       FROM VW_BOT_COMPRAS_SOCIO
       WHERE ${filters.join("\nAND ")}
+      GROUP BY MONEDA, SIMBOLO_MONEDA
     `;
 
+    const countStartedAt = Date.now();
     const countResult = await executeOracleQuery(
       connection,
       countSql,
       binds,
     );
-    const totalRows = Number(countResult?.[0]?.TOTAL_ROWS ?? 0);
+    console.log(
+      `[CHATBOT-DEV] MEMBER PURCHASES COUNT: ${Date.now() - countStartedAt} ms`,
+    );
+
+    const totalRows = (Array.isArray(countResult) ? countResult : []).reduce(
+      (total, row) => total + Number(row.PURCHASE_COUNT ?? 0),
+      0,
+    );
     const totalPages =
       totalRows === 0 ? 0 : Math.ceil(totalRows / safeRows);
 
@@ -203,10 +215,14 @@ export const getMemberPurchasesRepository = async ({
       ORDER BY RN
     `;
 
+    const detailStartedAt = Date.now();
     const result = await executeOracleQuery(
       connection,
       sql,
       detailBinds,
+    );
+    console.log(
+      `[CHATBOT-DEV] MEMBER PURCHASES DETAIL: ${Date.now() - detailStartedAt} ms`,
     );
     const detailRows = Array.isArray(result) ? result : [];
 
