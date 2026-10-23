@@ -166,7 +166,7 @@ export const getMemberPurchasesRepository = async ({
 
     const detailBinds = {
       ...binds,
-      minRow: offset + 1,
+      minRow: offset,
       maxRow,
     };
 
@@ -174,15 +174,8 @@ export const getMemberPurchasesRepository = async ({
       SELECT *
       FROM (
         SELECT
-          detail_rows.*,
-          ROW_NUMBER() OVER (
-            ORDER BY
-              FECHA_COMPRA DESC,
-              NRO_FACTURA DESC,
-              FECHA DESC,
-              COD_CLIENTE,
-              COD_RUBRO
-          ) AS RN
+          ordered_rows.*,
+          ROWNUM AS RN
         FROM (
           SELECT
             FECHA,
@@ -197,9 +190,16 @@ export const getMemberPurchasesRepository = async ({
             IMPORTE
           FROM VW_BOT_COMPRAS_SOCIO
           WHERE ${filters.join("\nAND ")}
-        ) detail_rows
+          ORDER BY
+            FECHA_COMPRA DESC,
+            NRO_FACTURA DESC,
+            FECHA DESC,
+            COD_CLIENTE,
+            COD_RUBRO
+        ) ordered_rows
+        WHERE ROWNUM <= :maxRow
       )
-      WHERE RN BETWEEN :minRow AND :maxRow
+      WHERE RN > :minRow
       ORDER BY RN
     `;
 
