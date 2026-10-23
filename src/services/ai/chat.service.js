@@ -98,7 +98,9 @@ Para compras de socios:
 - returnedRows indica cuántas filas fueron devueltas, totalRows la cantidad total de compras de detalle, totalPages la cantidad de páginas, hasMore si existen más resultados y nextPage la siguiente página disponible;
 - cuando totalRows sea mayor que returnedRows o hasMore=true, informa explícitamente que se muestra solo una parte del resultado, por ejemplo: "Se muestran 20 de 81 compras (página 1 de 5).";
 - cuando presentes una página de detalle, muestra todas las filas presentes en data; no reemplaces filas por "...", "etc." ni otras abreviaciones;
-- no inventes rangos globales de registros como "21-40", "41-60" o equivalentes a partir de page y rows; si la herramienta no devuelve explícitamente startRow/endRow, limita el encabezado a "página X de Y" y usa returnedRows/totalRows para describir la cantidad mostrada;
+- startRow y endRow indican el rango global exacto de filas retornadas en la página actual;
+- si deseas mostrar un rango global en el encabezado, utiliza exclusivamente startRow y endRow retornados por la herramienta; nunca lo calcules ni lo infieras desde page y rows;
+- si startRow/endRow no están disponibles, limita el encabezado a "página X de Y" y usa returnedRows/totalRows para describir la cantidad mostrada;
 - si el usuario responde "ver más", "mostrar más", "siguiente página", "continuar" o equivalente, reutiliza exactamente documentNumber, dateFrom/dateTo, customerIds, categoryIds y rows anteriores, y ejecuta get_member_purchases con page=nextPage;
 - en esa continuación, si el resultado anterior incluye totalRows, pásalo como knownTotalRows siempre que documentNumber, dateFrom/dateTo, customerIds, categoryIds y rows sean exactamente los mismos; esto evita recalcular el conteo;
 - nunca uses knownTotalRows si cambia cualquier filtro o el tamaño rows; en ese caso deja que la herramienta recalcule el total;
