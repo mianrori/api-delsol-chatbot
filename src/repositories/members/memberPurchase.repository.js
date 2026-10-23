@@ -178,41 +178,29 @@ export const getMemberPurchasesRepository = async ({
 
     const detailBinds = {
       ...binds,
-      minRow: offset,
-      maxRow,
+      offset,
+      rows: safeRows,
     };
 
     const sql = `
-      SELECT *
-      FROM (
-        SELECT
-          ordered_rows.*,
-          ROWNUM AS RN
-        FROM (
-          SELECT
-            FECHA,
-            FECHA_COMPRA,
-            COD_CLIENTE,
-            LOCAL,
-            COD_RUBRO,
-            RUBRO,
-            MONEDA,
-            SIMBOLO_MONEDA,
-            NRO_FACTURA,
-            IMPORTE
-          FROM VW_BOT_COMPRAS_SOCIO
-          WHERE ${filters.join("\nAND ")}
-          ORDER BY
-            FECHA_COMPRA DESC,
-            NRO_FACTURA DESC,
-            FECHA DESC,
-            COD_CLIENTE,
-            COD_RUBRO
-        ) ordered_rows
-        WHERE ROWNUM <= :maxRow
-      )
-      WHERE RN > :minRow
-      ORDER BY RN
+      SELECT
+        TO_CHAR(FECHA, 'DD/MM/YYYY') AS REGISTER_DATE,
+        TO_CHAR(FECHA_COMPRA, 'DD/MM/YYYY') AS PURCHASE_DATE,
+        COD_CLIENTE AS CUSTOMER_ID,
+        LOCAL AS CUSTOMER_NAME,
+        COD_RUBRO AS CATEGORY_ID,
+        RUBRO AS CATEGORY_NAME,
+        MONEDA AS CURRENCY_DESCRIPTION,
+        SIMBOLO_MONEDA AS CURRENCY_SYMBOL,
+        TO_CHAR(NRO_FACTURA) AS INVOICE_NUMBER,
+        IMPORTE AS AMOUNT
+      FROM VW_BOT_COMPRAS_SOCIO
+      WHERE ${filters.join("\nAND ")}
+      ORDER BY
+        FECHA_COMPRA DESC,
+        NRO_FACTURA DESC
+      OFFSET :offset ROWS
+      FETCH NEXT :rows ROWS ONLY
     `;
 
     const detailStartedAt = Date.now();
@@ -237,40 +225,29 @@ export const getMemberPurchasesRepository = async ({
       hasMore: safePage < totalPages,
       nextPage: safePage < totalPages ? safePage + 1 : null,
       data: detailRows.map((row) => ({
-        purchaseDate: row.PURCHASE_DATE
-          ? new Date(row.PURCHASE_DATE).toLocaleDateString("es-PY", {
-              timeZone: "UTC",
-            })
-          : null,
-        registerDate: row.FECHA
-          ? new Date(row.FECHA).toLocaleDateString("es-PY", {
-              timeZone: "UTC",
-            })
-          : null,
+        purchaseDate: row.PURCHASE_DATE,
+        registerDate: row.REGISTER_DATE,
         customer: {
           id:
-            row.COD_CLIENTE != null
-              ? String(row.COD_CLIENTE)
+            row.CUSTOMER_ID != null
+              ? String(row.CUSTOMER_ID)
               : null,
-          name: row.LOCAL,
+          name: row.CUSTOMER_NAME,
         },
         category: {
           id:
-            row.COD_RUBRO != null
-              ? String(row.COD_RUBRO)
+            row.CATEGORY_ID != null
+              ? String(row.CATEGORY_ID)
               : null,
-          name: row.RUBRO,
+          name: row.CATEGORY_NAME,
         },
         currency: {
-          description: row.MONEDA,
-          symbol: row.SIMBOLO_MONEDA,
+          description: row.CURRENCY_DESCRIPTION,
+          symbol: row.CURRENCY_SYMBOL,
           symbolPosition: "prefix",
         },
-        invoiceNumber:
-          row.NRO_FACTURA != null
-            ? String(row.NRO_FACTURA)
-            : null,
-        amount: Number(row.IMPORTE ?? 0),
+        invoiceNumber: row.INVOICE_NUMBER,
+        amount: Number(row.AMOUNT ?? 0),
       })),
     };
   }
