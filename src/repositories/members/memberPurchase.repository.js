@@ -178,8 +178,8 @@ export const getMemberPurchasesRepository = async ({
 
     const detailBinds = {
       ...binds,
-      offset,
-      rows: safeRows,
+      pageOffset: offset,
+      pageSize: safeRows,
     };
 
     const sql = `
@@ -199,8 +199,8 @@ export const getMemberPurchasesRepository = async ({
       ORDER BY
         FECHA_COMPRA DESC,
         NRO_FACTURA DESC
-      OFFSET :offset ROWS
-      FETCH NEXT :rows ROWS ONLY
+      OFFSET :pageOffset ROWS
+      FETCH NEXT :pageSize ROWS ONLY
     `;
 
     const detailStartedAt = Date.now();
