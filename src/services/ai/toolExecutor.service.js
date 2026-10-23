@@ -9,7 +9,7 @@ import { getContractConditions } from "../contracts/contractConditions.service.j
 import { getContractCostPerSqm } from "../contracts/contractCostPerSqm.service.js";
 import { analyzeContractCostIncidence } from "../contracts/contractCostIncidence.service.js";
 import { resolveMember } from "../members/member.resolver.js";
-import { getMember } from "../members/member.service.js";
+import { getMember, getMemberPurchases } from "../members/member.service.js";
 import { withOracleProxySession } from "../sessions/oracleSession.service.js";
 
 const withAuthorizedOracle = async (sessionId, callback) => {
@@ -114,6 +114,13 @@ const toolHandlers = {
     return withAuthorizedOracle(
       context.sessionId,
       ({ connection }) => getMember(args, connection),
+    );
+  },
+
+  get_member_purchases: async (args, context) => {
+    return withAuthorizedOracle(
+      context.sessionId,
+      ({ connection }) => getMemberPurchases(args, connection),
     );
   },
 };
