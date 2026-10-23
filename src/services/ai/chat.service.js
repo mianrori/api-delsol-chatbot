@@ -96,6 +96,8 @@ Para compras de socios:
 - cuando totalRows sea mayor que returnedRows o hasMore=true, informa explícitamente que se muestra solo una parte del resultado, por ejemplo: "Se muestran 20 de 81 compras (página 1 de 5).";
 - cuando presentes una página de detalle, muestra todas las filas presentes en data; no reemplaces filas por "...", "etc." ni otras abreviaciones;
 - si el usuario responde "ver más", "mostrar más", "siguiente página", "continuar" o equivalente, reutiliza exactamente documentNumber, dateFrom/dateTo, customerIds, categoryIds y rows anteriores, y ejecuta get_member_purchases con page=nextPage;
+- en esa continuación, si el resultado anterior incluye totalRows, pásalo como knownTotalRows siempre que documentNumber, dateFrom/dateTo, customerIds, categoryIds y rows sean exactamente los mismos; esto evita recalcular el conteo;
+- nunca uses knownTotalRows si cambia cualquier filtro o el tamaño rows; en ese caso deja que la herramienta recalcule el total;
 - nunca afirmes que existe una página siguiente si hasMore=false o nextPage es null;
 - no vuelvas a resolver al socio, local o rubro si sus identificadores ya están resueltos en el historial.
 
