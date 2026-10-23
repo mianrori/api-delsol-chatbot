@@ -74,6 +74,7 @@ export const getMemberPurchasesRepository = async ({
   metrics = ["totalAmount", "purchaseCount"],
   page = 1,
   rows = 20,
+  knownTotalRows,
 }) => {
   if (!documentNumber) {
     throw new Error("documentNumber es obligatorio.");
@@ -149,30 +150,45 @@ export const getMemberPurchasesRepository = async ({
     const offset = (safePage - 1) * safeRows;
     const maxRow = offset + safeRows;
 
-    const countSql = `
-      SELECT
-        MONEDA,
-        SIMBOLO_MONEDA,
-        COUNT(*) AS PURCHASE_COUNT
-      FROM VW_BOT_COMPRAS_SOCIO
-      WHERE ${filters.join("\nAND ")}
-      GROUP BY MONEDA, SIMBOLO_MONEDA
-    `;
+    let totalRows;
 
-    const countStartedAt = Date.now();
-    const countResult = await executeOracleQuery(
-      connection,
-      countSql,
-      binds,
-    );
-    console.log(
-      `[CHATBOT-DEV] MEMBER PURCHASES COUNT: ${Date.now() - countStartedAt} ms`,
-    );
+    if (
+      knownTotalRows !== undefined &&
+      knownTotalRows !== null &&
+      Number.isFinite(Number(knownTotalRows)) &&
+      Number(knownTotalRows) >= 0
+    ) {
+      totalRows = Number(knownTotalRows);
+      console.log(
+        `[CHATBOT-DEV] MEMBER PURCHASES COUNT: reused totalRows=${totalRows}`,
+      );
+    } else {
+      const countSql = `
+        SELECT
+          MONEDA,
+          SIMBOLO_MONEDA,
+          COUNT(*) AS PURCHASE_COUNT
+        FROM VW_BOT_COMPRAS_SOCIO
+        WHERE ${filters.join("\nAND ")}
+        GROUP BY MONEDA, SIMBOLO_MONEDA
+      `;
 
-    const totalRows = (Array.isArray(countResult) ? countResult : []).reduce(
-      (total, row) => total + Number(row.PURCHASE_COUNT ?? 0),
-      0,
-    );
+      const countStartedAt = Date.now();
+      const countResult = await executeOracleQuery(
+        connection,
+        countSql,
+        binds,
+      );
+      console.log(
+        `[CHATBOT-DEV] MEMBER PURCHASES COUNT: ${Date.now() - countStartedAt} ms`,
+      );
+
+      totalRows = (Array.isArray(countResult) ? countResult : []).reduce(
+        (total, row) => total + Number(row.PURCHASE_COUNT ?? 0),
+        0,
+      );
+    }
+
     const totalPages =
       totalRows === 0 ? 0 : Math.ceil(totalRows / safeRows);
 
