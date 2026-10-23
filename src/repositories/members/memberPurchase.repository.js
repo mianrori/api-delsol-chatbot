@@ -191,9 +191,8 @@ export const getMemberPurchasesRepository = async ({
           name: row.CATEGORY_NAME,
         },
         currency: {
-          code: "PYG",
           description: row.CURRENCY_DESCRIPTION,
-          symbol: row.CURRENCY_SYMBOL || "₲",
+          symbol: row.CURRENCY_SYMBOL,
           symbolPosition: "prefix",
         },
         invoiceNumber: row.INVOICE_NUMBER,
@@ -254,9 +253,8 @@ export const getMemberPurchasesRepository = async ({
     }
 
     item.currency = {
-      code: "PYG",
       description: row.CURRENCY_DESCRIPTION,
-      symbol: row.CURRENCY_SYMBOL || "₲",
+      symbol: row.CURRENCY_SYMBOL,
       symbolPosition: "prefix",
     };
 
