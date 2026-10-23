@@ -8,6 +8,8 @@ import { getInvoicesTool } from "./invoices/getInvoices.tool.js";
 import { getContractConditionsTool } from "./contracts/getContractConditions.tool.js";
 import { getContractCostPerSqmTool } from "./contracts/getContractCostPerSqm.tool.js";
 import { analyzeContractCostIncidenceTool } from "./contracts/analyzeContractCostIncidence.tool.js";
+import { searchMembersTool } from "./members/searchMembers.tool.js";
+import { getMemberTool } from "./members/getMember.tool.js";
 
 export const tools = [
   searchCustomersTool,
@@ -20,4 +22,6 @@ export const tools = [
   getContractConditionsTool,
   getContractCostPerSqmTool,
   analyzeContractCostIncidenceTool,
+  searchMembersTool,
+  getMemberTool,
 ];
