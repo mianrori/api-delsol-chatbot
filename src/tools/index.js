@@ -10,6 +10,7 @@ import { getContractCostPerSqmTool } from "./contracts/getContractCostPerSqm.too
 import { analyzeContractCostIncidenceTool } from "./contracts/analyzeContractCostIncidence.tool.js";
 import { searchMembersTool } from "./members/searchMembers.tool.js";
 import { getMemberTool } from "./members/getMember.tool.js";
+import { getMemberPurchasesTool } from "./members/getMemberPurchases.tool.js";
 
 export const tools = [
   searchCustomersTool,
@@ -24,4 +25,5 @@ export const tools = [
   analyzeContractCostIncidenceTool,
   searchMembersTool,
   getMemberTool,
+  getMemberPurchasesTool,
 ];
