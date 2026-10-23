@@ -297,9 +297,9 @@ export const getMemberPurchasesRepository = async ({
   `;
 
   const result = await executeOracleQuery(connection, sql, binds);
-  const rows = Array.isArray(result) ? result : [];
+  const summaryRows = Array.isArray(result) ? result : [];
 
-  const data = rows.map((row) => {
+  const data = summaryRows.map((row) => {
     let item = {};
 
     for (const dimension of groupBy) {
