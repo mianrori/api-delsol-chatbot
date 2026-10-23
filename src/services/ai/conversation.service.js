@@ -16,6 +16,8 @@ const compactMemberPurchaseToolResult = (json = {}) => {
     mode: json.mode,
     page: json.page,
     rows: json.rows,
+    startRow: json.startRow,
+    endRow: json.endRow,
     returnedRows: json.returnedRows,
     totalRows: json.totalRows,
     totalPages: json.totalPages,
@@ -143,6 +145,10 @@ export const compactMemberPurchasePaginationHistory = (messages) => {
       const page = previousCompactedMemberPurchaseResult.page;
       const totalPages =
         previousCompactedMemberPurchaseResult.totalPages;
+      const startRow =
+        previousCompactedMemberPurchaseResult.startRow;
+      const endRow =
+        previousCompactedMemberPurchaseResult.endRow;
       const returnedRows =
         previousCompactedMemberPurchaseResult.returnedRows;
       const totalRows =
@@ -161,6 +167,7 @@ export const compactMemberPurchasePaginationHistory = (messages) => {
             text:
               "[Historial compactado de compras de socio] " +
               `Se presentó la página ${page} de ${totalPages}, ` +
+              `filas ${startRow ?? "n/a"}-${endRow ?? "n/a"}, ` +
               `con ${returnedRows} de ${totalRows} registros. ` +
               `hasMore=${hasMore}; nextPage=${nextPage ?? "null"}.`,
           },
