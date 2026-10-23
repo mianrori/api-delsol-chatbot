@@ -1,4 +1,5 @@
 import { getMemberRepository } from "../../repositories/members/member.repository.js";
+import { getMemberPurchasesRepository } from "../../repositories/members/memberPurchase.repository.js";
 
 export const getMember = async (args, connection) => {
   const member = await getMemberRepository(connection, args.documentNumber);
@@ -29,4 +30,12 @@ export const getMember = async (args, connection) => {
       phone: member.TELEFONO,
     },
   };
+};
+
+
+export const getMemberPurchases = async (args, connection) => {
+  return getMemberPurchasesRepository({
+    connection,
+    ...args,
+  });
 };
