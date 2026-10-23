@@ -58,12 +58,18 @@ export const getMemberPurchasesTool = {
             description:
               "Métricas a calcular cuando mode es summary.",
           },
-          limit: {
+          page: {
+            type: "integer",
+            minimum: 1,
+            description:
+              "Página a devolver cuando mode es detail. Por defecto 1.",
+          },
+          rows: {
             type: "integer",
             minimum: 1,
             maximum: 100,
             description:
-              "Cantidad máxima de registros a devolver cuando mode es detail.",
+              "Cantidad de registros por página cuando mode es detail. Por defecto 50.",
           },
         },
         required: ["documentNumber"],
