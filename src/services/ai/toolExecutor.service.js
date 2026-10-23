@@ -8,6 +8,8 @@ import { getInvoices } from "../invoices/invoices.service.js";
 import { getContractConditions } from "../contracts/contractConditions.service.js";
 import { getContractCostPerSqm } from "../contracts/contractCostPerSqm.service.js";
 import { analyzeContractCostIncidence } from "../contracts/contractCostIncidence.service.js";
+import { resolveMember } from "../members/member.resolver.js";
+import { getMember } from "../members/member.service.js";
 import { withOracleProxySession } from "../sessions/oracleSession.service.js";
 
 const withAuthorizedOracle = async (sessionId, callback) => {
@@ -98,6 +100,20 @@ const toolHandlers = {
     return withAuthorizedOracle(
       context.sessionId,
       ({ connection }) => analyzeContractCostIncidence(args, connection),
+    );
+  },
+
+  search_members: async (args, context) => {
+    return withAuthorizedOracle(
+      context.sessionId,
+      ({ connection }) => resolveMember(args.search, connection),
+    );
+  },
+
+  get_member: async (args, context) => {
+    return withAuthorizedOracle(
+      context.sessionId,
+      ({ connection }) => getMember(args, connection),
     );
   },
 };
