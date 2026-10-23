@@ -235,6 +235,11 @@ export const getMemberPurchasesRepository = async ({
       mode: "detail",
       page: safePage,
       rows: safeRows,
+      startRow: detailRows.length > 0 ? offset + 1 : null,
+      endRow:
+        detailRows.length > 0
+          ? offset + detailRows.length
+          : null,
       returnedRows: detailRows.length,
       totalRows,
       totalPages,
