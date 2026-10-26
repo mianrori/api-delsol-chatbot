@@ -475,6 +475,13 @@ export const restorePiiText = (sessionId, text) => {
   });
 };
 
+const normalizeUserVisibleCurrencyFormatting = (text) =>
+  String(text ?? "")
+    // Siempre un espacio ASCII entre el símbolo de Guaraníes y el importe.
+    .replace(/₲[\u00A0\u2007\u202F \t]*(?=\d)/g, "₲ ")
+    // Si el modelo usa espacios Unicode como separador de miles, normalizar a punto.
+    .replace(/(\d)[\u00A0\u2007\u202F](?=\d{3}(?:\D|$))/g, "$1.");
+
 export const restorePiiTextForUser = (sessionId, text) => {
   if (!sessionId || typeof text !== "string") {
     return text;
@@ -482,7 +489,7 @@ export const restorePiiTextForUser = (sessionId, text) => {
 
   const state = getPiiSession(sessionId);
 
-  return text
+  const restoredText = text
     .replace(TOKEN_PATTERN, (token, type) => {
       if (INTERNAL_ONLY_TOKEN_TYPES.has(type)) {
         return "";
@@ -494,6 +501,8 @@ export const restorePiiTextForUser = (sessionId, text) => {
     .replace(/[ \t]{2,}/g, " ")
     .replace(/ +\n/g, "\n")
     .trim();
+
+  return normalizeUserVisibleCurrencyFormatting(restoredText);
 };
 
 export const restorePiiDeep = (sessionId, value) => {
