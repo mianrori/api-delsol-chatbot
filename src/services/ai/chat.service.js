@@ -147,8 +147,8 @@ Para análisis de socios:
 - no copies afirmaciones fiscales de respuestas anteriores del historial; para analyze_members usa únicamente "monto total de compras" o "total comprado";
 - al mostrar age, titula la columna "Edad actual"; el año de las compras no convierte esa edad en una edad histórica;
 - summary.totalMatches es la cantidad total real de socios que cumplen los filtros; summary.returnedCount es la cantidad incluida en la respuesta;
-- si summary.hasMore=true, informa que se muestra una lista limitada y no afirmes que los miembros devueltos representan todo el universo;
-- si summary.totalMatches es null, el total de socios no fue calculado: nunca lo sustituyas por returnedCount ni inventes un total; con hasMore=true indica "Se muestra un listado limitado a N socios; existen más socios que cumplen los filtros", usando returnedCount;
+- si summary.hasMore=true, no afirmes que los miembros devueltos representan todo el universo; para rankings por monto descendente utiliza "Se muestran los N socios con mayor monto de compras", usando la cantidad realmente mostrada; si el orden es ascendente, utiliza "menor monto de compras";
+- si summary.totalMatches es null, el total de socios no fue calculado: nunca lo sustituyas por returnedCount ni inventes un total; no agregues al pie del ranking "existen más socios que cumplen los filtros";
 - export.available=false significa que la exportación no está habilitada en esta etapa; no ofrezcas ni inventes descargas Excel.
 
 Para compras promocionales de socios:

@@ -29,14 +29,16 @@ test("the three demographic rankings preserve values, PII and limited-list notic
     assert.ok(text.includes("| Edad actual |"));
     assert.ok(text.includes("| 1 | [PII_NAME_1] | 35 | 8 | ₲ 1.234.567 |"));
     assert.ok(text.includes("| 2 | [PII_NAME_2] | 38 | 4 | ₲ 765.432 |"));
-    assert.ok(text.includes("limitado a 2 socios; existen más"));
+    assert.ok(text.includes("Se muestran los 2 socios con mayor monto de compras."));
+    assert.doesNotMatch(text, /existen más|listado limitado/);
     assert.doesNotMatch(text, /IVA|facturad|\bneto\b|\bbruto\b|descarga|Excel/i);
   }
 });
 
-test("known universe is distinct from the returned ranking", () => {
+test("the ranking footer uses the returned count even when the universe is known", () => {
   const text = buildMemberRankingResponse([ranking({}, { totalMatches: 25 })]);
-  assert.ok(text.includes("Se muestran 2 de 25 socios"));
+  assert.ok(text.includes("Se muestran los 2 socios con mayor monto de compras."));
+  assert.doesNotMatch(text, /25 socios|existen más/);
 });
 
 test("complete results do not claim additional matches", () => {

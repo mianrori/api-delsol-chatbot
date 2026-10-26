@@ -70,10 +70,8 @@ export const buildMemberRankingResponse = (calls = []) => {
       `| ${columns.map((column) => cell(column.value(member, index))).join(" | ")} |`),
   ];
   if (result.summary?.hasMore === true) {
-    const total = result.summary.totalMatches;
-    lines.push("", Number.isInteger(total) && total > members.length
-      ? `Se muestran ${members.length} de ${number(total)} socios que cumplen los filtros.`
-      : `Se muestra un listado limitado a ${members.length} socios; existen más socios que cumplen los filtros.`);
+    const direction = input.orderDirection === "asc" ? "menor" : "mayor";
+    lines.push("", `Se muestran los ${members.length} socios con ${direction} monto de compras.`);
   }
   return lines.join("\n");
 };
