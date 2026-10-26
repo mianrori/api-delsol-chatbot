@@ -718,7 +718,7 @@ export const getMemberAnalysisRepository = async ({
 
     return {
       rows,
-      totalMatches: null,
+      totalMatches: hasMore ? Number(limit) + 1 : topRows.length,
       hasMore,
     };
   }
