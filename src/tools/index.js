@@ -11,6 +11,8 @@ import { analyzeContractCostIncidenceTool } from "./contracts/analyzeContractCos
 import { searchMembersTool } from "./members/searchMembers.tool.js";
 import { getMemberTool } from "./members/getMember.tool.js";
 import { getMemberPurchasesTool } from "./members/getMemberPurchases.tool.js";
+import { searchPromotionsTool } from "./promotions/searchPromotions.tool.js";
+import { getMemberPromoPurchasesTool } from "./members/getMemberPromoPurchases.tool.js";
 
 export const tools = [
   searchCustomersTool,
@@ -26,4 +28,6 @@ export const tools = [
   searchMembersTool,
   getMemberTool,
   getMemberPurchasesTool,
+  searchPromotionsTool,
+  getMemberPromoPurchasesTool,
 ];
