@@ -5,6 +5,7 @@ const TOKEN_PATTERN = /\[PII_([A-Z_]+)_\d+\]/g;
 
 const INTERNAL_ONLY_TOKEN_TYPES = new Set([
   "CUSTOMER_ID",
+  "CATEGORY_ID",
   "CONCEPT_ID",
   "PROMOTION_ID",
   "CAMPAIGN_ID",
@@ -70,6 +71,8 @@ const FIELD_TYPES = new Map([
   // Clientes / locales
   ["customerid", "CUSTOMER_ID"],
   ["codcliente", "CUSTOMER_ID"],
+  ["categoryid", "CATEGORY_ID"],
+  ["codrubro", "CATEGORY_ID"],
   ["customername", "CUSTOMER_NAME"],
   ["businessname", "BUSINESS_NAME"],
   ["razonsocial", "BUSINESS_NAME"],
