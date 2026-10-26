@@ -14,6 +14,7 @@ import { getMemberPurchasesTool } from "./members/getMemberPurchases.tool.js";
 import { searchPromotionsTool } from "./promotions/searchPromotions.tool.js";
 import { getMemberPromoPurchasesTool } from "./members/getMemberPromoPurchases.tool.js";
 import { getMemberVehiclesTool } from "./members/getMemberVehicles.tool.js";
+import { analyzeMembersTool } from "./members/analyzeMembers.tool.js";
 
 export const tools = [
   searchCustomersTool,
@@ -32,4 +33,5 @@ export const tools = [
   searchPromotionsTool,
   getMemberPromoPurchasesTool,
   getMemberVehiclesTool,
+  analyzeMembersTool,
 ];
