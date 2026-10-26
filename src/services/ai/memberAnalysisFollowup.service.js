@@ -1,3 +1,37 @@
+const canonical = (value) => {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.keys(value).sort()
+      .map((key) => [key, canonical(value[key])]));
+  }
+  return value;
+};
+
+const rankingKey = (input) => {
+  const { breakdownBy, ...ranking } = input ?? {};
+  return JSON.stringify(canonical(ranking));
+};
+
+// Accept a ranking followed by breakdowns only when both filters and the
+// ordered cohort match. Never collapse comparisons of different rankings.
+export const selectEquivalentMemberAnalysis = (calls = []) => {
+  if (calls.length === 0) return null;
+  const first = calls[0];
+  const cohortKey = (result) => JSON.stringify(result?.members?.map((member) => ({
+    documentNumber: member.documentNumber,
+    currency: canonical(member.currency),
+  })));
+  for (const call of calls) {
+    if (call.name !== "analyze_members" || call.input?.resultMode !== "members" ||
+      rankingKey(call.input) !== rankingKey(first.input) ||
+      call.result?.status !== "FOUND" || !Array.isArray(call.result.members) ||
+      call.result.members.length === 0 ||
+      call.result.members.some((member) => !member.documentNumber) ||
+      cohortKey(call.result) !== cohortKey(first.result)) return null;
+  }
+  return calls[calls.length - 1];
+};
+
 // Resolve only short requests that change the breakdown of the previous turn.
 // Explicit dates, new filters and individual-member questions go to the model.
 export const resolveMemberAnalysisFollowup = ({ message, history = [] }) => {
@@ -21,21 +55,29 @@ export const resolveMemberAnalysisFollowup = ({ message, history = [] }) => {
   const turn = history.slice(turnStart);
   const calls = turn.filter((item) => item.role === "assistant")
     .flatMap((item) => item.content ?? []).map((block) => block.toolUse).filter(Boolean);
-  // Never select an arbitrary cohort from a multi-period or multi-tool answer.
-  if (calls.length !== 1 || calls[0].name !== "analyze_members" ||
-    calls[0].input?.resultMode !== "members") return null;
-  const previous = calls[0];
-  const result = turn.filter((item) => item.role === "user")
-    .flatMap((item) => item.content ?? []).map((block) => block.toolResult)
-    .find((item) => item?.toolUseId === previous.toolUseId);
-  const json = result?.content?.find((item) => item.json)?.json;
-  if (result?.status !== "success" || json?.status !== "FOUND" ||
-    !Array.isArray(json.members) || json.members.length === 0) return null;
+  const results = turn.filter((item) => item.role === "user")
+    .flatMap((item) => item.content ?? []).map((block) => block.toolResult).filter(Boolean);
+  const previous = selectEquivalentMemberAnalysis(calls.map((call) => {
+    const response = results.find((item) => item.toolUseId === call.toolUseId);
+    return { ...call, result: response?.status === "success"
+      ? response.content?.find((item) => item.json)?.json : null };
+  }));
+  if (!previous) return null;
 
   return {
     ...structuredClone(previous.input),
     breakdownBy: [/^(rubro|categoria)/.test(match[1]) ? "category" : "customer"],
   };
+};
+
+export const buildMemberAnalysisBreakdownResponse = (calls = []) => {
+  const selected = selectEquivalentMemberAnalysis(calls);
+  const dimensions = selected?.input?.breakdownBy;
+  if (!Array.isArray(dimensions) || dimensions.length !== 1 ||
+    !["category", "customer"].includes(dimensions[0]) ||
+    !selected.result.members.every((member) =>
+      Array.isArray(member.breakdown?.[dimensions[0]]))) return null;
+  return buildMemberAnalysisFollowupResponse(selected);
 };
 
 export const buildMemberAnalysisFollowupResponse = ({ input, result }) => {
