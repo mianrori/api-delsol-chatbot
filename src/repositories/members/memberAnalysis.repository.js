@@ -563,7 +563,6 @@ export const getMemberAnalysisRepository = async ({
   const canUseRankingFastPath =
     limit != null &&
     activityStatus !== "inactive" &&
-    memberFilters.length === 0 &&
     metricFilters.length === 0 &&
     customerIds.length === 0 &&
     categoryIds.length === 0 &&
@@ -583,18 +582,66 @@ export const getMemberAnalysisRepository = async ({
       fetchLimit: Number(limit) + 1,
     };
 
+    if (birthMonth != null) {
+      rankingBinds.birthMonth = Number(birthMonth);
+    }
+
+    if (gender) {
+      rankingBinds.gender = GENDER_VALUES[gender];
+    }
+
+    if (ageMin != null) {
+      rankingBinds.ageMin = Number(ageMin);
+    }
+
+    if (ageMax != null) {
+      rankingBinds.ageMax = Number(ageMax);
+    }
+
+    const demographicWhere =
+      memberFilters.length > 0
+        ? `
+          AND
+          ${memberFilters.join("\nAND ")}
+        `
+        : "";
+
     const rankingSql = `
       SELECT *
       FROM (
         SELECT
           M.COD_SOCIO AS DOCUMENT_NUMBER,
+          S.NOMBRE_COMPLETO AS FULL_NAME,
+          TO_CHAR(
+            S.FECHA_NACIMIENTO,
+            'DD/MM/YYYY'
+          ) AS BIRTH_DATE,
+          EXTRACT(
+            MONTH FROM S.FECHA_NACIMIENTO
+          ) AS BIRTH_MONTH,
+          S.GENERO AS GENDER,
+          CASE
+            WHEN S.FECHA_NACIMIENTO IS NOT NULL
+            THEN
+              TRUNC(
+                MONTHS_BETWEEN(
+                  TRUNC(SYSDATE),
+                  S.FECHA_NACIMIENTO
+                ) / 12
+              )
+            ELSE NULL
+          END AS AGE,
           'GUARANIES' AS CURRENCY_DESCRIPTION,
           '₲' AS CURRENCY_SYMBOL,
           SUM(M.TOTAL_AMOUNT) AS TOTAL_AMOUNT,
           SUM(M.PURCHASE_COUNT) AS PURCHASE_COUNT,
-          COUNT(*) AS RECURRENCE_MONTHS
+          COUNT(*) AS RECURRENCE_MONTHS,
+          1 AS COMMERCIALLY_ACTIVE
         FROM
           MV_BOT_COMPRAS_SOCIO_MES M
+        INNER JOIN
+          VW_BOT_SOCIOS S
+            ON S.COD_SOCIO = M.COD_SOCIO
         WHERE
           M.MES >= TRUNC(
             TO_DATE(:rankingDateFrom, 'DD/MM/YYYY'),
@@ -607,11 +654,15 @@ export const getMemberAnalysisRepository = async ({
             ),
             1
           )
+          ${demographicWhere}
         GROUP BY
-          M.COD_SOCIO
+          M.COD_SOCIO,
+          S.NOMBRE_COMPLETO,
+          S.FECHA_NACIMIENTO,
+          S.GENERO
         ORDER BY
           ${rankingOrderColumn} ${direction},
-          M.COD_SOCIO ASC
+          S.NOMBRE_COMPLETO ASC
       )
       WHERE
         ROWNUM <= :fetchLimit
@@ -645,98 +696,11 @@ export const getMemberAnalysisRepository = async ({
       : [];
 
     const hasMore = rankingRows.length > Number(limit);
-    const topRows = rankingRows.slice(0, Number(limit));
-
-    if (topRows.length === 0) {
-      return {
-        rows: [],
-        totalMatches: 0,
-        hasMore: false,
-      };
-    }
-
-    const memberBinds = {};
-    const memberFilter = createInFilter({
-      column: "S.COD_SOCIO",
-      values: topRows.map((row) => row.DOCUMENT_NUMBER),
-      bindPrefix: "rankingDocumentNumber",
-      binds: memberBinds,
-    });
-
-    const memberSql = `
-      SELECT
-        S.COD_SOCIO AS DOCUMENT_NUMBER,
-        S.NOMBRE_COMPLETO AS FULL_NAME,
-        TO_CHAR(
-          S.FECHA_NACIMIENTO,
-          'DD/MM/YYYY'
-        ) AS BIRTH_DATE,
-        EXTRACT(
-          MONTH FROM S.FECHA_NACIMIENTO
-        ) AS BIRTH_MONTH,
-        S.GENERO AS GENDER,
-        CASE
-          WHEN S.FECHA_NACIMIENTO IS NOT NULL
-          THEN
-            TRUNC(
-              MONTHS_BETWEEN(
-                TRUNC(SYSDATE),
-                S.FECHA_NACIMIENTO
-              ) / 12
-            )
-          ELSE NULL
-        END AS AGE
-      FROM
-        VW_BOT_SOCIOS S
-      WHERE
-        ${memberFilter}
-    `;
-
-    const memberStartedAt = Date.now();
-    const memberResult = await executeOracleQuery(
-      connection,
-      memberSql,
-      memberBinds,
-    );
-
-    console.log(
-      `[CHATBOT-DEV] MEMBER ANALYSIS MEMBER LOOKUP: ${Date.now() - memberStartedAt} ms`,
-    );
-
-    const memberRows = Array.isArray(memberResult)
-      ? memberResult
-      : [];
-
-    const memberByDocument = new Map(
-      memberRows.map((row) => [
-        String(row.DOCUMENT_NUMBER),
-        row,
-      ]),
-    );
-
-    const rows = topRows.map((rankingRow) => {
-      const member =
-        memberByDocument.get(String(rankingRow.DOCUMENT_NUMBER)) ?? {};
-
-      return {
-        DOCUMENT_NUMBER: rankingRow.DOCUMENT_NUMBER,
-        FULL_NAME: member.FULL_NAME ?? null,
-        BIRTH_DATE: member.BIRTH_DATE ?? null,
-        BIRTH_MONTH: member.BIRTH_MONTH ?? null,
-        GENDER: member.GENDER ?? null,
-        AGE: member.AGE ?? null,
-        CURRENCY_DESCRIPTION: rankingRow.CURRENCY_DESCRIPTION,
-        CURRENCY_SYMBOL: rankingRow.CURRENCY_SYMBOL,
-        TOTAL_AMOUNT: rankingRow.TOTAL_AMOUNT,
-        PURCHASE_COUNT: rankingRow.PURCHASE_COUNT,
-        RECURRENCE_MONTHS: rankingRow.RECURRENCE_MONTHS,
-        COMMERCIALLY_ACTIVE: 1,
-      };
-    });
+    const rows = rankingRows.slice(0, Number(limit));
 
     return {
       rows,
-      totalMatches: hasMore ? null : topRows.length,
+      totalMatches: hasMore ? null : rows.length,
       hasMore,
     };
   }
