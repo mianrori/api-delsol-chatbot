@@ -4,6 +4,7 @@ import {
 } from "@aws-sdk/client-bedrock-runtime";
 
 import config from "../../../config.js";
+import { getRequestSignal, throwIfRequestAborted, isTerminalSessionError } from "../requestContext.service.js";
 import { randomUUID } from "node:crypto";
 import { tools } from "../../tools/index.js";
 import { executeTool } from "./toolExecutor.service.js";
@@ -1291,6 +1292,7 @@ const executeToolRequests = async ({ content, sessionId }) => {
   const toolUses = content.filter((block) => block.toolUse);
 
   for (const block of toolUses) {
+    throwIfRequestAborted();
     const { toolUseId, name, input = {} } = block.toolUse;
     const presentationCall = { name, input };
     internalContext.presentationCalls.push(presentationCall);
@@ -1313,6 +1315,7 @@ const executeToolRequests = async ({ content, sessionId }) => {
           sessionId,
         },
       });
+      throwIfRequestAborted();
 
       actions = mergeActions(
         actions,
@@ -1399,6 +1402,8 @@ const executeToolRequests = async ({ content, sessionId }) => {
         },
       });
     } catch (error) {
+      throwIfRequestAborted();
+      if (isTerminalSessionError(error)) throw error;
       const protectedErrorMessage = protectPiiText(
         sessionId,
         error?.message || "Error ejecutando la herramienta.",
@@ -1443,6 +1448,7 @@ const executeToolRequests = async ({ content, sessionId }) => {
 };
 
 export const chatService = async ({ message, sessionId }) => {
+  throwIfRequestAborted();
   if (!message?.trim()) {
     throw new Error("El mensaje del usuario es obligatorio.");
   }
@@ -1504,6 +1510,7 @@ export const chatService = async ({ message, sessionId }) => {
   }
 
   while (true) {
+    throwIfRequestAborted();
     bedrockIteration += 1;
 
     const commandInput = {
@@ -1536,7 +1543,10 @@ export const chatService = async ({ message, sessionId }) => {
     // avoiding further model/tool calls and preserving protected identifiers.
     const response = followupAnswer
       ? { output: { message: { role: "assistant", content: [{ text: followupAnswer }] } }, stopReason: "end_turn" }
-      : await bedrockClient.send(new ConverseCommand(commandInput));
+      : await bedrockClient.send(new ConverseCommand(commandInput), {
+        abortSignal: getRequestSignal(),
+      });
+    throwIfRequestAborted();
 
     if (!followupAnswer) logBedrockResponse({
       iteration: bedrockIteration,

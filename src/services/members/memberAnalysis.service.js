@@ -2,6 +2,7 @@ import {
   getMemberAnalysisRepository,
   getMemberPurchaseBreakdownRepository,
 } from "../../repositories/members/memberAnalysis.repository.js";
+import { getMemberSummaryRepository } from "../../repositories/members/memberSummary.repository.js";
 
 const GENDER_LABELS = {
   M: "Masculino",
@@ -392,6 +393,26 @@ export const analyzeMembers = async (args, connection, username) => {
   const referenceDate = args.referenceDate ?? formatDate(new Date());
 
   const metrics = normalizeMetrics(args.metrics);
+
+  const aggregated = await getMemberSummaryRepository(args, connection);
+  if (aggregated) {
+    const { memberCount, totalAmount, purchaseCount } = aggregated;
+    return {
+      status: memberCount > 0 ? "FOUND" : "NOT_FOUND",
+      analysis: buildAnalysisDescription({ activityMonths, referenceDate, purchasePeriods: args.purchasePeriods }),
+      summary: {
+        totalMatches: memberCount, returnedCount: memberCount, hasMore: false,
+        commerciallyActiveCount: memberCount, commerciallyInactiveCount: 0,
+        purchaseCount,
+        totalsByCurrency: memberCount > 0 ? [{
+          currency: { description: "GUARANIES", symbol: "₲" },
+          memberCount, totalAmount, purchaseCount,
+        }] : [],
+      },
+      export: { available: false, exportId: null, fileName: null, totalRecords: memberCount, format: null },
+      breakdown: {},
+    };
+  }
 
   /*
    * Regla de límite:
