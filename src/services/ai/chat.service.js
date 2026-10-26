@@ -18,6 +18,7 @@ import {
 } from "./conversation.service.js";
 import { getSystemPrompt } from "../../prompts/system.prompt.js";
 import { buildMemberRankingResponse } from "./memberRankingPresentation.service.js";
+import { buildMemberSummaryResponse } from "./memberSummaryPresentation.service.js";
 import {
   resolveMemberAnalysisFollowup,
   buildMemberAnalysisFollowupResponse,
@@ -1635,6 +1636,7 @@ export const chatService = async ({ message, sessionId }) => {
 
     const completedAssistantText =
       monthlyIncidenceText ??
+      buildMemberSummaryResponse(conversationInternalContext.presentationCalls) ??
       buildMemberAnalysisBreakdownResponse(conversationInternalContext.presentationCalls) ??
       buildMemberRankingResponse(conversationInternalContext.presentationCalls) ??
       ensureSqmTwoPeriodComparison({

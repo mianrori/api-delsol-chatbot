@@ -5,8 +5,11 @@ export const executeOracleQuery = async (connection, sql, binds = {}) => {
   const signal = getRequestSignal();
   let breaking;
   const onAbort = () => {
+    if (process.env.NODE_ENV === "development") console.log("[CHATBOT-DEV] ORACLE QUERY CANCEL REQUESTED");
     // Wait for break to finish before the caller may close/reuse the connection.
-    breaking ??= Promise.resolve().then(() => connection.break()).catch((error) => {
+    breaking ??= Promise.resolve().then(() => connection.break()).then(() => {
+      if (process.env.NODE_ENV === "development") console.log("[CHATBOT-DEV] ORACLE QUERY CANCEL FINISHED");
+    }).catch((error) => {
       console.error("No se pudo interrumpir la consulta Oracle:", error?.message);
     });
   };

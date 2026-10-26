@@ -123,13 +123,18 @@ export const chatController = async (req, res) => {
   }
 
   const cancellation = new AbortController();
-  const onAborted = () => cancellation.abort();
+  const onAborted = () => {
+    if (!cancellation.signal.aborted && process.env.NODE_ENV === "development") {
+      console.log("[CHATBOT-DEV] REQUEST CANCELLED");
+    }
+    cancellation.abort();
+  };
   const onClosed = () => {
-    if (!res.writableEnded) cancellation.abort();
+    if (!res.writableEnded) onAborted();
   };
   req.once("aborted", onAborted);
   res.once("close", onClosed);
-  if (req.aborted || res.destroyed) cancellation.abort();
+  if (req.aborted || res.destroyed) onAborted();
 
   try {
     const result = await runWithRequestSignal(cancellation.signal, async () => {
@@ -168,5 +173,8 @@ export const chatController = async (req, res) => {
   } finally {
     req.removeListener("aborted", onAborted);
     res.removeListener("close", onClosed);
+    if (cancellation.signal.aborted && process.env.NODE_ENV === "development") {
+      console.log("[CHATBOT-DEV] REQUEST CANCEL CLEANUP FINISHED");
+    }
   }
 };

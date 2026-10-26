@@ -671,14 +671,6 @@ export const getMemberAnalysisRepository = async ({
     console.log(
       "[CHATBOT-DEV] MEMBER ANALYSIS: using materialized ranking path",
     );
-    console.log(
-      "getMemberAnalysisRepository ranking SQL:",
-      rankingSql,
-    );
-    console.log(
-      "getMemberAnalysisRepository ranking binds:",
-      rankingBinds,
-    );
 
     const rankingStartedAt = Date.now();
     const rankingResult = await executeOracleQuery(
@@ -856,8 +848,6 @@ export const getMemberAnalysisRepository = async ({
     ${limitClause}
   `;
 
-  console.log("getMemberAnalysisRepository SQL:", sql);
-  console.log("getMemberAnalysisRepository binds:", binds);
 
   const result = await executeOracleQuery(connection, sql, binds);
 
@@ -948,8 +938,6 @@ export const getMemberPurchaseBreakdownRepository = async ({
       ${config.orderBy}
   `;
 
-  console.log("getMemberPurchaseBreakdownRepository SQL:", sql);
-  console.log("getMemberPurchaseBreakdownRepository binds:", binds);
 
   const result = await executeOracleQuery(connection, sql, binds);
   const rows = Array.isArray(result) ? result : [];
