@@ -577,7 +577,12 @@ export const analyzeMembers = async (args, connection, username) => {
 
   const returnedCount = members.length;
 
-  const hasMore = totalMatches > returnedCount;
+  const hasMore =
+    repositoryHasMore != null
+      ? Boolean(repositoryHasMore)
+      : totalMatches != null
+        ? totalMatches > returnedCount
+        : false;
 
   /*
    * En summary, members contiene todo el universo filtrado.
@@ -608,7 +613,7 @@ export const analyzeMembers = async (args, connection, username) => {
   });
 
   const summary = {
-    totalMatches,
+    totalMatches: totalMatches ?? null,
 
     returnedCount,
 
@@ -648,7 +653,7 @@ export const analyzeMembers = async (args, connection, username) => {
     available: false,
     exportId: null,
     fileName: null,
-    totalRecords: totalMatches,
+    totalRecords: totalMatches ?? null,
     format: null,
   };
 
@@ -690,7 +695,12 @@ export const analyzeMembers = async (args, connection, username) => {
    */
 
   const result = {
-    status: totalMatches > 0 ? "FOUND" : "NOT_FOUND",
+    status:
+      returnedCount > 0
+        ? "FOUND"
+        : totalMatches === 0
+          ? "NOT_FOUND"
+          : "NOT_FOUND",
 
     analysis: buildAnalysisDescription({
       activityMonths,
