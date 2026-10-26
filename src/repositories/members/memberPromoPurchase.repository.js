@@ -613,9 +613,9 @@ export const getMemberPromoPurchasesRepository = async ({
 
   const result = await executeOracleQuery(connection, sql, binds);
 
-  const rows = Array.isArray(result) ? result : [];
+  const resultRows = Array.isArray(result) ? result : [];
 
-  const data = rows.map((row) => {
+  const data = resultRows.map((row) => {
     let item = {};
 
     for (const dimension of groupBy) {
