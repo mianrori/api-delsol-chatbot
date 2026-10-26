@@ -194,6 +194,11 @@ const getSensitiveType = ({ fieldName, path }) => {
 const isProtectableValue = (value) =>
   typeof value === "string" || typeof value === "number";
 
+const SAFE_DESCRIPTIVE_FIELDS = new Set([
+  "activitydefinition",
+  "recurrencedefinition",
+]);
+
 export const protectPiiValue = (sessionId, type, value) => {
   if (!sessionId || value === null || value === undefined) {
     return value;
@@ -448,6 +453,10 @@ export const protectPiiDeep = (
   }
 
   if (typeof value === "string") {
+    if (SAFE_DESCRIPTIVE_FIELDS.has(normalizeFieldName(fieldName))) {
+      return value;
+    }
+
     return protectKnownTextPatterns(sessionId, value);
   }
 
