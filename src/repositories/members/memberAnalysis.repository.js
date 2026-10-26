@@ -533,6 +533,147 @@ export const getMemberAnalysisRepository = async ({
       `
       : "";
 
+  const canUseRankingFastPath =
+    limit != null &&
+    activityStatus !== "inactive" &&
+    memberFilters.length === 0 &&
+    metricFilters.length === 0 &&
+    ["totalAmount", "purchaseCount", "recurrenceMonths"].includes(orderBy);
+
+  if (canUseRankingFastPath) {
+    const rankingOrderColumn =
+      ORDER_BY_CONFIG[orderBy] ?? ORDER_BY_CONFIG.totalAmount;
+
+    const rankingSql = `
+      WITH PURCHASES AS (
+        SELECT
+          COD_SOCIO AS DOCUMENT_NUMBER,
+          MONEDA AS CURRENCY_DESCRIPTION,
+          SIMBOLO_MONEDA AS CURRENCY_SYMBOL,
+          SUM(IMPORTE) AS TOTAL_AMOUNT,
+          COUNT(*) AS PURCHASE_COUNT,
+          COUNT(
+            DISTINCT TO_CHAR(
+              FECHA_COMPRA,
+              'YYYYMM'
+            )
+          ) AS RECURRENCE_MONTHS
+        FROM
+          VW_BOT_COMPRAS_SOCIO
+        WHERE
+          ${purchaseFilters.join("\nAND ")}
+        GROUP BY
+          COD_SOCIO,
+          MONEDA,
+          SIMBOLO_MONEDA
+        ${
+          purchaseHaving.length > 0
+            ? `
+              HAVING
+                ${purchaseHaving.join("\nAND ")}
+            `
+            : ""
+        }
+      ),
+      TOTAL_COUNT AS (
+        SELECT
+          COUNT(DISTINCT DOCUMENT_NUMBER) AS TOTAL_MATCHES
+        FROM
+          PURCHASES
+      ),
+      TOP_PURCHASES AS (
+        SELECT *
+        FROM (
+          SELECT
+            P.DOCUMENT_NUMBER,
+            P.CURRENCY_DESCRIPTION,
+            P.CURRENCY_SYMBOL,
+            P.TOTAL_AMOUNT,
+            P.PURCHASE_COUNT,
+            P.RECURRENCE_MONTHS
+          FROM
+            PURCHASES P
+          ORDER BY
+            P.${rankingOrderColumn} ${direction},
+            P.DOCUMENT_NUMBER ASC
+        )
+        WHERE
+          ROWNUM <= :limit
+      )
+      SELECT
+        T.DOCUMENT_NUMBER,
+        S.NOMBRE_COMPLETO AS FULL_NAME,
+        TO_CHAR(
+          S.FECHA_NACIMIENTO,
+          'DD/MM/YYYY'
+        ) AS BIRTH_DATE,
+        EXTRACT(
+          MONTH FROM S.FECHA_NACIMIENTO
+        ) AS BIRTH_MONTH,
+        S.GENERO AS GENDER,
+        CASE
+          WHEN S.FECHA_NACIMIENTO IS NOT NULL
+          THEN
+            TRUNC(
+              MONTHS_BETWEEN(
+                TRUNC(SYSDATE),
+                S.FECHA_NACIMIENTO
+              ) / 12
+            )
+          ELSE NULL
+        END AS AGE,
+        T.CURRENCY_DESCRIPTION,
+        T.CURRENCY_SYMBOL,
+        T.TOTAL_AMOUNT,
+        T.PURCHASE_COUNT,
+        T.RECURRENCE_MONTHS,
+        1 AS COMMERCIALLY_ACTIVE,
+        C.TOTAL_MATCHES
+      FROM
+        TOP_PURCHASES T
+      INNER JOIN
+        VW_BOT_SOCIOS S
+          ON S.COD_SOCIO = T.DOCUMENT_NUMBER
+      CROSS JOIN
+        TOTAL_COUNT C
+      ORDER BY
+        T.${rankingOrderColumn} ${direction},
+        S.NOMBRE_COMPLETO ASC
+    `;
+
+    console.log(
+      "[CHATBOT-DEV] MEMBER ANALYSIS: using ranking fast path",
+    );
+    console.log("getMemberAnalysisRepository SQL:", rankingSql);
+    console.log("getMemberAnalysisRepository binds:", binds);
+
+    const startedAt = Date.now();
+    const result = await executeOracleQuery(
+      connection,
+      rankingSql,
+      binds,
+    );
+
+    console.log(
+      `[CHATBOT-DEV] MEMBER ANALYSIS RANKING: ${Date.now() - startedAt} ms`,
+    );
+
+    const rows = Array.isArray(result) ? result : [];
+    const totalMatches =
+      rows.length > 0
+        ? Number(rows[0].TOTAL_MATCHES ?? 0)
+        : 0;
+
+    const cleanRows = rows.map(
+      ({ TOTAL_MATCHES, ...row }) => row,
+    );
+
+    return {
+      rows: cleanRows,
+      totalMatches,
+    };
+  }
+
   const sql = `
     WITH PURCHASES AS (
       SELECT
