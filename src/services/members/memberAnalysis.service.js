@@ -470,7 +470,7 @@ export const analyzeMembers = async (args, connection, username) => {
    * -------------------------------------------------------------
    */
 
-  const { rows, totalMatches } = await getMemberAnalysisRepository({
+  const { rows, totalMatches, hasMore: repositoryHasMore } = await getMemberAnalysisRepository({
     connection,
 
     ...args,
