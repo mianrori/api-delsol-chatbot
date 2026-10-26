@@ -82,6 +82,32 @@ const BREAKDOWN_CONFIG = {
 
 const ORACLE_IN_LIMIT = 1000;
 
+const isFullMonthPeriod = (period) => {
+  const matchFrom = String(period?.dateFrom ?? "").match(
+    /^(\d{2})\/(\d{2})\/(\d{4})$/,
+  );
+  const matchTo = String(period?.dateTo ?? "").match(
+    /^(\d{2})\/(\d{2})\/(\d{4})$/,
+  );
+
+  if (!matchFrom || !matchTo) {
+    return false;
+  }
+
+  const [, fromDay, fromMonth, fromYear] = matchFrom;
+  const [, toDay, toMonth, toYear] = matchTo;
+
+  if (Number(fromDay) !== 1) {
+    return false;
+  }
+
+  const lastDay = new Date(
+    Date.UTC(Number(toYear), Number(toMonth), 0),
+  ).getUTCDate();
+
+  return Number(toDay) === lastDay;
+};
+
 const createInFilter = ({ column, values, bindPrefix, binds }) => {
   if (!Array.isArray(values) || values.length === 0) {
     return null;
@@ -539,73 +565,65 @@ export const getMemberAnalysisRepository = async ({
     activityStatus !== "inactive" &&
     memberFilters.length === 0 &&
     metricFilters.length === 0 &&
+    customerIds.length === 0 &&
+    categoryIds.length === 0 &&
+    Array.isArray(purchasePeriods) &&
+    purchasePeriods.length === 1 &&
+    purchasePeriods.every(isFullMonthPeriod) &&
     ["totalAmount", "purchaseCount", "recurrenceMonths"].includes(orderBy);
 
   if (canUseRankingFastPath) {
     const rankingOrderColumn =
       ORDER_BY_CONFIG[orderBy] ?? ORDER_BY_CONFIG.totalAmount;
 
-    const needsRecurrence =
-      orderBy === "recurrenceMonths" ||
-      (Array.isArray(metrics) && metrics.includes("recurrenceMonths"));
-
-    const recurrenceSelect = needsRecurrence
-      ? `,
-          COUNT(
-            DISTINCT TO_CHAR(
-              FECHA_COMPRA,
-              'YYYYMM'
-            )
-          ) AS RECURRENCE_MONTHS`
-      : `,
-          0 AS RECURRENCE_MONTHS`;
-
-    const fetchLimit = Number(limit) + 1;
+    const period = purchasePeriods[0];
     const rankingBinds = {
-      ...binds,
-      fetchLimit,
+      rankingDateFrom: period.dateFrom,
+      rankingDateTo: period.dateTo,
+      fetchLimit: Number(limit) + 1,
     };
-
-    delete rankingBinds.limit;
 
     const rankingSql = `
       SELECT *
       FROM (
         SELECT
-          COD_SOCIO AS DOCUMENT_NUMBER,
-          MONEDA AS CURRENCY_DESCRIPTION,
-          SIMBOLO_MONEDA AS CURRENCY_SYMBOL,
-          SUM(IMPORTE) AS TOTAL_AMOUNT,
-          COUNT(*) AS PURCHASE_COUNT
-          ${recurrenceSelect}
+          M.COD_SOCIO AS DOCUMENT_NUMBER,
+          'GUARANIES' AS CURRENCY_DESCRIPTION,
+          '₲' AS CURRENCY_SYMBOL,
+          SUM(M.TOTAL_AMOUNT) AS TOTAL_AMOUNT,
+          SUM(M.PURCHASE_COUNT) AS PURCHASE_COUNT,
+          COUNT(*) AS RECURRENCE_MONTHS
         FROM
-          VW_BOT_COMPRAS_SOCIO
+          MV_BOT_COMPRAS_SOCIO_MES M
         WHERE
-          ${purchaseFilters.join("\nAND ")}
+          M.MES >= TRUNC(
+            TO_DATE(:rankingDateFrom, 'DD/MM/YYYY'),
+            'MM'
+          )
+          AND M.MES < ADD_MONTHS(
+            TRUNC(
+              TO_DATE(:rankingDateTo, 'DD/MM/YYYY'),
+              'MM'
+            ),
+            1
+          )
         GROUP BY
-          COD_SOCIO,
-          MONEDA,
-          SIMBOLO_MONEDA
-        ${
-          purchaseHaving.length > 0
-            ? `
-              HAVING
-                ${purchaseHaving.join("\nAND ")}
-            `
-            : ""
-        }
+          M.COD_SOCIO
         ORDER BY
           ${rankingOrderColumn} ${direction},
-          COD_SOCIO ASC
+          M.COD_SOCIO ASC
       )
       WHERE
         ROWNUM <= :fetchLimit
     `;
 
     console.log(
-      "[CHATBOT-DEV] MEMBER ANALYSIS: using lean ranking fast path",
+      "[CHATBOT-DEV] MEMBER ANALYSIS: using materialized ranking path",
     );
-    console.log("getMemberAnalysisRepository ranking SQL:", rankingSql);
+    console.log(
+      "getMemberAnalysisRepository ranking SQL:",
+      rankingSql,
+    );
     console.log(
       "getMemberAnalysisRepository ranking binds:",
       rankingBinds,
@@ -619,7 +637,7 @@ export const getMemberAnalysisRepository = async ({
     );
 
     console.log(
-      `[CHATBOT-DEV] MEMBER ANALYSIS RANKING AGGREGATE: ${Date.now() - rankingStartedAt} ms`,
+      `[CHATBOT-DEV] MEMBER ANALYSIS MV RANKING: ${Date.now() - rankingStartedAt} ms`,
     );
 
     const rankingRows = Array.isArray(rankingResult)
@@ -718,7 +736,7 @@ export const getMemberAnalysisRepository = async ({
 
     return {
       rows,
-      totalMatches: hasMore ? Number(limit) + 1 : topRows.length,
+      totalMatches: hasMore ? null : topRows.length,
       hasMore,
     };
   }
