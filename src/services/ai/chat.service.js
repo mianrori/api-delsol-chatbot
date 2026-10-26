@@ -15,6 +15,7 @@ import {
   trimConversation,
 } from "./conversation.service.js";
 import { getSystemPrompt } from "../../prompts/system.prompt.js";
+import { buildMemberRankingResponse } from "./memberRankingPresentation.service.js";
 import {
   logBedrockRequest,
   logBedrockResponse,
@@ -143,8 +144,11 @@ Para análisis de socios:
 - presenta importes separados por moneda usando summary.totalsByCurrency; nunca sumes monedas distintas;
 - en analyze_members, describe totalAmount exclusivamente como monto total de compras o total comprado según corresponda; no lo describas como facturado, facturación, importe con IVA, importe sin IVA, neto, bruto ni atribuyas tratamiento fiscal alguno salvo que la herramienta lo devuelva explícitamente;
 - nunca agregues frases como "facturado sin IVA", "con IVA incluido", "neto de IVA" o equivalentes a partir de analyze_members;
+- no copies afirmaciones fiscales de respuestas anteriores del historial; para analyze_members usa únicamente "monto total de compras" o "total comprado";
+- al mostrar age, titula la columna "Edad actual"; el año de las compras no convierte esa edad en una edad histórica;
 - summary.totalMatches es la cantidad total real de socios que cumplen los filtros; summary.returnedCount es la cantidad incluida en la respuesta;
 - si summary.hasMore=true, informa que se muestra una lista limitada y no afirmes que los miembros devueltos representan todo el universo;
+- si summary.totalMatches es null, el total de socios no fue calculado: nunca lo sustituyas por returnedCount ni inventes un total; con hasMore=true indica "Se muestra un listado limitado a N socios; existen más socios que cumplen los filtros", usando returnedCount;
 - export.available=false significa que la exportación no está habilitada en esta etapa; no ofrezcas ni inventes descargas Excel.
 
 Para compras promocionales de socios:
@@ -1276,11 +1280,13 @@ const buildMonthlyIncidenceResponse = (result) => {
 const executeToolRequests = async ({ content, sessionId }) => {
   const toolResults = [];
   let actions = {};
-  let internalContext = {};
+  let internalContext = { presentationCalls: [] };
   const toolUses = content.filter((block) => block.toolUse);
 
   for (const block of toolUses) {
     const { toolUseId, name, input = {} } = block.toolUse;
+    const presentationCall = { name, input };
+    internalContext.presentationCalls.push(presentationCall);
 
     logToolCall({
       name,
@@ -1354,6 +1360,9 @@ const executeToolRequests = async ({ content, sessionId }) => {
         null,
         [name],
       );
+      if (name === "analyze_members") {
+        presentationCall.result = protectedResultForModel;
+      }
 
       if (
         name === "analyze_contract_cost_incidence" &&
@@ -1544,6 +1553,10 @@ export const chatService = async ({ message, sessionId }) => {
       conversationInternalContext = {
         ...conversationInternalContext,
         ...internalContext,
+        presentationCalls: [
+          ...(conversationInternalContext.presentationCalls ?? []),
+          ...(internalContext.presentationCalls ?? []),
+        ],
         salesPerSqmPeriods: [
           ...(conversationInternalContext.salesPerSqmPeriods ?? []),
           ...(internalContext.salesPerSqmPeriods ?? []),
@@ -1574,6 +1587,7 @@ export const chatService = async ({ message, sessionId }) => {
 
     const completedAssistantText =
       monthlyIncidenceText ??
+      buildMemberRankingResponse(conversationInternalContext.presentationCalls) ??
       ensureSqmTwoPeriodComparison({
         text: safeAssistantText,
         internalContext: conversationInternalContext,
@@ -1589,6 +1603,13 @@ export const chatService = async ({ message, sessionId }) => {
         `Bedrock finalizó con stopReason="${response.stopReason}" sin texto.`,
       );
     }
+
+    // Persist the corrected, still pseudonymized answer so unsupported claims
+    // from the model cannot become evidence in subsequent turns.
+    messages[messages.length - 1] = {
+      role: "assistant",
+      content: [{ text: completedAssistantText }],
+    };
 
     const compactedMessages =
       compactMemberPurchasePaginationHistory(messages);

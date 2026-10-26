@@ -44,14 +44,14 @@ export const analyzeMembersTool = {
             type: "integer",
             minimum: 0,
             description:
-              "Edad mínima opcional. No es obligatoria para consultar socios.",
+              "Edad actual mínima opcional. No es la edad durante el período de compras. No es obligatoria para consultar socios.",
           },
 
           ageMax: {
             type: "integer",
             minimum: 0,
             description:
-              "Edad máxima opcional. No es obligatoria para consultar socios.",
+              "Edad actual máxima opcional. No es la edad durante el período de compras. No es obligatoria para consultar socios.",
           },
 
           activityStatus: {
@@ -296,6 +296,7 @@ export const analyzeMembersTool = {
 
             description:
               "Métricas opcionales a devolver. totalAmount=importe total de compras, " +
+              "sin información sobre IVA: nunca lo describas como facturado, neto, bruto, con IVA o sin IVA. " +
               "purchaseCount=cantidad de compras y recurrenceMonths=cantidad de " +
               "meses distintos con al menos una compra. En comparaciones entre " +
               "períodos utiliza exactamente las mismas métricas en cada llamada. " +
