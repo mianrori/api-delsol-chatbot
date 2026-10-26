@@ -12,6 +12,7 @@ import { resolveMember } from "../members/member.resolver.js";
 import { getMember, getMemberPurchases } from "../members/member.service.js";
 import { resolvePromotion } from "../promotions/promotion.resolver.js";
 import { getMemberPromoPurchases } from "../members/memberPromoPurchase.service.js";
+import { getMemberVehicles } from "../members/memberVehicle.service.js";
 import { withOracleProxySession } from "../sessions/oracleSession.service.js";
 
 const withAuthorizedOracle = async (sessionId, callback) => {
@@ -137,6 +138,13 @@ const toolHandlers = {
     return withAuthorizedOracle(
       context.sessionId,
       ({ connection }) => getMemberPromoPurchases(args, connection),
+    );
+  },
+
+  get_member_vehicles: async (args, context) => {
+    return withAuthorizedOracle(
+      context.sessionId,
+      ({ connection }) => getMemberVehicles(args, connection),
     );
   },
 };
