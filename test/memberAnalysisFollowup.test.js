@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import {
   resolveMemberAnalysisFollowup,
   buildMemberAnalysisFollowupResponse,
+  buildMemberAnalysisBreakdownResponse,
+  selectEquivalentMemberAnalysis,
 } from "../src/services/ai/memberAnalysisFollowup.service.js";
 
 const input = {
@@ -79,4 +81,62 @@ test("renders every returned breakdown row and handles empty breakdowns", () => 
   const text = buildMemberAnalysisFollowupResponse({ input: { breakdownBy: ["category"] }, result: data });
   assert.equal(text.split("\n").filter((line) => line.startsWith("| [PII_NAME_1]")).length, 30);
   assert.ok(text.includes("Sin compras registradas para este desglose"));
+});
+
+const analysisCall = (args = input, data = result) => ({
+  name: "analyze_members", input: structuredClone(args), result: structuredClone(data),
+});
+
+test("a ranking and its breakdown are equivalent regardless of property order", () => {
+  const calls = [analysisCall(), analysisCall({ breakdownBy: ["category"], ...input })];
+  assert.equal(selectEquivalentMemberAnalysis(calls), calls[1]);
+  assert.ok(buildMemberAnalysisBreakdownResponse(calls).includes("₲ 1.234.567"));
+});
+
+test("changing periods renders the new tool result directly", () => {
+  const updated = { ...input, purchasePeriods: [{ dateFrom: "01/01/2023", dateTo: "30/04/2023" }] };
+  const data = structuredClone(result);
+  data.analysis.periodDefinition = updated.purchasePeriods;
+  data.members[0].breakdown.category = [{ categoryName: "Rubro nuevo", purchaseCount: 3, totalAmount: 125331600 }];
+  const text = buildMemberAnalysisBreakdownResponse([
+    analysisCall(updated, data), analysisCall({ ...updated, breakdownBy: ["category"] }, data),
+  ]);
+  assert.ok(text.includes("30/04/2023"));
+  assert.ok(text.includes("| Rubro nuevo | 3 | ₲ 125.331.600 |"));
+  assert.doesNotMatch(text, /128.941.400/);
+});
+
+test("local follow-up recognizes a previous turn with equivalent ranking and category calls", () => {
+  const history = historyFor();
+  history.splice(3, 0,
+    { role: "assistant", content: [{ toolUse: { name: "analyze_members", toolUseId: "detail", input: { ...input, breakdownBy: ["category"] } } }] },
+    { role: "user", content: [{ toolResult: { toolUseId: "detail", status: "success", content: [{ json: result }] } }] },
+  );
+  assert.deepEqual(resolveMemberAnalysisFollowup({ message: "Ahora por local", history }),
+    { ...input, breakdownBy: ["customer"] });
+});
+
+test("different periods, filters, metrics, limits, order and cohorts are never combined", () => {
+  const first = analysisCall();
+  for (const changes of [
+    { gender: "male" }, { limit: 5 }, { metrics: ["totalAmount"] },
+    { orderDirection: "asc" }, { purchasePeriods: [{ dateFrom: "01/01/2022", dateTo: "31/12/2022" }] },
+  ]) {
+    const calls = [first, analysisCall({ ...input, ...changes, breakdownBy: ["category"] })];
+    assert.equal(selectEquivalentMemberAnalysis(calls), null);
+    assert.equal(buildMemberAnalysisBreakdownResponse(calls), null);
+  }
+  const other = analysisCall({ ...input, breakdownBy: ["category"] });
+  other.result.members[0].documentNumber = "[PII_DOCUMENT_2]";
+  assert.equal(selectEquivalentMemberAnalysis([first, other]), null);
+  assert.equal(buildMemberAnalysisBreakdownResponse([first, { name: "get_member_purchases" }]), null);
+});
+
+test("missing or unsupported breakdowns do not produce a fabricated table", () => {
+  for (const breakdownBy of [[], ["month"], ["category", "customer"]]) {
+    assert.equal(buildMemberAnalysisBreakdownResponse([analysisCall({ ...input, breakdownBy })]), null);
+  }
+  const call = analysisCall({ ...input, breakdownBy: ["category"] });
+  delete call.result.members[0].breakdown;
+  assert.equal(buildMemberAnalysisBreakdownResponse([call]), null);
 });

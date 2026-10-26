@@ -20,6 +20,7 @@ import { buildMemberRankingResponse } from "./memberRankingPresentation.service.
 import {
   resolveMemberAnalysisFollowup,
   buildMemberAnalysisFollowupResponse,
+  buildMemberAnalysisBreakdownResponse,
 } from "./memberAnalysisFollowup.service.js";
 import {
   logBedrockRequest,
@@ -1595,6 +1596,12 @@ export const chatService = async ({ message, sessionId }) => {
         ],
       };
 
+      // A complete breakdown is authoritative even when the model requested
+      // it after changing dates or filters. Do not ask the model to rewrite it.
+      followupAnswer = buildMemberAnalysisBreakdownResponse(
+        conversationInternalContext.presentationCalls,
+      );
+
       if (toolResults.length === 0) {
         throw new Error(
           "Bedrock indicó tool_use pero no devolvió ninguna herramienta.",
@@ -1619,6 +1626,7 @@ export const chatService = async ({ message, sessionId }) => {
 
     const completedAssistantText =
       monthlyIncidenceText ??
+      buildMemberAnalysisBreakdownResponse(conversationInternalContext.presentationCalls) ??
       buildMemberRankingResponse(conversationInternalContext.presentationCalls) ??
       ensureSqmTwoPeriodComparison({
         text: safeAssistantText,
