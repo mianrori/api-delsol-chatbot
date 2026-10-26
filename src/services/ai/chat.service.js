@@ -141,6 +141,8 @@ Para análisis de socios:
 - nunca muestres documentNumber, customerId, categoryId ni otros identificadores internos en una respuesta agregada salvo que el usuario solicite explícitamente una lista de socios individuales;
 - si resultMode="members", los nombres, documentos y fechas personales pueden llegar como tokens PII y deben conservarse hasta la restauración final;
 - presenta importes separados por moneda usando summary.totalsByCurrency; nunca sumes monedas distintas;
+- en analyze_members, describe totalAmount exclusivamente como monto total de compras o total comprado según corresponda; no lo describas como facturado, facturación, importe con IVA, importe sin IVA, neto, bruto ni atribuyas tratamiento fiscal alguno salvo que la herramienta lo devuelva explícitamente;
+- nunca agregues frases como "facturado sin IVA", "con IVA incluido", "neto de IVA" o equivalentes a partir de analyze_members;
 - summary.totalMatches es la cantidad total real de socios que cumplen los filtros; summary.returnedCount es la cantidad incluida en la respuesta;
 - si summary.hasMore=true, informa que se muestra una lista limitada y no afirmes que los miembros devueltos representan todo el universo;
 - export.available=false significa que la exportación no está habilitada en esta etapa; no ofrezcas ni inventes descargas Excel.
