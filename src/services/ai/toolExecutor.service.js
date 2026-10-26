@@ -10,6 +10,8 @@ import { getContractCostPerSqm } from "../contracts/contractCostPerSqm.service.j
 import { analyzeContractCostIncidence } from "../contracts/contractCostIncidence.service.js";
 import { resolveMember } from "../members/member.resolver.js";
 import { getMember, getMemberPurchases } from "../members/member.service.js";
+import { resolvePromotion } from "../promotions/promotion.resolver.js";
+import { getMemberPromoPurchases } from "../members/memberPromoPurchase.service.js";
 import { withOracleProxySession } from "../sessions/oracleSession.service.js";
 
 const withAuthorizedOracle = async (sessionId, callback) => {
@@ -121,6 +123,20 @@ const toolHandlers = {
     return withAuthorizedOracle(
       context.sessionId,
       ({ connection }) => getMemberPurchases(args, connection),
+    );
+  },
+
+  search_promotions: async (args, context) => {
+    return withAuthorizedOracle(
+      context.sessionId,
+      ({ connection }) => resolvePromotion(args.search, connection),
+    );
+  },
+
+  get_member_promo_purchases: async (args, context) => {
+    return withAuthorizedOracle(
+      context.sessionId,
+      ({ connection }) => getMemberPromoPurchases(args, connection),
     );
   },
 };
