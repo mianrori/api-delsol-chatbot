@@ -4,6 +4,7 @@ import {
 } from "@aws-sdk/client-bedrock-runtime";
 
 import config from "../../../config.js";
+import { randomUUID } from "node:crypto";
 import { tools } from "../../tools/index.js";
 import { executeTool } from "./toolExecutor.service.js";
 import {
@@ -16,6 +17,10 @@ import {
 } from "./conversation.service.js";
 import { getSystemPrompt } from "../../prompts/system.prompt.js";
 import { buildMemberRankingResponse } from "./memberRankingPresentation.service.js";
+import {
+  resolveMemberAnalysisFollowup,
+  buildMemberAnalysisFollowupResponse,
+} from "./memberAnalysisFollowup.service.js";
 import {
   logBedrockRequest,
   logBedrockResponse,
@@ -137,6 +142,7 @@ Para análisis de socios:
 - para distribuciones o agregados donde no se necesitan nombres individuales, usa resultMode="summary";
 - para un período explícito, usa purchasePeriods con dateFrom/dateTo; para comparar dos períodos con métricas separadas, ejecuta analyze_members una vez por cada período con los mismos filtros/métricas;
 - usa breakdownBy=["category"] para rubro, ["customer"] para local, ["month"] para mes, ["year"] para año, ["gender"] para género;
+- ante seguimientos de un ranking como "ahora detalla sus compras por rubro" o "ahora por local", ejecuta analyze_members una sola vez con el breakdownBy solicitado, conservando resultMode="members", limit, orden, métricas y todos los filtros del ranking anterior; no ejecutes get_member_purchases individualmente para cada socio;
 - usa amountSegments o recurrenceSegments solo si el usuario proporciona explícitamente los rangos; nunca inventes segmentos;
 - si el usuario menciona un local aún no resuelto, usa search_customers y reutiliza sus IDs; si menciona un rubro aún no resuelto, usa search_categories;
 - nunca muestres documentNumber, customerId, categoryId ni otros identificadores internos en una respuesta agregada salvo que el usuario solicite explícitamente una lista de socios individuales;
@@ -1471,6 +1477,30 @@ export const chatService = async ({ message, sessionId }) => {
   let bedrockIteration = 0;
   let conversationActions = {};
   let conversationInternalContext = {};
+  let followupAnswer = null;
+
+  const followupInput = resolveMemberAnalysisFollowup({
+    message,
+    history: protectedHistory,
+  });
+  if (followupInput) {
+    const content = [{ toolUse: {
+      toolUseId: `ranking_followup_${randomUUID()}`,
+      name: "analyze_members",
+      input: followupInput,
+    } }];
+    messages.push({ role: "assistant", content });
+    const executed = await executeToolRequests({ content, sessionId });
+    messages.push({ role: "user", content: executed.toolResults });
+    conversationActions = executed.actions;
+    conversationInternalContext = executed.internalContext;
+    toolIterations = 1;
+    const result = executed.internalContext.presentationCalls[0]?.result;
+    followupAnswer = result
+      ? buildMemberAnalysisFollowupResponse({ input: followupInput, result })
+      : executed.toolResults[0]?.toolResult?.content?.[0]?.json?.message ||
+        "No fue posible consultar el desglose solicitado.";
+  }
 
   while (true) {
     bedrockIteration += 1;
@@ -1495,17 +1525,19 @@ export const chatService = async ({ message, sessionId }) => {
         },
       };
 
-    logBedrockRequest({
+    if (!followupAnswer) logBedrockRequest({
       iteration: bedrockIteration,
       modelId: config.awsBedrockModelId,
       input: commandInput,
     });
 
-    const response = await bedrockClient.send(
-      new ConverseCommand(commandInput),
-    );
+    // These follow-ups already have their result. Render all rows directly,
+    // avoiding further model/tool calls and preserving protected identifiers.
+    const response = followupAnswer
+      ? { output: { message: { role: "assistant", content: [{ text: followupAnswer }] } }, stopReason: "end_turn" }
+      : await bedrockClient.send(new ConverseCommand(commandInput));
 
-    logBedrockResponse({
+    if (!followupAnswer) logBedrockResponse({
       iteration: bedrockIteration,
       response,
     });

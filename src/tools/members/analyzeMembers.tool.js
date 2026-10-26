@@ -271,6 +271,8 @@ export const analyzeMembersTool = {
               "'ahora por local' o 'sepáralo por género', conserva los filtros, " +
               "períodos y demás condiciones aplicables de la consulta anterior y " +
               "vuelve a ejecutar analyze_members con el breakdownBy solicitado. " +
+              "Para desglosar un ranking, conserva resultMode=members, limit, orden, " +
+              "métricas y filtros; no llames get_member_purchases una vez por socio. " +
               "No afirmes que un desglose por rubro, local, género, mes o año no está " +
               "disponible si aparece en este enum. Si una comparación entre períodos " +
               "requiere el mismo desglose para cada período, ejecuta una llamada por " +
