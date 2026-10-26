@@ -301,6 +301,7 @@ export const getMemberAnalysisRepository = async ({
   amountMax,
   recurrenceMin,
   recurrenceMax,
+  metrics = [],
   orderBy = "totalAmount",
   orderDirection = "desc",
   limit = 10,
@@ -544,20 +545,39 @@ export const getMemberAnalysisRepository = async ({
     const rankingOrderColumn =
       ORDER_BY_CONFIG[orderBy] ?? ORDER_BY_CONFIG.totalAmount;
 
-    const rankingSql = `
-      WITH PURCHASES AS (
-        SELECT
-          COD_SOCIO AS DOCUMENT_NUMBER,
-          MONEDA AS CURRENCY_DESCRIPTION,
-          SIMBOLO_MONEDA AS CURRENCY_SYMBOL,
-          SUM(IMPORTE) AS TOTAL_AMOUNT,
-          COUNT(*) AS PURCHASE_COUNT,
+    const needsRecurrence =
+      orderBy === "recurrenceMonths" ||
+      (Array.isArray(metrics) && metrics.includes("recurrenceMonths"));
+
+    const recurrenceSelect = needsRecurrence
+      ? `,
           COUNT(
             DISTINCT TO_CHAR(
               FECHA_COMPRA,
               'YYYYMM'
             )
-          ) AS RECURRENCE_MONTHS
+          ) AS RECURRENCE_MONTHS`
+      : `,
+          0 AS RECURRENCE_MONTHS`;
+
+    const fetchLimit = Number(limit) + 1;
+    const rankingBinds = {
+      ...binds,
+      fetchLimit,
+    };
+
+    delete rankingBinds.limit;
+
+    const rankingSql = `
+      SELECT *
+      FROM (
+        SELECT
+          COD_SOCIO AS DOCUMENT_NUMBER,
+          MONEDA AS CURRENCY_DESCRIPTION,
+          SIMBOLO_MONEDA AS CURRENCY_SYMBOL,
+          SUM(IMPORTE) AS TOTAL_AMOUNT,
+          COUNT(*) AS PURCHASE_COUNT
+          ${recurrenceSelect}
         FROM
           VW_BOT_COMPRAS_SOCIO
         WHERE
@@ -574,34 +594,60 @@ export const getMemberAnalysisRepository = async ({
             `
             : ""
         }
-      ),
-      TOTAL_COUNT AS (
-        SELECT
-          COUNT(DISTINCT DOCUMENT_NUMBER) AS TOTAL_MATCHES
-        FROM
-          PURCHASES
-      ),
-      TOP_PURCHASES AS (
-        SELECT *
-        FROM (
-          SELECT
-            P.DOCUMENT_NUMBER,
-            P.CURRENCY_DESCRIPTION,
-            P.CURRENCY_SYMBOL,
-            P.TOTAL_AMOUNT,
-            P.PURCHASE_COUNT,
-            P.RECURRENCE_MONTHS
-          FROM
-            PURCHASES P
-          ORDER BY
-            P.${rankingOrderColumn} ${direction},
-            P.DOCUMENT_NUMBER ASC
-        )
-        WHERE
-          ROWNUM <= :limit
+        ORDER BY
+          ${rankingOrderColumn} ${direction},
+          COD_SOCIO ASC
       )
+      WHERE
+        ROWNUM <= :fetchLimit
+    `;
+
+    console.log(
+      "[CHATBOT-DEV] MEMBER ANALYSIS: using lean ranking fast path",
+    );
+    console.log("getMemberAnalysisRepository ranking SQL:", rankingSql);
+    console.log(
+      "getMemberAnalysisRepository ranking binds:",
+      rankingBinds,
+    );
+
+    const rankingStartedAt = Date.now();
+    const rankingResult = await executeOracleQuery(
+      connection,
+      rankingSql,
+      rankingBinds,
+    );
+
+    console.log(
+      `[CHATBOT-DEV] MEMBER ANALYSIS RANKING AGGREGATE: ${Date.now() - rankingStartedAt} ms`,
+    );
+
+    const rankingRows = Array.isArray(rankingResult)
+      ? rankingResult
+      : [];
+
+    const hasMore = rankingRows.length > Number(limit);
+    const topRows = rankingRows.slice(0, Number(limit));
+
+    if (topRows.length === 0) {
+      return {
+        rows: [],
+        totalMatches: 0,
+        hasMore: false,
+      };
+    }
+
+    const memberBinds = {};
+    const memberFilter = createInFilter({
+      column: "S.COD_SOCIO",
+      values: topRows.map((row) => row.DOCUMENT_NUMBER),
+      bindPrefix: "rankingDocumentNumber",
+      binds: memberBinds,
+    });
+
+    const memberSql = `
       SELECT
-        T.DOCUMENT_NUMBER,
+        S.COD_SOCIO AS DOCUMENT_NUMBER,
         S.NOMBRE_COMPLETO AS FULL_NAME,
         TO_CHAR(
           S.FECHA_NACIMIENTO,
@@ -621,56 +667,59 @@ export const getMemberAnalysisRepository = async ({
               ) / 12
             )
           ELSE NULL
-        END AS AGE,
-        T.CURRENCY_DESCRIPTION,
-        T.CURRENCY_SYMBOL,
-        T.TOTAL_AMOUNT,
-        T.PURCHASE_COUNT,
-        T.RECURRENCE_MONTHS,
-        1 AS COMMERCIALLY_ACTIVE,
-        C.TOTAL_MATCHES
+        END AS AGE
       FROM
-        TOP_PURCHASES T
-      INNER JOIN
         VW_BOT_SOCIOS S
-          ON S.COD_SOCIO = T.DOCUMENT_NUMBER
-      CROSS JOIN
-        TOTAL_COUNT C
-      ORDER BY
-        T.${rankingOrderColumn} ${direction},
-        S.NOMBRE_COMPLETO ASC
+      WHERE
+        ${memberFilter}
     `;
 
-    console.log(
-      "[CHATBOT-DEV] MEMBER ANALYSIS: using ranking fast path",
-    );
-    console.log("getMemberAnalysisRepository SQL:", rankingSql);
-    console.log("getMemberAnalysisRepository binds:", binds);
-
-    const startedAt = Date.now();
-    const result = await executeOracleQuery(
+    const memberStartedAt = Date.now();
+    const memberResult = await executeOracleQuery(
       connection,
-      rankingSql,
-      binds,
+      memberSql,
+      memberBinds,
     );
 
     console.log(
-      `[CHATBOT-DEV] MEMBER ANALYSIS RANKING: ${Date.now() - startedAt} ms`,
+      `[CHATBOT-DEV] MEMBER ANALYSIS MEMBER LOOKUP: ${Date.now() - memberStartedAt} ms`,
     );
 
-    const rows = Array.isArray(result) ? result : [];
-    const totalMatches =
-      rows.length > 0
-        ? Number(rows[0].TOTAL_MATCHES ?? 0)
-        : 0;
+    const memberRows = Array.isArray(memberResult)
+      ? memberResult
+      : [];
 
-    const cleanRows = rows.map(
-      ({ TOTAL_MATCHES, ...row }) => row,
+    const memberByDocument = new Map(
+      memberRows.map((row) => [
+        String(row.DOCUMENT_NUMBER),
+        row,
+      ]),
     );
+
+    const rows = topRows.map((rankingRow) => {
+      const member =
+        memberByDocument.get(String(rankingRow.DOCUMENT_NUMBER)) ?? {};
+
+      return {
+        DOCUMENT_NUMBER: rankingRow.DOCUMENT_NUMBER,
+        FULL_NAME: member.FULL_NAME ?? null,
+        BIRTH_DATE: member.BIRTH_DATE ?? null,
+        BIRTH_MONTH: member.BIRTH_MONTH ?? null,
+        GENDER: member.GENDER ?? null,
+        AGE: member.AGE ?? null,
+        CURRENCY_DESCRIPTION: rankingRow.CURRENCY_DESCRIPTION,
+        CURRENCY_SYMBOL: rankingRow.CURRENCY_SYMBOL,
+        TOTAL_AMOUNT: rankingRow.TOTAL_AMOUNT,
+        PURCHASE_COUNT: rankingRow.PURCHASE_COUNT,
+        RECURRENCE_MONTHS: rankingRow.RECURRENCE_MONTHS,
+        COMMERCIALLY_ACTIVE: 1,
+      };
+    });
 
     return {
-      rows: cleanRows,
-      totalMatches,
+      rows,
+      totalMatches: null,
+      hasMore,
     };
   }
 
