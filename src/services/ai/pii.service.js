@@ -126,6 +126,14 @@ const PATH_TYPES = [
     type: "CUSTOMER_NAME",
   },
   {
+    pattern: /(?:^|\.)promotion\.name$/,
+    type: "PROMOTION_NAME",
+  },
+  {
+    pattern: /(?:^|\.)campaign\.name$/,
+    type: "CAMPAIGN_NAME",
+  },
+  {
     pattern:
       /(?:^|\.)concepts?\.description$/,
     type: "CONCEPT_DESCRIPTION",
