@@ -353,6 +353,17 @@ const protectKnownTextPatterns = (sessionId, text) => {
 
 
   /*
+   * Promociones y campañas mencionadas explícitamente por el usuario.
+   * Conservamos fuera del token los calificadores temporales para que
+   * Bedrock pueda interpretar correctamente el período solicitado.
+   */
+  protectedText = protectedText.replace(
+    /\b((?:promoci[oó]n|campa[nñ]a)\s+(?:(?:llamada|denominada)\s+)?)([A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9&.'’ -]{2,80}?)(?=\s+(?:(?:desde|durante|en)\s+(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre|20\d{2}|hoy|ayer|este|esta)|del\s+\d{1,2}[/-]\d{1,2}[/-]\d{2,4})|\s*(?:[,.!?;:]|$))/gi,
+    (_match, prefix, value) =>
+      `${prefix}${protectPiiValue(sessionId, "PROMOTION_NAME", value.trim())}`,
+  );
+
+  /*
    * Consultas de facturas del tipo:
    *
    *   "Facturas de Nike de enero a abril de 2023"
