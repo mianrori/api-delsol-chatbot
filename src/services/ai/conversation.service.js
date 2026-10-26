@@ -1,5 +1,10 @@
+const MEMBER_PURCHASE_DETAIL_TOOLS = new Set([
+  "get_member_purchases",
+  "get_member_promo_purchases",
+]);
+
 const isMemberPurchaseDetailToolUse = (block) =>
-  block?.toolUse?.name === "get_member_purchases" &&
+  MEMBER_PURCHASE_DETAIL_TOOLS.has(block?.toolUse?.name) &&
   block?.toolUse?.input?.mode === "detail";
 
 const compactMemberPurchaseToolResult = (json = {}) => {
