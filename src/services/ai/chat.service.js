@@ -4,7 +4,7 @@ import {
 } from "@aws-sdk/client-bedrock-runtime";
 
 import config from "../../../config.js";
-import { getRequestSignal, throwIfRequestAborted, isTerminalSessionError } from "../requestContext.service.js";
+import { getRequestSignal, throwIfRequestAborted } from "../requestContext.service.js";
 import { randomUUID } from "node:crypto";
 import { tools } from "../../tools/index.js";
 import { executeTool } from "./toolExecutor.service.js";
@@ -1403,7 +1403,6 @@ const executeToolRequests = async ({ content, sessionId }) => {
       });
     } catch (error) {
       throwIfRequestAborted();
-      if (isTerminalSessionError(error)) throw error;
       const protectedErrorMessage = protectPiiText(
         sessionId,
         error?.message || "Error ejecutando la herramienta.",

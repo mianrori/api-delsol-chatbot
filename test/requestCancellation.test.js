@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { runWithRequestSignal, getRequestSignal, throwIfRequestAborted, isTerminalSessionError } from "../src/services/requestContext.service.js";
+import { runWithRequestSignal, getRequestSignal, throwIfRequestAborted } from "../src/services/requestContext.service.js";
 import { executeOracleQuery } from "../src/database/oracle-query.database.js";
 
 test("cancelling an active query breaks once and waits for break cleanup", async () => {
@@ -56,9 +56,3 @@ test("request signals are isolated across concurrent requests", async () => {
   assert.equal(getRequestSignal(), undefined);
 });
 
-test("all session failures are terminal while other tool errors remain recoverable", () => {
-  for (const code of ["ORACLE_SESSION_ID_REQUIRED", "ORACLE_SESSION_NOT_FOUND", "ORACLE_SESSION_NOT_ACTIVE", "ORACLE_SESSION_EXPIRED", "ORACLE_SESSION_USERNAME_MISSING"]) {
-    assert.equal(isTerminalSessionError({ code }), true);
-  }
-  assert.equal(isTerminalSessionError(new Error("Other error")), false);
-});

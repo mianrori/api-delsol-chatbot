@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-test("session failure stops model retries and HTTP cancellation propagates through request lifecycle", () => {
+test("HTTP cancellation propagates through request lifecycle and preserves session responses", () => {
   const result = spawnSync(process.execPath, ["--experimental-vm-modules",
     fileURLToPath(new URL("./fixtures/chatLifecycle.mjs", import.meta.url))],
   { encoding: "utf8", timeout: 15000 });

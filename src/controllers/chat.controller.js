@@ -97,7 +97,6 @@ const getSessionHttpStatus = (code) => {
       return 404;
     case "ORACLE_SESSION_NOT_ACTIVE":
     case "ORACLE_SESSION_EXPIRED":
-    case "ORACLE_SESSION_USERNAME_MISSING":
       return 401;
     default:
       return 500;
@@ -155,9 +154,7 @@ export const chatController = async (req, res) => {
       return res.status(sessionStatus).json({
         env: process.env.NODE_ENV,
         success: false,
-        code: error.code,
-        message: sessionStatus === 401
-          ? `${error.message} Vuelve a iniciar sesión.` : error.message,
+        message: error.message,
       });
     }
 

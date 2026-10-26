@@ -72,10 +72,7 @@ export const createProxyConnectionBySessionId = async (sessionId) => {
   const connection = await connectWithProxy(session.username);
   try {
     throwIfRequestAborted();
-    const touched = await touchOracleSessionRepository(session.session_id);
-    if (!touched) {
-      throw createSessionError("ORACLE_SESSION_NOT_ACTIVE", "La sesión Oracle no está activa.");
-    }
+    await touchOracleSessionRepository(session.session_id);
     throwIfRequestAborted();
   } catch (error) {
     await connection.close().catch(() => {});

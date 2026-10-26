@@ -12,8 +12,3 @@ export const throwIfRequestAborted = () => {
   }
 };
 
-export const isTerminalSessionError = (error) => new Set([
-  "ORACLE_SESSION_ID_REQUIRED", "ORACLE_SESSION_NOT_FOUND",
-  "ORACLE_SESSION_NOT_ACTIVE", "ORACLE_SESSION_EXPIRED",
-  "ORACLE_SESSION_USERNAME_MISSING",
-]).has(error?.code);

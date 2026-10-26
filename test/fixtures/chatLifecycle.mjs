@@ -27,7 +27,7 @@ let toolCalls = 0;
 let writes = 0;
 let pendingModel;
 let modelSignal;
-let mode = "session";
+let mode = "cancel-model";
 const same = (_id, value) => value;
 const chat = await load("../../src/services/ai/chat.service.js", {
   "../../../config.js": { default: {} },
@@ -52,7 +52,7 @@ const chat = await load("../../src/services/ai/chat.service.js", {
   "../../tools/index.js": { tools: [] },
   "./toolExecutor.service.js": { executeTool: async () => {
     toolCalls++;
-    throw Object.assign(new Error("La sesión Oracle no está activa."), { code: "ORACLE_SESSION_NOT_ACTIVE" });
+    assert.fail("A cancelled model must not invoke tools");
   } },
   "../../state/conversation.store.js": { getConversation: () => [], setConversation: () => { writes++; } },
   "./conversation.service.js": { compactMemberPurchasePaginationHistory: (x) => x, trimConversation: (x) => x },
@@ -60,12 +60,6 @@ const chat = await load("../../src/services/ai/chat.service.js", {
   "../../utils/debug.logger.js": Object.fromEntries(["logBedrockRequest", "logBedrockResponse", "logToolCall", "logToolResult"].map((key) => [key, () => {}])),
   "./pii.service.js": { protectPiiDeep: same, protectPiiText: same, restorePiiDeep: same, restorePiiTextForUser: same },
 });
-await assert.rejects(chat.chatService({ message: "Comparar", sessionId: "test" }), { code: "ORACLE_SESSION_NOT_ACTIVE" });
-assert.equal(modelCalls, 1);
-assert.equal(toolCalls, 1);
-assert.equal(writes, 0);
-
-mode = "cancel-model";
 const cancellation = new AbortController();
 const modelStarted = new Promise((resolve) => { pendingModel = resolve; });
 const pending = requestContext.runWithRequestSignal(cancellation.signal,
@@ -74,7 +68,8 @@ await modelStarted;
 cancellation.abort();
 await assert.rejects(pending);
 assert.equal(modelSignal, cancellation.signal);
-assert.equal(toolCalls, 1);
+assert.equal(toolCalls, 0);
+assert.equal(modelCalls, 1);
 assert.equal(writes, 0);
 
 // Controller: normal completion is not cancellation; disconnect aborts work,
@@ -123,7 +118,8 @@ controllerMode = "session";
 const expired = http();
 await controller.chatController(expired.req, expired.res);
 assert.equal(expired.res.statusCode, 401);
-assert.match(expired.res.responses[0].message, /Vuelve a iniciar sesión/);
+assert.equal(expired.res.responses[0].message, "Sesión inactiva.");
+assert.equal(expired.res.responses[0].code, undefined);
 
 let closes = 0;
 let touches = 0;
