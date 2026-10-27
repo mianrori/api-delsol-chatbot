@@ -23,3 +23,46 @@ El servicio no crea ni cierra sesiones ERP. PostgreSQL es la fuente compartida d
 ## Siguiente etapa
 
 Migrar el módulo de IA del ERP por capas: catálogo, repositories, services, tools, Bedrock y PII.
+
+
+## Conversaciones del chatbot
+
+`POST /chatbot/api/bot/chat` recibe `{ "sessionId": "...", "message": "..." }`.
+El historial y el diccionario PII se guardan en memoria por `sessionId`.
+
+Para iniciar una conversación nueva sin reiniciar el contenedor:
+
+```http
+POST /chatbot/api/bot/chat/reset
+Content-Type: application/json
+
+{ "sessionId": "SESION_VIGENTE_DEL_ERP" }
+```
+
+La operación valida la sesión existente y elimina únicamente su historial y su
+diccionario PII. No cierra la sesión ERP, no modifica su vencimiento y no abre
+una conexión Oracle. Después se envía la primera pregunta al endpoint habitual,
+con el mismo `sessionId`. La interfaz puede asociar esta operación al botón
+«Nueva conversación» y limpiar sus mensajes visibles cuando reciba `success: true`.
+
+Ejemplo desde PowerShell en DEV (puerto 5400):
+
+```powershell
+$chatbotSessionId = "SESION_VIGENTE_DEL_ERP"
+Invoke-RestMethod -Method Post -Uri "http://localhost:5400/chatbot/api/bot/chat/reset" -ContentType "application/json" -Body (@{ sessionId = $chatbotSessionId } | ConvertTo-Json)
+```
+
+Si hay una solicitud activa para esa sesión, chat y reset responden `409`.
+Espera a que termine o cancélala y espera a que el backend complete la limpieza;
+no se mezclan mensajes ni se limpia el diccionario PII mientras una respuesta lo utiliza.
+Los códigos de sesión siguen siendo `400` (ausente), `404` (inexistente) y `401`
+(inactiva o vencida). Otras sesiones no se ven afectadas.
+El historial y esta exclusión son locales al proceso; no proporcionan coordinación
+entre varias réplicas del backend.
+
+Las comparaciones mensuales repetidas literalmente dentro de una secuencia de
+resúmenes compatibles vuelven a consultar Oracle una vez por mes, sin Bedrock.
+Se conservan los filtros, métricas, períodos y desglose de la consulta original.
+Los cambios de tema, filtros o fechas usan el flujo normal del modelo.
+
+Pruebas locales: `node --test test/*.test.js`.

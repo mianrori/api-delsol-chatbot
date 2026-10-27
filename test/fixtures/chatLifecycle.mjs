@@ -2,6 +2,8 @@ import vm from "node:vm";
 import { readFile } from "node:fs/promises";
 import { EventEmitter } from "node:events";
 import assert from "node:assert/strict";
+import * as conversationStore from "../../src/state/conversation.store.js";
+import { getPiiSession } from "../../src/state/pii.store.js";
 import * as requestContext from "../../src/services/requestContext.service.js";
 import { analyzeMembers } from "../../src/services/members/memberAnalysis.service.js";
 
@@ -139,6 +141,15 @@ for (const [message, dimension] of [["Ahora desglosa cada mes por rubro", "categ
   assert.ok(response.answer.includes("₲ 4.000"));
   assert.equal(storedHistory.at(-1).content[0].text, response.answer);
 }
+// Exact repetitions also re-query both months and keep the direct route alive.
+for (const message of ["Desglosa enero y febrero por rubro", "Desglosa enero y febrero por rubro", "Ahora por local"]) {
+  const before = plannedCalls.length;
+  const response = await chat.chatService({ message, sessionId: "test" });
+  assert.equal(plannedCalls.length - before, 2);
+  assert.equal(modelCalls, callsBeforeFollowups);
+  assert.ok(response.answer.includes("₲ 3.000"));
+  assert.ok(response.answer.includes("₲ 4.000"));
+}
 const historyBeforeFailure = JSON.stringify(storedHistory);
 const writesBeforeCancellation = writes;
 mode = "cancel-between";
@@ -161,7 +172,16 @@ assert.ok(!failedComparison.answer.includes("₲ 3.000"));
 let controllerMode = "disconnect";
 let controllerStarted;
 let capturedSignal;
+let sessionValidationError;
+const lifecycle = await load("../../src/services/ai/conversationLifecycle.service.js", {
+  "../../state/conversation.store.js": { clearConversation: (id) => { storedHistory = []; conversationStore.clearConversation(id); } },
+  "../sessions/oracleSession.service.js": { getValidOracleSession: async () => {
+    if (sessionValidationError) throw sessionValidationError;
+    return {};
+  } },
+});
 const controller = await load("../../src/controllers/chat.controller.js", {
+  "../services/ai/conversationLifecycle.service.js": lifecycle,
   "../services/requestContext.service.js": requestContext,
   "../services/sessions/oracleSession.service.js": { getValidOracleSession: async () => ({}) },
   "../services/ai/chat.service.js": { chatService: async () => {
@@ -187,6 +207,13 @@ const disconnected = http();
 const started = new Promise((resolve) => { controllerStarted = resolve; });
 const pendingHttp = controller.chatController(disconnected.req, disconnected.res);
 await started;
+const busyReset = http();
+await controller.resetConversationController(busyReset.req, busyReset.res);
+assert.equal(busyReset.res.statusCode, 409);
+assert.ok(storedHistory.length > 0);
+const busyChat = http();
+await controller.chatController(busyChat.req, busyChat.res);
+assert.equal(busyChat.res.statusCode, 409);
 disconnected.res.emit("close");
 await pendingHttp;
 assert.equal(capturedSignal.aborted, true);
@@ -204,6 +231,35 @@ await controller.chatController(expired.req, expired.res);
 assert.equal(expired.res.statusCode, 401);
 assert.equal(expired.res.responses[0].message, "Sesión inactiva.");
 assert.equal(expired.res.responses[0].code, undefined);
+
+// A session failure cannot clear history. A successful reset affects only the
+// conversation store and does not log out or open an Oracle connection.
+sessionValidationError = Object.assign(new Error("Sesión inactiva."), { code: "ORACLE_SESSION_NOT_ACTIVE" });
+const rejectedReset = http();
+await controller.resetConversationController(rejectedReset.req, rejectedReset.res);
+assert.equal(rejectedReset.res.statusCode, 401);
+assert.ok(storedHistory.length > 0);
+sessionValidationError = undefined;
+conversationStore.setConversation("test", [{ role: "user", content: [{ text: "Synthetic" }] }]);
+conversationStore.setConversation("other", [{ role: "user", content: [{ text: "Other" }] }]);
+const targetPii = getPiiSession("test"); targetPii.tokenToValue.set("TOKEN", "Synthetic");
+const otherPii = getPiiSession("other"); otherPii.tokenToValue.set("TOKEN", "Other");
+const reset = http();
+await controller.resetConversationController(reset.req, reset.res);
+assert.equal(reset.res.statusCode, 200);
+assert.equal(storedHistory.length, 0);
+assert.equal(conversationStore.getConversation("test").length, 0);
+assert.equal(getPiiSession("test").tokenToValue.size, 0);
+assert.equal(conversationStore.getConversation("other").length, 1);
+assert.equal(getPiiSession("other"), otherPii);
+const invalidReset = http(); invalidReset.req.body = {};
+await controller.resetConversationController(invalidReset.req, invalidReset.res);
+assert.equal(invalidReset.res.statusCode, 400);
+// The lock is released after success, failure and cancellation.
+controllerMode = "success";
+const afterReset = http();
+await controller.chatController(afterReset.req, afterReset.res);
+assert.equal(afterReset.res.statusCode, 200);
 
 let closes = 0;
 let touches = 0;

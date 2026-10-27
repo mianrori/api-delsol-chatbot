@@ -83,3 +83,30 @@ test("a month with no purchases remains part of the comparison", () => {
   history[4].content[0].toolResult.content[0].json.summary.totalsByCurrency = [];
   assert.equal(resolveMemberSummaryFollowup({ message: "Ahora por local", history }).length, 2);
 });
+
+
+test("repeated comparison after breakdowns restores its original queries without a breakdown", () => {
+  const initial = historyFor();
+  const category = historyFor(inputs.map((input) => ({ ...input, breakdownBy: ["category"] })));
+  category[0].content[0].text = "Ahora por rubro";
+  const local = historyFor(inputs.map((input) => ({ ...input, breakdownBy: ["customer"] })));
+  local[0].content[0].text = "Ahora por local";
+  const history = [...initial, ...category, ...local];
+  const before = structuredClone(history);
+  assert.deepEqual(resolveMemberSummaryFollowup({ message: "Comparar enero y febrero", history }), inputs);
+  assert.deepEqual(history, before);
+  assert.deepEqual(resolveMemberSummaryFollowup({ message: "Ahora por rubro", history }),
+    inputs.map((input) => ({ ...input, breakdownBy: ["category"] })));
+});
+
+test("repeat routing cannot cross topics, failed turns, changed dates or changed filters", () => {
+  for (const tail of [
+    [{ role: "user", content: [{ text: "Hola" }] }, { role: "assistant", content: [{ text: "Hola" }] }],
+    historyFor(inputs.map((input) => ({ ...input, gender: "different" }))),
+    historyFor([inputs[0]]),
+  ]) {
+    tail[0].content[0].text = "Otro tema";
+    assert.equal(resolveMemberSummaryFollowup({ message: "Comparar enero y febrero", history: [...historyFor(), ...tail] }), null);
+  }
+  assert.equal(resolveMemberSummaryFollowup({ message: "Comparar enero y marzo", history: historyFor() }), null);
+});
