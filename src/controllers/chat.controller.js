@@ -1,5 +1,6 @@
 import { chatService } from "../services/ai/chat.service.js";
 import { getValidOracleSession } from "../services/sessions/oracleSession.service.js";
+import { runWithRequestSignal, throwIfRequestAborted } from "../services/requestContext.service.js";
 
 const parseParaguayanNumber = (value) => {
   const normalized = String(value ?? "")
@@ -121,13 +122,28 @@ export const chatController = async (req, res) => {
     });
   }
 
-  try {
-    await getValidOracleSession(sessionId);
+  const cancellation = new AbortController();
+  const onAborted = () => {
+    if (!cancellation.signal.aborted && process.env.NODE_ENV === "development") {
+      console.log("[CHATBOT-DEV] REQUEST CANCELLED");
+    }
+    cancellation.abort();
+  };
+  const onClosed = () => {
+    if (!res.writableEnded) onAborted();
+  };
+  req.once("aborted", onAborted);
+  res.once("close", onClosed);
+  if (req.aborted || res.destroyed) onAborted();
 
-    const result = await chatService({
-      message,
-      sessionId,
+  try {
+    const result = await runWithRequestSignal(cancellation.signal, async () => {
+      throwIfRequestAborted();
+      await getValidOracleSession(sessionId);
+      throwIfRequestAborted();
+      return chatService({ message, sessionId });
     });
+    if (cancellation.signal.aborted) return;
 
     return res.status(200).json({
       env: process.env.NODE_ENV,
@@ -136,6 +152,7 @@ export const chatController = async (req, res) => {
       actions: result.actions ?? {},
     });
   } catch (error) {
+    if (cancellation.signal.aborted || error.code === "REQUEST_ABORTED") return;
     const sessionStatus = getSessionHttpStatus(error.code);
 
     if (sessionStatus !== 500) {
@@ -153,5 +170,11 @@ export const chatController = async (req, res) => {
       success: false,
       message: "Ocurrió un error procesando la consulta.",
     });
+  } finally {
+    req.removeListener("aborted", onAborted);
+    res.removeListener("close", onClosed);
+    if (cancellation.signal.aborted && process.env.NODE_ENV === "development") {
+      console.log("[CHATBOT-DEV] REQUEST CANCEL CLEANUP FINISHED");
+    }
   }
 };

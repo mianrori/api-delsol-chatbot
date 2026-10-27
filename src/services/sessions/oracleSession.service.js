@@ -1,4 +1,5 @@
 import { connectWithProxy } from "../../database/oracle.database.js";
+import { throwIfRequestAborted } from "../requestContext.service.js";
 import {
   getOracleSessionRepository,
   touchOracleSessionRepository,
@@ -65,10 +66,18 @@ export const getValidOracleSession = async (sessionId) => {
 };
 
 export const createProxyConnectionBySessionId = async (sessionId) => {
+  throwIfRequestAborted();
   const session = await getValidOracleSession(sessionId);
+  throwIfRequestAborted();
   const connection = await connectWithProxy(session.username);
-
-  await touchOracleSessionRepository(session.session_id);
+  try {
+    throwIfRequestAborted();
+    await touchOracleSessionRepository(session.session_id);
+    throwIfRequestAborted();
+  } catch (error) {
+    await connection.close().catch(() => {});
+    throw error;
+  }
 
   return {
     connection,
@@ -81,6 +90,7 @@ export const withOracleProxySession = async (sessionId, callback) => {
   const context = await createProxyConnectionBySessionId(sessionId);
 
   try {
+    throwIfRequestAborted();
     return await callback(context);
   } finally {
     try {
