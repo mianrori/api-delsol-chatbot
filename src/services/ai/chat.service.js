@@ -21,6 +21,7 @@ import { buildMemberRankingResponse } from "./memberRankingPresentation.service.
 import { buildMemberSummaryResponse } from "./memberSummaryPresentation.service.js";
 import {
   resolveMemberAnalysisFollowup,
+  resolveMemberSummaryFollowup,
   buildMemberAnalysisFollowupResponse,
   buildMemberAnalysisBreakdownResponse,
 } from "./memberAnalysisFollowup.service.js";
@@ -1490,7 +1491,25 @@ export const chatService = async ({ message, sessionId }) => {
     message,
     history: protectedHistory,
   });
-  if (followupInput) {
+  const summaryFollowupInputs = resolveMemberSummaryFollowup({
+    message,
+    history: protectedHistory,
+  });
+  if (summaryFollowupInputs) {
+    const content = summaryFollowupInputs.map((input, index) => ({ toolUse: {
+      toolUseId: `summary_followup_${index}_${randomUUID()}`,
+      name: "analyze_members",
+      input,
+    } }));
+    messages.push({ role: "assistant", content });
+    const executed = await executeToolRequests({ content, sessionId });
+    messages.push({ role: "user", content: executed.toolResults });
+    conversationActions = executed.actions;
+    conversationInternalContext = executed.internalContext;
+    toolIterations = 1;
+    followupAnswer = buildMemberSummaryResponse(executed.internalContext.presentationCalls)
+      ?? "No fue posible completar el desglose de todos los períodos. Vuelve a intentarlo.";
+  } else if (followupInput) {
     const content = [{ toolUse: {
       toolUseId: `ranking_followup_${randomUUID()}`,
       name: "analyze_members",
