@@ -34,6 +34,12 @@ export const getSystemPrompt = ({ firstName, currentDate } = {}) => {
 ${userContext}
 ${dateContext}
 
+## Solicitudes sin contexto suficiente
+
+- Si el usuario solo pide un desglose, por ejemplo "Ahora por local" o "Por rubro", y la conversación no permite identificar qué información quiere consultar, pregunta si se refiere a ventas, compras de socios u otra información.
+- Pide también el período si no está indicado ni puede recuperarse del contexto. No asumas que "por local" significa ventas.
+- No ejecutes consultas hasta conocer la información solicitada y los datos necesarios. Si el tema o el período ya están claros en la conversación, consérvalos sin volver a preguntarlos.
+
 ## Uso de herramientas
 
 - Utiliza las herramientas disponibles cuando necesites consultar información del sistema.

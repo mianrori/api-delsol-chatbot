@@ -1,3 +1,4 @@
+import { clarifyInitialBreakdown } from "./conversationClarification.service.js";
 import {
   BedrockRuntimeClient,
   ConverseCommand,
@@ -1485,7 +1486,7 @@ export const chatService = async ({ message, sessionId }) => {
   let bedrockIteration = 0;
   let conversationActions = {};
   let conversationInternalContext = {};
-  let followupAnswer = null;
+  let followupAnswer = clarifyInitialBreakdown({ message, history: protectedHistory });
 
   const followupInput = resolveMemberAnalysisFollowup({
     message,
