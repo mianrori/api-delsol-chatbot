@@ -31,14 +31,21 @@ let modelSignal;
 let mode = "cancel-model";
 let comparisonStep = 0;
 let aggregateQueries = 0;
+let storedHistory = [];
+const plannedCalls = [];
+let cancelBetweenPeriods;
+let uuidCounter = 0;
 const same = (_id, value) => value;
 const chat = await load("../../src/services/ai/chat.service.js", {
   "../../../config.js": { default: {} },
-  "node:crypto": { randomUUID: () => "test-id" },
+  "node:crypto": { randomUUID: () => `test-id-${++uuidCounter}` },
   "../requestContext.service.js": requestContext,
   "@aws-sdk/client-bedrock-runtime": {
     BedrockRuntimeClient: class { async send(_command, options) {
       modelCalls++;
+      if (mode === "direct-followup" || mode === "partial-followup" || mode === "cancel-between") {
+        assert.fail("A summary follow-up must not invoke Bedrock");
+      }
       if (mode === "compare") {
         comparisonStep++;
         if (comparisonStep === 3) return { stopReason: "end_turn", output: { message: {
@@ -68,23 +75,27 @@ const chat = await load("../../src/services/ai/chat.service.js", {
   "../../tools/index.js": { tools: [] },
   "./toolExecutor.service.js": { executeTool: async (call) => {
     toolCalls++;
-    if (mode === "compare") {
+    if (["compare", "direct-followup", "partial-followup", "cancel-between"].includes(mode)) {
+      plannedCalls.push(structuredClone(call));
       assert.equal(call.name, "analyze_members");
       assert.equal(call.context.sessionId, "test");
-      return analyzeMembers(call.arguments, { execute: async (sql, binds) => {
+      const result = await analyzeMembers(call.arguments, { execute: async (sql, binds) => {
         aggregateQueries++;
         assert.match(sql, /GROUP BY GROUPING SETS/);
+        if (mode === "partial-followup" && binds.dateFrom === "01/02/2023") throw new Error("Simulated query failure");
         const amount = binds.dateFrom === "01/01/2023" ? 3000 : 4000;
         return { rows: [
           { ROW_KIND: "universe", MEMBER_COUNT: 1, PURCHASE_COUNT: 2 },
           { ROW_KIND: "total", MEMBER_COUNT: 1, PURCHASE_COUNT: 2, TOTAL_AMOUNT: amount, CURRENCY_SYMBOL: "PYG", CURRENCY_DESCRIPTION: "GUARANIES" },
-          { ROW_KIND: "detail", CATEGORY_ID: "1", CATEGORY_NAME: "Rubro de prueba", MEMBER_COUNT: 1, PURCHASE_COUNT: 2, TOTAL_AMOUNT: amount, CURRENCY_SYMBOL: "PYG", CURRENCY_DESCRIPTION: "GUARANIES" },
+          { ROW_KIND: "detail", CATEGORY_ID: "1", CATEGORY_NAME: "Rubro de prueba", CUSTOMER_ID: "1", CUSTOMER_NAME: "Local de prueba", MEMBER_COUNT: 1, PURCHASE_COUNT: 2, TOTAL_AMOUNT: amount, CURRENCY_SYMBOL: "PYG", CURRENCY_DESCRIPTION: "GUARANIES" },
         ] };
       } }, "TEST");
+      if (mode === "cancel-between") cancelBetweenPeriods.abort();
+      return result;
     }
     assert.fail("A cancelled model must not invoke tools");
   } },
-  "../../state/conversation.store.js": { getConversation: () => [], setConversation: () => { writes++; } },
+  "../../state/conversation.store.js": { getConversation: () => storedHistory, setConversation: (_id, history) => { writes++; storedHistory = history; } },
   "./conversation.service.js": { compactMemberPurchasePaginationHistory: (x) => x, trimConversation: (x) => x },
   "../../prompts/system.prompt.js": { getSystemPrompt: () => "" },
   "../../utils/debug.logger.js": Object.fromEntries(["logBedrockRequest", "logBedrockResponse", "logToolCall", "logToolResult"].map((key) => [key, () => {}])),
@@ -111,6 +122,39 @@ assert.ok(comparison.answer.includes("₲ 3.000"));
 assert.ok(comparison.answer.includes("₲ 4.000"));
 assert.ok(!comparison.answer.includes("999999"));
 assert.equal(writes, 1);
+
+mode = "direct-followup";
+const callsBeforeFollowups = modelCalls;
+for (const [message, dimension] of [["Ahora desglosa cada mes por rubro", "category"], ["Ahora por local", "customer"]]) {
+  const before = plannedCalls.length;
+  const response = await chat.chatService({ message, sessionId: "test" });
+  assert.equal(modelCalls, callsBeforeFollowups);
+  assert.equal(plannedCalls.length - before, 2);
+  assert.equal(plannedCalls.at(-2).arguments.purchasePeriods[0].dateFrom, "01/01/2023");
+  assert.equal(plannedCalls.at(-1).arguments.purchasePeriods[0].dateFrom, "01/02/2023");
+  assert.equal(plannedCalls.at(-1).arguments.breakdownBy[0], dimension);
+  assert.equal(response.toolIterations, 1);
+  assert.equal(response.usage, null);
+  assert.ok(response.answer.includes("₲ 3.000"));
+  assert.ok(response.answer.includes("₲ 4.000"));
+  assert.equal(storedHistory.at(-1).content[0].text, response.answer);
+}
+const historyBeforeFailure = JSON.stringify(storedHistory);
+const writesBeforeCancellation = writes;
+mode = "cancel-between";
+cancelBetweenPeriods = new AbortController();
+const beforeCancellation = plannedCalls.length;
+await assert.rejects(requestContext.runWithRequestSignal(cancelBetweenPeriods.signal,
+  () => chat.chatService({ message: "Ahora por rubro", sessionId: "test" })), { code: "REQUEST_ABORTED" });
+assert.equal(plannedCalls.length - beforeCancellation, 1);
+assert.equal(writes, writesBeforeCancellation);
+assert.equal(modelCalls, callsBeforeFollowups);
+assert.equal(JSON.stringify(storedHistory), historyBeforeFailure);
+mode = "partial-followup";
+const failedComparison = await chat.chatService({ message: "Ahora por rubro", sessionId: "test" });
+assert.equal(modelCalls, callsBeforeFollowups);
+assert.ok(failedComparison.answer.includes("No fue posible completar"));
+assert.ok(!failedComparison.answer.includes("₲ 3.000"));
 
 // Controller: normal completion is not cancellation; disconnect aborts work,
 // emits no response, and always removes request/response event listeners.

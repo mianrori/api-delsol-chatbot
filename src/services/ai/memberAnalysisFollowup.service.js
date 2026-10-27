@@ -70,6 +70,68 @@ export const resolveMemberAnalysisFollowup = ({ message, history = [] }) => {
   };
 };
 
+// Summary comparisons keep one independent query per calendar month. Recover
+// only the latest user turn, never a comparison from an earlier topic.
+export const resolveMemberSummaryFollowup = ({ message, history = [] }) => {
+  const text = String(message ?? "").normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "").toLowerCase()
+    .replace(/[¿?¡!.,;:]/g, "").replace(/\s+/g, " ").trim();
+  const match = text.match(
+    /^(?:ahora )?(?:(?:detalla|desglosa|desglosalo|detallalo|separa|separalo|muestra|muestralo) )?(?:sus compras |las compras |el detalle |el desglose )?(?:cada mes |cada periodo )?por (rubro|rubros|categoria|categorias|local|locales|comercio|comercios)$/,
+  );
+  if (!match) return null;
+
+  let start = -1;
+  for (let index = history.length - 1; index >= 0; index--) {
+    if (history[index]?.role === "user" && history[index].content?.some((block) => typeof block.text === "string")) {
+      start = index;
+      break;
+    }
+  }
+  if (start < 0) return null;
+  const turn = history.slice(start);
+  const calls = turn.filter((item) => item.role === "assistant")
+    .flatMap((item) => item.content ?? []).map((block) => block.toolUse).filter(Boolean);
+  const results = turn.filter((item) => item.role === "user")
+    .flatMap((item) => item.content ?? []).map((block) => block.toolResult).filter(Boolean);
+  if (!calls.length) return null;
+
+  const filtersKey = (input) => {
+    const { purchasePeriods, breakdownBy, ...filters } = input;
+    return JSON.stringify(canonical(filters));
+  };
+  const isCalendarMonth = (period) => {
+    const from = /^01\/(\d{2})\/(\d{4})$/.exec(String(period?.dateFrom ?? ""));
+    const to = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(period?.dateTo ?? ""));
+    if (!from || !to || from[1] !== to[2] || from[2] !== to[3]) return false;
+    const month = Number(from[1]);
+    const year = Number(from[2]);
+    return month >= 1 && month <= 12 && year >= 100 &&
+      Number(to[1]) === new Date(Date.UTC(year, month, 0)).getUTCDate();
+  };
+  const periods = new Map();
+  for (const call of calls) {
+    const input = call.input;
+    if (call.name !== "analyze_members" || input?.resultMode !== "summary" ||
+      !Array.isArray(input.purchasePeriods) || input.purchasePeriods.length !== 1 ||
+      !isCalendarMonth(input.purchasePeriods[0]) || filtersKey(input) !== filtersKey(calls[0].input)) return null;
+    const response = results.find((item) => item.toolUseId === call.toolUseId);
+    const result = response?.content?.find((item) => item.json)?.json;
+    const period = input.purchasePeriods[0];
+    const returnedPeriod = result?.analysis?.periodDefinition?.[0];
+    if (response?.status !== "success" || !["FOUND", "NOT_FOUND"].includes(result?.status) ||
+      !Array.isArray(result.summary?.totalsByCurrency) ||
+      result.analysis?.periodDefinition?.length !== 1 ||
+      returnedPeriod?.dateFrom !== period.dateFrom || returnedPeriod?.dateTo !== period.dateTo) return null;
+    periods.set(`${period.dateFrom}:${period.dateTo}`, {
+      ...structuredClone(input),
+      breakdownBy: [/^(rubro|categoria)/.test(match[1]) ? "category" : "customer"],
+    });
+  }
+  if (periods.size > 24) return null;
+  return [...periods.values()];
+};
+
 export const buildMemberAnalysisBreakdownResponse = (calls = []) => {
   const selected = selectEquivalentMemberAnalysis(calls);
   const dimensions = selected?.input?.breakdownBy;
