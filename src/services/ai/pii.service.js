@@ -450,7 +450,10 @@ export const protectPiiDeep = (
 
         return [
           key,
-          protectPiiDeep(sessionId, childValue, key, childPath),
+          protectPiiDeep(sessionId, childValue,
+            path.at(-1) === "dimensions" && ["customer", "category"].includes(value.type) && ["id", "name"].includes(key)
+              ? `${value.type}${key === "id" ? "Id" : "Name"}` : key,
+            childPath),
         ];
       }),
     );

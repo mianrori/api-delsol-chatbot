@@ -1,3 +1,4 @@
+import { compareMemberPurchasesVsSalesTool } from "./members/compareMemberPurchasesVsSales.tool.js";
 import { searchCustomersTool } from "./customers/searchCustomers.tool.js";
 import { searchCategoriesTool } from "./categories/searchCategories.tool.js";
 import { getSalesTool } from "./sales/getSales.tool.js";
@@ -17,6 +18,7 @@ import { getMemberVehiclesTool } from "./members/getMemberVehicles.tool.js";
 import { analyzeMembersTool } from "./members/analyzeMembers.tool.js";
 
 export const tools = [
+  compareMemberPurchasesVsSalesTool,
   searchCustomersTool,
   searchCategoriesTool,
   getSalesTool,

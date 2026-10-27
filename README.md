@@ -66,3 +66,31 @@ Se conservan los filtros, métricas, períodos y desglose de la consulta origina
 Los cambios de tema, filtros o fechas usan el flujo normal del modelo.
 
 Pruebas locales: `node --test test/*.test.js`.
+
+
+## Comparación de canjes de socios frente a ventas
+
+La herramienta `compare_member_purchases_vs_sales` compara el importe de facturas
+canjeadas por socios con las ventas disponibles en el mismo período. Conserva
+la consulta del ERP a `VW_BOT_VENTAS_LOCALES` y `VW_BOT_COMPRAS_SOCIO`, sin agregar
+filtros de auditoría. Calcula `importe de canjes / ventas * 100` por moneda; si
+las ventas no son positivas, muestra «No calculable».
+
+Admite hasta dos dimensiones entre mes, año, local y rubro; filtros por locales
+y rubros previamente resueltos; orden y límite de hasta 100 grupos después del
+cálculo. Usa exclusivamente la sesión proxy resuelta desde `sessionId`. Las
+consultas se ejecutan secuencialmente para respetar la cancelación y el cierre
+de conexión. Los identificadores y nombres de locales en las dimensiones se
+pseudonimizan antes de enviarse al modelo.
+
+Prueba en Insomnia después de reset:
+«¿Qué porcentaje representan los canjes de facturas de socios sobre las ventas
+de enero de 2023?». Después: «Ahora desglosa ese porcentaje por rubro» y «Ahora
+por local». Se muestran los valores calculados sin pedir al modelo que reescriba
+la tabla. Los resultados deben validarse contra Oracle DEV.
+
+Inventario de herramientas aún pendientes frente al registro de `api-delsol-erp/main`
+revisado el 27/10/2026: análisis de ventas de campañas, generación de gráficos,
+registros de vehículos, búsqueda de tipos de soles, soles de socios, uso de soles,
+destinos de uso y tipos de movimiento de soles. La presencia de herramientas
+migradas no equivale a haber validado todos sus casos en DEV.
