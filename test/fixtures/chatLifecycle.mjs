@@ -15,7 +15,7 @@ const synthetic = (exports) => new vm.SyntheticModule(Object.keys(exports), func
 const load = async (path, stubs) => {
   const main = new vm.SourceTextModule(await readFile(new URL(path, import.meta.url), "utf8"), { context });
   await main.link(async (spec) => {
-    if (["./memberAnalysisFollowup.service.js", "./memberRankingPresentation.service.js", "./memberSummaryPresentation.service.js"].includes(spec)) {
+    if (["./conversationClarification.service.js", "./memberAnalysisFollowup.service.js", "./memberRankingPresentation.service.js", "./memberSummaryPresentation.service.js"].includes(spec)) {
       return new vm.SourceTextModule(await readFile(new URL("../../src/services/ai/" + spec.slice(2), import.meta.url), "utf8"), { context });
     }
     assert.ok(stubs[spec], `Missing stub: ${spec}`);
@@ -114,6 +114,20 @@ assert.equal(modelSignal, cancellation.signal);
 assert.equal(toolCalls, 0);
 assert.equal(modelCalls, 1);
 assert.equal(writes, 0);
+
+// A new conversation asks for subject and period without model or tool calls.
+mode = "direct-followup";
+const beforeClarification = modelCalls;
+const clarification = await chat.chatService({ message: "Ahora por local", sessionId: "test" });
+assert.equal(modelCalls, beforeClarification);
+assert.equal(toolCalls, 0);
+assert.equal(clarification.toolIterations, 0);
+assert.equal(clarification.usage, null);
+assert.match(clarification.answer, /ventas, compras de socios/);
+assert.match(clarification.answer, /período/);
+assert.equal(storedHistory.length, 2);
+assert.equal(storedHistory.at(-1).content[0].text, clarification.answer);
+storedHistory = []; writes = 0;
 
 mode = "compare";
 const comparison = await chat.chatService({ message: "Desglosa enero y febrero por rubro", sessionId: "test" });
