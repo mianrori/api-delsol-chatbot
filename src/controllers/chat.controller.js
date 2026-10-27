@@ -1,3 +1,4 @@
+import { resetConversation, withConversationOperation } from "../services/ai/conversationLifecycle.service.js";
 import { chatService } from "../services/ai/chat.service.js";
 import { getValidOracleSession } from "../services/sessions/oracleSession.service.js";
 import { runWithRequestSignal, throwIfRequestAborted } from "../services/requestContext.service.js";
@@ -91,6 +92,8 @@ const normalizeIncidencePresentation = (answer) => {
 
 const getSessionHttpStatus = (code) => {
   switch (code) {
+    case "CONVERSATION_BUSY":
+      return 409;
     case "ORACLE_SESSION_ID_REQUIRED":
       return 400;
     case "ORACLE_SESSION_NOT_FOUND":
@@ -137,12 +140,12 @@ export const chatController = async (req, res) => {
   if (req.aborted || res.destroyed) onAborted();
 
   try {
-    const result = await runWithRequestSignal(cancellation.signal, async () => {
+    const result = await runWithRequestSignal(cancellation.signal, () => withConversationOperation(sessionId, async () => {
       throwIfRequestAborted();
       await getValidOracleSession(sessionId);
       throwIfRequestAborted();
       return chatService({ message, sessionId });
-    });
+    }));
     if (cancellation.signal.aborted) return;
 
     return res.status(200).json({
@@ -176,5 +179,21 @@ export const chatController = async (req, res) => {
     if (cancellation.signal.aborted && process.env.NODE_ENV === "development") {
       console.log("[CHATBOT-DEV] REQUEST CANCEL CLEANUP FINISHED");
     }
+  }
+};
+
+export const resetConversationController = async (req, res) => {
+  const { sessionId } = req.body ?? {};
+  if (typeof sessionId !== "string" || !sessionId.trim()) {
+    return res.status(400).json({ env: process.env.NODE_ENV, success: false, message: "El sessionId es obligatorio." });
+  }
+  try {
+    await resetConversation(sessionId);
+    return res.status(200).json({ env: process.env.NODE_ENV, success: true, message: "Se inició una conversación nueva." });
+  } catch (error) {
+    const status = getSessionHttpStatus(error.code);
+    if (status === 500) console.error("Error en resetConversationController:", error.code ?? "UNKNOWN");
+    return res.status(status).json({ env: process.env.NODE_ENV, success: false,
+      message: status === 500 ? "No fue posible iniciar una conversación nueva." : error.message });
   }
 };

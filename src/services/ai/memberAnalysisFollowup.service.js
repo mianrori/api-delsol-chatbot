@@ -72,7 +72,7 @@ export const resolveMemberAnalysisFollowup = ({ message, history = [] }) => {
 
 // Summary comparisons keep one independent query per calendar month. Recover
 // only the latest user turn, never a comparison from an earlier topic.
-export const resolveMemberSummaryFollowup = ({ message, history = [] }) => {
+const resolveLatestMemberSummaryFollowup = ({ message, history = [] }) => {
   const text = String(message ?? "").normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "").toLowerCase()
     .replace(/[¿?¡!.,;:]/g, "").replace(/\s+/g, " ").trim();
@@ -130,6 +130,46 @@ export const resolveMemberSummaryFollowup = ({ message, history = [] }) => {
   }
   if (periods.size > 24) return null;
   return [...periods.values()];
+};
+
+// Repeat only an identical request within a contiguous sequence of compatible
+// summary turns. Re-run its original inputs so data and permissions stay current.
+const normalizedRequest = (message) => String(message ?? "").normalize("NFD")
+  .replace(/[\u0300-\u036f]/g, "").toLowerCase()
+  .replace(/[¿?¡!.,;:]/g, "").replace(/\s+/g, " ").trim();
+
+export const resolveMemberSummaryFollowup = ({ message, history = [] }) => {
+  const direct = resolveLatestMemberSummaryFollowup({ message, history });
+  if (direct) return direct;
+  const starts = history.flatMap((item, index) => item?.role === "user" &&
+    item.content?.some((block) => typeof block.text === "string") ? [index] : []);
+  let latestKey;
+  const key = (plans) => JSON.stringify(plans.map(({ breakdownBy, ...input }) => {
+    const copy = structuredClone(input);
+    copy.purchasePeriods = copy.purchasePeriods.map(({ label, ...period }) => period);
+    return canonical(copy);
+  }).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))));
+  for (let index = starts.length - 1; index >= 0; index--) {
+    const turn = history.slice(starts[index], starts[index + 1] ?? history.length);
+    const plans = resolveLatestMemberSummaryFollowup({ message: "Por rubro", history: turn });
+    if (!plans) return null;
+    const signature = key(plans);
+    if (latestKey !== undefined && signature !== latestKey) return null;
+    latestKey = signature;
+    const previousText = turn[0].content.filter((block) => typeof block.text === "string")
+      .map((block) => block.text).join(" ");
+    if (normalizedRequest(previousText) === normalizedRequest(message)) {
+      // Recover exactly the requested breakdown (or its absence), not the
+      // arbitrary dimension used above to validate each historical turn.
+      return plans.map((plan) => {
+        const original = turn.filter((item) => item.role === "assistant")
+          .flatMap((item) => item.content ?? []).map((block) => block.toolUse)
+          .filter(Boolean).filter((call) => call.input.purchasePeriods[0].dateFrom === plan.purchasePeriods[0].dateFrom).at(-1);
+        return structuredClone(original.input);
+      });
+    }
+  }
+  return null;
 };
 
 export const buildMemberAnalysisBreakdownResponse = (calls = []) => {
