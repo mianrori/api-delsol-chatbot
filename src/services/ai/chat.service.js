@@ -1,3 +1,4 @@
+import { buildMemberPurchasesVsSalesResponse } from "./memberPurchasesVsSalesPresentation.service.js";
 import { clarifyInitialBreakdown } from "./conversationClarification.service.js";
 import {
   BedrockRuntimeClient,
@@ -67,6 +68,7 @@ En esta etapa de migración, las herramientas habilitadas son:
 - get_member_promo_purchases
 - get_member_vehicles
 - analyze_members
+- compare_member_purchases_vs_sales
 
 Las únicas capacidades disponibles son las definidas a continuación y las herramientas presentes en toolConfig.
 
@@ -87,6 +89,7 @@ Para esta etapa:
 - puedes resolver promociones y campañas;
 - puedes consultar compras de socios asociadas a promociones o campañas;
 - puedes consultar vehículos registrados por socio o directamente por matrícula/chapa;
+- puedes comparar el importe de canjes de facturas de socios con las ventas del mismo período y calcular su participación por mes, año, local o rubro;
 - puedes analizar y segmentar socios por actividad comercial, compras, recurrencia, género, edad, cumpleaños, local, rubro y período.
 
 Si el usuario solicita información que requiere una herramienta todavía no habilitada en este servicio, indícale brevemente que esa consulta aún no está disponible en esta etapa de migración.
@@ -1373,7 +1376,7 @@ const executeToolRequests = async ({ content, sessionId }) => {
         null,
         [name],
       );
-      if (name === "analyze_members") {
+      if (["analyze_members", "compare_member_purchases_vs_sales"].includes(name)) {
         presentationCall.result = protectedResultForModel;
       }
 
@@ -1628,9 +1631,8 @@ export const chatService = async ({ message, sessionId }) => {
 
       // A complete breakdown is authoritative even when the model requested
       // it after changing dates or filters. Do not ask the model to rewrite it.
-      followupAnswer = buildMemberAnalysisBreakdownResponse(
-        conversationInternalContext.presentationCalls,
-      );
+      followupAnswer = buildMemberPurchasesVsSalesResponse(conversationInternalContext.presentationCalls)
+        ?? buildMemberAnalysisBreakdownResponse(conversationInternalContext.presentationCalls);
 
       if (toolResults.length === 0) {
         throw new Error(
@@ -1656,6 +1658,7 @@ export const chatService = async ({ message, sessionId }) => {
 
     const completedAssistantText =
       monthlyIncidenceText ??
+      buildMemberPurchasesVsSalesResponse(conversationInternalContext.presentationCalls) ??
       buildMemberSummaryResponse(conversationInternalContext.presentationCalls) ??
       buildMemberAnalysisBreakdownResponse(conversationInternalContext.presentationCalls) ??
       buildMemberRankingResponse(conversationInternalContext.presentationCalls) ??

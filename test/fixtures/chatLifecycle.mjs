@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import * as conversationStore from "../../src/state/conversation.store.js";
 import { getPiiSession } from "../../src/state/pii.store.js";
 import * as requestContext from "../../src/services/requestContext.service.js";
+import { compareMemberPurchasesVsSales } from "../../src/services/members/memberPurchasesVsSales.service.js";
 import { analyzeMembers } from "../../src/services/members/memberAnalysis.service.js";
 
 const context = vm.createContext({ console, structuredClone, Intl, Date, Map, Set,
@@ -15,7 +16,7 @@ const synthetic = (exports) => new vm.SyntheticModule(Object.keys(exports), func
 const load = async (path, stubs) => {
   const main = new vm.SourceTextModule(await readFile(new URL(path, import.meta.url), "utf8"), { context });
   await main.link(async (spec) => {
-    if (["./conversationClarification.service.js", "./memberAnalysisFollowup.service.js", "./memberRankingPresentation.service.js", "./memberSummaryPresentation.service.js"].includes(spec)) {
+    if (["./memberPurchasesVsSalesPresentation.service.js", "./conversationClarification.service.js", "./memberAnalysisFollowup.service.js", "./memberRankingPresentation.service.js", "./memberSummaryPresentation.service.js"].includes(spec)) {
       return new vm.SourceTextModule(await readFile(new URL("../../src/services/ai/" + spec.slice(2), import.meta.url), "utf8"), { context });
     }
     assert.ok(stubs[spec], `Missing stub: ${spec}`);
@@ -48,6 +49,14 @@ const chat = await load("../../src/services/ai/chat.service.js", {
       if (mode === "direct-followup" || mode === "partial-followup" || mode === "cancel-between") {
         assert.fail("A summary follow-up must not invoke Bedrock");
       }
+      if (mode === "vs-sales") {
+        assert.equal(comparisonStep++, 0, "Comparison presentation must not call Bedrock again");
+        return { stopReason: "tool_use", output: { message: { role: "assistant", content: [{ toolUse: {
+          name: "compare_member_purchases_vs_sales", toolUseId: "vs-sales", input: {
+            dateFrom: "01/01/2023", dateTo: "31/01/2023", breakdownBy: ["customer"],
+          },
+        } }] } } };
+      }
       if (mode === "compare") {
         comparisonStep++;
         if (comparisonStep === 3) return { stopReason: "end_turn", output: { message: {
@@ -77,6 +86,12 @@ const chat = await load("../../src/services/ai/chat.service.js", {
   "../../tools/index.js": { tools: [] },
   "./toolExecutor.service.js": { executeTool: async (call) => {
     toolCalls++;
+    if (mode === "vs-sales") return compareMemberPurchasesVsSales(call.arguments, {
+      execute: async (sql) => ({ rows: [{ DIMENSION_1_ID: "1", DIMENSION_1_NAME: "Local sintético",
+        CURRENCY_SYMBOL: "₲", CURRENCY_DESCRIPTION: "GUARANIES",
+        ...(sql.includes("VW_BOT_VENTAS_LOCALES") ? { SALES_AMOUNT: 1000 } : { EXCHANGE_AMOUNT: 250, INVOICE_COUNT: 2, MEMBER_COUNT: 1 }),
+      }] }),
+    });
     if (["compare", "direct-followup", "partial-followup", "cancel-between"].includes(mode)) {
       plannedCalls.push(structuredClone(call));
       assert.equal(call.name, "analyze_members");
@@ -180,6 +195,39 @@ const failedComparison = await chat.chatService({ message: "Ahora por rubro", se
 assert.equal(modelCalls, callsBeforeFollowups);
 assert.ok(failedComparison.answer.includes("No fue posible completar"));
 assert.ok(!failedComparison.answer.includes("₲ 3.000"));
+
+mode = "vs-sales"; comparisonStep = 0; storedHistory = [];
+const beforeComparisonModel = modelCalls;
+const vsSales = await chat.chatService({ sessionId: "test", message: "Compara canjes con ventas por local en enero 2023" });
+assert.equal(modelCalls - beforeComparisonModel, 1);
+assert.equal(vsSales.toolIterations, 1);
+assert.match(vsSales.answer, /25 %/);
+assert.match(vsSales.answer, /Local sintético/);
+assert.equal(storedHistory.at(-1).content[0].text, vsSales.answer);
+
+// Exercise the actual dispatcher: it must use the session proxy and close the
+// connection even when a queried view is not authorized.
+const dispatcherText = await readFile(new URL("../../src/services/ai/toolExecutor.service.js", import.meta.url), "utf8");
+const dispatcherStubs = {};
+for (const match of dispatcherText.matchAll(/import \{([^}]+)\} from "([^"]+)";/g)) {
+  dispatcherStubs[match[2]] = Object.fromEntries(match[1].split(",").map((name) => [name.trim(), () => assert.fail("Unexpected unrelated tool")]));
+}
+let proxyClosed = 0; let proxyDenied = false;
+dispatcherStubs["../members/memberPurchasesVsSales.service.js"] = { compareMemberPurchasesVsSales };
+dispatcherStubs["../sessions/oracleSession.service.js"] = { withOracleProxySession: async (id, callback) => {
+  assert.equal(id, "authorized-session");
+  try { return await callback({ username: "SYNTHETIC", connection: { execute: async () => {
+    if (proxyDenied) throw Object.assign(new Error("Denied"), { errorNum: 942 });
+    return { rows: [] };
+  } } }); } finally { proxyClosed++; }
+} };
+const dispatcher = await load("../../src/services/ai/toolExecutor.service.js", dispatcherStubs);
+const comparisonRequest = { name: "compare_member_purchases_vs_sales", arguments: { dateFrom: "01/01/2023", dateTo: "31/01/2023" }, context: { sessionId: "authorized-session" } };
+assert.equal((await dispatcher.executeTool(comparisonRequest)).status, "NOT_FOUND");
+assert.equal(proxyClosed, 1);
+proxyDenied = true;
+await assert.rejects(dispatcher.executeTool(comparisonRequest), /no tiene permisos/);
+assert.equal(proxyClosed, 2);
 
 // Controller: normal completion is not cancellation; disconnect aborts work,
 // emits no response, and always removes request/response event listeners.

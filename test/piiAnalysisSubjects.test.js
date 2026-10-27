@@ -71,3 +71,30 @@ test("personal fields and contact details remain protected in analytical convers
   assert.ok(!protectedText.includes("1234567"));
   clearPiiSession(session);
 });
+
+
+test("canjes comparison preserves generic members, sales denominator and period", () => {
+  const texts = [
+    "¿Qué porcentaje representan los canjes de facturas de socios sobre las ventas de enero de 2023?",
+    "Compara canjes de facturas de los socios respecto a las ventas de enero de 2023",
+    "Canjes de comprobantes de las socias frente a las ventas de enero de 2023",
+    "Facturas de los socios por rubro",
+  ];
+  for (const text of texts) {
+    assert.equal(protectPiiText("pii-canjes", text), text);
+    assert.equal(protectPiiDeep("pii-canjes", { text }).text, text);
+  }
+  clearPiiSession("pii-canjes");
+});
+
+test("named entities in invoice comparisons remain protected without hiding the comparison", () => {
+  for (const name of ["Marca Ejemplo", "Socios Club", "Socios Persona Ejemplo"]) {
+    const text = `Canjes de facturas de ${name} sobre las ventas de enero de 2023`;
+    const protectedText = protectPiiText("pii-canjes-names", text);
+    assert.match(protectedText, /\[PII_BUSINESS_ENTITY_\d+\]/);
+    assert.ok(!protectedText.includes(name));
+    assert.ok(protectedText.includes("sobre las ventas de enero de 2023"));
+    assert.equal(restorePiiText("pii-canjes-names", protectedText), text);
+  }
+  clearPiiSession("pii-canjes-names");
+});

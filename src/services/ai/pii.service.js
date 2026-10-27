@@ -401,9 +401,10 @@ const protectKnownTextPatterns = (sessionId, text) => {
    * No tratamos nombres de meses ni años como entidades comerciales.
    */
   protectedText = protectedText.replace(
-    /\b((?:facturas?|comprobantes?)\s+de\s+)(?!(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre|20\d{2})\b)([A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9&.'’ -]{2,80}?)(?=\s+(?:(?:de|desde|durante|en)\s+(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre|20\d{2}|hoy|ayer|este|esta)|del\s+(?:20\d{2}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4})|por\s+(?:d[ií]a|mes|a[nñ]o))|\s*(?:[,.!?;:]|$))/gi,
-    (_match, prefix, value) =>
-      `${prefix}${protectPiiValue(sessionId, "BUSINESS_ENTITY", value.trim())}`,
+    /\b((?:facturas?|comprobantes?)\s+de\s+)(?!(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre|20\d{2})\b)([A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9&.'’ -]{2,80}?)(?=\s+(?:(?:de|desde|durante|en)\s+(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre|20\d{2}|hoy|ayer|este|esta)|del\s+(?:20\d{2}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4})|(?:sobre|respecto\s+(?:a|de)|frente\s+a)\s+(?:las\s+)?ventas|por\s+(?:d[ií]a|mes|a[nñ]o|local|rubro))|\s*(?:[,.!?;:]|$))/gi,
+    (match, prefix, value) => isGenericAnalysisSubject(value)
+      ? match
+      : `${prefix}${protectPiiValue(sessionId, "BUSINESS_ENTITY", value.trim())}`,
   );
 
   protectedText = protectedText.replace(
@@ -450,7 +451,10 @@ export const protectPiiDeep = (
 
         return [
           key,
-          protectPiiDeep(sessionId, childValue, key, childPath),
+          protectPiiDeep(sessionId, childValue,
+            path.at(-1) === "dimensions" && ["customer", "category"].includes(value.type) && ["id", "name"].includes(key)
+              ? `${value.type}${key === "id" ? "Id" : "Name"}` : key,
+            childPath),
         ];
       }),
     );

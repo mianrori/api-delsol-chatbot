@@ -1,3 +1,4 @@
+import { compareMemberPurchasesVsSales } from "../members/memberPurchasesVsSales.service.js";
 import { resolveCustomer } from "../customers/customer.resolver.js";
 import { resolveCategory } from "../categories/category.resolver.js";
 import { getSales } from "../sales/sales.service.js";
@@ -36,6 +37,10 @@ const withAuthorizedOracle = async (sessionId, callback) => {
 };
 
 const toolHandlers = {
+  compare_member_purchases_vs_sales: async (args, context) => withAuthorizedOracle(
+    context.sessionId,
+    ({ connection }) => compareMemberPurchasesVsSales(args, connection),
+  ),
   search_customers: async (args, context) => {
     return withAuthorizedOracle(
       context.sessionId,
