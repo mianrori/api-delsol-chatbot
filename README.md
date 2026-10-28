@@ -340,3 +340,20 @@ Pruebas DEV sugeridas:
 En cada caso exitoso se espera `actions.chart.available=true`, una `url` con prefijo
 `data:image/svg+xml;base64,` y una respuesta breve, sin enlaces técnicos ni Markdown
 de imagen. La validación con Bedrock/Oracle DEV y el frontend está pendiente.
+
+
+## Interpretación de series temporales de ventas
+
+Los resúmenes completos de `get_sales` agrupados únicamente por día, mes o año,
+con importes y/o cantidad de facturas, se presentan directamente desde el backend.
+Cada métrica y moneda se interpreta por separado, comprobando todos los cambios
+consecutivos. Una subida entre el primer y último punto o una regresión lineal
+positiva no se presentan como aumentos en todos los períodos si hubo caídas.
+Por ejemplo, las facturas de enero (366.427) a febrero (358.354) de 2023 se describen
+como una caída de 8.073 (-2,20 %), aunque terminen mayo por encima de enero.
+
+Se conservan las filas devueltas sin inventar meses con cero, y los datos faltantes
+no se convierten a cero ni sustentan interpretaciones de continuidad. Las preguntas
+estadísticas explícitas (anomalías, ticket promedio, etc.), agrupaciones combinadas
+y fuentes truncadas conservan su flujo existente. Las instrucciones al modelo
+refuerzan la distinción entre evolución observada y pendiente estadística.
