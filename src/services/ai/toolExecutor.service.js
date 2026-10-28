@@ -1,3 +1,5 @@
+import { searchSolesTypes } from "../soles/searchSolesTypes.service.js";
+import { getMemberSoles } from "../soles/memberSoles.service.js";
 import { getCampaignSalesPerformance } from "../sales/campaignSalesPerformance.service.js";
 import { compareMemberPurchasesVsSales } from "../members/memberPurchasesVsSales.service.js";
 import { resolveCustomer } from "../customers/customer.resolver.js";
@@ -38,6 +40,10 @@ const withAuthorizedOracle = async (sessionId, callback) => {
 };
 
 const toolHandlers = {
+  search_soles_types: async (args, context) => withAuthorizedOracle(context.sessionId,
+    ({ connection }) => searchSolesTypes(args, connection)),
+  get_member_soles: async (args, context) => withAuthorizedOracle(context.sessionId,
+    ({ connection }) => getMemberSoles(args, connection)),
   analyze_campaign_sales_performance: async (args, context) => withAuthorizedOracle(
     context.sessionId,
     ({ connection }) => getCampaignSalesPerformance(args, connection),

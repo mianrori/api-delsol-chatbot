@@ -4,6 +4,7 @@ import { logPiiTransformation } from "../../utils/debug.logger.js";
 const TOKEN_PATTERN = /\[PII_([A-Z_]+)_\d+\]/g;
 
 const INTERNAL_ONLY_TOKEN_TYPES = new Set([
+  "SOLES_TYPE_ID",
   "CUSTOMER_ID",
   "CATEGORY_ID",
   "CONCEPT_ID",
@@ -64,6 +65,10 @@ const FIELD_TYPES = new Map([
   ["ruc", "TAX_ID"],
   ["taxid", "TAX_ID"],
 
+  ["typeid", "SOLES_TYPE_ID"],
+  ["typeids", "SOLES_TYPE_ID"],
+  ["typedescription", "SOLES_TYPE_NAME"],
+
   // Vehículos
   ["plate", "PLATE"],
   ["matricula", "PLATE"],
@@ -108,6 +113,8 @@ const FIELD_TYPES = new Map([
 ]);
 
 const PATH_TYPES = [
+  { pattern: /(?:^|\.)searchsolestypes(?:\.options)?\.description$/, type: "SOLES_TYPE_NAME" },
+  { pattern: /(?:^|\.)getmembersoles\.data\.type\.description$/, type: "SOLES_TYPE_NAME" },
   {
     pattern: /(?:^|\.)contract\.number$/,
     type: "CONTRACT_NUMBER",
@@ -290,6 +297,17 @@ const protectKnownTextPatterns = (sessionId, text) => {
     /\b((?:del|de\s+la|del\s+)?soci[oa]\s+(?:(?:llamad[oa]|denominad[oa])\s+)?)([A-Za-zÁÉÍÓÚÜÑáéíóúüñ'’-]+(?:\s+[A-Za-zÁÉÍÓÚÜÑáéíóúüñ'’-]+){1,4})(?=\s*(?:[,.!?;:]|$))/gi,
     (_match, prefix, value) =>
       `${prefix}${protectPiiValue(sessionId, "NAME", value.trim())}`,
+  );
+
+  // In these short balance requests, the final subject is a member even when
+  // the word socio is omitted. Keep the balance intent and any date visible.
+  protectedText = protectedText.replace(
+    /\b((?:saldo\s+de\s+soles\s+(?:de|del)|cu[aá]ntos\s+soles\s+(?:dispone|tiene)(?:\s+(?:de|del))?)\s+(?:(?:el\s+|la\s+)?soci[oa]\s+)?)(["“]?)([A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9'’.-]+(?:\s+[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9'’.-]+){0,7}?)(["”]?)(?=\s*(?:,\s*)?(?:al|a\s+la\s+fecha|con\s+fecha\s+de\s+referencia)\s+\d{1,2}\/\d{1,2}\/\d{4}|\s+por\s+(?:tipo|vencimiento|fecha\s+de\s+vencimiento)\b|\s*[?!.;:]?\s*$)/gi,
+    (match, prefix, quote, value, closingQuote) => {
+      if (isGenericAnalysisSubject(value) || /^(?:mi|mis|su|sus|el|la|los|las)$/i.test(value)) return match;
+      const document = /^[0-9][0-9. -]*$/.test(value);
+      return `${prefix}${quote}${protectPiiValue(sessionId, document ? "DOCUMENT" : "NAME", value.trim())}${closingQuote}`;
+    },
   );
 
   /*

@@ -1,3 +1,5 @@
+import { getMemberSoles } from "../../src/services/soles/memberSoles.service.js";
+import { searchSolesTypes } from "../../src/services/soles/searchSolesTypes.service.js";
 import vm from "node:vm";
 import { readFile } from "node:fs/promises";
 import { EventEmitter } from "node:events";
@@ -18,7 +20,7 @@ const synthetic = (exports) => new vm.SyntheticModule(Object.keys(exports), func
 const load = async (path, stubs) => {
   const main = new vm.SourceTextModule(await readFile(new URL(path, import.meta.url), "utf8"), { context });
   await main.link(async (spec) => {
-    if (["./promotionSearchPresentation.service.js", "./campaignSalesPerformancePresentation.service.js", "./memberPurchasesVsSalesPresentation.service.js", "./conversationClarification.service.js", "./memberAnalysisFollowup.service.js", "./memberRankingPresentation.service.js", "./memberSummaryPresentation.service.js"].includes(spec)) {
+    if (["./memberSolesPresentation.service.js", "./promotionSearchPresentation.service.js", "./campaignSalesPerformancePresentation.service.js", "./memberPurchasesVsSalesPresentation.service.js", "./conversationClarification.service.js", "./memberAnalysisFollowup.service.js", "./memberRankingPresentation.service.js", "./memberSummaryPresentation.service.js"].includes(spec)) {
       return new vm.SourceTextModule(await readFile(new URL("../../src/services/ai/" + spec.slice(2), import.meta.url), "utf8"), { context });
     }
     assert.ok(stubs[spec], `Missing stub: ${spec}`);
@@ -50,6 +52,22 @@ const chat = await load("../../src/services/ai/chat.service.js", {
       modelCalls++;
       if (mode === "direct-followup" || mode === "partial-followup" || mode === "cancel-between") {
         assert.fail("A summary follow-up must not invoke Bedrock");
+      }
+      if (mode === "soles") {
+        const step = comparisonStep++;
+        assert.ok(step < 3, "Soles table must not call the model again");
+        const name = ["search_members", "search_soles_types", "get_member_soles"][step];
+        const input = [{ search: "Persona sintética" }, { query: "Soles normales" },
+          { documentNumber: "1234567", typeIds: [10], referenceDate: "31/05/2023" }][step];
+        return { stopReason: "tool_use", output: { message: { role: "assistant", content: [{ toolUse: { name, input, toolUseId: `soles-${step}` } }] } } };
+      }
+      if (mode === "soles-detail") {
+        assert.equal(comparisonStep++, 0, "Soles detail paging must not call the model again");
+        return { stopReason: "tool_use", output: { message: { role: "assistant", content: [{ toolUse: {
+          name: "get_member_soles", toolUseId: "soles-detail", input: {
+            documentNumber: "1234567", typeIds: [10], referenceDate: "31/05/2023", mode: "detail", status: "all", page: 1, rows: 1,
+          },
+        } }] } } };
       }
       if (mode === "promotion-pages") {
         assert.equal(comparisonStep++, 0, "Promotion pages must not invoke Bedrock again");
@@ -105,6 +123,21 @@ const chat = await load("../../src/services/ai/chat.service.js", {
   "../../tools/index.js": { tools: [] },
   "./toolExecutor.service.js": { executeTool: async (call) => {
     toolCalls++;
+    if (mode === "soles" || mode === "soles-detail") {
+      if (call.name === "search_members") return { status: "RESOLVED", member: { documentNumber: "1234567", fullName: "Persona sintética" } };
+      if (call.name === "search_soles_types") return { status: "RESOLVED", typeId: 10, description: "Soles de prueba" };
+      assert.equal(call.name, "get_member_soles");
+      return getMemberSoles(call.arguments, { execute: async (sql, binds) => {
+        assert.equal(binds.documentNumber, "1234567");
+        assert.equal(binds.referenceDate, call.arguments.status === "all" ? undefined : "31/05/2023");
+        if (mode === "soles-detail") return { rows: [{ TOTAL_ROWS: 2, COD_SOCIO: "1234567", NOM_SOCIO: "Persona sintética",
+          COD_TIPO_SOL: 10, DES_TIPO_SOL: "Soles de prueba", TOTAL: 25, SALDO: binds.offset === 0 ? 20 : 5,
+          NRO_TRANSACCION: binds.offset + 1, FECHA_ALTA: "01/01/2023", VENCIMIENTO: "31/12/2023",
+        }] };
+        return { rows: sql.includes("GROUP BY") ? [{ TYPE_ID: 10, TYPE_DESCRIPTION: "Soles de prueba", EXPIRATION_DATE: "31/12/2023", GENERATED_AMOUNT: 50, BALANCE: 25, RECORD_COUNT: 1 }]
+          : [{ BALANCE: 25, RECORD_COUNT: 1 }] };
+      } });
+    }
     if (mode === "promotion-pages") {
       assert.equal(call.name, "search_promotions");
       const page = call.arguments.page;
@@ -275,6 +308,29 @@ assert.match(noMorePages.answer, /No hay más páginas/);
 assert.equal(modelCalls - beforePageModels, 1);
 assert.equal(toolCalls - beforeNextPageTools, 1);
 
+mode = "soles"; comparisonStep = 0; storedHistory = [];
+const beforeSolesModels = modelCalls;
+const solesSummary = await chat.chatService({ sessionId: "test", message: "Soles vigentes de Persona sintética" });
+assert.equal(modelCalls - beforeSolesModels, 3);
+assert.equal(solesSummary.toolIterations, 3);
+assert.match(solesSummary.answer, /Soles de prueba \| 25/);
+assert.match(solesSummary.answer, /Detallar por vencimiento/);
+const beforeSolesBreakdownModels = modelCalls;
+const solesByExpiration = await chat.chatService({ sessionId: "test", message: "Detallar por vencimiento" });
+assert.equal(modelCalls, beforeSolesBreakdownModels);
+assert.match(solesByExpiration.answer, /31\/12\/2023/);
+assert.match(solesByExpiration.answer, /Soles de prueba/);
+assert.ok(!solesSummary.answer.includes("₲"));
+assert.equal(storedHistory.at(-1).content[0].text, solesByExpiration.answer);
+mode = "soles-detail"; comparisonStep = 0; storedHistory = [];
+const beforeSolesDetailModels = modelCalls;
+const firstSolesPage = await chat.chatService({ sessionId: "test", message: "Detalle de soles" });
+assert.match(firstSolesPage.answer, /Página 1 de 2/);
+const secondSolesPage = await chat.chatService({ sessionId: "test", message: "Siguiente página" });
+assert.match(secondSolesPage.answer, /Página 2 de 2/);
+assert.equal(modelCalls - beforeSolesDetailModels, 1);
+assert.equal(storedHistory.at(-1).content[0].text, secondSolesPage.answer);
+
 // Exercise the actual dispatcher: it must use the session proxy and close the
 // connection even when a queried view is not authorized.
 const dispatcherText = await readFile(new URL("../../src/services/ai/toolExecutor.service.js", import.meta.url), "utf8");
@@ -283,6 +339,8 @@ for (const match of dispatcherText.matchAll(/import \{([^}]+)\} from "([^"]+)";/
   dispatcherStubs[match[2]] = Object.fromEntries(match[1].split(",").map((name) => [name.trim(), () => assert.fail("Unexpected unrelated tool")]));
 }
 let proxyClosed = 0; let proxyDenied = false;
+dispatcherStubs["../soles/memberSoles.service.js"] = { getMemberSoles };
+dispatcherStubs["../soles/searchSolesTypes.service.js"] = { searchSolesTypes };
 dispatcherStubs["../sales/campaignSalesPerformance.service.js"] = { getCampaignSalesPerformance };
 dispatcherStubs["../members/memberPurchasesVsSales.service.js"] = { compareMemberPurchasesVsSales };
 dispatcherStubs["../sessions/oracleSession.service.js"] = { withOracleProxySession: async (id, callback) => {
@@ -309,6 +367,13 @@ assert.equal(proxyClosed, 3);
 proxyDenied = true;
 await assert.rejects(dispatcher.executeTool(campaignRequest), /no tiene permisos/);
 assert.equal(proxyClosed, 4);
+proxyDenied = false;
+const solesRequest = { name: "get_member_soles", arguments: { documentNumber: "1234567", mode: "balance", referenceDate: "31/05/2023" }, context: { sessionId: "authorized-session" } };
+assert.deepEqual(JSON.stringify((await dispatcher.executeTool(solesRequest)).queryContext.groupBy), JSON.stringify(["type"]));
+assert.equal(proxyClosed, 5);
+proxyDenied = true;
+await assert.rejects(dispatcher.executeTool(solesRequest), /no tiene permisos/);
+assert.equal(proxyClosed, 6);
 
 // Controller: normal completion is not cancellation; disconnect aborts work,
 // emits no response, and always removes request/response event listeners.
