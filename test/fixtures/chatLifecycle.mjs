@@ -1,3 +1,4 @@
+import { getVehicleRegistrations } from "../../src/services/vehicles/vehicleRegistrations.service.js";
 import { getSolesUsage } from "../../src/services/soles/solesUsage.service.js";
 import { getMemberSoles } from "../../src/services/soles/memberSoles.service.js";
 import { searchSolesTypes } from "../../src/services/soles/searchSolesTypes.service.js";
@@ -21,7 +22,7 @@ const synthetic = (exports) => new vm.SyntheticModule(Object.keys(exports), func
 const load = async (path, stubs) => {
   const main = new vm.SourceTextModule(await readFile(new URL(path, import.meta.url), "utf8"), { context });
   await main.link(async (spec) => {
-    if (["./solesUsagePresentation.service.js", "./memberSolesPresentation.service.js", "./promotionSearchPresentation.service.js", "./campaignSalesPerformancePresentation.service.js", "./memberPurchasesVsSalesPresentation.service.js", "./conversationClarification.service.js", "./memberAnalysisFollowup.service.js", "./memberRankingPresentation.service.js", "./memberSummaryPresentation.service.js"].includes(spec)) {
+    if (["./vehiclePresentation.service.js", "./solesUsagePresentation.service.js", "./memberSolesPresentation.service.js", "./promotionSearchPresentation.service.js", "./campaignSalesPerformancePresentation.service.js", "./memberPurchasesVsSalesPresentation.service.js", "./conversationClarification.service.js", "./memberAnalysisFollowup.service.js", "./memberRankingPresentation.service.js", "./memberSummaryPresentation.service.js"].includes(spec)) {
       return new vm.SourceTextModule(await readFile(new URL("../../src/services/ai/" + spec.slice(2), import.meta.url), "utf8"), { context });
     }
     assert.ok(stubs[spec], `Missing stub: ${spec}`);
@@ -53,6 +54,12 @@ const chat = await load("../../src/services/ai/chat.service.js", {
       modelCalls++;
       if (mode === "direct-followup" || mode === "partial-followup" || mode === "cancel-between") {
         assert.fail("A summary follow-up must not invoke Bedrock");
+      }
+      if (mode === "vehicle-detail") {
+        assert.equal(comparisonStep++, 0, "Vehicle table and pagination must not invoke Bedrock again");
+        return { stopReason: "tool_use", output: { message: { role: "assistant", content: [{ toolUse: {
+          name: "get_vehicle_registrations", toolUseId: "vehicle", input: { relativePeriod: "today", mode: "detail", rows: 1, groupBy: ["gender"], ageMin: 18 },
+        } }] } } };
       }
       if (mode === "usage-destinations" || mode === "usage-movements") {
         assert.equal(comparisonStep++, 0, "Lookup rendering must not call Bedrock again");
@@ -182,6 +189,9 @@ const chat = await load("../../src/services/ai/chat.service.js", {
         })) };
       } }, { page, rows: call.arguments.rows });
     }
+    if (mode === "vehicle-detail") return getVehicleRegistrations(call.arguments, { execute: async (_sql, binds) => ({ rows: [{ RN: binds.startRow, VEHICLE_COUNT: 2, PLATE_COUNT: 2, MEMBER_COUNT: 2,
+      MATRICULA: `SYNTH${binds.startRow}`, NOM_SOCIO: "Persona sintética", ACTIVO: "S", REGISTRATION_DATE: binds.dateFrom,
+    }] }) });
     if (mode === "usage-destinations") return { status: "RESOLVED", destinationType: "LOCAL", destinationCode: "INTERNAL-SECRET", name: "Local sintético" };
     if (mode === "usage-movements") return { status: "LISTED", totalMatches: 2, returnedMatches: 2, hasMore: false, options: [{ movementType: "A" }, { movementType: "B" }] };
     if (mode === "campaign") {
@@ -387,6 +397,15 @@ assert.match(usageNextPage.answer, /Página 2 de 2/);
 assert.equal(modelCalls - beforeUsageDetailModels, 1);
 assert.equal(storedHistory.at(-1).content[0].text, usageNextPage.answer);
 
+mode = "vehicle-detail"; comparisonStep = 0; storedHistory = [];
+const beforeVehicleModels = modelCalls;
+const vehiclePage = await chat.chatService({ sessionId: "test", message: "Vehículos registrados hoy, detalle de uno por página" });
+assert.match(vehiclePage.answer, /1 de 2 registros/);
+const vehicleNextPage = await chat.chatService({ sessionId: "test", message: "Siguiente página" });
+assert.match(vehicleNextPage.answer, /página 2 de 2/);
+assert.equal(modelCalls - beforeVehicleModels, 1);
+assert.equal(storedHistory.at(-1).content[0].text, vehicleNextPage.answer);
+
 // Exercise the actual dispatcher: it must use the session proxy and close the
 // connection even when a queried view is not authorized.
 const dispatcherText = await readFile(new URL("../../src/services/ai/toolExecutor.service.js", import.meta.url), "utf8");
@@ -395,6 +414,7 @@ for (const match of dispatcherText.matchAll(/import \{([^}]+)\} from "([^"]+)";/
   dispatcherStubs[match[2]] = Object.fromEntries(match[1].split(",").map((name) => [name.trim(), () => assert.fail("Unexpected unrelated tool")]));
 }
 let proxyClosed = 0; let proxyDenied = false;
+dispatcherStubs["../vehicles/vehicleRegistrations.service.js"] = { getVehicleRegistrations };
 dispatcherStubs["../soles/solesUsage.service.js"] = { getSolesUsage };
 dispatcherStubs["../soles/memberSoles.service.js"] = { getMemberSoles };
 dispatcherStubs["../soles/searchSolesTypes.service.js"] = { searchSolesTypes };
@@ -551,4 +571,12 @@ await assert.rejects(requestContext.runWithRequestSignal(acquiring.signal,
   () => sessions.createProxyConnectionBySessionId("test")), { code: "REQUEST_ABORTED" });
 assert.equal(closes, 1);
 assert.equal(touches, 0);
+proxyDenied = false;
+const beforeVehicleProxyClosed = proxyClosed;
+const vehicleRequest = { name: "get_vehicle_registrations", arguments: { dateFrom: "01/01/2023", dateTo: "31/05/2023", groupBy: ["gender"] }, context: { sessionId: "authorized-session" } };
+assert.equal((await dispatcher.executeTool(vehicleRequest)).mode, "summary");
+assert.equal(proxyClosed, beforeVehicleProxyClosed + 1);
+proxyDenied = true;
+await assert.rejects(dispatcher.executeTool(vehicleRequest), /no tiene permisos/);
+assert.equal(proxyClosed, beforeVehicleProxyClosed + 2);
 console.log("Lifecycle integration passed");

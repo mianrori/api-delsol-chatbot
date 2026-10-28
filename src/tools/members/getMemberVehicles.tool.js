@@ -7,7 +7,7 @@ export const getMemberVehiclesTool = {
       "Si se proporciona documentNumber, devuelve los vehículos asociados al socio. " +
       "Si se proporciona plate, consulta directamente esa matrícula sin necesidad de ejecutar search_members. " +
       "Cuando la consulta es por matrícula, el resultado puede incluir datos del propietario además de los datos del vehículo. " +
-      "Por defecto devuelve todos los vehículos priorizando los activos. " +
+      "Devuelve exclusivamente vehículos con ACTIVO=S; los inactivos son borrados lógicos. " +
       "Permite consultar únicamente vehículos activos y filtrar por débito automático.",
 
     inputSchema: {
@@ -26,10 +26,11 @@ export const getMemberVehiclesTool = {
 
           activeOnly: {
             type: "boolean",
+            enum: [true],
 
             description:
-              "true si el usuario solicita únicamente vehículos activos. " +
-              "Si no se especifica, se devuelven activos e inactivos, mostrando primero los activos.",
+              "Siempre true: solo se consultan vehículos activos. " +
+              "Si se omite, se aplica igualmente ACTIVO=S; los inactivos son borrados lógicos.",
           },
 
           plate: {

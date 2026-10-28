@@ -290,10 +290,26 @@ const protectKnownTextPatterns = (sessionId, text) => {
       `${prefix}${protectPiiValue(sessionId, "DOCUMENT", value)}`,
   );
 
+  // Recognize split letter/number plate blocks before the contiguous rule.
+  // Restrict the blocks so dates and following words remain outside the token.
+  protectedText = protectedText.replace(
+    /\b((?:matr[ií]cula|chapa|patente|veh[ií]culo)\s*(?:n[°ºo]\.?|:|=)?\s*)([A-Z](?:[^\S\r\n]*[A-Z]){1,3}[^\S\r\n]*[0-9](?:[^\S\r\n]*[0-9]){1,3})\b/gi,
+    (_match, prefix, value) =>
+      `${prefix}${protectPiiValue(sessionId, "PLATE", value)}`,
+  );
+
   protectedText = protectedText.replace(
     /\b((?:matr[ií]cula|chapa|patente)\s*(?:n[°ºo]\.?|:|=)?\s*)([A-Z0-9-]{5,10})\b/gi,
     (_match, prefix, value) =>
       `${prefix}${protectPiiValue(sessionId, "PLATE", value)}`,
+  );
+
+  // A vehicle reference can supply the plate without saying matrícula/chapa.
+  // Require a digit so ordinary words such as "registrado" stay readable.
+  protectedText = protectedText.replace(
+    /\b(veh[ií]culo\s+(?:con\s+)?)([A-Z0-9-]{5,10})\b/gi,
+    (match, prefix, value) => /[0-9]/.test(value)
+      ? `${prefix}${protectPiiValue(sessionId, "PLATE", value)}` : match,
   );
 
   /*

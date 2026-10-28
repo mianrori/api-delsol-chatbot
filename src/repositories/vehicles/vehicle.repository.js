@@ -13,8 +13,6 @@ export const getMemberVehiclesRepository = async ({
 
   documentNumber,
 
-  activeOnly = false,
-
   plate,
 
   automaticDebit,
@@ -48,7 +46,9 @@ export const getMemberVehiclesRepository = async ({
    * -------------------------------------------------------------
    */
 
-  const filters = [];
+  // Inactive rows are logical deletions and must never participate.
+  const filters = ["ACTIVO = :active"];
+  binds.active = VEHICLE_VALUES.active;
 
   /*
    * -------------------------------------------------------------
@@ -71,7 +71,8 @@ export const getMemberVehiclesRepository = async ({
    */
 
   if (plate) {
-    binds.plate = String(plate).trim().toUpperCase();
+    binds.plate = String(plate).replace(/\s+/g, "").toUpperCase();
+    if (!binds.plate) throw new Error("La matrícula no puede estar vacía.");
 
     filters.push(`
       UPPER(
@@ -86,13 +87,6 @@ export const getMemberVehiclesRepository = async ({
    * -------------------------------------------------------------
    */
 
-  if (activeOnly === true) {
-    binds.active = VEHICLE_VALUES.active;
-
-    filters.push(`
-      ACTIVO = :active
-    `);
-  }
 
   /*
    * -------------------------------------------------------------
@@ -179,10 +173,6 @@ export const getMemberVehiclesRepository = async ({
 
       MATRICULA
   `;
-
-  console.log("getMemberVehiclesRepository SQL:", sql);
-
-  console.log("getMemberVehiclesRepository binds:", binds);
 
   const result = await executeOracleQuery(connection, sql, binds);
 
