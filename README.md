@@ -90,7 +90,62 @@ por local». Se muestran los valores calculados sin pedir al modelo que reescrib
 la tabla. Los resultados deben validarse contra Oracle DEV.
 
 Inventario de herramientas aún pendientes frente al registro de `api-delsol-erp/main`
-revisado el 27/10/2026: análisis de ventas de campañas, generación de gráficos,
+revisado el 28/10/2026: generación de gráficos,
 registros de vehículos, búsqueda de tipos de soles, soles de socios, uso de soles,
 destinos de uso y tipos de movimiento de soles. La presencia de herramientas
 migradas no equivale a haber validado todos sus casos en DEV.
+
+
+## Ventas antes, durante y después de una campaña
+
+`analyze_campaign_sales_performance` se utiliza después de resolver la promoción
+con `search_promotions`. Recibe los identificadores y las fechas de la campaña
+seleccionada. El backend vuelve a comprobarlos contra `VW_BOT_PROMOCIONES` y
+utiliza los nombres registrados. Si hay ambigüedad o no coinciden las fechas,
+no consulta ventas hasta resolver la campaña.
+
+Los tres períodos tienen la misma duración en días calendario, sin solaparse.
+Para una campaña del 01/05/2023 al 10/05/2023, se comparan 21–30/04, 01–10/05 y
+11–20/05. Cada consulta usa los mismos filtros de locales y rubros, la conexión
+proxy del `sessionId` y el repositorio de ventas ya migrado. Las consultas son
+secuenciales y respetan la cancelación.
+
+La tabla muestra ventas, cantidad de facturas y promedio diario. Las variaciones
+se calculan en Node.js, se presentan directamente y se conservan en el historial.
+No se atribuyen causas a la campaña. Una base cero produce porcentaje no
+calculable; si las monedas difieren, se conservan los importes separados y solo
+se comparan las cantidades. Los períodos sin registros permanecen visibles.
+Los nombres e identificadores de promoción/campaña se protegen mediante PII.
+
+Prueba DEV en Insomnia: después de reset, enviar «Analiza las ventas antes,
+durante y después de la campaña [nombre de una campaña que exista en DEV]».
+Si devuelve opciones, seleccionar una. Verificar vigencia, igualdad de duración,
+importes y variaciones contra la base; recordar que el conjunto DEV llega hasta
+mayo de 2023 y un período posterior puede no tener registros.
+
+
+## Búsqueda y páginas de promociones/campañas
+
+`search_promotions` acepta `search`, `page` (desde 1) y `rows` (1–50; por defecto
+usa LIMIT_FILTER o 10). La búsqueda combina identificadores con coincidencias
+por palabras en promoción o campaña. Los resultados por nombre se ordenan por
+la fecha Oracle real, más reciente primero, antes de aplicar la página.
+Las coincidencias por identificador tienen prioridad; una coincidencia exacta
+por nombre no excluye las parciales. Si no hay coincidencias textuales, conserva
+la búsqueda aproximada, calculando el total antes de paginar.
+
+El resultado incluye totalRows, totalPages, page, rows, hasMore y nextPage.
+Una página con una sola opción no significa que la búsqueda sea única: solo
+se resuelve automáticamente cuando totalRows es 1. Las opciones conservan
+numeración global, nombres, identificadores y vigencia de cada campaña.
+
+La presentación muestra todas las opciones de la página e indica el total.
+«Siguiente página»/«Ver más» recupera la siguiente página con la misma búsqueda
+y tamaño sin llamar a Bedrock; «primera página» permite volver al inicio del
+listado activo. No reutiliza páginas de un tema anterior.
+
+Prueba en Insomnia: reset, «Analiza las ventas antes, durante y después de la
+campaña Navidad», «Siguiente página», y seleccionar el número global de una
+campaña de esa página. Contrastar el total con VW_BOT_PROMOCIONES usando los
+mismos filtros y el mismo usuario. El análisis debe utilizar la identidad y
+vigencia de la opción seleccionada.

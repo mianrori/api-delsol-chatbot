@@ -1,3 +1,5 @@
+import { buildPromotionSearchResponse, resolvePromotionSearchPage } from "./promotionSearchPresentation.service.js";
+import { buildCampaignSalesPerformanceResponse } from "./campaignSalesPerformancePresentation.service.js";
 import { buildMemberPurchasesVsSalesResponse } from "./memberPurchasesVsSalesPresentation.service.js";
 import { clarifyInitialBreakdown } from "./conversationClarification.service.js";
 import {
@@ -69,6 +71,7 @@ En esta etapa de migración, las herramientas habilitadas son:
 - get_member_vehicles
 - analyze_members
 - compare_member_purchases_vs_sales
+- analyze_campaign_sales_performance
 
 Las únicas capacidades disponibles son las definidas a continuación y las herramientas presentes en toolConfig.
 
@@ -87,6 +90,8 @@ Para esta etapa:
 - puedes consultar los datos de un socio previamente resuelto;
 - puedes consultar compras de un socio por período, local, rubro, resumen o detalle;
 - puedes resolver promociones y campañas;
+- puedes comparar ventas antes, durante y después de una campaña resuelta, con períodos de igual duración y los mismos filtros de locales y rubros;
+- para analizar campañas usa primero search_promotions: si devuelve AMBIGUOUS, espera la selección del usuario; reutiliza promotionId, campaignId, dateFrom y dateTo de la campaña seleccionada, sin inventar fechas ni atribuir causalidad;
 - puedes consultar compras de socios asociadas a promociones o campañas;
 - puedes consultar vehículos registrados por socio o directamente por matrícula/chapa;
 - puedes comparar el importe de canjes de facturas de socios con las ventas del mismo período y calcular su participación por mes, año, local o rubro;
@@ -168,7 +173,8 @@ Para análisis de socios:
 Para compras promocionales de socios:
 - usa search_promotions cuando el usuario mencione una promoción o campaña y todavía no exista una resolución inequívoca;
 - si search_promotions devuelve RESOLVED, reutiliza exclusivamente promotion.promotionId y promotion.campaignId en get_member_promo_purchases;
-- si search_promotions devuelve AMBIGUOUS, presenta las opciones en lenguaje comercial con nombre de promoción, campaña y vigencia, y espera la selección;
+- si search_promotions devuelve AMBIGUOUS, conserva su totalRows, page, totalPages y opciones numeradas globalmente; espera la selección sin asumir que la página contiene todas las coincidencias;
+- ante "siguiente página" o "ver más" de promociones, conserva search y rows y utiliza nextPage; no repitas la primera página ni inventes opciones;
 - utiliza get_member_promo_purchases únicamente cuando exista un documentNumber inequívocamente resuelto o proporcionado por el usuario;
 - para totales utiliza mode="summary"; para compras individuales utiliza mode="detail";
 - para evolución mensual usa groupBy=["month"]; por año usa groupBy=["year"]; por promoción usa groupBy=["promotion"]; por campaña usa groupBy=["campaign"]; por local usa groupBy=["customer"]; por rubro usa groupBy=["category"]; por origen bancario usa groupBy=["bankOrigin"];
@@ -1376,7 +1382,7 @@ const executeToolRequests = async ({ content, sessionId }) => {
         null,
         [name],
       );
-      if (["analyze_members", "compare_member_purchases_vs_sales"].includes(name)) {
+      if (["analyze_members", "compare_member_purchases_vs_sales", "analyze_campaign_sales_performance", "search_promotions"].includes(name)) {
         presentationCall.result = protectedResultForModel;
       }
 
@@ -1499,7 +1505,21 @@ export const chatService = async ({ message, sessionId }) => {
     message,
     history: protectedHistory,
   });
-  if (summaryFollowupInputs) {
+  const promotionPage = resolvePromotionSearchPage({ message, history: protectedHistory });
+  if (promotionPage) {
+    if (promotionPage.answer) followupAnswer = promotionPage.answer;
+    else {
+      const content = [{ toolUse: { toolUseId: `promotion_page_${randomUUID()}`, name: "search_promotions", input: promotionPage.input } }];
+      messages.push({ role: "assistant", content });
+      const executed = await executeToolRequests({ content, sessionId });
+      messages.push({ role: "user", content: executed.toolResults });
+      conversationActions = executed.actions;
+      conversationInternalContext = executed.internalContext;
+      toolIterations = 1;
+      followupAnswer = buildPromotionSearchResponse(executed.internalContext.presentationCalls)
+        ?? "No fue posible recuperar la página de campañas. Vuelve a intentarlo.";
+    }
+  } else if (summaryFollowupInputs) {
     const content = summaryFollowupInputs.map((input, index) => ({ toolUse: {
       toolUseId: `summary_followup_${index}_${randomUUID()}`,
       name: "analyze_members",
@@ -1631,7 +1651,9 @@ export const chatService = async ({ message, sessionId }) => {
 
       // A complete breakdown is authoritative even when the model requested
       // it after changing dates or filters. Do not ask the model to rewrite it.
-      followupAnswer = buildMemberPurchasesVsSalesResponse(conversationInternalContext.presentationCalls)
+      followupAnswer = buildPromotionSearchResponse(conversationInternalContext.presentationCalls)
+        ?? buildCampaignSalesPerformanceResponse(conversationInternalContext.presentationCalls)
+        ?? buildMemberPurchasesVsSalesResponse(conversationInternalContext.presentationCalls)
         ?? buildMemberAnalysisBreakdownResponse(conversationInternalContext.presentationCalls);
 
       if (toolResults.length === 0) {
@@ -1658,6 +1680,8 @@ export const chatService = async ({ message, sessionId }) => {
 
     const completedAssistantText =
       monthlyIncidenceText ??
+      buildPromotionSearchResponse(conversationInternalContext.presentationCalls) ??
+      buildCampaignSalesPerformanceResponse(conversationInternalContext.presentationCalls) ??
       buildMemberPurchasesVsSalesResponse(conversationInternalContext.presentationCalls) ??
       buildMemberSummaryResponse(conversationInternalContext.presentationCalls) ??
       buildMemberAnalysisBreakdownResponse(conversationInternalContext.presentationCalls) ??

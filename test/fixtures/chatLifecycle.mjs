@@ -5,6 +5,8 @@ import assert from "node:assert/strict";
 import * as conversationStore from "../../src/state/conversation.store.js";
 import { getPiiSession } from "../../src/state/pii.store.js";
 import * as requestContext from "../../src/services/requestContext.service.js";
+import { resolvePromotion } from "../../src/services/promotions/promotion.resolver.js";
+import { getCampaignSalesPerformance } from "../../src/services/sales/campaignSalesPerformance.service.js";
 import { compareMemberPurchasesVsSales } from "../../src/services/members/memberPurchasesVsSales.service.js";
 import { analyzeMembers } from "../../src/services/members/memberAnalysis.service.js";
 
@@ -16,7 +18,7 @@ const synthetic = (exports) => new vm.SyntheticModule(Object.keys(exports), func
 const load = async (path, stubs) => {
   const main = new vm.SourceTextModule(await readFile(new URL(path, import.meta.url), "utf8"), { context });
   await main.link(async (spec) => {
-    if (["./memberPurchasesVsSalesPresentation.service.js", "./conversationClarification.service.js", "./memberAnalysisFollowup.service.js", "./memberRankingPresentation.service.js", "./memberSummaryPresentation.service.js"].includes(spec)) {
+    if (["./promotionSearchPresentation.service.js", "./campaignSalesPerformancePresentation.service.js", "./memberPurchasesVsSalesPresentation.service.js", "./conversationClarification.service.js", "./memberAnalysisFollowup.service.js", "./memberRankingPresentation.service.js", "./memberSummaryPresentation.service.js"].includes(spec)) {
       return new vm.SourceTextModule(await readFile(new URL("../../src/services/ai/" + spec.slice(2), import.meta.url), "utf8"), { context });
     }
     assert.ok(stubs[spec], `Missing stub: ${spec}`);
@@ -48,6 +50,23 @@ const chat = await load("../../src/services/ai/chat.service.js", {
       modelCalls++;
       if (mode === "direct-followup" || mode === "partial-followup" || mode === "cancel-between") {
         assert.fail("A summary follow-up must not invoke Bedrock");
+      }
+      if (mode === "promotion-pages") {
+        assert.equal(comparisonStep++, 0, "Promotion pages must not invoke Bedrock again");
+        return { stopReason: "tool_use", output: { message: { role: "assistant", content: [{ toolUse: {
+          name: "search_promotions", toolUseId: "promotion-search", input: { search: "Navidad", page: 1, rows: 5 },
+        } }] } } };
+      }
+      if (mode === "campaign") {
+        const step = comparisonStep++;
+        assert.ok(step < 2, "Campaign presentation must not call Bedrock again");
+        return { stopReason: "tool_use", output: { message: { role: "assistant", content: [{ toolUse: {
+          name: step === 0 ? "search_promotions" : "analyze_campaign_sales_performance",
+          toolUseId: `campaign-${step}`,
+          input: step === 0 ? { search: "Promoción sintética" } : {
+            promotionId: "P1", campaignId: "C1", campaignDateFrom: "01/05/2023", campaignDateTo: "10/05/2023",
+          },
+        } }] } } };
       }
       if (mode === "vs-sales") {
         assert.equal(comparisonStep++, 0, "Comparison presentation must not call Bedrock again");
@@ -86,6 +105,30 @@ const chat = await load("../../src/services/ai/chat.service.js", {
   "../../tools/index.js": { tools: [] },
   "./toolExecutor.service.js": { executeTool: async (call) => {
     toolCalls++;
+    if (mode === "promotion-pages") {
+      assert.equal(call.name, "search_promotions");
+      const page = call.arguments.page;
+      assert.equal(call.arguments.search, "Navidad");
+      assert.equal(call.arguments.rows, 5);
+      return resolvePromotion(call.arguments.search, { execute: async (_sql, binds) => {
+        assert.equal(binds.startRow, page === 1 ? 1 : 6);
+        return { rows: Array.from({ length: page === 1 ? 5 : 1 }, (_, index) => ({
+          COD_PROMOCION: "P1", COD_CAMPANIA: (page - 1) * 5 + index + 1,
+          NOMBRE_PROMOCION: "Navidad", NOMBRE_CAMPANIA: `Navidad sintética ${(page - 1) * 5 + index + 1}`,
+          FECHA_DESDE: "01/12/2022", FECHA_HASTA: "31/12/2022", TOTAL_ROWS: 6,
+        })) };
+      } }, { page, rows: call.arguments.rows });
+    }
+    if (mode === "campaign") {
+      if (call.name === "search_promotions") return { status: "RESOLVED", promotion: {
+        promotionId: "P1", campaignId: "C1", dateFrom: "01/05/2023", dateTo: "10/05/2023",
+      } };
+      assert.equal(call.name, "analyze_campaign_sales_performance");
+      return getCampaignSalesPerformance(call.arguments, { execute: async (sql) => ({ rows: sql.includes("VW_BOT_PROMOCIONES") ? [{
+        COD_PROMOCION: "P1", COD_CAMPANIA: "C1", NOMBRE_PROMOCION: "Promoción sintética", NOMBRE_CAMPANIA: "Campaña sintética",
+        FECHA_DESDE: "01/05/2023", FECHA_HASTA: "10/05/2023",
+      }] : [{ TOTAL_AMOUNT: 2000, TOTAL_INVOICES: 20, CURRENCY_DESCRIPTION: "GUARANIES", CURRENCY_ABBREVIATION: "PYG" }] }) });
+    }
     if (mode === "vs-sales") return compareMemberPurchasesVsSales(call.arguments, {
       execute: async (sql) => ({ rows: [{ DIMENSION_1_ID: "1", DIMENSION_1_NAME: "Local sintético",
         CURRENCY_SYMBOL: "₲", CURRENCY_DESCRIPTION: "GUARANIES",
@@ -205,6 +248,33 @@ assert.match(vsSales.answer, /25 %/);
 assert.match(vsSales.answer, /Local sintético/);
 assert.equal(storedHistory.at(-1).content[0].text, vsSales.answer);
 
+mode = "campaign"; comparisonStep = 0; storedHistory = [];
+const beforeCampaignModel = modelCalls;
+const campaignResponse = await chat.chatService({ sessionId: "test", message: "Analiza las ventas antes, durante y después de la campaña sintética" });
+assert.equal(modelCalls - beforeCampaignModel, 2);
+assert.equal(campaignResponse.toolIterations, 2);
+assert.match(campaignResponse.answer, /21\/04\/2023/);
+assert.match(campaignResponse.answer, /20\/05\/2023/);
+assert.match(campaignResponse.answer, /no demuestran/);
+assert.equal(storedHistory.at(-1).content[0].text, campaignResponse.answer);
+
+mode = "promotion-pages"; comparisonStep = 0; storedHistory = [];
+const beforePageModels = modelCalls;
+const firstPromotionPage = await chat.chatService({ sessionId: "test", message: "Busca Navidad" });
+assert.equal(modelCalls - beforePageModels, 1);
+assert.match(firstPromotionPage.answer, /6 coincidencias. Página 1 de 2/);
+const beforeNextPageTools = toolCalls;
+const nextPromotionPage = await chat.chatService({ sessionId: "test", message: "Siguiente página" });
+assert.equal(modelCalls - beforePageModels, 1);
+assert.equal(toolCalls - beforeNextPageTools, 1);
+assert.match(nextPromotionPage.answer, /Página 2 de 2/);
+assert.match(nextPromotionPage.answer, /\| 6 \| Navidad/);
+assert.equal(storedHistory.at(-1).content[0].text, nextPromotionPage.answer);
+const noMorePages = await chat.chatService({ sessionId: "test", message: "Ver más" });
+assert.match(noMorePages.answer, /No hay más páginas/);
+assert.equal(modelCalls - beforePageModels, 1);
+assert.equal(toolCalls - beforeNextPageTools, 1);
+
 // Exercise the actual dispatcher: it must use the session proxy and close the
 // connection even when a queried view is not authorized.
 const dispatcherText = await readFile(new URL("../../src/services/ai/toolExecutor.service.js", import.meta.url), "utf8");
@@ -213,12 +283,14 @@ for (const match of dispatcherText.matchAll(/import \{([^}]+)\} from "([^"]+)";/
   dispatcherStubs[match[2]] = Object.fromEntries(match[1].split(",").map((name) => [name.trim(), () => assert.fail("Unexpected unrelated tool")]));
 }
 let proxyClosed = 0; let proxyDenied = false;
+dispatcherStubs["../sales/campaignSalesPerformance.service.js"] = { getCampaignSalesPerformance };
 dispatcherStubs["../members/memberPurchasesVsSales.service.js"] = { compareMemberPurchasesVsSales };
 dispatcherStubs["../sessions/oracleSession.service.js"] = { withOracleProxySession: async (id, callback) => {
   assert.equal(id, "authorized-session");
-  try { return await callback({ username: "SYNTHETIC", connection: { execute: async () => {
+  try { return await callback({ username: "SYNTHETIC", connection: { execute: async (sql) => {
     if (proxyDenied) throw Object.assign(new Error("Denied"), { errorNum: 942 });
-    return { rows: [] };
+    return { rows: sql.includes("VW_BOT_PROMOCIONES") ? [{ COD_PROMOCION: "P1", COD_CAMPANIA: "C1",
+      NOMBRE_PROMOCION: "Promoción sintética", NOMBRE_CAMPANIA: "Campaña sintética", FECHA_DESDE: "01/05/2023", FECHA_HASTA: "10/05/2023" }] : [] };
   } } }); } finally { proxyClosed++; }
 } };
 const dispatcher = await load("../../src/services/ai/toolExecutor.service.js", dispatcherStubs);
@@ -228,6 +300,15 @@ assert.equal(proxyClosed, 1);
 proxyDenied = true;
 await assert.rejects(dispatcher.executeTool(comparisonRequest), /no tiene permisos/);
 assert.equal(proxyClosed, 2);
+proxyDenied = false;
+const campaignRequest = { name: "analyze_campaign_sales_performance", arguments: {
+  promotionId: "P1", campaignId: "C1", campaignDateFrom: "01/05/2023", campaignDateTo: "10/05/2023",
+}, context: { sessionId: "authorized-session" } };
+assert.equal((await dispatcher.executeTool(campaignRequest)).analysisType, "campaignSalesPerformance");
+assert.equal(proxyClosed, 3);
+proxyDenied = true;
+await assert.rejects(dispatcher.executeTool(campaignRequest), /no tiene permisos/);
+assert.equal(proxyClosed, 4);
 
 // Controller: normal completion is not cancellation; disconnect aborts work,
 // emits no response, and always removes request/response event listeners.
