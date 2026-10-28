@@ -1,3 +1,4 @@
+import { generateChartTool } from "./charts/generateChart.tool.js";
 import { getVehicleRegistrationsTool } from "./vehicles/getVehicleRegistrations.tool.js";
 import { getSolesUsageTool } from "./soles/getSolesUsage.tool.js";
 import { searchSolesUsageDestinationsTool } from "./soles/searchSolesUsageDestinations.tool.js";
@@ -25,6 +26,7 @@ import { getMemberVehiclesTool } from "./members/getMemberVehicles.tool.js";
 import { analyzeMembersTool } from "./members/analyzeMembers.tool.js";
 
 export const tools = [
+  generateChartTool,
   getVehicleRegistrationsTool,
   getSolesUsageTool,
   searchSolesUsageDestinationsTool,
