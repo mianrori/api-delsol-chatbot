@@ -23,7 +23,7 @@ const synthetic = (exports) => new vm.SyntheticModule(Object.keys(exports), func
 const load = async (path, stubs) => {
   const main = new vm.SourceTextModule(await readFile(new URL(path, import.meta.url), "utf8"), { context });
   await main.link(async (spec) => {
-    if (["./vehiclePresentation.service.js", "./solesUsagePresentation.service.js", "./memberSolesPresentation.service.js", "./promotionSearchPresentation.service.js", "./campaignSalesPerformancePresentation.service.js", "./memberPurchasesVsSalesPresentation.service.js", "./conversationClarification.service.js", "./memberAnalysisFollowup.service.js", "./memberRankingPresentation.service.js", "./memberSummaryPresentation.service.js"].includes(spec)) {
+    if (["./salesSeriesPresentation.service.js", "./vehiclePresentation.service.js", "./solesUsagePresentation.service.js", "./memberSolesPresentation.service.js", "./promotionSearchPresentation.service.js", "./campaignSalesPerformancePresentation.service.js", "./memberPurchasesVsSalesPresentation.service.js", "./conversationClarification.service.js", "./memberAnalysisFollowup.service.js", "./memberRankingPresentation.service.js", "./memberSummaryPresentation.service.js"].includes(spec)) {
       return new vm.SourceTextModule(await readFile(new URL("../../src/services/ai/" + spec.slice(2), import.meta.url), "utf8"), { context });
     }
     assert.ok(stubs[spec], `Missing stub: ${spec}`);
@@ -57,6 +57,12 @@ const chat = await load("../../src/services/ai/chat.service.js", {
       modelCalls++;
       if (mode === "direct-followup" || mode === "partial-followup" || mode === "cancel-between") {
         assert.fail("A summary follow-up must not invoke Bedrock");
+      }
+      if (mode === "sales-series") {
+        assert.equal(comparisonStep++, 0, "Temporal sales must render before a model can invent a sustained trend");
+        return { stopReason: "tool_use", output: { message: { role: "assistant", content: [{ toolUse: {
+          name: "get_sales", toolUseId: "sales-series", input: { dateFrom: "01/01/2023", dateTo: "31/05/2023", groupBy: ["month"], metrics: ["totalAmount", "totalInvoices"] },
+        } }] } } };
       }
       if (mode === "chart-vehicles" || mode === "chart-followup") {
         const step = comparisonStep++;
@@ -163,6 +169,12 @@ const chat = await load("../../src/services/ai/chat.service.js", {
   "../../tools/index.js": { tools: [] },
   "./toolExecutor.service.js": { executeTool: async (call) => {
     toolCalls++;
+    if (mode === "sales-series") return { data: [
+      { month: "01", totalAmount: 58706137966, totalInvoices: 366427, currency: { abbreviation: "PYG", symbol: "₲" } },
+      { month: "02", totalAmount: 63255876492, totalInvoices: 358354, currency: { abbreviation: "PYG", symbol: "₲" } },
+      { month: "05", totalAmount: 86767167311, totalInvoices: 432821, currency: { abbreviation: "PYG", symbol: "₲" } },
+    ] };
+
     if (call.name === "generate_chart") return generateChart(call.arguments, { sources: call.context.chartSources, restoreText: call.context.restoreChartText });
     if (mode === "chart-vehicles") return getVehicleRegistrations(call.arguments, { execute: async () => ({ rows: [
       { MONTH: "2025-01", VEHICLE_COUNT: 2, PLATE_COUNT: 2, MEMBER_COUNT: 2, TOTAL_VEHICLE_COUNT: 5, TOTAL_PLATE_COUNT: 5, TOTAL_MEMBER_COUNT: 3 },
@@ -427,6 +439,14 @@ const vehicleNextPage = await chat.chatService({ sessionId: "test", message: "Si
 assert.match(vehicleNextPage.answer, /página 2 de 2/);
 assert.equal(modelCalls - beforeVehicleModels, 1);
 assert.equal(storedHistory.at(-1).content[0].text, vehicleNextPage.answer);
+
+mode = "sales-series"; comparisonStep = 0; storedHistory = [];
+const beforeSalesModels = modelCalls;
+const salesSeries = await chat.chatService({ sessionId: "test", message: "Ventas de enero a mayo de 2023 por mes" });
+assert.equal(modelCalls - beforeSalesModels, 1);
+assert.match(salesSeries.answer, /cantidad de facturas presentó subidas y bajadas/);
+assert.match(salesSeries.answer, /-8.073; -2,20 %/);
+assert.equal(storedHistory.at(-1).content[0].text, salesSeries.answer);
 
 mode = "chart-vehicles"; comparisonStep = 0; storedHistory = [];
 const beforeChartModels = modelCalls;

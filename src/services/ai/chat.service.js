@@ -1,3 +1,4 @@
+import { buildSalesSeriesResponse } from "./salesSeriesPresentation.service.js";
 import { chartsPrompt } from "../../prompts/sections/charts.prompt.js";
 import { getChartSources, isChartRequest, isChartSourceTool } from "../charts/chartSource.service.js";
 import { buildVehicleResponse, resolveVehiclePage } from "./vehiclePresentation.service.js";
@@ -276,6 +277,9 @@ Para ventas por metro cuadrado:
 - si un período tiene status="AREA_NOT_AVAILABLE", no afirmes en ninguna otra observación que ese mismo período dispone de superficie contractual;
 - evita expresiones ambiguas como "la superficie contractual no estaba disponible" cuando puedan interpretarse como ausencia de dato en el contrato; utiliza preferentemente "no se dispone de una superficie contractual aplicable para ese período";
 - una disminución de ventas o ventas por m² puede describirse como una caída del indicador; no la conviertas automáticamente en una afirmación sobre disminución de actividad comercial, flujo de clientes, demanda, eficiencia comercial u otra causa no demostrada por los datos;
+- en get_sales, interpreta totalAmount y totalInvoices por separado: una subida de ventas no implica una subida de facturas;
+- una pendiente de regresión positiva o un aumento entre el primer y último período no demuestra crecimiento sostenido: revisa todas las variaciones consecutivas de esa métrica;
+- si alguna variación es negativa, no afirmes crecimiento sostenido ni aumentos en todos los períodos; describe las subidas y bajadas observadas;
 - no describas una serie como "incremento sostenido", "caída sostenida", "tendencia ascendente" o "tendencia descendente" si existen observaciones intermedias que contradigan esa dirección; si no existe una tendencia monotónica clara, limita el análisis a máximos, mínimos y variaciones observadas;
 - no calcules variaciones porcentuales, diferencias porcentuales ni porcentajes aproximados entre períodos a partir de sales, salesPerSqm o texto previo; utiliza únicamente percentageChange de analysisSummary.totalSalesChange cuando esté disponible; si no está disponible, limita la descripción a los valores explícitos retornados sin derivar porcentajes;
 - nunca calcules manualmente sales.usd ni salesPerSqm.usd usando sellRate; si el equivalente USD no fue retornado explícitamente por la herramienta, no lo derives por tu cuenta;
@@ -1432,7 +1436,7 @@ const executeToolRequests = async ({ content, sessionId, sourceMessages = [], ch
       if (isChartSourceTool(name) && protectedResultForModel && typeof protectedResultForModel === "object" && !Array.isArray(protectedResultForModel)) {
         protectedResultForModel.chartSourceId = toolUseId;
       }
-      if (["analyze_members", "compare_member_purchases_vs_sales", "analyze_campaign_sales_performance", "search_promotions", "get_member_soles", "get_soles_usage", "search_soles_usage_destinations", "search_soles_usage_movement_types", "get_vehicle_registrations", "get_member_vehicles"].includes(name)) {
+      if (["get_sales", "analyze_members", "compare_member_purchases_vs_sales", "analyze_campaign_sales_performance", "search_promotions", "get_member_soles", "get_soles_usage", "search_soles_usage_destinations", "search_soles_usage_movement_types", "get_vehicle_registrations", "get_member_vehicles"].includes(name)) {
         presentationCall.result = protectedResultForModel;
       }
 
@@ -1723,7 +1727,8 @@ export const chatService = async ({ message, sessionId }) => {
 
       // A complete breakdown is authoritative even when the model requested
       // it after changing dates or filters. Do not ask the model to rewrite it.
-      followupAnswer = buildVehicleResponse(conversationInternalContext.presentationCalls)
+      followupAnswer = buildSalesSeriesResponse(conversationInternalContext.presentationCalls, { message })
+        ?? buildVehicleResponse(conversationInternalContext.presentationCalls)
         ?? buildSolesUsageResponse(conversationInternalContext.presentationCalls)
         ?? buildMemberSolesResponse(conversationInternalContext.presentationCalls)
         ?? buildPromotionSearchResponse(conversationInternalContext.presentationCalls)
@@ -1759,6 +1764,7 @@ export const chatService = async ({ message, sessionId }) => {
     const completedAssistantText = conversationActions.chart?.available
       ? "Aquí tienes el gráfico solicitado."
       : monthlyIncidenceText ??
+      buildSalesSeriesResponse(conversationInternalContext.presentationCalls, { message }) ??
       buildVehicleResponse(conversationInternalContext.presentationCalls) ??
       buildSolesUsageResponse(conversationInternalContext.presentationCalls) ??
       buildMemberSolesResponse(conversationInternalContext.presentationCalls) ??
