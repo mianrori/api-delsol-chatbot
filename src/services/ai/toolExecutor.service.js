@@ -1,3 +1,4 @@
+import { getVehicleRegistrations } from "../vehicles/vehicleRegistrations.service.js";
 import { getSolesUsage } from "../soles/solesUsage.service.js";
 import { searchSolesUsageDestinations } from "../soles/solesUsageDestination.resolver.js";
 import { searchSolesUsageMovementTypes } from "../soles/solesUsageMovementType.resolver.js";
@@ -43,6 +44,7 @@ const withAuthorizedOracle = async (sessionId, callback) => {
 };
 
 const toolHandlers = {
+  get_vehicle_registrations: async (args, context) => withAuthorizedOracle(context.sessionId, ({ connection }) => getVehicleRegistrations(args, connection)),
   get_soles_usage: async (args, context) => withAuthorizedOracle(context.sessionId, ({ connection }) => getSolesUsage(args, connection)),
   search_soles_usage_destinations: async (args, context) => withAuthorizedOracle(context.sessionId, ({ connection }) => searchSolesUsageDestinations(args, connection)),
   search_soles_usage_movement_types: async (args, context) => withAuthorizedOracle(context.sessionId, ({ connection }) => searchSolesUsageMovementTypes(args, connection)),

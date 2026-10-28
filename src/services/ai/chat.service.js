@@ -1,3 +1,4 @@
+import { buildVehicleResponse, resolveVehiclePage } from "./vehiclePresentation.service.js";
 import { buildSolesUsageResponse, resolveSolesUsagePage } from "./solesUsagePresentation.service.js";
 import { buildMemberSolesResponse, resolveMemberSolesPage, resolveMemberSolesBreakdown } from "./memberSolesPresentation.service.js";
 import { buildPromotionSearchResponse, resolvePromotionSearchPage } from "./promotionSearchPresentation.service.js";
@@ -71,6 +72,7 @@ En esta etapa de migración, las herramientas habilitadas son:
 - search_promotions
 - get_member_promo_purchases
 - get_member_vehicles
+- get_vehicle_registrations
 - analyze_members
 - compare_member_purchases_vs_sales
 - analyze_campaign_sales_performance
@@ -161,13 +163,20 @@ Para compras de socios:
 - no vuelvas a resolver al socio, local o rubro si sus identificadores ya están resueltos en el historial.
 
 Para vehículos de socios:
+- "de quién es el vehículo/matrícula/chapa" solicita la asociación registrada en get_member_vehicles, sin acreditar propiedad legal; si hay varias asociaciones muestra todas y no elijas una arbitrariamente;
+- para cantidades y listados generales por fecha de registro usa get_vehicle_registrations sin resolver un socio; contar registros no equivale a contar matrículas únicas ni entradas al estacionamiento;
+- hoy/ayer/esta semana/este mes/este año se envían con relativePeriod; para meses, años o rangos explícitos envía dateFrom/dateTo; nunca combines ambos;
+- segmenta con groupBy gender, age o ageRange y filtra con gender, ageMin/ageMax; puedes combinar con día/mes/año, marca, modelo, color, estado y débito automático;
+- la edad es la actual del socio por defecto (ageReference=current); si pide edad al registrar utiliza ageReference=registration; muestra siempre la referencia utilizada, sin inferir género ni edad del nombre;
+- conserva grupos Sin datos, no sumes matrículas únicas o socios entre grupos; usa exclusivamente totals para el total general;
+- get_vehicle_registrations detail es paginado; conserva queryContext, fechas resueltas, referencia de edad y rows al avanzar; no vuelvas a calcular hoy/ayer al paginar;
 - usa get_member_vehicles cuando el usuario pregunte por vehículos, autos, matrículas, chapas o débito automático asociado a vehículos;
 - si el usuario proporciona una matrícula/chapa explícita, llama directamente a get_member_vehicles con plate y NO ejecutes search_members previamente;
 - si la consulta parte de un socio y todavía no existe un documentNumber inequívoco, usa search_members y reutiliza member.documentNumber;
-- activeOnly=true únicamente cuando el usuario solicite vehículos activos; si no lo especifica, devuelve activos e inactivos y respeta el orden retornado por la herramienta;
+- consulta siempre únicamente vehículos con ACTIVO=S, tanto por socio/chapa como en conteos y desgloses; los inactivos son borrados lógicos y no deben incluirse; nunca solicites active=false ni activeOnly=false;
 - automaticDebit=true cuando solicite vehículos con débito automático y false cuando solicite vehículos sin débito automático;
 - si la consulta es por matrícula, presenta los datos del vehículo y del propietario retornados por la herramienta;
-- si la consulta es por socio, presenta el resumen total/activos/inactivos y los vehículos;
+- si la consulta es por socio, presenta la cantidad de vehículos activos y su detalle; no presentes los borrados lógicos como vehículos del socio;
 - nunca expongas códigos internos; documentNumber debe tratarse siempre como número de documento;
 - la matrícula/chapa, nombre del propietario, email y teléfono pueden llegar como tokens PII y deben conservarse exactamente hasta la restauración final.
 
@@ -1408,7 +1417,7 @@ const executeToolRequests = async ({ content, sessionId }) => {
         null,
         [name],
       );
-      if (["analyze_members", "compare_member_purchases_vs_sales", "analyze_campaign_sales_performance", "search_promotions", "get_member_soles", "get_soles_usage", "search_soles_usage_destinations", "search_soles_usage_movement_types"].includes(name)) {
+      if (["analyze_members", "compare_member_purchases_vs_sales", "analyze_campaign_sales_performance", "search_promotions", "get_member_soles", "get_soles_usage", "search_soles_usage_destinations", "search_soles_usage_movement_types", "get_vehicle_registrations", "get_member_vehicles"].includes(name)) {
         presentationCall.result = protectedResultForModel;
       }
 
@@ -1532,7 +1541,8 @@ export const chatService = async ({ message, sessionId }) => {
     history: protectedHistory,
   });
   const promotionPage = resolvePromotionSearchPage({ message, history: protectedHistory });
-  const solesPage = resolveSolesUsagePage({ message, history: protectedHistory })
+  const solesPage = resolveVehiclePage({ message, history: protectedHistory })
+    ?? resolveSolesUsagePage({ message, history: protectedHistory })
     ?? resolveMemberSolesPage({ message, history: protectedHistory })
     ?? resolveMemberSolesBreakdown({ message, history: protectedHistory });
   if (solesPage) {
@@ -1545,7 +1555,8 @@ export const chatService = async ({ message, sessionId }) => {
       conversationActions = executed.actions;
       conversationInternalContext = executed.internalContext;
       toolIterations = 1;
-      followupAnswer = buildSolesUsageResponse(executed.internalContext.presentationCalls)
+      followupAnswer = buildVehicleResponse(executed.internalContext.presentationCalls)
+        ?? buildSolesUsageResponse(executed.internalContext.presentationCalls)
         ?? buildMemberSolesResponse(executed.internalContext.presentationCalls)
         ?? "No fue posible consultar la página de soles. Vuelve a intentarlo.";
     }
@@ -1694,7 +1705,8 @@ export const chatService = async ({ message, sessionId }) => {
 
       // A complete breakdown is authoritative even when the model requested
       // it after changing dates or filters. Do not ask the model to rewrite it.
-      followupAnswer = buildSolesUsageResponse(conversationInternalContext.presentationCalls)
+      followupAnswer = buildVehicleResponse(conversationInternalContext.presentationCalls)
+        ?? buildSolesUsageResponse(conversationInternalContext.presentationCalls)
         ?? buildMemberSolesResponse(conversationInternalContext.presentationCalls)
         ?? buildPromotionSearchResponse(conversationInternalContext.presentationCalls)
         ?? buildCampaignSalesPerformanceResponse(conversationInternalContext.presentationCalls)
@@ -1725,6 +1737,7 @@ export const chatService = async ({ message, sessionId }) => {
 
     const completedAssistantText =
       monthlyIncidenceText ??
+      buildVehicleResponse(conversationInternalContext.presentationCalls) ??
       buildSolesUsageResponse(conversationInternalContext.presentationCalls) ??
       buildMemberSolesResponse(conversationInternalContext.presentationCalls) ??
       buildPromotionSearchResponse(conversationInternalContext.presentationCalls) ??

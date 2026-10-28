@@ -90,8 +90,7 @@ por local». Se muestran los valores calculados sin pedir al modelo que reescrib
 la tabla. Los resultados deben validarse contra Oracle DEV.
 
 Inventario de herramientas aún pendientes frente al registro de `api-delsol-erp/main`
-revisado el 28/10/2026: generación de gráficos,
-registros de vehículos. La presencia de herramientas
+revisado el 28/10/2026: generación de gráficos. La presencia de herramientas
 migradas no equivale a haber validado todos sus casos en DEV.
 
 
@@ -248,3 +247,49 @@ Validar también un destino o movimiento existente: primero resolver su nombre y
 luego filtrar la consulta con los valores retornados. Contrastar cantidades,
 fechas y paginación con Oracle usando el mismo usuario. No se han ejecutado
 consultas reales durante la implementación; el contraste DEV queda pendiente.
+
+
+## Registros de vehículos y segmentación de socios
+
+`get_member_vehicles` permite consultar «¿De quién es la chapa ABC123?» directamente
+por matrícula, sin buscar primero al socio. Informa la asociación registrada. Si una
+chapa está asociada a varios socios muestra todos los registros, sin elegir uno.
+
+`get_vehicle_registrations` consulta `VW_BOT_VEHICULOS` por `FECHA_ALTA`, sin exigir
+un socio: hoy, ayer, esta semana (desde el lunes), este mes, este año o fechas
+explícitas inclusivas. Los períodos relativos se resuelven en America/Asuncion;
+mes/año actuales llegan hasta hoy. No cuenta visitas ni accesos al estacionamiento.
+Devuelve registros, matrículas únicas normalizadas y socios distintos; los conteos
+únicos globales se calculan independientemente y no se suman entre grupos.
+
+Agrupa por día, mes, año, género, edad exacta, rango de edad (0–17, 18–29, 30–39,
+40–49, 50–59, 60+), marca, modelo, color y débito automático. Permite
+filtrar género, límites de edad y características del vehículo. En todas las consultas
+se exige `ACTIVO=S`; los registros con otro estado son borrados lógicos y quedan
+excluidos de búsquedas por chapa/socio, conteos, agrupaciones y detalle. Las fechas inválidas,
+filtros desconocidos y páginas fuera del formato permitido se rechazan.
+La edad usa por defecto la fecha actual de Paraguay (`ageReference=current`);
+`registration` calcula la edad a la fecha de registro del vehículo. La respuesta
+explicita la referencia. Se consulta `VW_BOT_SOCIOS` solo al necesitar demografía,
+con una fila por socio para evitar multiplicar vehículos. Los datos faltantes,
+contradictorios, fechas de nacimiento futuras o edades fuera de 0–120 quedan como
+«Sin datos». Los filtros de edad excluyen aquellos sin edad conocida.
+
+El detalle tiene páginas de 20 registros por defecto (máximo 100), conteo exacto
+y respuesta directa del backend. «Siguiente página» conserva las fechas resueltas,
+los filtros y la referencia de edad, incluso si cambia el día durante la conversación.
+Las matrículas, nombres y números de documento se protegen antes de enviarlos al
+modelo. El repositorio no imprime consultas con datos personales ni sus binds.
+
+Pruebas DEV sugeridas con datos disponibles:
+
+- «¿De quién es la chapa [matrícula conocida]?»
+- «¿Cuántos vehículos se registraron hoy?» / «¿Y ayer?»
+- «Vehículos registrados entre enero y mayo de 2023, por mes».
+- «Desglosa esos registros por género y rango de edad».
+- «Solo de socios de 30 a 39 años; edad al registrar el vehículo».
+- «Muestra el detalle, 5 por página» y luego «Siguiente página».
+
+Las pruebas automatizadas cubren calendario, filtros, conteos, datos demográficos
+faltantes, paginación, protección de datos, cancelación y cierre del proxy ante éxito
+y error. La validación contra Oracle DEV y las respuestas de Bedrock queda pendiente.

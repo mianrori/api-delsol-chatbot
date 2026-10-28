@@ -105,6 +105,11 @@ export const getMemberVehicles = async (args, connection) => {
    */
 
   if (args.plate) {
+    const documents = new Set(rows.map((row) => row.COD_SOCIO == null ? null : String(row.COD_SOCIO)));
+    if (documents.size > 1) return {
+      status: "AMBIGUOUS",
+      registrations: rows.map((row) => ({ owner: mapOwner(null, row), vehicle: mapVehicle(row) })),
+    };
     const vehicleRow = rows[0];
 
     const member = vehicleRow.COD_SOCIO

@@ -296,6 +296,14 @@ const protectKnownTextPatterns = (sessionId, text) => {
       `${prefix}${protectPiiValue(sessionId, "PLATE", value)}`,
   );
 
+  // A vehicle reference can supply the plate without saying matrícula/chapa.
+  // Require a digit so ordinary words such as "registrado" stay readable.
+  protectedText = protectedText.replace(
+    /\b(veh[ií]culo\s+(?:con\s+)?)([A-Z0-9-]{5,10})\b/gi,
+    (match, prefix, value) => /[0-9]/.test(value)
+      ? `${prefix}${protectPiiValue(sessionId, "PLATE", value)}` : match,
+  );
+
   /*
    * Nombres de personas cuando el contexto indica explícitamente socio/socia.
    */
