@@ -71,7 +71,8 @@ export const getMemberVehiclesRepository = async ({
    */
 
   if (plate) {
-    binds.plate = String(plate).trim().toUpperCase();
+    binds.plate = String(plate).replace(/\s+/g, "").toUpperCase();
+    if (!binds.plate) throw new Error("La matrícula no puede estar vacía.");
 
     filters.push(`
       UPPER(

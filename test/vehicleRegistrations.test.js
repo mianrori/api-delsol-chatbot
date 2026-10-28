@@ -152,3 +152,25 @@ test("logical deletions are excluded in every registration mode, grouping and pl
     assert.equal(connection.queries[0].binds.active, "S");
   }
 });
+
+
+test("plate whitespace is removed before lookup and split plates remain protected from the model", async () => {
+  const session = "vehicle-spaced-plate";
+  for (const plate of ["abc 123", "  abc   123  ", "a b c 1 2 3", "ABC\t123", "ABC\u00a0123", "abcd 123"]) {
+    const connection = connectionFor([]);
+    await getMemberVehicles({ plate }, connection);
+    assert.equal(connection.queries[0].binds.plate, plate.replace(/\s+/g, "").toUpperCase());
+    assert.equal(connection.queries[0].binds.active, "S");
+    for (const word of ["chapa", "matrícula", "vehículo"]) {
+      const input = `De quién es la ${word} ${plate.trim()}?`;
+      const protectedText = protectPiiText(session, input);
+      assert.match(protectedText, /\[PII_PLATE_\d+\]/);
+      assert.ok(!protectedText.includes(plate.trim()));
+      assert.equal(restorePiiDeep(session, { text: protectedText }).text, input);
+      assert.equal(protectPiiText(session, protectedText), protectedText);
+    }
+  }
+  const input = "Chapa abc 123 registrada en 2023";
+  assert.match(protectPiiText(session, input), /\[PII_PLATE_\d+\] registrada en 2023$/);
+  await assert.rejects(getMemberVehicles({ plate: "   " }, { execute: () => assert.fail("Empty plate queried Oracle") }), /vacía/);
+});
