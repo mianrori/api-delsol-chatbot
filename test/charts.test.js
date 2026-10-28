@@ -132,3 +132,23 @@ test("a unique applicable source is selected by the backend without an invented 
   const explicit = await generateChart(args, { sources: multiple });
   assert.equal(explicit.result.sourceToolUseId, "source");
 });
+
+
+test("large currency axes reserve space for complete labels without changing values", async () => {
+  const data = [{ month: "01", totalAmount: 58706137966, currency: { abbreviation: "PYG" } }, { month: "05", totalAmount: 86767167311, currency: { abbreviation: "PYG" } }];
+  for (const type of ["bar", "line", "horizontalBar"]) {
+    const result = await generateChart({ ...args, type, datasets: [{ label: "Ventas", valuePath: "totalAmount" }] }, { sources: { source: { result: { data } } } });
+    const image = svg(result.chart);
+    assert.match(image, /86.767.167.311/);
+    assert.match(image, /58.706.137.966/);
+    assert.equal(result.chart.width, 900);
+    const paths = [...image.matchAll(/<path d="M ([0-9.]+) ([0-9.]+) H ([0-9.]+)"/g)];
+    if (type !== "horizontalBar") {
+      assert.ok(paths.length > 0);
+      assert.ok(Number(paths[0][1]) > 140, "Long currency labels need a wider margin than the former fixed 100px");
+    } else {
+      const positions = [...image.matchAll(/<text x="([0-9.]+)"[^>]*text-anchor="middle">₲/g)].map((match) => Number(match[1]));
+      assert.ok(Math.max(...positions) <= 825, "The last horizontal tick must leave room for half of its label");
+    }
+  }
+});

@@ -38,7 +38,6 @@ const draw = ({ type, title, labels, datasets, width, height, valuePrefix, value
   const label = (x, y, value, extra = "") => svg.push(`<text x="${x}" y="${y}" ${extra}>${escape(value)}</text>`);
   if (subtitle) label(24, 53, subtitle);
   const amount = (value) => `${valuePrefix ? `${valuePrefix} ` : ""}${format(value)}${valueSuffix}`;
-  const x0 = type === "horizontalBar" ? 190 : 100, y0 = 75, w = width - x0 - 45, h = height - y0 - 115;
   if (type === "pie") {
     const values = datasets[0].values, total = values.reduce((a, b) => a + b, 0);
     if (!Number.isFinite(total) || total <= 0 || values.some((v) => v < 0)) throw new Error("El gráfico circular requiere valores no negativos y un total positivo.");
@@ -62,6 +61,17 @@ const draw = ({ type, title, labels, datasets, width, height, valuePrefix, value
     if (min === max) max = min + 1;
     const span = max - min;
     if (!Number.isFinite(span)) throw new Error("La escala de los valores es demasiado grande.");
+    // Conservative widths for the 12px Arial axis font, including currency,
+    // minus signs and decimal/thousands separators. Leave padding on both sides.
+    const textWidth = (value) => Array.from(value).reduce((sum, char) => sum + (/[MW@#%]/.test(char) ? 11 : /[ilI.,' :]/.test(char) ? 4 : 8), 0);
+    const axisWidth = Math.max(...Array.from({ length: 5 }, (_, i) => textWidth(amount(min + span * i / 4))));
+    const horizontalBars = type === "horizontalBar";
+    const x0 = horizontalBars
+      ? Math.max(190, ...labels.map((value) => textWidth(value.slice(0, 25)) + 20), Math.ceil(axisWidth / 2) + 16)
+      : Math.max(100, axisWidth + 20);
+    const rightMargin = horizontalBars ? Math.max(45, Math.ceil(axisWidth / 2) + 16) : 45;
+    const y0 = 75, w = width - x0 - rightMargin, h = height - y0 - 115;
+    if (w < 60) throw new Error("El ancho del gráfico no alcanza para mostrar las etiquetas completas. Solicita un ancho mayor.");
     const vertical = (value) => y0 + h - (value - min) / span * h;
     const horizontal = (value) => x0 + (value - min) / span * w;
     for (let i = 0; i <= 4; i++) {
