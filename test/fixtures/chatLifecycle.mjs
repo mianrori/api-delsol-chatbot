@@ -23,7 +23,7 @@ const synthetic = (exports) => new vm.SyntheticModule(Object.keys(exports), func
 const load = async (path, stubs) => {
   const main = new vm.SourceTextModule(await readFile(new URL(path, import.meta.url), "utf8"), { context });
   await main.link(async (spec) => {
-    if (["./toolErrors.service.js", "./salesSeriesPresentation.service.js", "./vehiclePresentation.service.js", "./solesUsagePresentation.service.js", "./memberSolesPresentation.service.js", "./promotionSearchPresentation.service.js", "./campaignSalesPerformancePresentation.service.js", "./memberPurchasesVsSalesPresentation.service.js", "./conversationClarification.service.js", "./memberAnalysisFollowup.service.js", "./memberRankingPresentation.service.js", "./memberSummaryPresentation.service.js"].includes(spec)) {
+    if (["./salesYearComparison.service.js", "./toolErrors.service.js", "./salesSeriesPresentation.service.js", "./vehiclePresentation.service.js", "./solesUsagePresentation.service.js", "./memberSolesPresentation.service.js", "./promotionSearchPresentation.service.js", "./campaignSalesPerformancePresentation.service.js", "./memberPurchasesVsSalesPresentation.service.js", "./conversationClarification.service.js", "./memberAnalysisFollowup.service.js", "./memberRankingPresentation.service.js", "./memberSummaryPresentation.service.js"].includes(spec)) {
       return new vm.SourceTextModule(await readFile(new URL("../../src/services/ai/" + spec.slice(2), import.meta.url), "utf8"), { context });
     }
     assert.ok(stubs[spec], `Missing stub: ${spec}`);
@@ -58,6 +58,7 @@ const chat = await load("../../src/services/ai/chat.service.js", {
       if (mode === "direct-followup" || mode === "partial-followup" || mode === "cancel-between") {
         assert.fail("A summary follow-up must not invoke Bedrock");
       }
+      if (mode === "sales-year-comparison") assert.fail("Explicit year comparisons and follow-ups are calculated directly by the backend");
       if (mode.startsWith("permission-")) {
         assert.notEqual(mode, "permission-followup", "A denied direct follow-up must not call Bedrock");
         assert.equal(comparisonStep++, 0, "Permission denials must not be rewritten by the model");
@@ -177,6 +178,13 @@ const chat = await load("../../src/services/ai/chat.service.js", {
   "../../tools/index.js": { tools: [] },
   "./toolExecutor.service.js": { executeTool: async (call) => {
     toolCalls++;
+    if (mode === "sales-year-comparison") {
+      assert.equal(call.name, "get_sales");
+      const year = call.arguments.dateFrom.slice(-4), to = call.arguments.dateTo;
+      return { data: year === "2023" ? [{ month: to.startsWith("31/05") ? "01" : "08", totalAmount: 100004, totalInvoices: 228, currency: { abbreviation: "PYG", symbol: "₲" } }]
+        : to.startsWith("31/05") ? [] : [{ month: "08", totalAmount: 5000000, totalInvoices: 1, currency: { abbreviation: "PYG", symbol: "₲" } }] };
+    }
+
     if (mode.startsWith("permission-")) {
       assert.equal(call.name, mode === "permission-followup" ? "get_member_soles" : "get_member_vehicles", "No alternative tool may execute after denial");
       throw Object.assign(new Error("El usuario no tiene permisos para consultar esta información."), { code: "ACCESS_DENIED" });
@@ -490,6 +498,18 @@ for (const deniedMode of ["permission-denied", "permission-batch", "permission-c
   assert.ok(toolErrors.some((response) => response.content?.[0]?.json?.error === "ACCESS_DENIED"));
   if (["permission-batch", "permission-chart"].includes(deniedMode)) assert.ok(toolErrors.some((response) => response.content?.[0]?.json?.error === "REQUEST_STOPPED"));
 }
+
+mode = "sales-year-comparison"; storedHistory = [];
+const beforeYearModels = modelCalls, beforeYearTools = toolCalls;
+const yearComparison = await chat.chatService({ sessionId: "test", message: "Compara las ventas de 2023 contra 2024, mes a mes, con monto total y cantidad de facturas" });
+assert.match(yearComparison.answer, /Agosto: las ventas de 2024 fueron mayores/);
+assert.equal(toolCalls - beforeYearTools, 2);
+const narrowedComparison = await chat.chatService({ sessionId: "test", message: "Ahora compara únicamente enero a mayo de ambos años" });
+assert.match(narrowedComparison.answer, /2024: no se encontraron registros/);
+assert.doesNotMatch(narrowedComparison.answer, /Agosto/);
+assert.equal(toolCalls - beforeYearTools, 4);
+assert.equal(modelCalls, beforeYearModels);
+assert.equal(storedHistory.at(-1).content[0].text, narrowedComparison.answer);
 
 // Exercise the actual dispatcher: it must use the session proxy and close the
 // connection even when a queried view is not authorized.
