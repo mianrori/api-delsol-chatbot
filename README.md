@@ -372,3 +372,20 @@ La conexión proxy mantiene su cierre habitual incluso ante error.
 Este ajuste conserva el contrato HTTP del chat y no modifica autenticación,
 permisos Oracle ni la política de expiración/inactividad de sesiones del ERP.
 Validar en DEV repitiendo una consulta con un usuario sin permiso sobre la vista.
+
+
+## Comparación mensual entre años
+
+«Compara las ventas de 2023 contra 2024, mes a mes, con monto total y cantidad de
+facturas» consulta ambos años y construye la comparación directamente en el
+backend. «Ahora compara únicamente enero a mayo de ambos años» conserva ambos
+años y los filtros de una comparación compatible del turno anterior, y vuelve a
+consultar ambos rangos. No toma valores de respuestas narrativas ni de otro tema.
+
+Las tablas distinguen «Sin registros» (no hay fila) de «Sin datos» (métrica ausente)
+y del cero explícito. Solo se comparan la misma moneda, mes y métrica cuando hay
+valores en ambos años. No se extrapolan totales anuales con datos parciales. La
+ruta directa se limita a expresiones reconocidas completas para no descartar
+filtros de local/rubro u otras condiciones; los demás pedidos siguen el flujo
+habitual de herramientas. Los rechazos de permisos y cancelaciones conservan
+su tratamiento existente.

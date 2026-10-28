@@ -1,3 +1,4 @@
+import { resolveSalesYearComparison, buildSalesYearComparisonResponse } from "./salesYearComparison.service.js";
 import { ACCESS_DENIED_CODE, ACCESS_DENIED_MESSAGE, isAccessDenied } from "./toolErrors.service.js";
 import { buildSalesSeriesResponse } from "./salesSeriesPresentation.service.js";
 import { chartsPrompt } from "../../prompts/sections/charts.prompt.js";
@@ -1575,12 +1576,25 @@ export const chatService = async ({ message, sessionId }) => {
     message,
     history: protectedHistory,
   });
+  const salesYearComparison = resolveSalesYearComparison({ message, history: protectedHistory });
   const promotionPage = resolvePromotionSearchPage({ message, history: protectedHistory });
   const solesPage = resolveVehiclePage({ message, history: protectedHistory })
     ?? resolveSolesUsagePage({ message, history: protectedHistory })
     ?? resolveMemberSolesPage({ message, history: protectedHistory })
     ?? resolveMemberSolesBreakdown({ message, history: protectedHistory });
-  if (solesPage) {
+  if (salesYearComparison) {
+    const content = salesYearComparison.inputs.map((input) => ({ toolUse: {
+      toolUseId: `sales_comparison_${randomUUID()}`, name: "get_sales", input,
+    } }));
+    messages.push({ role: "assistant", content });
+    const executed = await executeToolRequests({ content, sessionId });
+    messages.push({ role: "user", content: executed.toolResults });
+    conversationActions = executed.actions;
+    conversationInternalContext = executed.internalContext;
+    toolIterations = 1;
+    followupAnswer = buildSalesYearComparisonResponse(executed.internalContext.presentationCalls)
+      ?? "No fue posible completar la comparación de ambos años. Vuelve a intentarlo.";
+  } else if (solesPage) {
     if (solesPage.answer) followupAnswer = solesPage.answer;
     else {
       const content = [{ toolUse: { toolUseId: `soles_page_${randomUUID()}`, name: solesPage.toolName ?? "get_member_soles", input: solesPage.input } }];
@@ -1747,7 +1761,8 @@ export const chatService = async ({ message, sessionId }) => {
 
       // A complete breakdown is authoritative even when the model requested
       // it after changing dates or filters. Do not ask the model to rewrite it.
-      followupAnswer = buildSalesSeriesResponse(conversationInternalContext.presentationCalls, { message })
+      followupAnswer = buildSalesYearComparisonResponse(conversationInternalContext.presentationCalls)
+        ?? buildSalesSeriesResponse(conversationInternalContext.presentationCalls, { message })
         ?? buildVehicleResponse(conversationInternalContext.presentationCalls)
         ?? buildSolesUsageResponse(conversationInternalContext.presentationCalls)
         ?? buildMemberSolesResponse(conversationInternalContext.presentationCalls)
@@ -1789,6 +1804,7 @@ export const chatService = async ({ message, sessionId }) => {
       : conversationActions.chart?.available
       ? "Aquí tienes el gráfico solicitado."
       : monthlyIncidenceText ??
+      buildSalesYearComparisonResponse(conversationInternalContext.presentationCalls) ??
       buildSalesSeriesResponse(conversationInternalContext.presentationCalls, { message }) ??
       buildVehicleResponse(conversationInternalContext.presentationCalls) ??
       buildSolesUsageResponse(conversationInternalContext.presentationCalls) ??
