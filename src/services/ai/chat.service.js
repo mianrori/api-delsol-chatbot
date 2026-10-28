@@ -109,6 +109,7 @@ Para esta etapa:
 - conserva los filtros al paginar el detalle de saldos y usa nextPage;
 - para usos registrados de soles utiliza get_soles_usage, distinto de get_member_soles que consulta saldos; conserva los tipos de soles en los resúmenes;
 - resuelve destinos con search_soles_usage_destinations y conserva conjuntamente destinationType y destinationCode; un destino LOCAL y uno SOCIO pueden tener el mismo código y no son intercambiables;
+- para listar todos los tipos de movimiento llama a search_soles_usage_movement_types sin search o con search vacío; no inventes palabras para restringir el listado;
 - resuelve los tipos de movimiento con search_soles_usage_movement_types; utiliza sus valores reales, sin inventar códigos de pago, transferencia, entrada o salida;
 - no presentes cantidades de uso como saldo disponible ni conviertas unidades de soles a moneda; conserva los signos registrados;
 - si un resolver devuelve AMBIGUOUS espera selección; si hasMore=true indica que la lista está limitada y pide precisar el nombre antes de asumir una coincidencia única;
@@ -1407,7 +1408,7 @@ const executeToolRequests = async ({ content, sessionId }) => {
         null,
         [name],
       );
-      if (["analyze_members", "compare_member_purchases_vs_sales", "analyze_campaign_sales_performance", "search_promotions", "get_member_soles", "get_soles_usage"].includes(name)) {
+      if (["analyze_members", "compare_member_purchases_vs_sales", "analyze_campaign_sales_performance", "search_promotions", "get_member_soles", "get_soles_usage", "search_soles_usage_destinations", "search_soles_usage_movement_types"].includes(name)) {
         presentationCall.result = protectedResultForModel;
       }
 

@@ -138,3 +138,38 @@ test("cancellation between ranking and member breakdown stops the remaining quer
   await assert.rejects(runWithRequestSignal(cancellation.signal, () => getSolesUsage({ ...dates, groupBy: ["member"], limit: 1 }, connection)), { code: "REQUEST_ABORTED" });
   assert.equal(connection.queries.length, 1);
 });
+
+test("movement type listing accepts empty or omitted search and preserves the complete catalog", async () => {
+  for (const search of [undefined, "", "  "]) {
+    const connection = connectionFor(() => [
+      { MOVEMENT_TYPE: "MOVIMIENTO A", TOTAL_MATCHES: 2 },
+      { MOVEMENT_TYPE: "MOVIMIENTO B", TOTAL_MATCHES: 2 },
+    ]);
+    const result = await searchSolesUsageMovementTypes({ search }, connection);
+    assert.equal(result.status, "LISTED");
+    assert.equal(result.totalMatches, 2);
+    assert.equal(result.hasMore, false);
+    assert.equal(connection.queries[0].binds.search, null);
+    assert.match(connection.queries[0].sql, /:search IS NULL OR INSTR/);
+    const answer = buildSolesUsageResponse([{ name: "search_soles_usage_movement_types", result }]);
+    assert.match(answer, /MOVIMIENTO A/);
+    assert.match(answer, /MOVIMIENTO B/);
+    assert.doesNotMatch(answer, /Indica cuál/);
+  }
+  const limited = await searchSolesUsageMovementTypes({}, connectionFor(() => [{ MOVEMENT_TYPE: "A", TOTAL_MATCHES: 30 }]));
+  assert.equal(limited.hasMore, true);
+  assert.match(buildSolesUsageResponse([{ name: "search_soles_usage_movement_types", result: limited }]), /1 de 30/);
+});
+
+test("destination lookup presentation shows choices and names without internal codes", () => {
+  for (const status of ["RESOLVED", "AMBIGUOUS"]) {
+    const row = { destinationType: "LOCAL", destinationCode: "INTERNAL-SECRET", name: "Local sintético" };
+    const result = { status, ...row, options: [row, { ...row, destinationType: "SOCIO" }] };
+    const answer = buildSolesUsageResponse([{ name: "search_soles_usage_destinations", result }]);
+    assert.match(answer, /LOCAL/);
+    assert.match(answer, /Local sintético/);
+    assert.doesNotMatch(answer, /INTERNAL-SECRET|Código/);
+    if (status === "AMBIGUOUS") assert.match(answer, /SOCIO/);
+    assert.equal(buildSolesUsageResponse([{ name: "search_members", result }, { name: "search_soles_usage_destinations", result }]), null);
+  }
+});

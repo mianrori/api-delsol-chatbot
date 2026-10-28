@@ -54,6 +54,13 @@ const chat = await load("../../src/services/ai/chat.service.js", {
       if (mode === "direct-followup" || mode === "partial-followup" || mode === "cancel-between") {
         assert.fail("A summary follow-up must not invoke Bedrock");
       }
+      if (mode === "usage-destinations" || mode === "usage-movements") {
+        assert.equal(comparisonStep++, 0, "Lookup rendering must not call Bedrock again");
+        return { stopReason: "tool_use", output: { message: { role: "assistant", content: [{ toolUse: {
+          name: mode === "usage-destinations" ? "search_soles_usage_destinations" : "search_soles_usage_movement_types",
+          toolUseId: "usage-lookup", input: mode === "usage-destinations" ? { search: "Local sintético" } : {},
+        } }] } } };
+      }
       if (mode === "usage" || mode === "usage-detail") {
         assert.equal(comparisonStep++, 0, "Usage presentation and paging must not call Bedrock again");
         return { stopReason: "tool_use", output: { message: { role: "assistant", content: [{ toolUse: {
@@ -175,6 +182,8 @@ const chat = await load("../../src/services/ai/chat.service.js", {
         })) };
       } }, { page, rows: call.arguments.rows });
     }
+    if (mode === "usage-destinations") return { status: "RESOLVED", destinationType: "LOCAL", destinationCode: "INTERNAL-SECRET", name: "Local sintético" };
+    if (mode === "usage-movements") return { status: "LISTED", totalMatches: 2, returnedMatches: 2, hasMore: false, options: [{ movementType: "A" }, { movementType: "B" }] };
     if (mode === "campaign") {
       if (call.name === "search_promotions") return { status: "RESOLVED", promotion: {
         promotionId: "P1", campaignId: "C1", dateFrom: "01/05/2023", dateTo: "10/05/2023",
@@ -354,6 +363,15 @@ assert.match(secondSolesPage.answer, /Página 2 de 2/);
 assert.equal(modelCalls - beforeSolesDetailModels, 1);
 assert.equal(storedHistory.at(-1).content[0].text, secondSolesPage.answer);
 
+for (const lookup of ["usage-destinations", "usage-movements"]) {
+  mode = lookup; comparisonStep = 0; storedHistory = [];
+  const before = modelCalls;
+  const result = await chat.chatService({ sessionId: "test", message: "Buscar catálogo de usos de soles" });
+  assert.equal(modelCalls, before + 1);
+  assert.doesNotMatch(result.answer, /INTERNAL-SECRET|Código/);
+  assert.match(result.answer, lookup === "usage-destinations" ? /Local sintético/ : /Tipos de movimiento/);
+  assert.equal(storedHistory.at(-1).content[0].text, result.answer);
+}
 mode = "usage"; comparisonStep = 0; storedHistory = [];
 const beforeUsageModels = modelCalls;
 const usage = await chat.chatService({ sessionId: "test", message: "Soles utilizados del socio con documento 1234567 de enero a mayo de 2023" });

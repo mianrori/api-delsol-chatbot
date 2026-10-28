@@ -8,7 +8,7 @@ export const searchSolesUsageMovementTypesTool = {
         "properties": {
           "search": {
             "type": "string",
-            "description": "Texto del tipo de movimiento indicado por el usuario, por ejemplo pago o transferencia."
+            "description": "Texto del tipo de movimiento indicado por el usuario. Omitir o enviar vacío para listar los tipos existentes; no inventar términos de búsqueda."
           },
           "limit": {
             "type": "number",

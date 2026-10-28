@@ -301,8 +301,11 @@ const protectKnownTextPatterns = (sessionId, text) => {
    */
   protectedText = protectedText.replace(
     /\b((?:del|de\s+la|del\s+)?soci[oa]\s+(?:(?:llamad[oa]|denominad[oa])\s+)?)([A-Za-zÁÉÍÓÚÜÑáéíóúüñ'’-]+(?:\s+[A-Za-zÁÉÍÓÚÜÑáéíóúüñ'’-]+){1,4})(?=\s*(?:[,.!?;:]|$))/gi,
-    (_match, prefix, value) =>
-      `${prefix}${protectPiiValue(sessionId, "NAME", value.trim())}`,
+    (match, prefix, value) => {
+      // These words refer to a previously resolved destination, not a name.
+      if (/^en\s+(?:ese|este|el|aquel)\s+destino$/i.test(value.trim())) return match;
+      return `${prefix}${protectPiiValue(sessionId, "NAME", value.trim())}`;
+    },
   );
 
   // In these short balance requests, the final subject is a member even when

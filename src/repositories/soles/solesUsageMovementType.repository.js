@@ -8,8 +8,8 @@ export const searchSolesUsageMovementTypesRepository = async ({ connection, sear
       SELECT candidates.*, COUNT(*) OVER() AS TOTAL_MATCHES FROM (
         SELECT DISTINCT TIPO_MOVIMIENTO AS MOVEMENT_TYPE FROM VW_BOT_SOLES_UTILIZADOS WHERE TIPO_MOVIMIENTO IS NOT NULL
       ) candidates
-      WHERE INSTR(UPPER(TRIM(MOVEMENT_TYPE)), :search) > 0
+      WHERE (:search IS NULL OR INSTR(UPPER(TRIM(MOVEMENT_TYPE)), :search) > 0)
       ORDER BY CASE WHEN UPPER(TRIM(MOVEMENT_TYPE)) = :search THEN 1 ELSE 2 END, MOVEMENT_TYPE
     ) WHERE ROWNUM <= :resultLimit
-  `, { search: query, resultLimit: limit });
+  `, { search: query || null, resultLimit: limit });
 };

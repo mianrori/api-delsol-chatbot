@@ -9,10 +9,6 @@ const normalize = (value) =>
 export const searchSolesUsageMovementTypes = async (args = {}, connection) => {
   const search = String(args.search ?? "").trim();
 
-  if (!search) {
-    throw new Error("Debe indicar un tipo de movimiento para buscar.");
-  }
-
   const rows = await searchSolesUsageMovementTypesRepository({
     connection,
     search,
@@ -22,6 +18,7 @@ export const searchSolesUsageMovementTypes = async (args = {}, connection) => {
   if (rows.length === 0) {
     return {
       status: "NOT_FOUND",
+      totalMatches: 0, returnedMatches: 0, hasMore: false,
       search,
       options: [],
     };
@@ -37,7 +34,7 @@ export const searchSolesUsageMovementTypes = async (args = {}, connection) => {
 
   const candidates = !hasMore && exactMatches.length > 0 ? exactMatches : rows;
 
-  if (candidates.length === 1 && !hasMore) {
+  if (search && candidates.length === 1 && !hasMore) {
     return {
       status: "RESOLVED",
       ...metadata,
@@ -47,7 +44,7 @@ export const searchSolesUsageMovementTypes = async (args = {}, connection) => {
   }
 
   return {
-    status: "AMBIGUOUS",
+    status: search ? "AMBIGUOUS" : "LISTED",
     ...metadata,
     search,
     options: candidates.map((row, index) => ({

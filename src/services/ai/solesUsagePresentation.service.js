@@ -15,6 +15,7 @@ const dimensionFields = {
 
 export const buildSolesUsageResponse = (calls = []) => {
   const usages = calls.filter((call) => call.name === "get_soles_usage");
+  if (!usages.length) return buildSolesUsageLookupResponse(calls);
   if (usages.length !== 1 || calls.some((call) => !allowed.has(call.name))) return null;
   const result = usages[0].result;
   if (!result || !["summary", "detail"].includes(result.mode) || !Array.isArray(result.data)) return null;
@@ -66,4 +67,26 @@ export const resolveSolesUsagePage = ({ message, history = [] }) => {
   if (response?.status !== "success" || result?.mode !== "detail" || !result.pagination) return null;
   if (!result.pagination.hasMore) return { answer: "No hay más páginas de movimientos para los filtros consultados." };
   return { toolName: "get_soles_usage", input: { ...structuredClone(usages[0].input), page: result.pagination.nextPage, pageSize: result.pagination.pageSize } };
+};
+
+// Render lookup-only turns without exposing internal destination identifiers.
+const buildSolesUsageLookupResponse = (calls) => {
+  const names = ["search_soles_usage_destinations", "search_soles_usage_movement_types"];
+  if (calls.length !== 1 || !names.includes(calls[0].name)) return null;
+  const { name, result } = calls[0];
+  if (!result || !["RESOLVED", "AMBIGUOUS", "LISTED", "NOT_FOUND"].includes(result.status)) return null;
+  const destination = name === names[0];
+  const label = destination ? "destinos" : "tipos de movimiento";
+  if (result.status === "NOT_FOUND") return `No se encontraron ${label} para la búsqueda indicada.`;
+  const rows = result.status === "RESOLVED" ? [result] : result.options;
+  if (!Array.isArray(rows)) return null;
+  const lines = [`**${destination ? "Destinos de uso de soles" : "Tipos de movimiento de uso de soles"}**`, "",
+    destination ? "| Opción | Tipo de destino | Destino |" : "| Opción | Tipo de movimiento |",
+    destination ? "| --- | --- | --- |" : "| --- | --- |"];
+  rows.forEach((row, index) => lines.push(destination
+    ? `| ${index + 1} | ${cell(row.destinationType)} | ${cell(row.name)} |`
+    : `| ${index + 1} | ${cell(row.movementType)} |`));
+  if (result.hasMore) lines.push("", `Se muestran ${result.returnedMatches} de ${result.totalMatches} ${label}. Precisa el texto de búsqueda para ver otras coincidencias.`);
+  if (result.status === "AMBIGUOUS") lines.push("", "Indica cuál de las opciones deseas consultar.");
+  return lines.join("\n");
 };
