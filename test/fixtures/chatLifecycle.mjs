@@ -1,3 +1,4 @@
+import { getSolesUsage } from "../../src/services/soles/solesUsage.service.js";
 import { getMemberSoles } from "../../src/services/soles/memberSoles.service.js";
 import { searchSolesTypes } from "../../src/services/soles/searchSolesTypes.service.js";
 import vm from "node:vm";
@@ -20,7 +21,7 @@ const synthetic = (exports) => new vm.SyntheticModule(Object.keys(exports), func
 const load = async (path, stubs) => {
   const main = new vm.SourceTextModule(await readFile(new URL(path, import.meta.url), "utf8"), { context });
   await main.link(async (spec) => {
-    if (["./memberSolesPresentation.service.js", "./promotionSearchPresentation.service.js", "./campaignSalesPerformancePresentation.service.js", "./memberPurchasesVsSalesPresentation.service.js", "./conversationClarification.service.js", "./memberAnalysisFollowup.service.js", "./memberRankingPresentation.service.js", "./memberSummaryPresentation.service.js"].includes(spec)) {
+    if (["./solesUsagePresentation.service.js", "./memberSolesPresentation.service.js", "./promotionSearchPresentation.service.js", "./campaignSalesPerformancePresentation.service.js", "./memberPurchasesVsSalesPresentation.service.js", "./conversationClarification.service.js", "./memberAnalysisFollowup.service.js", "./memberRankingPresentation.service.js", "./memberSummaryPresentation.service.js"].includes(spec)) {
       return new vm.SourceTextModule(await readFile(new URL("../../src/services/ai/" + spec.slice(2), import.meta.url), "utf8"), { context });
     }
     assert.ok(stubs[spec], `Missing stub: ${spec}`);
@@ -52,6 +53,15 @@ const chat = await load("../../src/services/ai/chat.service.js", {
       modelCalls++;
       if (mode === "direct-followup" || mode === "partial-followup" || mode === "cancel-between") {
         assert.fail("A summary follow-up must not invoke Bedrock");
+      }
+      if (mode === "usage" || mode === "usage-detail") {
+        assert.equal(comparisonStep++, 0, "Usage presentation and paging must not call Bedrock again");
+        return { stopReason: "tool_use", output: { message: { role: "assistant", content: [{ toolUse: {
+          name: "get_soles_usage", toolUseId: "usage", input: {
+            documentNumber: "1234567", dateFrom: "01/01/2023", dateTo: "31/05/2023",
+            mode: mode === "usage" ? "summary" : "detail", pageSize: 1, page: 1,
+          },
+        } }] } } };
       }
       if (mode === "soles") {
         const step = comparisonStep++;
@@ -123,6 +133,19 @@ const chat = await load("../../src/services/ai/chat.service.js", {
   "../../tools/index.js": { tools: [] },
   "./toolExecutor.service.js": { executeTool: async (call) => {
     toolCalls++;
+    if (mode === "usage" || mode === "usage-detail") {
+      assert.equal(call.name, "get_soles_usage");
+      return getSolesUsage(call.arguments, { execute: async (_sql, binds) => {
+        assert.equal(binds.documentNumber, "1234567");
+        assert.equal(binds.dateFrom, "01/01/2023");
+        if (mode === "usage-detail") return { rows: [{ RN: call.arguments.page, TOTAL_ROWS: 2,
+          COD_SOCIO: "1234567", NOM_SOCIO: "Persona sintética", SOLES_UTILIZADOS: 5,
+          FECHA_MOVIMIENTO: "01/02/2023", TIPO_MOVIMIENTO: "MOVIMIENTO REAL", DESTINO: "Destino sintético",
+          COD_DESTINO: "42", TIPO_DESTINO: "SOCIO", ID_TIPO_SOL: 10, DES_TIPO_SOL: "Soles de prueba",
+        }] };
+        return { rows: [{ SOLES_TYPE_ID: 10, SOLES_TYPE_DESCRIPTION: "Soles de prueba", TOTAL_SOLES_USED: 10, MOVEMENT_COUNT: 2, TOTAL_GROUPS: 1 }] };
+      } });
+    }
     if (mode === "soles" || mode === "soles-detail") {
       if (call.name === "search_members") return { status: "RESOLVED", member: { documentNumber: "1234567", fullName: "Persona sintética" } };
       if (call.name === "search_soles_types") return { status: "RESOLVED", typeId: 10, description: "Soles de prueba" };
@@ -331,6 +354,21 @@ assert.match(secondSolesPage.answer, /Página 2 de 2/);
 assert.equal(modelCalls - beforeSolesDetailModels, 1);
 assert.equal(storedHistory.at(-1).content[0].text, secondSolesPage.answer);
 
+mode = "usage"; comparisonStep = 0; storedHistory = [];
+const beforeUsageModels = modelCalls;
+const usage = await chat.chatService({ sessionId: "test", message: "Soles utilizados del socio con documento 1234567 de enero a mayo de 2023" });
+assert.equal(modelCalls - beforeUsageModels, 1);
+assert.match(usage.answer, /Soles de prueba \| 10/);
+assert.equal(storedHistory.at(-1).content[0].text, usage.answer);
+mode = "usage-detail"; comparisonStep = 0; storedHistory = [];
+const beforeUsageDetailModels = modelCalls;
+const usageFirstPage = await chat.chatService({ sessionId: "test", message: "Detalle de usos de soles del socio con documento 1234567" });
+assert.match(usageFirstPage.answer, /Página 1 de 2/);
+const usageNextPage = await chat.chatService({ sessionId: "test", message: "Siguiente página" });
+assert.match(usageNextPage.answer, /Página 2 de 2/);
+assert.equal(modelCalls - beforeUsageDetailModels, 1);
+assert.equal(storedHistory.at(-1).content[0].text, usageNextPage.answer);
+
 // Exercise the actual dispatcher: it must use the session proxy and close the
 // connection even when a queried view is not authorized.
 const dispatcherText = await readFile(new URL("../../src/services/ai/toolExecutor.service.js", import.meta.url), "utf8");
@@ -339,6 +377,7 @@ for (const match of dispatcherText.matchAll(/import \{([^}]+)\} from "([^"]+)";/
   dispatcherStubs[match[2]] = Object.fromEntries(match[1].split(",").map((name) => [name.trim(), () => assert.fail("Unexpected unrelated tool")]));
 }
 let proxyClosed = 0; let proxyDenied = false;
+dispatcherStubs["../soles/solesUsage.service.js"] = { getSolesUsage };
 dispatcherStubs["../soles/memberSoles.service.js"] = { getMemberSoles };
 dispatcherStubs["../soles/searchSolesTypes.service.js"] = { searchSolesTypes };
 dispatcherStubs["../sales/campaignSalesPerformance.service.js"] = { getCampaignSalesPerformance };
@@ -374,6 +413,13 @@ assert.equal(proxyClosed, 5);
 proxyDenied = true;
 await assert.rejects(dispatcher.executeTool(solesRequest), /no tiene permisos/);
 assert.equal(proxyClosed, 6);
+proxyDenied = false;
+const usageRequest = { name: "get_soles_usage", arguments: { documentNumber: "1234567", dateFrom: "01/01/2023", dateTo: "31/05/2023" }, context: { sessionId: "authorized-session" } };
+assert.equal((await dispatcher.executeTool(usageRequest)).mode, "summary");
+assert.equal(proxyClosed, 7);
+proxyDenied = true;
+await assert.rejects(dispatcher.executeTool(usageRequest), /no tiene permisos/);
+assert.equal(proxyClosed, 8);
 
 // Controller: normal completion is not cancellation; disconnect aborts work,
 // emits no response, and always removes request/response event listeners.

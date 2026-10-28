@@ -65,6 +65,11 @@ const FIELD_TYPES = new Map([
   ["ruc", "TAX_ID"],
   ["taxid", "TAX_ID"],
 
+  ["solestypeid", "SOLES_TYPE_ID"],
+  ["solestypeids", "SOLES_TYPE_ID"],
+  ["solestypedescription", "SOLES_TYPE_NAME"],
+  ["movementtype", "MOVEMENT_TYPE"],
+  ["movementtypes", "MOVEMENT_TYPE"],
   ["typeid", "SOLES_TYPE_ID"],
   ["typeids", "SOLES_TYPE_ID"],
   ["typedescription", "SOLES_TYPE_NAME"],
@@ -113,6 +118,7 @@ const FIELD_TYPES = new Map([
 ]);
 
 const PATH_TYPES = [
+  { pattern: /(?:^|\.)searchsolesusagedestinations(?:\.options)?\.name$/, type: "DESTINATION_NAME" },
   { pattern: /(?:^|\.)searchsolestypes(?:\.options)?\.description$/, type: "SOLES_TYPE_NAME" },
   { pattern: /(?:^|\.)getmembersoles\.data\.type\.description$/, type: "SOLES_TYPE_NAME" },
   {
