@@ -1,3 +1,4 @@
+import { buildSolesUsageResponse, resolveSolesUsagePage } from "./solesUsagePresentation.service.js";
 import { buildMemberSolesResponse, resolveMemberSolesPage, resolveMemberSolesBreakdown } from "./memberSolesPresentation.service.js";
 import { buildPromotionSearchResponse, resolvePromotionSearchPage } from "./promotionSearchPresentation.service.js";
 import { buildCampaignSalesPerformanceResponse } from "./campaignSalesPerformancePresentation.service.js";
@@ -75,6 +76,9 @@ En esta etapa de migración, las herramientas habilitadas son:
 - analyze_campaign_sales_performance
 - search_soles_types
 - get_member_soles
+- get_soles_usage
+- search_soles_usage_destinations
+- search_soles_usage_movement_types
 
 Las únicas capacidades disponibles son las definidas a continuación y las herramientas presentes en toolConfig.
 
@@ -102,7 +106,15 @@ Para esta etapa:
 - muestra siempre los saldos de soles por tipo, incluso en consultas simples de saldo o disponibilidad; ofrece detallar por vencimiento y usa groupBy=["type","expirationDate"] cuando el usuario lo solicite; nunca presentes únicamente un saldo global que mezcle tipos;
 - para soles vencidos se aplica por defecto el período de generación iniciado el 1 de noviembre anterior a la fecha de referencia; usa useCurrentGenerationPeriod=false si el usuario solicita todo el histórico;
 - referenceDate clasifica vigencia por vencimiento sobre el saldo registrado; no reconstruye un saldo histórico ni movimientos de uso;
-- conserva los filtros al paginar el detalle y usa nextPage; todavía no están habilitadas las consultas de movimientos/destinos de uso de soles;
+- conserva los filtros al paginar el detalle de saldos y usa nextPage;
+- para usos registrados de soles utiliza get_soles_usage, distinto de get_member_soles que consulta saldos; conserva los tipos de soles en los resúmenes;
+- resuelve destinos con search_soles_usage_destinations y conserva conjuntamente destinationType y destinationCode; un destino LOCAL y uno SOCIO pueden tener el mismo código y no son intercambiables;
+- para listar todos los tipos de movimiento llama a search_soles_usage_movement_types sin search o con search vacío; no inventes palabras para restringir el listado;
+- resuelve los tipos de movimiento con search_soles_usage_movement_types; utiliza sus valores reales, sin inventar códigos de pago, transferencia, entrada o salida;
+- no presentes cantidades de uso como saldo disponible ni conviertas unidades de soles a moneda; conserva los signos registrados;
+- si un resolver devuelve AMBIGUOUS espera selección; si hasMore=true indica que la lista está limitada y pide precisar el nombre antes de asumir una coincidencia única;
+- para rankings de socios por soles utilizados, agrupa por member y solesType, ordena por totalSolesUsed y usa el límite pedido; el backend selecciona socios antes de desglosar tipos;
+- al pedir más movimientos conserva todos los filtros y pageSize y usa pagination.nextPage;
 - puedes resolver promociones y campañas;
 - puedes comparar ventas antes, durante y después de una campaña resuelta, con períodos de igual duración y los mismos filtros de locales y rubros;
 - para analizar campañas usa primero search_promotions: si devuelve AMBIGUOUS, espera la selección del usuario; reutiliza promotionId, campaignId, dateFrom y dateTo de la campaña seleccionada, sin inventar fechas ni atribuir causalidad;
@@ -1396,7 +1408,7 @@ const executeToolRequests = async ({ content, sessionId }) => {
         null,
         [name],
       );
-      if (["analyze_members", "compare_member_purchases_vs_sales", "analyze_campaign_sales_performance", "search_promotions", "get_member_soles"].includes(name)) {
+      if (["analyze_members", "compare_member_purchases_vs_sales", "analyze_campaign_sales_performance", "search_promotions", "get_member_soles", "get_soles_usage", "search_soles_usage_destinations", "search_soles_usage_movement_types"].includes(name)) {
         presentationCall.result = protectedResultForModel;
       }
 
@@ -1520,19 +1532,21 @@ export const chatService = async ({ message, sessionId }) => {
     history: protectedHistory,
   });
   const promotionPage = resolvePromotionSearchPage({ message, history: protectedHistory });
-  const solesPage = resolveMemberSolesPage({ message, history: protectedHistory })
+  const solesPage = resolveSolesUsagePage({ message, history: protectedHistory })
+    ?? resolveMemberSolesPage({ message, history: protectedHistory })
     ?? resolveMemberSolesBreakdown({ message, history: protectedHistory });
   if (solesPage) {
     if (solesPage.answer) followupAnswer = solesPage.answer;
     else {
-      const content = [{ toolUse: { toolUseId: `soles_page_${randomUUID()}`, name: "get_member_soles", input: solesPage.input } }];
+      const content = [{ toolUse: { toolUseId: `soles_page_${randomUUID()}`, name: solesPage.toolName ?? "get_member_soles", input: solesPage.input } }];
       messages.push({ role: "assistant", content });
       const executed = await executeToolRequests({ content, sessionId });
       messages.push({ role: "user", content: executed.toolResults });
       conversationActions = executed.actions;
       conversationInternalContext = executed.internalContext;
       toolIterations = 1;
-      followupAnswer = buildMemberSolesResponse(executed.internalContext.presentationCalls)
+      followupAnswer = buildSolesUsageResponse(executed.internalContext.presentationCalls)
+        ?? buildMemberSolesResponse(executed.internalContext.presentationCalls)
         ?? "No fue posible consultar la página de soles. Vuelve a intentarlo.";
     }
   } else if (promotionPage) {
@@ -1680,7 +1694,8 @@ export const chatService = async ({ message, sessionId }) => {
 
       // A complete breakdown is authoritative even when the model requested
       // it after changing dates or filters. Do not ask the model to rewrite it.
-      followupAnswer = buildMemberSolesResponse(conversationInternalContext.presentationCalls)
+      followupAnswer = buildSolesUsageResponse(conversationInternalContext.presentationCalls)
+        ?? buildMemberSolesResponse(conversationInternalContext.presentationCalls)
         ?? buildPromotionSearchResponse(conversationInternalContext.presentationCalls)
         ?? buildCampaignSalesPerformanceResponse(conversationInternalContext.presentationCalls)
         ?? buildMemberPurchasesVsSalesResponse(conversationInternalContext.presentationCalls)
@@ -1710,6 +1725,7 @@ export const chatService = async ({ message, sessionId }) => {
 
     const completedAssistantText =
       monthlyIncidenceText ??
+      buildSolesUsageResponse(conversationInternalContext.presentationCalls) ??
       buildMemberSolesResponse(conversationInternalContext.presentationCalls) ??
       buildPromotionSearchResponse(conversationInternalContext.presentationCalls) ??
       buildCampaignSalesPerformanceResponse(conversationInternalContext.presentationCalls) ??

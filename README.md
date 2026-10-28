@@ -91,8 +91,7 @@ la tabla. Los resultados deben validarse contra Oracle DEV.
 
 Inventario de herramientas aún pendientes frente al registro de `api-delsol-erp/main`
 revisado el 28/10/2026: generación de gráficos,
-registros de vehículos, uso de soles,
-destinos de uso y tipos de movimiento de soles. La presencia de herramientas
+registros de vehículos. La presencia de herramientas
 migradas no equivale a haber validado todos sus casos en DEV.
 
 
@@ -209,3 +208,43 @@ La respuesta inicial muestra «Tipo | Saldo de soles» y ofrece «Detallar por
 vencimiento»; no sustituye los tipos por un saldo global. Ese seguimiento consulta
 «Tipo | Vencimiento | Saldo de soles», manteniendo socio, tipos, estado, fechas y
 fecha de referencia de la consulta anterior, sin volver a llamar al modelo.
+
+
+## Uso registrado de soles, movimientos y destinos
+
+Se migran `get_soles_usage`, `search_soles_usage_destinations` y
+`search_soles_usage_movement_types` desde el ERP. Consultan VW_BOT_SOLES_UTILIZADOS
+mediante la conexión proxy del sessionId; todas las consultas usan el helper de
+cancelación y se cierran al terminar. No se modifican datos ni la política de sesión.
+
+Los usos son cantidades registradas, distintas del saldo vigente. Se conservan
+sus signos y los valores reales de movimiento, sin inventar códigos ni convertir
+soles a moneda. Los resúmenes mantienen el tipo de sol. Los destinos se filtran
+por la pareja tipo/código: un LOCAL y un SOCIO con código igual son diferentes.
+Las búsquedas informan totalMatches/returnedMatches/hasMore y no declaran única
+una coincidencia cuando se ha limitado el conjunto. Si hay más coincidencias,
+se debe precisar el nombre; no se inventan destinos o movimientos.
+
+Se validan fechas/intervalos, dimensiones, métricas, filtros, orden y límites.
+Los filtros se ligan como parámetros; listas largas se separan en bloques Oracle
+de 1000. Los rankings por soles utilizados seleccionan Top N socios antes de
+consultar todos sus tipos. Otros resúmenes indican su total de grupos antes de
+aplicar el límite. No se silencian dimensiones o destinos inválidos.
+
+El detalle tiene totalRows, totalPages, returnedRows, hasMore y nextPage, incluso
+en páginas vacías. «Siguiente página» conserva filtros y pageSize sin volver a
+llamar a Bedrock. Las tablas se generan desde los resultados calculados y se
+persisten en el historial. Socios, transacciones, tipos, nombres/códigos de destino
+y movimientos operativos se protegen antes del modelo; sus cantidades permanecen
+visibles para el análisis.
+
+Prueba DEV en Insomnia tras reset, con un documento existente:
+1. «Soles utilizados por el socio con documento [documento] entre enero y mayo de 2023, por tipo de soles».
+2. «Muestra el detalle de esos movimientos, 5 por página».
+3. «Siguiente página».
+4. «Agrupa esos usos por destino y tipo de soles».
+
+Validar también un destino o movimiento existente: primero resolver su nombre y
+luego filtrar la consulta con los valores retornados. Contrastar cantidades,
+fechas y paginación con Oracle usando el mismo usuario. No se han ejecutado
+consultas reales durante la implementación; el contraste DEV queda pendiente.

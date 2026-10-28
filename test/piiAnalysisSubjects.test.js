@@ -122,3 +122,17 @@ test("usual soles-balance questions protect the member while preserving the requ
   }
   clearPiiSession("soles-common");
 });
+
+test("member follow-ups preserve destination references without treating them as personal names", () => {
+  const session = "pii-usage-destination";
+  for (const reference of ["ese", "este", "el", "aquel"]) {
+    const text = `Muéstrame los soles utilizados por ese socio en ${reference} destino, entre enero y mayo de 2024, por tipo de soles`;
+    assert.equal(protectPiiText(session, text), text);
+    assert.equal(protectPiiDeep(session, { text }).text, text);
+  }
+  const named = "Muéstrame los soles utilizados por el socio Persona Ejemplo, entre enero y mayo de 2024";
+  const protectedText = protectPiiText(session, named);
+  assert.match(protectedText, /\[PII_NAME_\d+\]/);
+  assert.equal(restorePiiText(session, protectedText), named);
+  clearPiiSession(session);
+});

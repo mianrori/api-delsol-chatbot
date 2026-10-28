@@ -65,6 +65,11 @@ const FIELD_TYPES = new Map([
   ["ruc", "TAX_ID"],
   ["taxid", "TAX_ID"],
 
+  ["solestypeid", "SOLES_TYPE_ID"],
+  ["solestypeids", "SOLES_TYPE_ID"],
+  ["solestypedescription", "SOLES_TYPE_NAME"],
+  ["movementtype", "MOVEMENT_TYPE"],
+  ["movementtypes", "MOVEMENT_TYPE"],
   ["typeid", "SOLES_TYPE_ID"],
   ["typeids", "SOLES_TYPE_ID"],
   ["typedescription", "SOLES_TYPE_NAME"],
@@ -113,6 +118,7 @@ const FIELD_TYPES = new Map([
 ]);
 
 const PATH_TYPES = [
+  { pattern: /(?:^|\.)searchsolesusagedestinations(?:\.options)?\.name$/, type: "DESTINATION_NAME" },
   { pattern: /(?:^|\.)searchsolestypes(?:\.options)?\.description$/, type: "SOLES_TYPE_NAME" },
   { pattern: /(?:^|\.)getmembersoles\.data\.type\.description$/, type: "SOLES_TYPE_NAME" },
   {
@@ -295,8 +301,11 @@ const protectKnownTextPatterns = (sessionId, text) => {
    */
   protectedText = protectedText.replace(
     /\b((?:del|de\s+la|del\s+)?soci[oa]\s+(?:(?:llamad[oa]|denominad[oa])\s+)?)([A-Za-zÁÉÍÓÚÜÑáéíóúüñ'’-]+(?:\s+[A-Za-zÁÉÍÓÚÜÑáéíóúüñ'’-]+){1,4})(?=\s*(?:[,.!?;:]|$))/gi,
-    (_match, prefix, value) =>
-      `${prefix}${protectPiiValue(sessionId, "NAME", value.trim())}`,
+    (match, prefix, value) => {
+      // These words refer to a previously resolved destination, not a name.
+      if (/^en\s+(?:ese|este|el|aquel)\s+destino$/i.test(value.trim())) return match;
+      return `${prefix}${protectPiiValue(sessionId, "NAME", value.trim())}`;
+    },
   );
 
   // In these short balance requests, the final subject is a member even when
