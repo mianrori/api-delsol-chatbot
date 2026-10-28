@@ -5,13 +5,15 @@ export const searchPromotionsTool = {
     description:
       "Busca promociones y campañas por nombre o identificador. " +
       "Debe utilizarse cuando el usuario menciona una promoción o campaña " +
-      "pero todavía no se conocen con certeza sus identificadores.",
+      "pero todavía no se conocen con certeza sus identificadores. Incluye coincidencias parciales, total de resultados y paginación; no asumas que una página es la lista completa.",
 
     inputSchema: {
       json: {
         type: "object",
 
         properties: {
+          page: { type: "integer", minimum: 1, description: "Página solicitada; usar nextPage para ver más coincidencias con el mismo search y rows." },
+          rows: { type: "integer", minimum: 1, maximum: 50, description: "Tamaño de página; conservarlo al avanzar." },
           search: {
             type: "string",
 

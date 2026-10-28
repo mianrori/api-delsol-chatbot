@@ -122,3 +122,30 @@ durante y después de la campaña [nombre de una campaña que exista en DEV]».
 Si devuelve opciones, seleccionar una. Verificar vigencia, igualdad de duración,
 importes y variaciones contra la base; recordar que el conjunto DEV llega hasta
 mayo de 2023 y un período posterior puede no tener registros.
+
+
+## Búsqueda y páginas de promociones/campañas
+
+`search_promotions` acepta `search`, `page` (desde 1) y `rows` (1–50; por defecto
+usa LIMIT_FILTER o 10). La búsqueda combina identificadores con coincidencias
+por palabras en promoción o campaña. Los resultados por nombre se ordenan por
+la fecha Oracle real, más reciente primero, antes de aplicar la página.
+Las coincidencias por identificador tienen prioridad; una coincidencia exacta
+por nombre no excluye las parciales. Si no hay coincidencias textuales, conserva
+la búsqueda aproximada, calculando el total antes de paginar.
+
+El resultado incluye totalRows, totalPages, page, rows, hasMore y nextPage.
+Una página con una sola opción no significa que la búsqueda sea única: solo
+se resuelve automáticamente cuando totalRows es 1. Las opciones conservan
+numeración global, nombres, identificadores y vigencia de cada campaña.
+
+La presentación muestra todas las opciones de la página e indica el total.
+«Siguiente página»/«Ver más» recupera la siguiente página con la misma búsqueda
+y tamaño sin llamar a Bedrock; «primera página» permite volver al inicio del
+listado activo. No reutiliza páginas de un tema anterior.
+
+Prueba en Insomnia: reset, «Analiza las ventas antes, durante y después de la
+campaña Navidad», «Siguiente página», y seleccionar el número global de una
+campaña de esa página. Contrastar el total con VW_BOT_PROMOCIONES usando los
+mismos filtros y el mismo usuario. El análisis debe utilizar la identidad y
+vigencia de la opción seleccionada.

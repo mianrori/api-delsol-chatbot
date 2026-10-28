@@ -16,61 +16,21 @@ const mapPromotion = (item) => ({
   similarity: Number(item.SIMILARITY ?? 0),
 });
 
-export const resolvePromotion = async (search, connection) => {
-  const results = await searchPromotionsRepository(connection, search);
-
-  if (!Array.isArray(results) || results.length === 0) {
-    return {
-      status: "NOT_FOUND",
-      query: search,
-      options: [],
-    };
+export const resolvePromotion = async (search, connection, paging = {}) => {
+  const result = await searchPromotionsRepository(connection, search, paging);
+  const { items, ...pagination } = result;
+  if (result.totalRows === 0) return { status: "NOT_FOUND", query: search, ...pagination, options: [] };
+  // A page containing one row is not a unique match when other pages exist.
+  if (result.totalRows === 1) {
+    return items.length === 1
+      ? { status: "RESOLVED", query: search, ...pagination, promotion: mapPromotion(items[0]) }
+      : { status: "AMBIGUOUS", query: search, ...pagination, options: [] };
   }
-
-  if (results.length === 1) {
-    return {
-      status: "RESOLVED",
-      promotion: mapPromotion(results[0]),
-    };
-  }
-
-  const first = results[0];
-
-  const second = results[1];
-
-  const scoreDifference =
-    Number(first.SIMILARITY ?? 0) - Number(second.SIMILARITY ?? 0);
-
-  if (
-    first.MATCH_PRIORITY === 2 &&
-    Number(first.SIMILARITY ?? 0) >= 92 &&
-    scoreDifference >= 12
-  ) {
-    return {
-      status: "RESOLVED",
-      promotion: mapPromotion(first),
-    };
-  }
-
   return {
-    status: "AMBIGUOUS",
-
-    query: search,
-
-    options: results.map((item, index) => ({
-      optionId: String(index + 1),
-
-      promotionId: String(item.COD_PROMOCION),
-
-      promotionName: item.NOMBRE_PROMOCION,
-
-      campaignId: Number(item.COD_CAMPANIA),
-
-      campaignName: item.NOMBRE_CAMPANIA,
-
-      dateFrom: item.FECHA_DESDE ?? null,
-
-      dateTo: item.FECHA_HASTA ?? null,
+    status: "AMBIGUOUS", query: search, ...pagination,
+    options: items.map((item, index) => ({
+      optionId: String((result.page - 1) * result.rows + index + 1),
+      ...mapPromotion(item),
     })),
   };
 };

@@ -117,256 +117,89 @@ const calculateTextSimilarity = (promotionName, campaignName, search) => {
   };
 };
 
-export const searchPromotionsRepository = async (connection, search) => {
+const normalizedColumn = (column) => `UPPER(TRIM(REGEXP_REPLACE(
+  TRANSLATE(NVL(${column}, ''), 'ÁÉÍÓÚÜÑáéíóúüñ', 'AEIOUUNAEIOUUN'), '[^A-Za-z0-9]+', ' ')))`;
+
+const getPagination = ({ page = 1, rows = Number(config.limitFilter) || 10 } = {}) => {
+  if (!Number.isSafeInteger(page) || page < 1 || !Number.isInteger(rows) || rows < 1 || rows > 50 || !Number.isSafeInteger(page * rows)) {
+    throw new Error("La página debe ser un entero positivo y rows un entero entre 1 y 50.");
+  }
+  return { page, rows, offset: (page - 1) * rows };
+};
+
+const pageResult = (items, totalRows, pagination, matchMode) => ({
+  items, totalRows, page: pagination.page, rows: pagination.rows,
+  totalPages: Math.ceil(totalRows / pagination.rows),
+  hasMore: pagination.page * pagination.rows < totalRows,
+  nextPage: pagination.page * pagination.rows < totalRows ? pagination.page + 1 : null,
+  matchMode,
+});
+
+export const searchPromotionsRepository = async (connection, search, paging = {}) => {
+  const pagination = getPagination(paging);
   const normalizedSearch = normalizeText(search);
-
-  if (!normalizedSearch) {
-    return [];
-  }
-
-  const exactSql = `
-      SELECT
-        COD_PROMOCION,
-        NOMBRE_PROMOCION,
-        COD_CAMPANIA,
-        NOMBRE_CAMPANIA,
-
-        TO_CHAR(
-          FECHA_DESDE,
-          'DD/MM/YYYY'
-        ) AS FECHA_DESDE,
-
-        TO_CHAR(
-          FECHA_HASTA,
-          'DD/MM/YYYY'
-        ) AS FECHA_HASTA
-
-      FROM
-        VW_BOT_PROMOCIONES
-
-      WHERE
-           UPPER(TRIM(COD_PROMOCION)) =
-           UPPER(TRIM(:search))
-
-        OR TO_CHAR(COD_CAMPANIA) =
-           TRIM(:search)
-
-        OR UPPER(
-             TRIM(
-               REGEXP_REPLACE(
-                 TRANSLATE(
-                   NVL(
-                     NOMBRE_PROMOCION,
-                     ''
-                   ),
-                   'ÁÉÍÓÚÜÑáéíóúüñ',
-                   'AEIOUUNAEIOUUN'
-                 ),
-                 '[^A-Za-z0-9]+',
-                 ' '
-               )
-             )
-           ) =
-           UPPER(
-             TRIM(
-               REGEXP_REPLACE(
-                 TRANSLATE(
-                   :search,
-                   'ÁÉÍÓÚÜÑáéíóúüñ',
-                   'AEIOUUNAEIOUUN'
-                 ),
-                 '[^A-Za-z0-9]+',
-                 ' '
-               )
-             )
-           )
-
-        OR UPPER(
-             TRIM(
-               REGEXP_REPLACE(
-                 TRANSLATE(
-                   NVL(
-                     NOMBRE_CAMPANIA,
-                     ''
-                   ),
-                   'ÁÉÍÓÚÜÑáéíóúüñ',
-                   'AEIOUUNAEIOUUN'
-                 ),
-                 '[^A-Za-z0-9]+',
-                 ' '
-               )
-             )
-           ) =
-           UPPER(
-             TRIM(
-               REGEXP_REPLACE(
-                 TRANSLATE(
-                   :search,
-                   'ÁÉÍÓÚÜÑáéíóúüñ',
-                   'AEIOUUNAEIOUUN'
-                 ),
-                 '[^A-Za-z0-9]+',
-                 ' '
-               )
-             )
-           )
-
-      ORDER BY
-        FECHA_DESDE DESC,
-        NOMBRE_PROMOCION,
-        NOMBRE_CAMPANIA
-    `;
-
-  const exactResult = await executeOracleQuery(connection, exactSql, {
-    search,
+  if (!normalizedSearch) return pageResult([], 0, pagination, "text");
+  const tokens = tokenize(search);
+  const binds = { search: String(search).trim(), startRow: pagination.offset + 1, endRow: pagination.offset + pagination.rows };
+  const textFilters = tokens.map((token, index) => {
+    binds[`word${index}`] = token;
+    return `(INSTR(NORMALIZED_PROMOTION, :word${index}) > 0 OR INSTR(NORMALIZED_CAMPAIGN, :word${index}) > 0)`;
   });
-
-  const exactMatches = Array.isArray(exactResult) ? exactResult : [];
-
-  if (exactMatches.length > 0) {
-    return exactMatches
-      .slice(0, Number(config.limitFilter ?? 10))
-      .map((item) => ({
-        ...item,
-        MATCH_PRIORITY: 1,
-        SIMILARITY: 100,
-        MIN_TOKEN_SIMILARITY: 100,
-        TOKEN_SCORES: [],
-      }));
-  }
-
-  const searchTokens = tokenize(search);
-
-  if (searchTokens.length === 0) {
-    return [];
-  }
-
-  const binds = {};
-
-  const tokenFilters = searchTokens.map((token, index) => {
-    const bindName = `token${index}`;
-
-    binds[bindName] = token.length > 4 ? token.substring(0, 4) : token;
-
-    return `
-            (
-              NORMALIZED_PROMOTION
-              LIKE '%' || :${bindName} || '%'
-
-              OR
-
-              NORMALIZED_CAMPAIGN
-              LIKE '%' || :${bindName} || '%'
-            )
-          `;
-  });
-
-  binds.candidateLimit = Math.max(Number(config.limitFilter ?? 10) * 50, 500);
-
-  const candidateSql = `
-      SELECT
-        COD_PROMOCION,
-        NOMBRE_PROMOCION,
-        COD_CAMPANIA,
-        NOMBRE_CAMPANIA,
-        FECHA_DESDE,
-        FECHA_HASTA
-
-      FROM (
-        SELECT
-          COD_PROMOCION,
-          NOMBRE_PROMOCION,
-          COD_CAMPANIA,
-          NOMBRE_CAMPANIA,
-
-          TO_CHAR(
-            FECHA_DESDE,
-            'DD/MM/YYYY'
-          ) AS FECHA_DESDE,
-
-          TO_CHAR(
-            FECHA_HASTA,
-            'DD/MM/YYYY'
-          ) AS FECHA_HASTA,
-
-          UPPER(
-            TRIM(
-              REGEXP_REPLACE(
-                TRANSLATE(
-                  NVL(
-                    NOMBRE_PROMOCION,
-                    ''
-                  ),
-                  'ÁÉÍÓÚÜÑáéíóúüñ',
-                  'AEIOUUNAEIOUUN'
-                ),
-                '[^A-Za-z0-9]+',
-                ' '
-              )
-            )
-          ) AS NORMALIZED_PROMOTION,
-
-          UPPER(
-            TRIM(
-              REGEXP_REPLACE(
-                TRANSLATE(
-                  NVL(
-                    NOMBRE_CAMPANIA,
-                    ''
-                  ),
-                  'ÁÉÍÓÚÜÑáéíóúüñ',
-                  'AEIOUUNAEIOUUN'
-                ),
-                '[^A-Za-z0-9]+',
-                ' '
-              )
-            )
-          ) AS NORMALIZED_CAMPAIGN
-
-        FROM
-          VW_BOT_PROMOCIONES
-      )
-
-      WHERE (
-        ${tokenFilters.join("\n OR ")}
-      )
-
-      AND ROWNUM <= :candidateLimit
-    `;
-
-  const candidateResult = await executeOracleQuery(connection, candidateSql, binds);
-
-  const candidates = Array.isArray(candidateResult) ? candidateResult : [];
-
-  const ranked = candidates
-    .map((item) => {
-      const score = calculateTextSimilarity(
-        item.NOMBRE_PROMOCION,
-        item.NOMBRE_CAMPANIA,
-        search,
-      );
-
-      return {
-        ...item,
-        MATCH_PRIORITY: 2,
-        SIMILARITY: score.similarity,
-        MIN_TOKEN_SIMILARITY: score.minTokenSimilarity,
-        TOKEN_SCORES: score.tokenScores,
-      };
-    })
-    .filter(
-      (item) =>
-        item.SIMILARITY >= Number(config.minSimilarity ?? 65) &&
-        item.MIN_TOKEN_SIMILARITY >= 60,
+  const sql = `
+    WITH source AS (
+      SELECT COD_PROMOCION, COD_CAMPANIA, NOMBRE_PROMOCION, NOMBRE_CAMPANIA,
+             FECHA_DESDE AS START_DATE, FECHA_HASTA AS END_DATE,
+             ${normalizedColumn("NOMBRE_PROMOCION")} AS NORMALIZED_PROMOTION,
+             ${normalizedColumn("NOMBRE_CAMPANIA")} AS NORMALIZED_CAMPAIGN
+        FROM VW_BOT_PROMOCIONES
+    ), matches AS (
+      SELECT source.*, CASE WHEN UPPER(TRIM(COD_PROMOCION)) = UPPER(:search)
+                             OR TO_CHAR(COD_CAMPANIA) = :search THEN 1 ELSE 2 END AS MATCH_PRIORITY
+        FROM source
+       WHERE UPPER(TRIM(COD_PROMOCION)) = UPPER(:search)
+          OR TO_CHAR(COD_CAMPANIA) = :search
+          OR (${textFilters.join(" AND ")})
+    ), ranked AS (
+      SELECT matches.*, ROW_NUMBER() OVER (
+        ORDER BY MATCH_PRIORITY, START_DATE DESC NULLS LAST, COD_PROMOCION, COD_CAMPANIA,
+                 NOMBRE_PROMOCION, NOMBRE_CAMPANIA, END_DATE DESC NULLS LAST
+      ) AS RESULT_ROW_NUMBER FROM matches
     )
-    .sort((a, b) => {
-      if (b.SIMILARITY !== a.SIMILARITY) {
-        return b.SIMILARITY - a.SIMILARITY;
-      }
+    SELECT totals.TOTAL_ROWS, page_rows.COD_PROMOCION, page_rows.COD_CAMPANIA,
+           page_rows.NOMBRE_PROMOCION, page_rows.NOMBRE_CAMPANIA, page_rows.MATCH_PRIORITY,
+           TO_CHAR(page_rows.START_DATE, 'DD/MM/YYYY') AS FECHA_DESDE,
+           TO_CHAR(page_rows.END_DATE, 'DD/MM/YYYY') AS FECHA_HASTA
+      FROM (SELECT COUNT(*) AS TOTAL_ROWS FROM matches) totals
+      LEFT JOIN (SELECT * FROM ranked WHERE RESULT_ROW_NUMBER BETWEEN :startRow AND :endRow) page_rows ON 1 = 1
+     ORDER BY page_rows.RESULT_ROW_NUMBER
+  `;
+  const result = await executeOracleQuery(connection, sql, binds);
+  const totalRows = Number(result[0]?.TOTAL_ROWS ?? 0);
+  if (totalRows > 0) {
+    return pageResult(result.filter((row) => row.COD_PROMOCION != null), totalRows, pagination, "text");
+  }
 
-      return b.MIN_TOKEN_SIMILARITY - a.MIN_TOKEN_SIMILARITY;
-    })
-    .slice(0, Number(config.limitFilter ?? 10));
-
-  return ranked;
+  // Approximate matching remains a fallback. Rank the complete candidate set
+  // before paging so neither the total nor uniqueness depends on a hidden cap.
+  const fuzzyBinds = {};
+  const fuzzyFilters = tokens.map((token, index) => {
+    fuzzyBinds[`token${index}`] = token.length > 4 ? token.substring(0, 4) : token;
+    return `(INSTR(${normalizedColumn("NOMBRE_PROMOCION")}, :token${index}) > 0 OR INSTR(${normalizedColumn("NOMBRE_CAMPANIA")}, :token${index}) > 0)`;
+  });
+  const candidates = await executeOracleQuery(connection, `
+    SELECT COD_PROMOCION, COD_CAMPANIA, NOMBRE_PROMOCION, NOMBRE_CAMPANIA,
+           TO_CHAR(FECHA_DESDE, 'DD/MM/YYYY') AS FECHA_DESDE,
+           TO_CHAR(FECHA_HASTA, 'DD/MM/YYYY') AS FECHA_HASTA
+      FROM VW_BOT_PROMOCIONES
+     WHERE ${fuzzyFilters.join(" OR ")}
+     ORDER BY VW_BOT_PROMOCIONES.FECHA_DESDE DESC NULLS LAST, COD_PROMOCION, COD_CAMPANIA
+  `, fuzzyBinds);
+  const dateKey = (value) => String(value ?? "").split("/").reverse().join("");
+  const ranked = candidates.map((item) => {
+    const score = calculateTextSimilarity(item.NOMBRE_PROMOCION, item.NOMBRE_CAMPANIA, search);
+    return { ...item, MATCH_PRIORITY: 3, SIMILARITY: score.similarity, MIN_TOKEN_SIMILARITY: score.minTokenSimilarity };
+  }).filter((item) => item.SIMILARITY >= Number(config.minSimilarity ?? 65) && item.MIN_TOKEN_SIMILARITY >= 60)
+    .sort((a, b) => b.SIMILARITY - a.SIMILARITY || dateKey(b.FECHA_DESDE).localeCompare(dateKey(a.FECHA_DESDE)) ||
+      String(a.COD_PROMOCION).localeCompare(String(b.COD_PROMOCION)) || String(a.COD_CAMPANIA).localeCompare(String(b.COD_CAMPANIA)));
+  return pageResult(ranked.slice(pagination.offset, pagination.offset + pagination.rows), ranked.length, pagination, "approximate");
 };

@@ -141,7 +141,7 @@ const toolHandlers = {
   search_promotions: async (args, context) => {
     return withAuthorizedOracle(
       context.sessionId,
-      ({ connection }) => resolvePromotion(args.search, connection),
+      ({ connection }) => resolvePromotion(args.search, connection, { page: args.page, rows: args.rows }),
     );
   },
 
