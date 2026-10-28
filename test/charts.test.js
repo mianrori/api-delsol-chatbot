@@ -33,7 +33,7 @@ test("numeric values cannot be supplied or fabricated by the model", async () =>
     const invalid = { source: { result: { data: [{ month: "2025-04", vehicleCount: bad }, rows[1]] } } };
     await assert.rejects(generateChart(args, { sources: invalid }), /número explícito/);
   }
-  await assert.rejects(generateChart({ ...args, sourceToolUseId: "invented" }, { sources }), /resultado de consulta/);
+  await assert.rejects(generateChart({ ...args, sourceToolUseId: "invented" }, { sources }), /identificador de origen/);
 });
 
 test("limited result sets and paginated details cannot become complete charts", async () => {
@@ -117,4 +117,18 @@ test("a failed query in the current turn cannot reuse a previous topic as chart 
   const history = [...turn("get_vehicle_registrations", "old", { data: rows }), ...turn("get_sales", "failed", {})];
   history.at(-1).content[0].toolResult.status = "error";
   assert.deepEqual(getChartSources(history), {});
+});
+
+
+test("a unique applicable source is selected by the backend without an invented transport identifier", async () => {
+  for (const sourceToolUseId of [undefined, "latest"]) {
+    const result = await generateChart({ ...args, sourceToolUseId }, { sources });
+    assert.equal(result.result.sourceToolUseId, "source");
+    assert.equal(result.chart.available, true);
+  }
+  const multiple = { ...sources, second: sources.source };
+  await assert.rejects(generateChart({ ...args, sourceToolUseId: undefined }, { sources: multiple }), /varios resultados/);
+  await assert.rejects(generateChart({ ...args, sourceToolUseId: "tool_use_1" }, { sources }), /no inventes identificadores/);
+  const explicit = await generateChart(args, { sources: multiple });
+  assert.equal(explicit.result.sourceToolUseId, "source");
 });

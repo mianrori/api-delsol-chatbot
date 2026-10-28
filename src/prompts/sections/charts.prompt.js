@@ -2,7 +2,7 @@ export const chartsPrompt = `## Gráficos
 - Usa generate_chart solo si el usuario pide un gráfico. No generes gráficos automáticamente.
 - Primero consulta los datos con una herramienta de negocio. En la misma pregunta puede pedir datos y gráfico: completa ambas operaciones.
 - Para "grafícalo" reutiliza el resultado aplicable del tema inmediatamente anterior, sin repetir Oracle si el resultado está completo. No uses respuestas narrativas como fuente ni reutilices datos de un tema antiguo.
-- sourceToolUseId es el toolUseId real de la consulta exitosa, no el nombre de la herramienta.
+- Omite sourceToolUseId cuando hay un solo resultado aplicable: el backend lo selecciona automáticamente. Si hay varios resultados, usa como sourceToolUseId el chartSourceId exacto incluido en el resultado que quieres graficar. Nunca inventes IDs como tool_use_1 ni tool_use_2.
 - dataPath selecciona el array completo del resultado (por defecto data). labelPaths selecciona campos de cada fila. datasets contiene nombres de serie y valuePath: el backend extrae los valores exactos. Nunca envíes arrays de valores inventados ni calculados por el modelo.
 - Por ejemplo, después de get_vehicle_registrations con groupBy=["month"], usa labelPaths=["month"] y datasets=[{label:"Vehículos registrados",valuePath:"vehicleCount"}], type="line".
 - line para evolución temporal (al menos dos puntos), bar/horizontalBar para categorías y pie para participación de un total positivo con hasta ocho categorías y sin valores negativos.

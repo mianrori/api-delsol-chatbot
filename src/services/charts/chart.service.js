@@ -102,8 +102,12 @@ export const generateChart = async (args = {}, { sources = {}, restoreText = (va
   throwIfRequestAborted();
   const { sourceToolUseId, type, dataPath = "data", labelPaths, datasets, title = "Gráfico de resultados", width = 900, height = 500 } = args;
   if (!types.includes(type)) throw new Error("Tipo de gráfico no soportado.");
-  const source = Object.hasOwn(sources, sourceToolUseId) ? sources[sourceToolUseId] : null;
-  if (!source?.result) throw new Error("No hay un resultado de consulta aplicable para ese gráfico. Consulta primero los datos.");
+  const ids = Object.keys(sources);
+  const automatic = sourceToolUseId == null || sourceToolUseId === "latest";
+  if (automatic && ids.length > 1) throw new Error("Hay varios resultados aplicables. Indica el chartSourceId exacto del resultado que deseas graficar.");
+  const resolvedSourceId = automatic && ids.length === 1 ? ids[0] : sourceToolUseId;
+  const source = Object.hasOwn(sources, resolvedSourceId) ? sources[resolvedSourceId] : null;
+  if (!source?.result) throw new Error(ids.length ? "El identificador de origen no corresponde a los datos disponibles. Omite sourceToolUseId para elegir el único resultado aplicable, o usa su chartSourceId exacto; no inventes identificadores." : "No hay un resultado de consulta aplicable para ese gráfico. Consulta primero los datos.");
   const result = source.result;
   if (result.resultSet?.analysisPolicy === "NO_ANALYSIS" || result.resultSet?.truncated || result.pagination?.hasMore || Number(result.pagination?.page ?? result.page ?? 1) > 1 || result.hasMore || result.summary?.hasMore) throw new Error("El resultado está limitado o paginado. Obtén un resumen completo del alcance solicitado antes de graficar.");
   const rows = ownPath(result, dataPath);
@@ -138,5 +142,5 @@ export const generateChart = async (args = {}, { sources = {}, restoreText = (va
   const svg = draw({ type, title: displayTitle, labels: labels.map(restoreText), datasets: chartDatasets.map((series) => ({ ...series, label: restoreText(series.label) })), width, height, valuePrefix, valueSuffix, subtitle: restoreText(subtitle) });
   throwIfRequestAborted();
   return { chart: { available: true, format: "svg", mimeType: "image/svg+xml", url: `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`, type, title: displayTitle, subtitle: restoreText(subtitle) || null, width, height, valuePrefix: valuePrefix || null, valueSuffix: valueSuffix || null, pointCount: labels.length, datasetCount: chartDatasets.length },
-    result: { generated: true, sourceToolUseId, type, title: normalizedTitle, pointCount: labels.length, datasetCount: chartDatasets.length } };
+    result: { generated: true, sourceToolUseId: resolvedSourceId, type, title: normalizedTitle, pointCount: labels.length, datasetCount: chartDatasets.length } };
 };

@@ -1,5 +1,5 @@
 import { chartsPrompt } from "../../prompts/sections/charts.prompt.js";
-import { getChartSources, isChartRequest } from "../charts/chartSource.service.js";
+import { getChartSources, isChartRequest, isChartSourceTool } from "../charts/chartSource.service.js";
 import { buildVehicleResponse, resolveVehiclePage } from "./vehiclePresentation.service.js";
 import { buildSolesUsageResponse, resolveSolesUsagePage } from "./solesUsagePresentation.service.js";
 import { buildMemberSolesResponse, resolveMemberSolesPage, resolveMemberSolesBreakdown } from "./memberSolesPresentation.service.js";
@@ -1429,6 +1429,9 @@ const executeToolRequests = async ({ content, sessionId, sourceMessages = [], ch
         null,
         [name],
       );
+      if (isChartSourceTool(name) && protectedResultForModel && typeof protectedResultForModel === "object" && !Array.isArray(protectedResultForModel)) {
+        protectedResultForModel.chartSourceId = toolUseId;
+      }
       if (["analyze_members", "compare_member_purchases_vs_sales", "analyze_campaign_sales_performance", "search_promotions", "get_member_soles", "get_soles_usage", "search_soles_usage_destinations", "search_soles_usage_movement_types", "get_vehicle_registrations", "get_member_vehicles"].includes(name)) {
         presentationCall.result = protectedResultForModel;
       }

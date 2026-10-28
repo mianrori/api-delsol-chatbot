@@ -1,4 +1,5 @@
 const businessTools = new Set(["get_sales", "get_sales_per_sqm", "get_invoices", "get_contract_conditions", "get_contract_cost_per_sqm", "analyze_contract_cost_incidence", "get_member_purchases", "get_member_promo_purchases", "analyze_members", "compare_member_purchases_vs_sales", "analyze_campaign_sales_performance", "get_member_soles", "get_soles_usage", "get_vehicle_registrations"]);
+export const isChartSourceTool = (name) => businessTools.has(name);
 export const isChartRequest = (message) => /\b(grafic\w*|grafiqu\w*|grafica\w*|visualiza\w*|representacion visual)\b/i.test(String(message ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
 export const getChartSources = (messages = []) => {
   const calls = new Map(), results = new Map();

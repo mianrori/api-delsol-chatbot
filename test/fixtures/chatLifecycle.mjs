@@ -65,7 +65,7 @@ const chat = await load("../../src/services/ai/chat.service.js", {
         return { stopReason: "tool_use", output: { message: { role: "assistant", content: [{ toolUse: {
           name: first ? "get_vehicle_registrations" : "generate_chart", toolUseId: first ? "vehicles-chart-data" : "chart-result",
           input: first ? { dateFrom: "01/01/2025", dateTo: "31/12/2025", groupBy: ["month"] } : {
-            sourceToolUseId: "vehicles-chart-data", type: mode === "chart-vehicles" ? "line" : "bar", labelPaths: ["month"], datasets: [{ label: "Registros", valuePath: "vehicleCount" }],
+            type: mode === "chart-vehicles" ? "line" : "bar", labelPaths: ["month"], datasets: [{ label: "Registros", valuePath: "vehicleCount" }],
           },
         } }] } } };
       }

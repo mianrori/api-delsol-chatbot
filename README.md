@@ -299,7 +299,9 @@ y error. La validación contra Oracle DEV y las respuestas de Bedrock queda pend
 
 `generate_chart` representa resultados de negocio ya consultados mediante barras,
 barras horizontales, líneas o circular. Utiliza `sourceToolUseId` del resultado de
-negocio, `dataPath` (por defecto `data`), `labelPaths` y `datasets[].valuePath`.
+negocio (opcional cuando hay un solo resultado aplicable), `dataPath` (por defecto `data`), `labelPaths` y `datasets[].valuePath`.
+El backend selecciona automáticamente el resultado cuando es único. Si hay varios,
+`sourceToolUseId` debe coincidir con el `chartSourceId` devuelto en la consulta.
 El modelo selecciona campos, pero no envía ni reconstruye valores: el backend los
 extrae directamente del resultado de herramienta aplicable. No utiliza respuestas
 narrativas como fuente. «Grafícalo» reutiliza el tema inmediatamente anterior sin
