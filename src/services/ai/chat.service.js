@@ -1,3 +1,4 @@
+import { ACCESS_DENIED_CODE, ACCESS_DENIED_MESSAGE, isAccessDenied } from "./toolErrors.service.js";
 import { buildSalesSeriesResponse } from "./salesSeriesPresentation.service.js";
 import { chartsPrompt } from "../../prompts/sections/charts.prompt.js";
 import { getChartSources, isChartRequest, isChartSourceTool } from "../charts/chartSource.service.js";
@@ -132,6 +133,7 @@ Para esta etapa:
 Si el usuario solicita información que requiere una herramienta todavía no habilitada en este servicio, indícale brevemente que esa consulta aún no está disponible en esta etapa de migración.
 
 Para consultas de socios:
+- un error ACCESS_DENIED indica falta de permisos del usuario; no significa que la herramienta no exista o que la función esté pendiente de migración; no lo conviertas en ausencia de registros ni busques otra vía para consultar los mismos datos;
 - usa search_members cuando el usuario mencione un socio por nombre, apellido, nombre completo, número de documento, email o teléfono y todavía no exista una identificación inequívoca;
 - de cara al usuario, COD_SOCIO/documentNumber debe tratarse como número de documento y nunca como código de socio;
 - si search_members devuelve RESOLVED, reutiliza exclusivamente member.documentNumber como documentNumber de get_member;
@@ -1361,6 +1363,14 @@ const executeToolRequests = async ({ content, sessionId, sourceMessages = [], ch
       sessionId,
     });
 
+    if (internalContext.accessDenied) {
+      // Complete the tool protocol without running the remaining batch after denial.
+      toolResults.push({ toolResult: { toolUseId, status: "error", content: [{ json: {
+        success: false, error: "REQUEST_STOPPED", message: ACCESS_DENIED_MESSAGE,
+      } }] } });
+      continue;
+    }
+
     try {
       validateProtectedToolInput({ name, input });
 
@@ -1469,7 +1479,12 @@ const executeToolRequests = async ({ content, sessionId, sourceMessages = [], ch
       });
     } catch (error) {
       throwIfRequestAborted();
-      const protectedErrorMessage = protectPiiText(
+      const denied = isAccessDenied(error);
+      if (denied) {
+        internalContext.accessDenied = true;
+        actions = {};
+      }
+      const protectedErrorMessage = denied ? ACCESS_DENIED_MESSAGE : protectPiiText(
         sessionId,
         error?.message || "Error ejecutando la herramienta.",
       );
@@ -1495,7 +1510,7 @@ const executeToolRequests = async ({ content, sessionId, sourceMessages = [], ch
             {
               json: {
                 success: false,
-                error: "TOOL_EXECUTION_ERROR",
+                error: denied ? ACCESS_DENIED_CODE : "TOOL_EXECUTION_ERROR",
                 message: protectedErrorMessage,
               },
             },
@@ -1626,6 +1641,11 @@ export const chatService = async ({ message, sessionId }) => {
         "No fue posible consultar el desglose solicitado.";
   }
 
+  if (conversationInternalContext.accessDenied) {
+    followupAnswer = ACCESS_DENIED_MESSAGE;
+    conversationActions = {};
+  }
+
   while (true) {
     throwIfRequestAborted();
     bedrockIteration += 1;
@@ -1736,7 +1756,10 @@ export const chatService = async ({ message, sessionId }) => {
         ?? buildMemberPurchasesVsSalesResponse(conversationInternalContext.presentationCalls)
         ?? buildMemberAnalysisBreakdownResponse(conversationInternalContext.presentationCalls);
 
-      if (conversationActions.chart?.available) followupAnswer = "Aquí tienes el gráfico solicitado.";
+      if (conversationInternalContext.accessDenied) {
+        followupAnswer = ACCESS_DENIED_MESSAGE;
+        conversationActions = {};
+      } else if (conversationActions.chart?.available) followupAnswer = "Aquí tienes el gráfico solicitado.";
       else if (chartRequested && Object.keys(getChartSources([...messages, { role: "user", content: toolResults }])).length) followupAnswer = null;
 
       if (toolResults.length === 0) {
@@ -1761,7 +1784,9 @@ export const chatService = async ({ message, sessionId }) => {
       conversationInternalContext.monthlyIncidenceResult,
     );
 
-    const completedAssistantText = conversationActions.chart?.available
+    const completedAssistantText = conversationInternalContext.accessDenied
+      ? ACCESS_DENIED_MESSAGE
+      : conversationActions.chart?.available
       ? "Aquí tienes el gráfico solicitado."
       : monthlyIncidenceText ??
       buildSalesSeriesResponse(conversationInternalContext.presentationCalls, { message }) ??

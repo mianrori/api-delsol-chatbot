@@ -23,7 +23,7 @@ const synthetic = (exports) => new vm.SyntheticModule(Object.keys(exports), func
 const load = async (path, stubs) => {
   const main = new vm.SourceTextModule(await readFile(new URL(path, import.meta.url), "utf8"), { context });
   await main.link(async (spec) => {
-    if (["./salesSeriesPresentation.service.js", "./vehiclePresentation.service.js", "./solesUsagePresentation.service.js", "./memberSolesPresentation.service.js", "./promotionSearchPresentation.service.js", "./campaignSalesPerformancePresentation.service.js", "./memberPurchasesVsSalesPresentation.service.js", "./conversationClarification.service.js", "./memberAnalysisFollowup.service.js", "./memberRankingPresentation.service.js", "./memberSummaryPresentation.service.js"].includes(spec)) {
+    if (["./toolErrors.service.js", "./salesSeriesPresentation.service.js", "./vehiclePresentation.service.js", "./solesUsagePresentation.service.js", "./memberSolesPresentation.service.js", "./promotionSearchPresentation.service.js", "./campaignSalesPerformancePresentation.service.js", "./memberPurchasesVsSalesPresentation.service.js", "./conversationClarification.service.js", "./memberAnalysisFollowup.service.js", "./memberRankingPresentation.service.js", "./memberSummaryPresentation.service.js"].includes(spec)) {
       return new vm.SourceTextModule(await readFile(new URL("../../src/services/ai/" + spec.slice(2), import.meta.url), "utf8"), { context });
     }
     assert.ok(stubs[spec], `Missing stub: ${spec}`);
@@ -57,6 +57,14 @@ const chat = await load("../../src/services/ai/chat.service.js", {
       modelCalls++;
       if (mode === "direct-followup" || mode === "partial-followup" || mode === "cancel-between") {
         assert.fail("A summary follow-up must not invoke Bedrock");
+      }
+      if (mode.startsWith("permission-")) {
+        assert.notEqual(mode, "permission-followup", "A denied direct follow-up must not call Bedrock");
+        assert.equal(comparisonStep++, 0, "Permission denials must not be rewritten by the model");
+        const content = [{ toolUse: { name: "get_member_vehicles", toolUseId: "denied-vehicle", input: { plate: "SYN123" } } }];
+        if (mode === "permission-batch") content.push({ toolUse: { name: "get_sales", toolUseId: "must-stop", input: {} } });
+        if (mode === "permission-chart") content.push({ toolUse: { name: "generate_chart", toolUseId: "must-stop", input: {} } });
+        return { stopReason: "tool_use", output: { message: { role: "assistant", content } } };
       }
       if (mode === "sales-series") {
         assert.equal(comparisonStep++, 0, "Temporal sales must render before a model can invent a sustained trend");
@@ -169,6 +177,11 @@ const chat = await load("../../src/services/ai/chat.service.js", {
   "../../tools/index.js": { tools: [] },
   "./toolExecutor.service.js": { executeTool: async (call) => {
     toolCalls++;
+    if (mode.startsWith("permission-")) {
+      assert.equal(call.name, mode === "permission-followup" ? "get_member_soles" : "get_member_vehicles", "No alternative tool may execute after denial");
+      throw Object.assign(new Error("El usuario no tiene permisos para consultar esta información."), { code: "ACCESS_DENIED" });
+    }
+
     if (mode === "sales-series") return { data: [
       { month: "01", totalAmount: 58706137966, totalInvoices: 366427, currency: { abbreviation: "PYG", symbol: "₲" } },
       { month: "02", totalAmount: 63255876492, totalInvoices: 358354, currency: { abbreviation: "PYG", symbol: "₲" } },
@@ -398,6 +411,7 @@ assert.match(solesByExpiration.answer, /31\/12\/2023/);
 assert.match(solesByExpiration.answer, /Soles de prueba/);
 assert.ok(!solesSummary.answer.includes("₲"));
 assert.equal(storedHistory.at(-1).content[0].text, solesByExpiration.answer);
+const permissionFollowupHistory = structuredClone(storedHistory);
 mode = "soles-detail"; comparisonStep = 0; storedHistory = [];
 const beforeSolesDetailModels = modelCalls;
 const firstSolesPage = await chat.chatService({ sessionId: "test", message: "Detalle de soles" });
@@ -462,6 +476,21 @@ const changedChart = await chat.chatService({ sessionId: "test", message: "Graf�
 assert.equal(changedChart.actions.chart.type, "bar");
 assert.equal(toolCalls, beforeFollowupTools + 1, "Chart follow-up must not query Oracle again");
 
+for (const deniedMode of ["permission-denied", "permission-batch", "permission-chart", "permission-followup"]) {
+  mode = deniedMode; comparisonStep = 0;
+  storedHistory = deniedMode === "permission-followup" ? structuredClone(permissionFollowupHistory) : [];
+  const beforeModels = modelCalls, beforeTools = toolCalls;
+  const result = await chat.chatService({ sessionId: "test", message: deniedMode === "permission-followup" ? "Detallar por vencimiento" : deniedMode === "permission-chart" ? "Propietario de la chapa SYN123 y un gráfico" : "Propietario de la chapa SYN123" });
+  assert.equal(result.answer, "El usuario no tiene permisos para consultar esta información.");
+  assert.equal(JSON.stringify(result.actions), "{}");
+  assert.equal(modelCalls - beforeModels, deniedMode === "permission-followup" ? 0 : 1);
+  assert.equal(toolCalls - beforeTools, 1);
+  assert.equal(storedHistory.at(-1).content[0].text, result.answer);
+  const toolErrors = storedHistory.flatMap((item) => item.content ?? []).map((block) => block.toolResult).filter(Boolean);
+  assert.ok(toolErrors.some((response) => response.content?.[0]?.json?.error === "ACCESS_DENIED"));
+  if (["permission-batch", "permission-chart"].includes(deniedMode)) assert.ok(toolErrors.some((response) => response.content?.[0]?.json?.error === "REQUEST_STOPPED"));
+}
+
 // Exercise the actual dispatcher: it must use the session proxy and close the
 // connection even when a queried view is not authorized.
 const dispatcherText = await readFile(new URL("../../src/services/ai/toolExecutor.service.js", import.meta.url), "utf8");
@@ -480,7 +509,7 @@ dispatcherStubs["../members/memberPurchasesVsSales.service.js"] = { compareMembe
 dispatcherStubs["../sessions/oracleSession.service.js"] = { withOracleProxySession: async (id, callback) => {
   assert.equal(id, "authorized-session");
   try { return await callback({ username: "SYNTHETIC", connection: { execute: async (sql) => {
-    if (proxyDenied) throw Object.assign(new Error("Denied"), { errorNum: 942 });
+    if (proxyDenied) throw Object.assign(new Error("Denied"), { errorNum: typeof proxyDenied === "number" ? proxyDenied : 942 });
     return { rows: sql.includes("VW_BOT_PROMOCIONES") ? [{ COD_PROMOCION: "P1", COD_CAMPANIA: "C1",
       NOMBRE_PROMOCION: "Promoción sintética", NOMBRE_CAMPANIA: "Campaña sintética", FECHA_DESDE: "01/05/2023", FECHA_HASTA: "10/05/2023" }] : [] };
   } } }); } finally { proxyClosed++; }
@@ -640,4 +669,15 @@ const beforeChartProxyClosed = proxyClosed;
 const chartRequest = { name: "generate_chart", arguments: { sourceToolUseId: "v", type: "bar", labelPaths: ["month"], datasets: [{ label: "Registros", valuePath: "vehicleCount" }] }, context: { sessionId: "authorized-session", chartSources: { v: { result: { data: [{ month: "2025-01", vehicleCount: 2 }] } } } } };
 assert.equal((await dispatcher.executeTool(chartRequest)).chart.available, true);
 assert.equal(proxyClosed, beforeChartProxyClosed, "Chart generation does not open Oracle");
+const beforeSpecificDenials = proxyClosed;
+for (const errorNum of [942, 1031]) {
+  proxyDenied = errorNum;
+  await assert.rejects(dispatcher.executeTool(vehicleRequest), (error) => {
+    assert.equal(error.code, "ACCESS_DENIED");
+    assert.equal(error.errorNum, errorNum);
+    assert.equal(error.message, "El usuario no tiene permisos para consultar esta información.");
+    return true;
+  });
+}
+assert.equal(proxyClosed, beforeSpecificDenials + 2);
 console.log("Lifecycle integration passed");
