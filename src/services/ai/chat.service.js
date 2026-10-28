@@ -1,3 +1,4 @@
+import { buildCampaignSalesPerformanceResponse } from "./campaignSalesPerformancePresentation.service.js";
 import { buildMemberPurchasesVsSalesResponse } from "./memberPurchasesVsSalesPresentation.service.js";
 import { clarifyInitialBreakdown } from "./conversationClarification.service.js";
 import {
@@ -69,6 +70,7 @@ En esta etapa de migración, las herramientas habilitadas son:
 - get_member_vehicles
 - analyze_members
 - compare_member_purchases_vs_sales
+- analyze_campaign_sales_performance
 
 Las únicas capacidades disponibles son las definidas a continuación y las herramientas presentes en toolConfig.
 
@@ -87,6 +89,8 @@ Para esta etapa:
 - puedes consultar los datos de un socio previamente resuelto;
 - puedes consultar compras de un socio por período, local, rubro, resumen o detalle;
 - puedes resolver promociones y campañas;
+- puedes comparar ventas antes, durante y después de una campaña resuelta, con períodos de igual duración y los mismos filtros de locales y rubros;
+- para analizar campañas usa primero search_promotions: si devuelve AMBIGUOUS, espera la selección del usuario; reutiliza promotionId, campaignId, dateFrom y dateTo de la campaña seleccionada, sin inventar fechas ni atribuir causalidad;
 - puedes consultar compras de socios asociadas a promociones o campañas;
 - puedes consultar vehículos registrados por socio o directamente por matrícula/chapa;
 - puedes comparar el importe de canjes de facturas de socios con las ventas del mismo período y calcular su participación por mes, año, local o rubro;
@@ -1376,7 +1380,7 @@ const executeToolRequests = async ({ content, sessionId }) => {
         null,
         [name],
       );
-      if (["analyze_members", "compare_member_purchases_vs_sales"].includes(name)) {
+      if (["analyze_members", "compare_member_purchases_vs_sales", "analyze_campaign_sales_performance"].includes(name)) {
         presentationCall.result = protectedResultForModel;
       }
 
@@ -1631,7 +1635,8 @@ export const chatService = async ({ message, sessionId }) => {
 
       // A complete breakdown is authoritative even when the model requested
       // it after changing dates or filters. Do not ask the model to rewrite it.
-      followupAnswer = buildMemberPurchasesVsSalesResponse(conversationInternalContext.presentationCalls)
+      followupAnswer = buildCampaignSalesPerformanceResponse(conversationInternalContext.presentationCalls)
+        ?? buildMemberPurchasesVsSalesResponse(conversationInternalContext.presentationCalls)
         ?? buildMemberAnalysisBreakdownResponse(conversationInternalContext.presentationCalls);
 
       if (toolResults.length === 0) {
@@ -1658,6 +1663,7 @@ export const chatService = async ({ message, sessionId }) => {
 
     const completedAssistantText =
       monthlyIncidenceText ??
+      buildCampaignSalesPerformanceResponse(conversationInternalContext.presentationCalls) ??
       buildMemberPurchasesVsSalesResponse(conversationInternalContext.presentationCalls) ??
       buildMemberSummaryResponse(conversationInternalContext.presentationCalls) ??
       buildMemberAnalysisBreakdownResponse(conversationInternalContext.presentationCalls) ??

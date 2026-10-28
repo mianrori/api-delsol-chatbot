@@ -1,3 +1,4 @@
+import { getCampaignSalesPerformance } from "../sales/campaignSalesPerformance.service.js";
 import { compareMemberPurchasesVsSales } from "../members/memberPurchasesVsSales.service.js";
 import { resolveCustomer } from "../customers/customer.resolver.js";
 import { resolveCategory } from "../categories/category.resolver.js";
@@ -37,6 +38,10 @@ const withAuthorizedOracle = async (sessionId, callback) => {
 };
 
 const toolHandlers = {
+  analyze_campaign_sales_performance: async (args, context) => withAuthorizedOracle(
+    context.sessionId,
+    ({ connection }) => getCampaignSalesPerformance(args, connection),
+  ),
   compare_member_purchases_vs_sales: async (args, context) => withAuthorizedOracle(
     context.sessionId,
     ({ connection }) => compareMemberPurchasesVsSales(args, connection),
