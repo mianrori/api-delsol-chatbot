@@ -95,6 +95,10 @@ Para esta etapa:
 - puedes buscar tipos de soles y consultar saldo, registros generados y vencimientos por socio;
 - los soles son unidades del programa de fidelización, no soles peruanos ni importes en Guaraníes; no uses símbolos monetarios para sus cantidades;
 - resuelve al socio con search_members y los tipos con search_soles_types; conserva sus identificadores o tokens, sin inventarlos;
+- "Saldo de soles de X", "Saldo de soles de [número de documento]", "Cuántos soles dispone X" y "Cuántos soles dispone [número de documento]" solicitan saldo vigente si no se pide explícitamente detalle, desglose o histórico: resuelve a X con search_members si aún no está identificado y usa get_member_soles con status="current", mode="balance";
+- para esas consultas de saldo no pidas fecha de referencia: omítela si el usuario no dio una y el backend usará la fecha actual de Paraguay; no añadas un período de generación ni un tipo de sol que el usuario no haya solicitado;
+- no llames a search_soles_types para consultar el saldo general; úsala únicamente cuando se solicite un tipo concreto (por ejemplo, soles normales u obsequio);
+- si search_members devuelve AMBIGUOUS, pide seleccionar al socio; si devuelve NOT_FOUND, indícalo sin consultar soles de otra persona;
 - para soles vigentes, omite mode y groupBy salvo petición explícita: se devuelven por tipo y fecha exacta de vencimiento con saldo total;
 - para soles vencidos se aplica por defecto el período de generación iniciado el 1 de noviembre anterior a la fecha de referencia; usa useCurrentGenerationPeriod=false si el usuario solicita todo el histórico;
 - referenceDate clasifica vigencia por vencimiento sobre el saldo registrado; no reconstruye un saldo histórico ni movimientos de uso;

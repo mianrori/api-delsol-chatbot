@@ -187,3 +187,15 @@ Prueba en Insomnia tras reset, reemplazando el documento por uno existente en DE
 
 Contrastar saldos, tipos y vencimientos con Oracle bajo el mismo usuario. Este
 bloque no incluye todavía movimientos ni destinos de uso de soles.
+
+
+### Consultas habituales de saldo de soles
+
+«Saldo de soles de [nombre o número de documento]» y «Cuántos soles dispone
+[nombre o número de documento]» se interpretan como saldo vigente (`current`,
+`balance`). Se resuelve el socio y se consulta su saldo; se pide selección si
+su identidad es ambigua. No se requiere una fecha ni un tipo adicional. Sin
+fecha explícita se usa el día actual de Paraguay; sin tipo se conservan todos
+los tipos del saldo general. Un tipo o fecha solicitado explícitamente sí se
+respeta. Los nombres y documentos de estas formas breves se protegen antes de
+llegar al modelo aunque no se utilice la palabra «socio».

@@ -139,3 +139,17 @@ test("detail next-page requests preserve protected document, type, dates and all
   assert.equal(input.page, undefined);
   assert.equal(resolveMemberSolesPage({ message: "Ver más", history: [...history, { role: "user", content: [{ text: "Hola" }] }] }), null);
 });
+
+
+test("usual balance query needs only document and balance mode, using today with no extra filters", async () => {
+  const connection = connectionFor(() => [{ BALANCE: 12.5, RECORD_COUNT: 2, MEMBER_NAME: "Persona sintética" }]);
+  const result = await getMemberSoles({ documentNumber: "1234567", mode: "balance" }, connection);
+  assert.equal(connection.queries.length, 1);
+  assert.equal(result.balance, 12.5);
+  assert.equal(result.queryContext.status, "current");
+  assert.match(result.queryContext.referenceDate, /^\d{2}\/\d{2}\/\d{4}$/);
+  assert.equal(result.queryContext.generationPeriod.dateFrom, null);
+  assert.deepEqual(result.queryContext.typeIds, []);
+  assert.equal(connection.queries[0].binds.generationDateFrom, undefined);
+  assert.match(summarize(result), /12,5 soles/);
+});

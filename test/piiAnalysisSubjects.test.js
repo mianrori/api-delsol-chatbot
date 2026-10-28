@@ -98,3 +98,27 @@ test("named entities in invoice comparisons remain protected without hiding the 
   }
   clearPiiSession("pii-canjes-names");
 });
+
+
+test("usual soles-balance questions protect the member while preserving the request and date", () => {
+  const cases = [
+    ["Saldo de soles de Persona Ejemplo", "Persona Ejemplo", "NAME"],
+    ['Saldo de soles de "Persona Ejemplo"', "Persona Ejemplo", "NAME"],
+    ["¿Cuántos soles dispone Persona Ejemplo?", "Persona Ejemplo", "NAME"],
+    ["Cuantos soles dispone 1234567", "1234567", "DOCUMENT"],
+    ["Saldo de soles de 1.234.567", "1.234.567", "DOCUMENT"],
+    ["Saldo de soles de Persona Ejemplo al 31/05/2023", "Persona Ejemplo", "NAME"],
+    ["Saldo de soles de Persona Ejemplo, al 31/05/2023", "Persona Ejemplo", "NAME"],
+    ["Saldo de soles de Persona Ejemplo por tipo", "Persona Ejemplo", "NAME"],
+  ];
+  for (const [text, identity, type] of cases) {
+    const protectedText = protectPiiText("soles-common", text);
+    assert.ok(!protectedText.includes(identity));
+    assert.ok(protectedText.includes(`[PII_${type}_`));
+    assert.equal(restorePiiText("soles-common", protectedText), text);
+    if (text.includes("31/05/2023")) assert.ok(protectedText.includes("31/05/2023"));
+    if (text.endsWith("por tipo")) assert.ok(protectedText.endsWith("por tipo"));
+    assert.equal(protectPiiText("soles-common", protectedText), protectedText);
+  }
+  clearPiiSession("soles-common");
+});

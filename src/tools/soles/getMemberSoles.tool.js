@@ -5,7 +5,7 @@ export const getMemberSolesTool = {
     name: "get_member_soles",
 
     description:
-      "Consulta Soles del programa de fidelización de un socio. " +
+      "Consulta Soles del programa de fidelización de un socio. Para Saldo de soles de X o Cuántos soles dispone X, usar status=current y mode=balance, sin fechas ni tipos adicionales salvo petición del usuario. " +
       "Permite obtener saldo vigente, detalle de Soles vigentes o vencidos, históricos, próximos vencimientos y resúmenes.",
 
     inputSchema: {
