@@ -267,6 +267,10 @@ const isGenericAnalysisSubject = (value) => {
   if (/^(?:(?:todos|todas)(?: (?:los|las))? |(?:los|las) )?(?:socios|socias|clientes|locales|comercios|rubros|hombres|mujeres)(?: (?:activos|activas|inactivos|inactivas|registrados|registradas|hombres|mujeres))?(?: (?:de|entre) \d{1,3} (?:a|y) \d{1,3} anos)?$/.test(normalized)) {
     return true;
   }
+  // Exempt only complete calendar comparisons, never names containing years.
+  const year = "(?:(?:el |los )?anos? )?(?:19|20)\\d{2}";
+  const comparison = "(?:contra|vs\\.?|versus|frente a|respecto (?:a|de)|comparado con|y|a|hasta|-)";
+  if (new RegExp(`^${year}(?: ${comparison} ${year})+$`).test(normalized)) return true;
   const month = "(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)";
   return new RegExp(`^(?:${month}(?: (?:y|a|hasta) ${month})?|20\\d{2}|hoy|ayer|(?:este|el) (?:mes|ano))$`).test(normalized);
 };
@@ -417,7 +421,7 @@ const protectKnownTextPatterns = (sessionId, text) => {
    * construir correctamente dateFrom/dateTo/groupBy.
    */
   protectedText = protectedText.replace(
-    /\b((?:ventas|facturaci[oó]n|compras)\s+de\s+)([A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9&.'’ -]{2,80}?)(?=\s+(?:(?:de|desde|durante|en|entre)\s+(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre|20\d{2}|hoy|ayer|este|esta)|del\s+(?:20\d{2}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4})|por\s+(?:d[ií]a|mes|a[nñ]o|semana|local|rubro))|\s*(?:[,.!?;:]|$))/gi,
+    /\b((?:ventas|facturaci[oó]n|compras)\s+de\s+)([A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9&.'’ -]{2,80}?)(?=\s+(?:(?:(?<!respecto\s+)de|desde|durante|en|entre)\s+(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre|20\d{2}|hoy|ayer|este|esta)|del\s+(?:20\d{2}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4})|por\s+(?:d[ií]a|mes|a[nñ]o|semana|local|rubro))|\s*(?:[,!?;:]|(?<!vs)\.|$))/gi,
     (match, prefix, value) => isGenericAnalysisSubject(value)
       ? match
       : `${prefix}${protectPiiValue(sessionId, "BUSINESS_ENTITY", value.trim())}`,

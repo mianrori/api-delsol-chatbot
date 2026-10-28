@@ -136,3 +136,33 @@ test("member follow-ups preserve destination references without treating them as
   assert.equal(restorePiiText(session, protectedText), named);
   clearPiiSession(session);
 });
+
+
+test("year comparisons preserve both calendar periods rather than becoming business names", () => {
+  const session = "pii-year-comparisons";
+  for (const connector of ["contra", "vs", "vs.", "versus", "frente a", "respecto a", "respecto de", "comparado con", "y", "a", "hasta", "-"]) {
+    const text = `Compara las ventas de 2023 ${connector} 2024, mes a mes, con monto total y cantidad de facturas`;
+    assert.equal(protectPiiText(session, text), text);
+    assert.equal(protectPiiDeep(session, { text }).text, text);
+    assert.equal(protectPiiText(session, protectPiiText(session, text)), text);
+  }
+  for (const text of ["Compras de 2023 contra 2024 por mes", "Facturación de 2023 vs. 2024", "Ventas de los años 2023 contra 2024", "Ventas de 2023 contra el año 2024", "Ventas de 2022 contra 2023 contra 2024", "Ventas de 1999 versus 2000"]) assert.equal(protectPiiText(session, text), text);
+  clearPiiSession(session);
+});
+
+test("commercial names containing years remain protected in year comparison requests", () => {
+  const session = "pii-year-brands";
+  for (const name of ["Marca 2023", "2023 Store", "2023 contra 2024 Outlet"]) {
+    const text = `Compara las ventas de ${name} en 2023 contra 2024`;
+    const protectedText = protectPiiText(session, text);
+    assert.match(protectedText, /\[PII_BUSINESS_ENTITY_\d+\]/);
+    assert.ok(!protectedText.includes(name));
+    assert.ok(protectedText.endsWith("en 2023 contra 2024"));
+    assert.equal(restorePiiText(session, protectedText), text);
+  }
+  // An explicit business context still protects a numeric commercial name.
+  const explicit = "Ventas del local 2023";
+  assert.match(protectPiiText(session, explicit), /\[PII_BUSINESS_ENTITY_\d+\]/);
+  assert.equal(restorePiiText(session, protectPiiText(session, explicit)), explicit);
+  clearPiiSession(session);
+});
