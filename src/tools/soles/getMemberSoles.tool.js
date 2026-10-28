@@ -36,7 +36,7 @@ export const getMemberSolesTool = {
           mode: {
             type: "string",
             enum: ["balance", "detail", "summary"],
-            description: "Si se omite mode y groupBy para vigentes, devuelve resumen por tipo y vencimiento. balance solicita explícitamente el saldo total.",
+            description: "balance y summary conservan siempre el tipo de soles. balance muestra el saldo por tipo; para detalle por vencimiento añadir groupBy=[type,expirationDate].",
           },
 
           groupBy: {

@@ -1,4 +1,4 @@
-import { buildMemberSolesResponse, resolveMemberSolesPage } from "./memberSolesPresentation.service.js";
+import { buildMemberSolesResponse, resolveMemberSolesPage, resolveMemberSolesBreakdown } from "./memberSolesPresentation.service.js";
 import { buildPromotionSearchResponse, resolvePromotionSearchPage } from "./promotionSearchPresentation.service.js";
 import { buildCampaignSalesPerformanceResponse } from "./campaignSalesPerformancePresentation.service.js";
 import { buildMemberPurchasesVsSalesResponse } from "./memberPurchasesVsSalesPresentation.service.js";
@@ -99,7 +99,7 @@ Para esta etapa:
 - para esas consultas de saldo no pidas fecha de referencia: omítela si el usuario no dio una y el backend usará la fecha actual de Paraguay; no añadas un período de generación ni un tipo de sol que el usuario no haya solicitado;
 - no llames a search_soles_types para consultar el saldo general; úsala únicamente cuando se solicite un tipo concreto (por ejemplo, soles normales u obsequio);
 - si search_members devuelve AMBIGUOUS, pide seleccionar al socio; si devuelve NOT_FOUND, indícalo sin consultar soles de otra persona;
-- para soles vigentes, omite mode y groupBy salvo petición explícita: se devuelven por tipo y fecha exacta de vencimiento con saldo total;
+- muestra siempre los saldos de soles por tipo, incluso en consultas simples de saldo o disponibilidad; ofrece detallar por vencimiento y usa groupBy=["type","expirationDate"] cuando el usuario lo solicite; nunca presentes únicamente un saldo global que mezcle tipos;
 - para soles vencidos se aplica por defecto el período de generación iniciado el 1 de noviembre anterior a la fecha de referencia; usa useCurrentGenerationPeriod=false si el usuario solicita todo el histórico;
 - referenceDate clasifica vigencia por vencimiento sobre el saldo registrado; no reconstruye un saldo histórico ni movimientos de uso;
 - conserva los filtros al paginar el detalle y usa nextPage; todavía no están habilitadas las consultas de movimientos/destinos de uso de soles;
@@ -1520,7 +1520,8 @@ export const chatService = async ({ message, sessionId }) => {
     history: protectedHistory,
   });
   const promotionPage = resolvePromotionSearchPage({ message, history: protectedHistory });
-  const solesPage = resolveMemberSolesPage({ message, history: protectedHistory });
+  const solesPage = resolveMemberSolesPage({ message, history: protectedHistory })
+    ?? resolveMemberSolesBreakdown({ message, history: protectedHistory });
   if (solesPage) {
     if (solesPage.answer) followupAnswer = solesPage.answer;
     else {

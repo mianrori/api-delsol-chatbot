@@ -36,10 +36,11 @@ export const buildMemberSolesResponse = (calls = []) => {
     else {
       const dimensionFields = { type: ["Tipo", "typeDescription"], month: ["Mes de generación", "month"], year: ["Año de generación", "year"], expirationMonth: ["Mes de vencimiento", "expirationMonth"], expirationDate: ["Vencimiento", "expirationDate"] };
       const fields = (context.groupBy ?? []).map((dimension) => dimensionFields[dimension]);
-      lines.push(`| ${[...fields.map(([label]) => label), "Generados", "Saldo", "Registros"].join(" | ")} |`);
-      lines.push(`| ${Array(fields.length + 3).fill("---").join(" | ")} |`);
-      for (const row of populated) lines.push(`| ${[...fields.map(([, key]) => cell(row[key] ?? (key.startsWith("expiration") ? "Sin vencimiento" : "—"))), number(row.generatedAmount), number(row.balance), number(row.recordCount)].join(" | ")} |`);
-      if (result.summary) lines.push("", `Saldo vigente total de los tipos consultados: **${number(result.summary.currentBalance)} soles**.`);
+      const metrics = context.balanceOnly ? [["Saldo de soles", "balance"]] : [["Generados", "generatedAmount"], ["Saldo de soles", "balance"], ["Registros", "recordCount"]];
+      lines.push(`| ${[...fields.map(([label]) => label), ...metrics.map(([label]) => label)].join(" | ")} |`);
+      lines.push(`| ${Array(fields.length + metrics.length).fill("---").join(" | ")} |`);
+      for (const row of populated) lines.push(`| ${[...fields.map(([, key]) => cell(row[key] ?? (key.startsWith("expiration") ? "Sin vencimiento" : "—"))), ...metrics.map(([, key]) => number(row[key]))].join(" | ")} |`);
+      if (!(context.groupBy ?? []).includes("expirationDate")) lines.push("", "Puedes pedir «Detallar por vencimiento» para ver el saldo de cada tipo separado por fecha de vencimiento.");
     }
   }
   return lines.join("\n");
@@ -62,4 +63,24 @@ export const resolveMemberSolesPage = ({ message, history = [] }) => {
   if (response?.status !== "success" || result?.queryContext?.mode !== "detail") return null;
   if (!result.hasMore) return { answer: "No hay más páginas de soles para los filtros consultados." };
   return { input: { ...structuredClone(queries[0].input), referenceDate: result.queryContext.referenceDate, page: result.nextPage, rows: result.rows } };
+};
+
+
+export const resolveMemberSolesBreakdown = ({ message, history = [] }) => {
+  const text = String(message ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+    .replace(/[¿?¡!.,;:]/g, "").replace(/\s+/g, " ").trim();
+  if (!/^(?:si )?(?:ahora )?(?:(?:detallar|detalla|desglosa|mostrar|muestra)(?:lo)? )?(?:el detalle )?por (?:fecha de )?vencimiento(?:s)?$/.test(text)) return null;
+  let start = -1;
+  for (let index = history.length - 1; index >= 0; index--) {
+    if (history[index]?.role === "user" && history[index].content?.some((block) => typeof block.text === "string")) { start = index; break; }
+  }
+  if (start < 0) return null;
+  const turn = history.slice(start);
+  const calls = turn.filter((item) => item.role === "assistant").flatMap((item) => item.content ?? []).map((block) => block.toolUse).filter(Boolean);
+  const queries = calls.filter((call) => call.name === "get_member_soles");
+  if (queries.length !== 1 || calls.some((call) => !allowed.has(call.name))) return null;
+  const response = turn.flatMap((item) => item.content ?? []).map((block) => block.toolResult).find((item) => item?.toolUseId === queries[0].toolUseId);
+  const result = response?.content?.find((block) => block.json)?.json;
+  if (response?.status !== "success" || !result?.queryContext?.referenceDate) return null;
+  return { input: { ...structuredClone(queries[0].input), mode: "balance", groupBy: ["type", "expirationDate"], referenceDate: result.queryContext.referenceDate } };
 };

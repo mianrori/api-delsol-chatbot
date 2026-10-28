@@ -160,7 +160,7 @@ sus opciones reales sin truncar a 5 o 10 coincidencias.
 
 Los soles son cantidades del programa de fidelización, no una moneda. Los modos
 son saldo (`balance`), resumen (`summary`) y detalle (`detail`). Por defecto,
-vigentes devuelve resumen por tipo y vencimiento exacto y consulta el saldo total
+vigentes devuelve resumen por tipo y permite pedir el desglose por vencimiento; consulta el saldo total
 con los mismos filtros. Sin vencimiento se considera vigente; la fecha de
 vencimiento igual a referenceDate sigue vigente. La fecha por defecto es la del
 calendario de Paraguay, independientemente del huso horario del contenedor.
@@ -199,3 +199,13 @@ fecha explícita se usa el día actual de Paraguay; sin tipo se conservan todos
 los tipos del saldo general. Un tipo o fecha solicitado explícitamente sí se
 respeta. Los nombres y documentos de estas formas breves se protegen antes de
 llegar al modelo aunque no se utilice la palabra «socio».
+
+
+### Presentación obligatoria por tipo
+
+Toda consulta de saldo se ejecuta como resumen por tipo, incluso si el modelo
+solicita mode=balance. El resumen conserva siempre type entre sus dimensiones.
+La respuesta inicial muestra «Tipo | Saldo de soles» y ofrece «Detallar por
+vencimiento»; no sustituye los tipos por un saldo global. Ese seguimiento consulta
+«Tipo | Vencimiento | Saldo de soles», manteniendo socio, tipos, estado, fechas y
+fecha de referencia de la consulta anterior, sin volver a llamar al modelo.

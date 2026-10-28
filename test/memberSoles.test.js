@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { getMemberSoles, getSolesGenerationPeriodStart } from "../src/services/soles/memberSoles.service.js";
 import { searchSolesTypes } from "../src/services/soles/searchSolesTypes.service.js";
-import { buildMemberSolesResponse, resolveMemberSolesPage } from "../src/services/ai/memberSolesPresentation.service.js";
+import { buildMemberSolesResponse, resolveMemberSolesPage, resolveMemberSolesBreakdown } from "../src/services/ai/memberSolesPresentation.service.js";
 import { protectPiiDeep, restorePiiDeep } from "../src/services/ai/pii.service.js";
 import { runWithRequestSignal } from "../src/services/requestContext.service.js";
 
@@ -13,12 +13,12 @@ const connectionFor = (callback) => {
   return { queries, execute: async (sql, binds) => { queries.push({ sql, binds }); return { rows: await callback(sql, binds) }; }, break: async () => {} };
 };
 
-test("current soles default to type and expiration-date summary with explicit total from Oracle", async () => {
+test("explicit expiration breakdown retains the type, dates and null expirations", async () => {
   const connection = connectionFor((sql) => sql.includes("GROUP BY") ? [
     { TYPE_ID: 5, TYPE_DESCRIPTION: "Soles de prueba", EXPIRATION_DATE: "31/10/2026", GENERATED_AMOUNT: 50, BALANCE: 20, RECORD_COUNT: 1, MEMBER_NAME: "Persona sintética" },
     { TYPE_ID: 5, TYPE_DESCRIPTION: "Soles de prueba", EXPIRATION_DATE: null, GENERATED_AMOUNT: 10, BALANCE: 10, RECORD_COUNT: 1, MEMBER_NAME: "Persona sintética" },
   ] : [{ BALANCE: 30, RECORD_COUNT: 2, MEMBER_NAME: "Persona sintética" }]);
-  const result = await getMemberSoles(basic, connection);
+  const result = await getMemberSoles({ ...basic, groupBy: ["expirationDate"] }, connection);
   assert.equal(connection.queries.length, 2);
   assert.deepEqual(result.queryContext.groupBy, ["type", "expirationDate"]);
   assert.equal(result.summary.currentBalance, 30);
@@ -29,7 +29,7 @@ test("current soles default to type and expiration-date summary with explicit to
     assert.equal(binds.documentNumber, "1234567");
   }
   const text = summarize(result);
-  assert.match(text, /30 soles/);
+  assert.match(text, /Detallar por vencimiento|Saldo de soles/);
   assert.match(text, /Sin vencimiento/);
   assert.ok(!text.includes("₲"));
   assert.ok(!text.includes("PYG"));
@@ -144,12 +144,49 @@ test("detail next-page requests preserve protected document, type, dates and all
 test("usual balance query needs only document and balance mode, using today with no extra filters", async () => {
   const connection = connectionFor(() => [{ BALANCE: 12.5, RECORD_COUNT: 2, MEMBER_NAME: "Persona sintética" }]);
   const result = await getMemberSoles({ documentNumber: "1234567", mode: "balance" }, connection);
-  assert.equal(connection.queries.length, 1);
-  assert.equal(result.balance, 12.5);
+  assert.equal(connection.queries.length, 2);
+  assert.equal(result.data[0].balance, 12.5);
+  assert.deepEqual(result.queryContext.groupBy, ["type"]);
   assert.equal(result.queryContext.status, "current");
   assert.match(result.queryContext.referenceDate, /^\d{2}\/\d{2}\/\d{4}$/);
   assert.equal(result.queryContext.generationPeriod.dateFrom, null);
   assert.deepEqual(result.queryContext.typeIds, []);
   assert.equal(connection.queries[0].binds.generationDateFrom, undefined);
-  assert.match(summarize(result), /12,5 soles/);
+  assert.match(summarize(result), /12,5/);
+  assert.match(summarize(result), /Detallar por vencimiento/);
+});
+
+
+test("a balance request always shows separate types and never replaces them with a mixed balance", async () => {
+  const result = await getMemberSoles({ ...basic, mode: "balance" }, connectionFor((sql) => sql.includes("GROUP BY") ? [
+    { TYPE_ID: 1, TYPE_DESCRIPTION: "Normales", BALANCE: 150, RECORD_COUNT: 1 },
+    { TYPE_ID: 2, TYPE_DESCRIPTION: "Obsequio", BALANCE: 50, RECORD_COUNT: 1 },
+  ] : [{ BALANCE: 200, RECORD_COUNT: 2 }]));
+  assert.equal(result.queryContext.mode, "summary");
+  assert.deepEqual(result.queryContext.groupBy, ["type"]);
+  const text = summarize(result);
+  assert.match(text, /Normales \| 150/);
+  assert.match(text, /Obsequio \| 50/);
+  assert.ok(!text.includes("200"));
+  assert.match(text, /Detallar por vencimiento/);
+});
+
+
+test("expiration follow-up preserves identity, type and temporal filters and cannot cross topics", () => {
+  const input = { documentNumber: "[PII_DOCUMENT_1]", typeIds: ["[PII_SOLES_TYPE_ID_1]"], status: "expired",
+    mode: "balance", useCurrentGenerationPeriod: false, generationDateFrom: "01/01/2023", generationDateTo: "31/05/2023" };
+  const history = [
+    { role: "user", content: [{ text: "Saldo de soles" }] },
+    { role: "assistant", content: [{ toolUse: { name: "get_member_soles", toolUseId: "balance", input } }] },
+    { role: "user", content: [{ toolResult: { toolUseId: "balance", status: "success", content: [{ json: {
+      queryContext: { mode: "summary", referenceDate: "31/05/2023" },
+    } }] } }] },
+    { role: "assistant", content: [{ text: "Tipos y saldos" }] },
+  ];
+  assert.deepEqual(resolveMemberSolesBreakdown({ message: "Detallar por vencimiento", history }), {
+    input: { ...input, groupBy: ["type", "expirationDate"], referenceDate: "31/05/2023" },
+  });
+  assert.equal(input.groupBy, undefined);
+  assert.equal(resolveMemberSolesBreakdown({ message: "Por vencimiento en 2022", history }), null);
+  assert.equal(resolveMemberSolesBreakdown({ message: "Por vencimiento", history: [...history, { role: "user", content: [{ text: "Ventas de enero" }] }] }), null);
 });

@@ -138,33 +138,11 @@ export const getMemberSoles = async (
     resolvedGenerationDateTo = normalizedReferenceDate;
   }
 
-  /*
-   * =============================================================
-   * COMPORTAMIENTO POR DEFECTO PARA SALDO VIGENTE
-   * =============================================================
-   *
-   * Si la consulta es por Soles actuales/vigentes y el modelo
-   * no especificó mode ni groupBy, devolvemos:
-   *
-   * - resumen
-   * - por tipo
-   * - por fecha exacta de vencimiento
-   *
-   * Esto permite responder:
-   *
-   * Tipo | Saldo | Vencimiento
-   *
-   * sin perder el detalle de vencimientos diferentes.
-   */
-  const shouldUseDefaultCurrentBreakdown =
-    status === "current" && mode === undefined && groupBy === undefined;
-
-  const resolvedMode = shouldUseDefaultCurrentBreakdown
-    ? "summary"
-    : (mode ?? "balance");
-
-  const resolvedGroupBy = shouldUseDefaultCurrentBreakdown
-    ? ["type", "expirationDate"]
+  // Balances must always retain the type. Even a model request for balance
+  // is executed as an aggregate per type, never as a single mixed balance.
+  const resolvedMode = mode === "detail" ? "detail" : "summary";
+  const resolvedGroupBy = resolvedMode === "summary"
+    ? [...new Set(["type", ...normalizeArray(groupBy)])]
     : normalizeArray(groupBy);
 
   const repositoryArgs = {
@@ -262,6 +240,7 @@ export const getMemberSoles = async (
       status,
 
       mode: resolvedMode,
+      balanceOnly: mode === undefined || mode === "balance",
 
       groupBy: resolvedGroupBy,
 
