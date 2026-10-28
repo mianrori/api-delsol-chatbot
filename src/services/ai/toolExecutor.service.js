@@ -1,3 +1,4 @@
+import { isAccessDenied, accessDeniedError } from "./toolErrors.service.js";
 import { generateChart } from "../charts/chart.service.js";
 import { getVehicleRegistrations } from "../vehicles/vehicleRegistrations.service.js";
 import { getSolesUsage } from "../soles/solesUsage.service.js";
@@ -32,11 +33,7 @@ const withAuthorizedOracle = async (sessionId, callback) => {
       try {
         return await callback({ connection, username });
       } catch (error) {
-        if (Number(error?.errorNum) === 942) {
-          throw new Error(
-            "El usuario no tiene permisos para consultar esta información.",
-          );
-        }
+        if (isAccessDenied(error)) throw accessDeniedError(error);
 
         throw error;
       }

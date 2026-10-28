@@ -357,3 +357,18 @@ no se convierten a cero ni sustentan interpretaciones de continuidad. Las pregun
 estadísticas explícitas (anomalías, ticket promedio, etc.), agrupaciones combinadas
 y fuentes truncadas conservan su flujo existente. Las instrucciones al modelo
 refuerzan la distinción entre evolución observada y pendiente estadística.
+
+
+## Errores de permisos en consultas del chat
+
+Los rechazos Oracle ORA-00942 y ORA-01031 se trasladan como `ACCESS_DENIED`, con
+el mensaje «El usuario no tiene permisos para consultar esta información.».
+El backend devuelve ese texto directamente, sin pedir a Bedrock que lo reinterprete
+como una capacidad pendiente de migrar o como ausencia de datos. Se conserva el
+mensaje en el historial de la conversación y se detiene el resto de herramientas
+del lote, sin ofrecer gráficos o acciones parciales de la solicitud rechazada.
+La conexión proxy mantiene su cierre habitual incluso ante error.
+
+Este ajuste conserva el contrato HTTP del chat y no modifica autenticación,
+permisos Oracle ni la política de expiración/inactividad de sesiones del ERP.
+Validar en DEV repitiendo una consulta con un usuario sin permiso sobre la vista.
