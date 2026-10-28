@@ -324,7 +324,9 @@ no negativos y total positivo. Las líneas necesitan al menos dos puntos. Rechaz
 resultados truncados/paginados incompletos, valores ausentes/no numéricos, rutas no
 permitidas, unidades mezcladas e importes sin moneda explícita y única. Los soles
 se muestran como unidades, nunca como moneda. Los datos de edad conservan su
-referencia en el subtítulo. Los textos se escapan antes de generar SVG.
+referencia en el subtítulo. Los textos se escapan antes de generar SVG. Las barras y puntos de líneas muestran
+el valor de cada categoría; los importes incluyen símbolo de moneda y formato
+paraguayo. El gráfico reserva espacio para las etiquetas, sin alterar los datos.
 
 Pruebas DEV sugeridas:
 

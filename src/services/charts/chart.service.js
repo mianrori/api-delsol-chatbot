@@ -69,9 +69,16 @@ const draw = ({ type, title, labels, datasets, width, height, valuePrefix, value
     const x0 = horizontalBars
       ? Math.max(190, ...labels.map((value) => textWidth(value.slice(0, 25)) + 20), Math.ceil(axisWidth / 2) + 16)
       : Math.max(100, axisWidth + 20);
-    const rightMargin = horizontalBars ? Math.max(45, Math.ceil(axisWidth / 2) + 16) : 45;
-    const y0 = 75, w = width - x0 - rightMargin, h = height - y0 - 115;
-    if (w < 60) throw new Error("El ancho del gráfico no alcanza para mostrar las etiquetas completas. Solicita un ancho mayor.");
+    const valueWidth = Math.max(...values.map((value) => textWidth(amount(value)))) * 10 / 12;
+    const diagonal = Math.ceil(valueWidth / Math.SQRT2);
+    const rightMargin = horizontalBars
+      ? Math.max(45, Math.ceil(axisWidth / 2) + 16, valueWidth + 20)
+      : Math.max(45, diagonal + 20);
+    const y0 = horizontalBars ? 75 : 75 + diagonal;
+    const w = width - x0 - rightMargin, h = height - y0 - 115;
+    if (w < 60 || h < 60) throw new Error("El tamaño del gráfico no alcanza para mostrar las etiquetas completas. Solicita dimensiones mayores.");
+    const valueLabel = (x, y, value, rotated = false) => label(x, y, amount(value),
+      `data-value-label="true" font-size="10" font-weight="bold" paint-order="stroke" stroke="white" stroke-width="3" stroke-linejoin="round"${rotated ? ` transform="rotate(-45 ${x} ${y})"` : ""}`);
     const vertical = (value) => y0 + h - (value - min) / span * h;
     const horizontal = (value) => x0 + (value - min) / span * w;
     for (let i = 0; i <= 4; i++) {
@@ -92,7 +99,11 @@ const draw = ({ type, title, labels, datasets, width, height, valuePrefix, value
     datasets.forEach((series, j) => {
       if (type === "line") {
         svg.push(`<polyline points="${series.values.map((v, i) => `${x0 + (i + .5) * step},${vertical(v)}`).join(" ")}" fill="none" stroke="${colors[j]}" stroke-width="2"/>`);
-        series.values.forEach((v, i) => svg.push(`<circle cx="${x0 + (i + .5) * step}" cy="${vertical(v)}" r="3" fill="${colors[j]}"><title>${escape(`${labels[i]}: ${amount(v)}`)}</title></circle>`));
+        series.values.forEach((v, i) => {
+          const x = x0 + (i + .5) * step, y = vertical(v);
+          svg.push(`<circle cx="${x}" cy="${y}" r="3" fill="${colors[j]}"><title>${escape(`${labels[i]}: ${amount(v)}`)}</title></circle>`);
+          valueLabel(x + 2, y - 8, v, true);
+        });
       } else series.values.forEach((v, i) => {
         const size = step * .75 / datasets.length;
         const offset = i * step + step * .125 + j * size;
@@ -100,6 +111,8 @@ const draw = ({ type, title, labels, datasets, width, height, valuePrefix, value
           ? `x="${Math.min(horizontal(0), horizontal(v))}" y="${y0 + offset}" width="${Math.abs(horizontal(v) - horizontal(0))}" height="${size}"`
           : `x="${x0 + offset}" y="${Math.min(vertical(0), vertical(v))}" width="${size}" height="${Math.abs(vertical(v) - vertical(0))}"`;
         svg.push(`<rect ${geometry} fill="${colors[j]}"><title>${escape(`${labels[i]}: ${amount(v)}`)}</title></rect>`);
+        if (horizontalBars) valueLabel(horizontal(v) + 6, y0 + offset + size / 2 + 3, v);
+        else valueLabel(x0 + offset + size / 2 + 2, vertical(v) - 8, v, true);
       });
       const legendX = 25 + j * Math.floor((width - 30) / datasets.length);
       svg.push(`<rect x="${legendX}" y="${height - 31}" width="12" height="12" fill="${colors[j]}"/>`); label(legendX + 18, height - 20, series.label.slice(0, 25));

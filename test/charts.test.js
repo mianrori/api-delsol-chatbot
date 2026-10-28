@@ -152,3 +152,15 @@ test("large currency axes reserve space for complete labels without changing val
     }
   }
 });
+
+
+test("every monthly bar and line point displays its exact amount as visible text", async () => {
+  const amounts = [58706137966, 63255876492, 64924535090, 72875754527, 86767167311, 28570145323, 365000, 100004];
+  const data = amounts.map((value, index) => ({ month: String(index + 1).padStart(2, "0"), totalAmount: value, currency: { abbreviation: "PYG" } }));
+  for (const type of ["bar", "line", "horizontalBar"]) {
+    const result = await generateChart({ ...args, type, datasets: [{ label: "Ventas", valuePath: "totalAmount" }] }, { sources: { source: { result: { data } } } });
+    const labels = [...svg(result.chart).matchAll(/<text [^>]*data-value-label="true"[^>]*>([^<]+)<\/text>/g)].map((match) => match[1]);
+    assert.deepEqual(labels, amounts.map((value) => `₲ ${new Intl.NumberFormat("es-PY").format(value)}`));
+    assert.equal(result.chart.width, 900); assert.equal(result.chart.height, 500);
+  }
+});
