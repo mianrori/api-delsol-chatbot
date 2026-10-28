@@ -1,3 +1,4 @@
+import { generateChart } from "../charts/chart.service.js";
 import { getVehicleRegistrations } from "../vehicles/vehicleRegistrations.service.js";
 import { getSolesUsage } from "../soles/solesUsage.service.js";
 import { searchSolesUsageDestinations } from "../soles/solesUsageDestination.resolver.js";
@@ -44,6 +45,7 @@ const withAuthorizedOracle = async (sessionId, callback) => {
 };
 
 const toolHandlers = {
+  generate_chart: async (args, context) => generateChart(args, { sources: context.chartSources, restoreText: context.restoreChartText }),
   get_vehicle_registrations: async (args, context) => withAuthorizedOracle(context.sessionId, ({ connection }) => getVehicleRegistrations(args, connection)),
   get_soles_usage: async (args, context) => withAuthorizedOracle(context.sessionId, ({ connection }) => getSolesUsage(args, connection)),
   search_soles_usage_destinations: async (args, context) => withAuthorizedOracle(context.sessionId, ({ connection }) => searchSolesUsageDestinations(args, connection)),

@@ -1,3 +1,4 @@
+import { generateChart } from "../../src/services/charts/chart.service.js";
 import { getVehicleRegistrations } from "../../src/services/vehicles/vehicleRegistrations.service.js";
 import { getSolesUsage } from "../../src/services/soles/solesUsage.service.js";
 import { getMemberSoles } from "../../src/services/soles/memberSoles.service.js";
@@ -46,6 +47,8 @@ let cancelBetweenPeriods;
 let uuidCounter = 0;
 const same = (_id, value) => value;
 const chat = await load("../../src/services/ai/chat.service.js", {
+  "../../prompts/sections/charts.prompt.js": { chartsPrompt: "Instrucciones de gráficos" },
+  "../charts/chartSource.service.js": await import("../../src/services/charts/chartSource.service.js"),
   "../../../config.js": { default: {} },
   "node:crypto": { randomUUID: () => `test-id-${++uuidCounter}` },
   "../requestContext.service.js": requestContext,
@@ -54,6 +57,17 @@ const chat = await load("../../src/services/ai/chat.service.js", {
       modelCalls++;
       if (mode === "direct-followup" || mode === "partial-followup" || mode === "cancel-between") {
         assert.fail("A summary follow-up must not invoke Bedrock");
+      }
+      if (mode === "chart-vehicles" || mode === "chart-followup") {
+        const step = comparisonStep++;
+        assert.ok(step < (mode === "chart-vehicles" ? 2 : 1), "A generated chart must not be rewritten by Bedrock");
+        const first = mode === "chart-vehicles" && step === 0;
+        return { stopReason: "tool_use", output: { message: { role: "assistant", content: [{ toolUse: {
+          name: first ? "get_vehicle_registrations" : "generate_chart", toolUseId: first ? "vehicles-chart-data" : "chart-result",
+          input: first ? { dateFrom: "01/01/2025", dateTo: "31/12/2025", groupBy: ["month"] } : {
+            sourceToolUseId: "vehicles-chart-data", type: mode === "chart-vehicles" ? "line" : "bar", labelPaths: ["month"], datasets: [{ label: "Registros", valuePath: "vehicleCount" }],
+          },
+        } }] } } };
       }
       if (mode === "vehicle-detail") {
         assert.equal(comparisonStep++, 0, "Vehicle table and pagination must not invoke Bedrock again");
@@ -142,11 +156,19 @@ const chat = await load("../../src/services/ai/chat.service.js", {
         name: "analyze_members", toolUseId: "test-tool", input: { resultMode: "summary" },
       } }] } } };
     } },
-    ConverseCommand: class {},
+    ConverseCommand: class { constructor(input) {
+      assert.ok(!JSON.stringify(input).includes("data:image/svg+xml"), "Chart images must not reach Bedrock or history");
+    } },
   },
   "../../tools/index.js": { tools: [] },
   "./toolExecutor.service.js": { executeTool: async (call) => {
     toolCalls++;
+    if (call.name === "generate_chart") return generateChart(call.arguments, { sources: call.context.chartSources, restoreText: call.context.restoreChartText });
+    if (mode === "chart-vehicles") return getVehicleRegistrations(call.arguments, { execute: async () => ({ rows: [
+      { MONTH: "2025-01", VEHICLE_COUNT: 2, PLATE_COUNT: 2, MEMBER_COUNT: 2, TOTAL_VEHICLE_COUNT: 5, TOTAL_PLATE_COUNT: 5, TOTAL_MEMBER_COUNT: 3 },
+      { MONTH: "2025-02", VEHICLE_COUNT: 3, PLATE_COUNT: 3, MEMBER_COUNT: 1, TOTAL_VEHICLE_COUNT: 5, TOTAL_PLATE_COUNT: 5, TOTAL_MEMBER_COUNT: 3 },
+    ] }) });
+
     if (mode === "usage" || mode === "usage-detail") {
       assert.equal(call.name, "get_soles_usage");
       return getSolesUsage(call.arguments, { execute: async (_sql, binds) => {
@@ -406,6 +428,20 @@ assert.match(vehicleNextPage.answer, /página 2 de 2/);
 assert.equal(modelCalls - beforeVehicleModels, 1);
 assert.equal(storedHistory.at(-1).content[0].text, vehicleNextPage.answer);
 
+mode = "chart-vehicles"; comparisonStep = 0; storedHistory = [];
+const beforeChartModels = modelCalls;
+const plotted = await chat.chatService({ sessionId: "test", message: "Vehículos registrados por mes de 2025 en un gráfico" });
+assert.equal(modelCalls - beforeChartModels, 2);
+assert.equal(plotted.actions.chart.available, true);
+assert.match(plotted.actions.chart.url, /^data:image\/svg\+xml;base64,/);
+assert.equal(plotted.answer, "Aquí tienes el gráfico solicitado.");
+assert.ok(!JSON.stringify(storedHistory).includes("data:image"));
+mode = "chart-followup"; comparisonStep = 0;
+const beforeFollowupTools = toolCalls;
+const changedChart = await chat.chatService({ sessionId: "test", message: "Grafícalo en barras" });
+assert.equal(changedChart.actions.chart.type, "bar");
+assert.equal(toolCalls, beforeFollowupTools + 1, "Chart follow-up must not query Oracle again");
+
 // Exercise the actual dispatcher: it must use the session proxy and close the
 // connection even when a queried view is not authorized.
 const dispatcherText = await readFile(new URL("../../src/services/ai/toolExecutor.service.js", import.meta.url), "utf8");
@@ -414,6 +450,7 @@ for (const match of dispatcherText.matchAll(/import \{([^}]+)\} from "([^"]+)";/
   dispatcherStubs[match[2]] = Object.fromEntries(match[1].split(",").map((name) => [name.trim(), () => assert.fail("Unexpected unrelated tool")]));
 }
 let proxyClosed = 0; let proxyDenied = false;
+dispatcherStubs["../charts/chart.service.js"] = { generateChart };
 dispatcherStubs["../vehicles/vehicleRegistrations.service.js"] = { getVehicleRegistrations };
 dispatcherStubs["../soles/solesUsage.service.js"] = { getSolesUsage };
 dispatcherStubs["../soles/memberSoles.service.js"] = { getMemberSoles };
@@ -579,4 +616,8 @@ assert.equal(proxyClosed, beforeVehicleProxyClosed + 1);
 proxyDenied = true;
 await assert.rejects(dispatcher.executeTool(vehicleRequest), /no tiene permisos/);
 assert.equal(proxyClosed, beforeVehicleProxyClosed + 2);
+const beforeChartProxyClosed = proxyClosed;
+const chartRequest = { name: "generate_chart", arguments: { sourceToolUseId: "v", type: "bar", labelPaths: ["month"], datasets: [{ label: "Registros", valuePath: "vehicleCount" }] }, context: { sessionId: "authorized-session", chartSources: { v: { result: { data: [{ month: "2025-01", vehicleCount: 2 }] } } } } };
+assert.equal((await dispatcher.executeTool(chartRequest)).chart.available, true);
+assert.equal(proxyClosed, beforeChartProxyClosed, "Chart generation does not open Oracle");
 console.log("Lifecycle integration passed");

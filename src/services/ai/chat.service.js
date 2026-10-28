@@ -1,3 +1,5 @@
+import { chartsPrompt } from "../../prompts/sections/charts.prompt.js";
+import { getChartSources, isChartRequest } from "../charts/chartSource.service.js";
 import { buildVehicleResponse, resolveVehiclePage } from "./vehiclePresentation.service.js";
 import { buildSolesUsageResponse, resolveSolesUsagePage } from "./solesUsagePresentation.service.js";
 import { buildMemberSolesResponse, resolveMemberSolesPage, resolveMemberSolesBreakdown } from "./memberSolesPresentation.service.js";
@@ -73,6 +75,7 @@ En esta etapa de migración, las herramientas habilitadas son:
 - get_member_promo_purchases
 - get_member_vehicles
 - get_vehicle_registrations
+- generate_chart
 - analyze_members
 - compare_member_purchases_vs_sales
 - analyze_campaign_sales_performance
@@ -701,6 +704,8 @@ const mergeActions = (currentActions, newActions) => ({
 });
 
 const extractClientActions = ({ name, result }) => {
+  if (name === "generate_chart" && result?.chart?.available) return { chart: result.chart };
+
   if (name === "get_sales" && result?.export?.available) {
     const exportId = result.export.exportId ?? null;
 
@@ -757,6 +762,8 @@ const extractClientActions = ({ name, result }) => {
 };
 
 const removeClientOnlyMetadata = ({ name, result }) => {
+  if (name === "generate_chart") return result.result;
+
   if (
     name === "get_sales_per_sqm" &&
     result &&
@@ -1332,7 +1339,7 @@ const buildMonthlyIncidenceResponse = (result) => {
   return lines.join("\n");
 };
 
-const executeToolRequests = async ({ content, sessionId }) => {
+const executeToolRequests = async ({ content, sessionId, sourceMessages = [], chartRequested = false }) => {
   const toolResults = [];
   let actions = {};
   let internalContext = { presentationCalls: [] };
@@ -1353,13 +1360,18 @@ const executeToolRequests = async ({ content, sessionId }) => {
     try {
       validateProtectedToolInput({ name, input });
 
-      const restoredInput = restorePiiDeep(sessionId, input);
+      if (name === "generate_chart" && !chartRequested) throw new Error("El usuario debe solicitar el gráfico antes de generarlo.");
+      const restoredInput = name === "generate_chart" ? input : restorePiiDeep(sessionId, input);
 
       const result = await executeTool({
         name,
         arguments: restoredInput,
         context: {
           sessionId,
+          ...(name === "generate_chart" ? {
+            chartSources: getChartSources([...sourceMessages, { role: "user", content: toolResults }]),
+            restoreChartText: (value) => restorePiiTextForUser(sessionId, value),
+          } : {}),
         },
       });
       throwIfRequestAborted();
@@ -1524,7 +1536,8 @@ export const chatService = async ({ message, sessionId }) => {
 
   const systemPrompt = getSystemPrompt({
     currentDate: getCurrentDateParaguay(),
-  });
+  }) + "\n" + chartsPrompt;
+  const chartRequested = isChartRequest(message);
 
   let toolIterations = 0;
   let bedrockIteration = 0;
@@ -1684,6 +1697,8 @@ export const chatService = async ({ message, sessionId }) => {
       } = await executeToolRequests({
         content: safeOutputMessage.content ?? [],
         sessionId,
+        sourceMessages: messages,
+        chartRequested,
       });
 
       conversationActions = mergeActions(
@@ -1713,6 +1728,9 @@ export const chatService = async ({ message, sessionId }) => {
         ?? buildMemberPurchasesVsSalesResponse(conversationInternalContext.presentationCalls)
         ?? buildMemberAnalysisBreakdownResponse(conversationInternalContext.presentationCalls);
 
+      if (conversationActions.chart?.available) followupAnswer = "Aquí tienes el gráfico solicitado.";
+      else if (chartRequested && Object.keys(getChartSources([...messages, { role: "user", content: toolResults }])).length) followupAnswer = null;
+
       if (toolResults.length === 0) {
         throw new Error(
           "Bedrock indicó tool_use pero no devolvió ninguna herramienta.",
@@ -1735,8 +1753,9 @@ export const chatService = async ({ message, sessionId }) => {
       conversationInternalContext.monthlyIncidenceResult,
     );
 
-    const completedAssistantText =
-      monthlyIncidenceText ??
+    const completedAssistantText = conversationActions.chart?.available
+      ? "Aquí tienes el gráfico solicitado."
+      : monthlyIncidenceText ??
       buildVehicleResponse(conversationInternalContext.presentationCalls) ??
       buildSolesUsageResponse(conversationInternalContext.presentationCalls) ??
       buildMemberSolesResponse(conversationInternalContext.presentationCalls) ??

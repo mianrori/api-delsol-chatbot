@@ -90,7 +90,7 @@ por local». Se muestran los valores calculados sin pedir al modelo que reescrib
 la tabla. Los resultados deben validarse contra Oracle DEV.
 
 Inventario de herramientas aún pendientes frente al registro de `api-delsol-erp/main`
-revisado el 28/10/2026: generación de gráficos. La presencia de herramientas
+revisado el 28/10/2026: sin herramientas pendientes de registrar. La presencia de herramientas
 migradas no equivale a haber validado todos sus casos en DEV.
 
 
@@ -293,3 +293,46 @@ Pruebas DEV sugeridas con datos disponibles:
 Las pruebas automatizadas cubren calendario, filtros, conteos, datos demográficos
 faltantes, paginación, protección de datos, cancelación y cierre del proxy ante éxito
 y error. La validación contra Oracle DEV y las respuestas de Bedrock queda pendiente.
+
+
+## Gráficos de resultados
+
+`generate_chart` representa resultados de negocio ya consultados mediante barras,
+barras horizontales, líneas o circular. Utiliza `sourceToolUseId` del resultado de
+negocio, `dataPath` (por defecto `data`), `labelPaths` y `datasets[].valuePath`.
+El modelo selecciona campos, pero no envía ni reconstruye valores: el backend los
+extrae directamente del resultado de herramienta aplicable. No utiliza respuestas
+narrativas como fuente. «Grafícalo» reutiliza el tema inmediatamente anterior sin
+abrir Oracle. Si se pide datos y gráfico en una pregunta, se completan ambas etapas.
+
+El resultado del endpoint mantiene `response` y `actions.chart`. El gráfico contiene
+`available`, `url`, `type`, `title`, `subtitle`, `width`, `height`, `valuePrefix`,
+`valueSuffix`, `pointCount`, `datasetCount`, `format` y `mimeType`. `url` es una URI
+`data:image/svg+xml;base64,...` generada localmente, sin descargar imágenes de
+servicios externos ni enviarles datos comerciales. El frontend puede usarla como
+`src` de una imagen; su política de contenido debe permitir `data:` en `img-src`.
+Insomnia permite inspeccionar el JSON, aunque no necesariamente previsualiza la
+imagen incluida en una propiedad JSON. La imagen no se incluye en el historial,
+los logs de herramientas ni en los mensajes enviados a Bedrock: solo la metadata.
+Las etiquetas protegidas se restauran exclusivamente al renderizar para el cliente.
+
+No requiere dependencias nuevas ni conexión Oracle para generar la imagen. Admite
+hasta 100 filas y 5 series. El circular tiene una serie, hasta 8 categorías, valores
+no negativos y total positivo. Las líneas necesitan al menos dos puntos. Rechaza
+resultados truncados/paginados incompletos, valores ausentes/no numéricos, rutas no
+permitidas, unidades mezcladas e importes sin moneda explícita y única. Los soles
+se muestran como unidades, nunca como moneda. Los datos de edad conservan su
+referencia en el subtítulo. Los textos se escapan antes de generar SVG.
+
+Pruebas DEV sugeridas:
+
+1. «Vehículos registrados entre enero y diciembre de 2025 por mes».
+2. «Grafícalo en líneas» (sin repetir consulta Oracle).
+3. «Grafícalo en barras» (reutiliza la misma fuente).
+4. En conversación nueva: «Vehículos registrados entre enero y diciembre de 2025
+   por mes en un gráfico de barras» (consulta y gráfico en la misma petición).
+5. «Ventas de enero a mayo de 2023 por mes en un gráfico de líneas».
+
+En cada caso exitoso se espera `actions.chart.available=true`, una `url` con prefijo
+`data:image/svg+xml;base64,` y una respuesta breve, sin enlaces técnicos ni Markdown
+de imagen. La validación con Bedrock/Oracle DEV y el frontend está pendiente.
