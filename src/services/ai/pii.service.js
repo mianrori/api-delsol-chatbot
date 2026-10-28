@@ -4,6 +4,7 @@ import { logPiiTransformation } from "../../utils/debug.logger.js";
 const TOKEN_PATTERN = /\[PII_([A-Z_]+)_\d+\]/g;
 
 const INTERNAL_ONLY_TOKEN_TYPES = new Set([
+  "SOLES_TYPE_ID",
   "CUSTOMER_ID",
   "CATEGORY_ID",
   "CONCEPT_ID",
@@ -64,6 +65,10 @@ const FIELD_TYPES = new Map([
   ["ruc", "TAX_ID"],
   ["taxid", "TAX_ID"],
 
+  ["typeid", "SOLES_TYPE_ID"],
+  ["typeids", "SOLES_TYPE_ID"],
+  ["typedescription", "SOLES_TYPE_NAME"],
+
   // Vehículos
   ["plate", "PLATE"],
   ["matricula", "PLATE"],
@@ -108,6 +113,8 @@ const FIELD_TYPES = new Map([
 ]);
 
 const PATH_TYPES = [
+  { pattern: /(?:^|\.)searchsolestypes(?:\.options)?\.description$/, type: "SOLES_TYPE_NAME" },
+  { pattern: /(?:^|\.)getmembersoles\.data\.type\.description$/, type: "SOLES_TYPE_NAME" },
   {
     pattern: /(?:^|\.)contract\.number$/,
     type: "CONTRACT_NUMBER",

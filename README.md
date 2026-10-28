@@ -91,7 +91,7 @@ la tabla. Los resultados deben validarse contra Oracle DEV.
 
 Inventario de herramientas aún pendientes frente al registro de `api-delsol-erp/main`
 revisado el 28/10/2026: generación de gráficos,
-registros de vehículos, búsqueda de tipos de soles, soles de socios, uso de soles,
+registros de vehículos, uso de soles,
 destinos de uso y tipos de movimiento de soles. La presencia de herramientas
 migradas no equivale a haber validado todos sus casos en DEV.
 
@@ -149,3 +149,41 @@ campaña Navidad», «Siguiente página», y seleccionar el número global de un
 campaña de esa página. Contrastar el total con VW_BOT_PROMOCIONES usando los
 mismos filtros y el mismo usuario. El análisis debe utilizar la identidad y
 vigencia de la opción seleccionada.
+
+
+## Soles del programa de fidelización
+
+Se migran `search_soles_types` y `get_member_soles`. El socio se resuelve con
+`search_members` y el tipo con el catálogo Oracle; los alias comerciales apuntan
+a descripciones, nunca a identificadores fijos. Las búsquedas de tipos conservan
+sus opciones reales sin truncar a 5 o 10 coincidencias.
+
+Los soles son cantidades del programa de fidelización, no una moneda. Los modos
+son saldo (`balance`), resumen (`summary`) y detalle (`detail`). Por defecto,
+vigentes devuelve resumen por tipo y vencimiento exacto y consulta el saldo total
+con los mismos filtros. Sin vencimiento se considera vigente; la fecha de
+vencimiento igual a referenceDate sigue vigente. La fecha por defecto es la del
+calendario de Paraguay, independientemente del huso horario del contenedor.
+
+Para vencidos, el período automático de generación empieza el 1 de noviembre
+más reciente y termina en referenceDate. `useCurrentGenerationPeriod=false`
+permite todo el histórico; un intervalo explícito sustituye el automático.
+referenceDate clasifica vigencia según vencimiento sobre los saldos registrados;
+no reconstruye saldos pasados ni consulta movimientos de uso.
+
+El detalle incluye totalRows, totalPages, returnedRows, startRow, endRow, hasMore
+y nextPage; conserva filtros y fecha de referencia al pedir «siguiente página».
+rows admite 1–100, por defecto 20. Las cantidades y tablas se presentan directamente
+sin una llamada adicional al modelo. Documentos, nombres, transacciones y tipos
+se protegen antes de llegar a Bedrock. Las consultas usan la sesión proxy existente,
+se cierran al terminar y respetan cancelación.
+
+Prueba en Insomnia tras reset, reemplazando el documento por uno existente en DEV:
+1. «Busca el tipo de soles normales».
+2. «Consulta los soles vigentes del socio con documento [documento], con fecha de referencia 31/05/2023».
+3. «Muestra el detalle de sus soles de todos los estados, 5 por página, manteniendo la fecha de referencia».
+4. «Siguiente página».
+5. «Consulta sus soles vencidos al 31/05/2023 de todo el histórico».
+
+Contrastar saldos, tipos y vencimientos con Oracle bajo el mismo usuario. Este
+bloque no incluye todavía movimientos ni destinos de uso de soles.

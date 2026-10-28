@@ -1,3 +1,4 @@
+import { buildMemberSolesResponse, resolveMemberSolesPage } from "./memberSolesPresentation.service.js";
 import { buildPromotionSearchResponse, resolvePromotionSearchPage } from "./promotionSearchPresentation.service.js";
 import { buildCampaignSalesPerformanceResponse } from "./campaignSalesPerformancePresentation.service.js";
 import { buildMemberPurchasesVsSalesResponse } from "./memberPurchasesVsSalesPresentation.service.js";
@@ -72,6 +73,8 @@ En esta etapa de migración, las herramientas habilitadas son:
 - analyze_members
 - compare_member_purchases_vs_sales
 - analyze_campaign_sales_performance
+- search_soles_types
+- get_member_soles
 
 Las únicas capacidades disponibles son las definidas a continuación y las herramientas presentes en toolConfig.
 
@@ -89,6 +92,13 @@ Para esta etapa:
 - puedes buscar socios por nombre, número de documento, email o teléfono;
 - puedes consultar los datos de un socio previamente resuelto;
 - puedes consultar compras de un socio por período, local, rubro, resumen o detalle;
+- puedes buscar tipos de soles y consultar saldo, registros generados y vencimientos por socio;
+- los soles son unidades del programa de fidelización, no soles peruanos ni importes en Guaraníes; no uses símbolos monetarios para sus cantidades;
+- resuelve al socio con search_members y los tipos con search_soles_types; conserva sus identificadores o tokens, sin inventarlos;
+- para soles vigentes, omite mode y groupBy salvo petición explícita: se devuelven por tipo y fecha exacta de vencimiento con saldo total;
+- para soles vencidos se aplica por defecto el período de generación iniciado el 1 de noviembre anterior a la fecha de referencia; usa useCurrentGenerationPeriod=false si el usuario solicita todo el histórico;
+- referenceDate clasifica vigencia por vencimiento sobre el saldo registrado; no reconstruye un saldo histórico ni movimientos de uso;
+- conserva los filtros al paginar el detalle y usa nextPage; todavía no están habilitadas las consultas de movimientos/destinos de uso de soles;
 - puedes resolver promociones y campañas;
 - puedes comparar ventas antes, durante y después de una campaña resuelta, con períodos de igual duración y los mismos filtros de locales y rubros;
 - para analizar campañas usa primero search_promotions: si devuelve AMBIGUOUS, espera la selección del usuario; reutiliza promotionId, campaignId, dateFrom y dateTo de la campaña seleccionada, sin inventar fechas ni atribuir causalidad;
@@ -1382,7 +1392,7 @@ const executeToolRequests = async ({ content, sessionId }) => {
         null,
         [name],
       );
-      if (["analyze_members", "compare_member_purchases_vs_sales", "analyze_campaign_sales_performance", "search_promotions"].includes(name)) {
+      if (["analyze_members", "compare_member_purchases_vs_sales", "analyze_campaign_sales_performance", "search_promotions", "get_member_soles"].includes(name)) {
         presentationCall.result = protectedResultForModel;
       }
 
@@ -1506,7 +1516,21 @@ export const chatService = async ({ message, sessionId }) => {
     history: protectedHistory,
   });
   const promotionPage = resolvePromotionSearchPage({ message, history: protectedHistory });
-  if (promotionPage) {
+  const solesPage = resolveMemberSolesPage({ message, history: protectedHistory });
+  if (solesPage) {
+    if (solesPage.answer) followupAnswer = solesPage.answer;
+    else {
+      const content = [{ toolUse: { toolUseId: `soles_page_${randomUUID()}`, name: "get_member_soles", input: solesPage.input } }];
+      messages.push({ role: "assistant", content });
+      const executed = await executeToolRequests({ content, sessionId });
+      messages.push({ role: "user", content: executed.toolResults });
+      conversationActions = executed.actions;
+      conversationInternalContext = executed.internalContext;
+      toolIterations = 1;
+      followupAnswer = buildMemberSolesResponse(executed.internalContext.presentationCalls)
+        ?? "No fue posible consultar la página de soles. Vuelve a intentarlo.";
+    }
+  } else if (promotionPage) {
     if (promotionPage.answer) followupAnswer = promotionPage.answer;
     else {
       const content = [{ toolUse: { toolUseId: `promotion_page_${randomUUID()}`, name: "search_promotions", input: promotionPage.input } }];
@@ -1651,7 +1675,8 @@ export const chatService = async ({ message, sessionId }) => {
 
       // A complete breakdown is authoritative even when the model requested
       // it after changing dates or filters. Do not ask the model to rewrite it.
-      followupAnswer = buildPromotionSearchResponse(conversationInternalContext.presentationCalls)
+      followupAnswer = buildMemberSolesResponse(conversationInternalContext.presentationCalls)
+        ?? buildPromotionSearchResponse(conversationInternalContext.presentationCalls)
         ?? buildCampaignSalesPerformanceResponse(conversationInternalContext.presentationCalls)
         ?? buildMemberPurchasesVsSalesResponse(conversationInternalContext.presentationCalls)
         ?? buildMemberAnalysisBreakdownResponse(conversationInternalContext.presentationCalls);
@@ -1680,6 +1705,7 @@ export const chatService = async ({ message, sessionId }) => {
 
     const completedAssistantText =
       monthlyIncidenceText ??
+      buildMemberSolesResponse(conversationInternalContext.presentationCalls) ??
       buildPromotionSearchResponse(conversationInternalContext.presentationCalls) ??
       buildCampaignSalesPerformanceResponse(conversationInternalContext.presentationCalls) ??
       buildMemberPurchasesVsSalesResponse(conversationInternalContext.presentationCalls) ??

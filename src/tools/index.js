@@ -1,3 +1,5 @@
+import { searchSolesTypesTool } from "./soles/searchSolesTypes.tool.js";
+import { getMemberSolesTool } from "./soles/getMemberSoles.tool.js";
 import { analyzeCampaignSalesPerformanceTool } from "./sales/analyzeCampaignSalesPerformance.tool.js";
 import { compareMemberPurchasesVsSalesTool } from "./members/compareMemberPurchasesVsSales.tool.js";
 import { searchCustomersTool } from "./customers/searchCustomers.tool.js";
@@ -19,6 +21,8 @@ import { getMemberVehiclesTool } from "./members/getMemberVehicles.tool.js";
 import { analyzeMembersTool } from "./members/analyzeMembers.tool.js";
 
 export const tools = [
+  searchSolesTypesTool,
+  getMemberSolesTool,
   analyzeCampaignSalesPerformanceTool,
   compareMemberPurchasesVsSalesTool,
   searchCustomersTool,
