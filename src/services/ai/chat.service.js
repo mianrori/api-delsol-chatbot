@@ -6,7 +6,7 @@ import { ACCESS_DENIED_CODE, ACCESS_DENIED_MESSAGE, isAccessDenied } from "./too
 import { buildSalesSeriesResponse } from "./salesSeriesPresentation.service.js";
 import { chartsPrompt } from "../../prompts/sections/charts.prompt.js";
 import { getChartSources, isChartRequest, isChartSourceTool } from "../charts/chartSource.service.js";
-import { buildVehicleResponse, resolveVehiclePage } from "./vehiclePresentation.service.js";
+import { buildVehicleResponse, resolveVehiclePage, resolveVehicleGenderBreakdown } from "./vehiclePresentation.service.js";
 import { buildSolesUsageResponse, resolveSolesUsagePage } from "./solesUsagePresentation.service.js";
 import { buildMemberSolesResponse, resolveMemberSolesPage, resolveMemberSolesBreakdown, resolveMemberSolesBalance } from "./memberSolesPresentation.service.js";
 import { buildPromotionSearchResponse, resolvePromotionSearchPage } from "./promotionSearchPresentation.service.js";
@@ -1588,6 +1588,7 @@ export const chatService = async ({ message, sessionId }) => {
     ?? resolveRepeatedSalesExport(salesRefreshRequest);
   const promotionPage = resolvePromotionSearchPage({ message, history: protectedHistory });
   const solesPage = resolveVehiclePage({ message, history: protectedHistory })
+    ?? resolveVehicleGenderBreakdown({ message, history: protectedHistory })
     ?? resolveSolesUsagePage({ message, history: protectedHistory })
     ?? resolveMemberSolesPage({ message, history: protectedHistory })
     ?? resolveMemberSolesBreakdown({ message, history: protectedHistory })
