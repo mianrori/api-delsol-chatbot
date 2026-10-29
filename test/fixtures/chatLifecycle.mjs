@@ -23,6 +23,9 @@ const synthetic = (exports) => new vm.SyntheticModule(Object.keys(exports), func
 const load = async (path, stubs) => {
   const main = new vm.SourceTextModule(await readFile(new URL(path, import.meta.url), "utf8"), { context });
   await main.link(async (spec) => {
+    if (["./salesHistory.service.js", "./salesSamplePresentation.service.js"].includes(spec)) {
+      return new vm.SourceTextModule(await readFile(new URL("../../src/services/ai/" + spec.slice(2), import.meta.url), "utf8"), { context });
+    }
     if (["./salesExportFollowup.service.js", "./salesYearComparison.service.js", "./toolErrors.service.js", "./salesSeriesPresentation.service.js", "./vehiclePresentation.service.js", "./solesUsagePresentation.service.js", "./memberSolesPresentation.service.js", "./promotionSearchPresentation.service.js", "./campaignSalesPerformancePresentation.service.js", "./memberPurchasesVsSalesPresentation.service.js", "./conversationClarification.service.js", "./memberAnalysisFollowup.service.js", "./memberRankingPresentation.service.js", "./memberSummaryPresentation.service.js"].includes(spec)) {
       return new vm.SourceTextModule(await readFile(new URL("../../src/services/ai/" + spec.slice(2), import.meta.url), "utf8"), { context });
     }
@@ -55,6 +58,16 @@ const chat = await load("../../src/services/ai/chat.service.js", {
   "@aws-sdk/client-bedrock-runtime": {
     BedrockRuntimeClient: class { async send(_command, options) {
       modelCalls++;
+      if (mode.startsWith("sales-history-")) {
+        const step = comparisonStep++;
+        assert.ok(step < 2, "A historical sales reuse can retry only once");
+        if (step === 0 || mode === "sales-history-stubborn") return { stopReason: "end_turn", output: { message: { role: "assistant", content: [{ text: "| Local | Ventas |\n| --- | --- |\n| Vieja muestra | ₲ 999999 |" }] } } };
+        assert.ok(_command.input.system.some((item) => item.text.includes("muestra histórica de ventas")));
+        assert.ok(!_command.input.messages.some((item) => JSON.stringify(item).includes("999999")), "Rejected output cannot become evidence for the retry");
+        return { stopReason: "tool_use", output: { message: { role: "assistant", content: [{ toolUse: {
+          name: "get_sales", toolUseId: "refreshed-equivalent", input: { dateFrom: "01/01/2023", dateTo: "31/01/2023", groupBy: ["customer"], metrics: ["totalAmount", "totalInvoices"] },
+        } }] } } };
+      }
       if (mode.startsWith("sales-export-")) {
         assert.ok(!mode.endsWith("denied"), "Permission denial must bypass the model");
         assert.equal(comparisonStep++, 0);
@@ -187,6 +200,13 @@ const chat = await load("../../src/services/ai/chat.service.js", {
   "../../tools/index.js": { tools: [] },
   "./toolExecutor.service.js": { executeTool: async (call) => {
     toolCalls++;
+    if (mode.startsWith("sales-history-")) {
+      assert.equal(call.name, "get_sales");
+      assert.equal(call.arguments.dateTo, "31/01/2023");
+      if (mode === "sales-history-denied") throw Object.assign(new Error("Access denied"), { code: "ACCESS_DENIED" });
+      return { data: Array.from({ length: 180 }, (_, i) => ({ customerName: `Local ${i}`, totalAmount: i * 1000, totalInvoices: i, currency: { symbol: "₲", abbreviation: "PYG" } })),
+        export: { available: true, exportId: "current-equivalent-export", totalRecords: 180, expiresAt: new Date(Date.now() + 600000).toISOString() } };
+    }
     if (mode.startsWith("sales-export-")) {
       assert.equal(call.name, "get_sales");
       const removing = mode.includes("removal");
@@ -560,7 +580,7 @@ const removalQuestion = "Ahora todos los rubros, manteniendo enero de 2023 y el 
 const seedCategoryHistory = () => [
   { role: "user", content: [{ text: "Ventas de enero de 2023 por local" }] },
   { role: "assistant", content: [{ toolUse: { name: "get_sales", toolUseId: "old-all-categories", input: { ...exportInput, dateTo: "31/01/2023" } } }] },
-  { role: "user", content: [{ toolResult: { toolUseId: "old-all-categories", status: "success", content: [{ json: { data: [], resultSet: { fullResultAvailableInExport: true } } }] } }] },
+  { role: "user", content: [{ toolResult: { toolUseId: "old-all-categories", status: "success", content: [{ json: { data: [], resultSet: { fullResultAvailableInExport: true, truncated: true } } }] } }] },
   { role: "assistant", content: [{ text: "Muestra de 12 de 180 locales." }] },
   { role: "user", content: [{ text: "Ahora por local solo del rubro deportes" }] },
   { role: "assistant", content: [{ toolUse: { name: "get_sales", toolUseId: "filtered-categories", input: { ...exportInput, dateTo: "31/01/2023", categoryIds: ["[PII_CATEGORY_ID_9]"] } } }] },
@@ -580,6 +600,28 @@ for (const removalMode of ["sales-export-removal", "sales-export-removal-denied"
     assert.equal(result.actions.salesExport.totalRecords, 180);
     assert.equal(result.actions.salesExport.available, true);
     assert.match(result.actions.salesExport.exportId, /^fresh-/);
+  }
+}
+
+for (const reuseMode of ["sales-history-reuse", "sales-history-stubborn", "sales-history-denied"]) {
+  mode = reuseMode; comparisonStep = 0;
+  storedHistory = seedCategoryHistory().slice(0, 4);
+  const before = toolCalls, beforeModels = modelCalls;
+  const result = await chat.chatService({ sessionId: "test", message: "Ventas de enero de 2023 por local, con monto total y cantidad de facturas" });
+  assert.equal(modelCalls - beforeModels, 2);
+  assert.equal(toolCalls - before, reuseMode === "sales-history-stubborn" ? 0 : 1);
+  assert.doesNotMatch(result.answer, /999999/);
+  assert.ok(!JSON.stringify(storedHistory).includes("999999"));
+  if (reuseMode === "sales-history-denied") {
+    assert.equal(result.answer, "El usuario no tiene permisos para consultar esta información.");
+    assert.equal(JSON.stringify(result.actions), "{}");
+  } else if (reuseMode === "sales-history-stubborn") {
+    assert.equal(result.answer, "No fue posible actualizar la consulta de ventas. Vuelve a intentarlo.");
+    assert.equal(JSON.stringify(result.actions), "{}");
+  } else {
+    assert.match(result.answer, /Se muestran 12 de 180 registros/);
+    assert.match(result.answer, /Período: 01\/01\/2023 a 31\/01\/2023/);
+    assert.equal(result.actions.salesExport.exportId, "current-equivalent-export");
   }
 }
 
