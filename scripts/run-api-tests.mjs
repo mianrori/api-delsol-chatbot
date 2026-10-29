@@ -16,6 +16,11 @@ export const controls = {
     { month: "05", name: "mayo", amount: 86767167311, invoices: 432821 },
   ],
 };
+const monthNames = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+export const comparisonControls = {
+  2023: [...controls.monthly.map((row) => [row.amount, row.invoices]), [28570145323, 158555], [365000, 1], [100004, 228], null, null, null, null],
+  2024: [null, null, null, null, null, null, null, [5000000, 1], null, [172500, 1], [20380000, 28], null],
+};
 const xlsxType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const clean = (value) => String(value ?? "").replace(/\*\*/g, "").replace(/[\u00a0\u202f]/g, " ").trim();
 const numeric = (value) => {
@@ -35,7 +40,7 @@ export const readConfig = (env = process.env) => {
   const timeoutMs = Number(env.BOT_TEST_TIMEOUT_MS || 90000);
   if (!Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 600000) throw new Failure("INVALID_TIMEOUT");
   const suite = env.BOT_TEST_SUITE || "all";
-  if (!["quick", "sales", "charts", "all"].includes(suite)) throw new Failure("INVALID_SUITE");
+  if (!["quick", "sales", "charts", "comparisons", "all"].includes(suite)) throw new Failure("INVALID_SUITE");
   return { baseUrl, sessionId, timeoutMs, suite, reportPath: env.BOT_TEST_REPORT || join(tmpdir(), "chatbot-api-tests.json") };
 };
 
@@ -50,7 +55,7 @@ const defaultLoadWorkbook = async (bytes) => {
 // request follows the same HTTP/session contract as Insomnia.
 export const runApiTests = async (config, { fetchImpl = fetch, loadWorkbook = defaultLoadWorkbook, progress = console.log } = {}) => {
   const report = { version: 1, suite: config.suite, startedAt: new Date().toISOString(),
-    description: "DEV regression using 2023 control totals. No session IDs, export IDs, names, response bodies, SVG images or workbook rows are stored.", steps: [] };
+    description: "DEV regression using 2023/2024 control totals. No session IDs, export IDs, names, response bodies, SVG images or workbook rows are stored.", steps: [] };
   const exportIds = new Set();
   let step;
   const check = (condition, code) => {
@@ -171,6 +176,49 @@ export const runApiTests = async (config, { fetchImpl = fetch, loadWorkbook = de
     }), "CHART_VALUE_ANCHORS_IN_VIEWBOX");
     check(points.every((point) => texts.some((item) => [point.month, `2023-${point.month}`, point.name].includes(item.value.toLowerCase()))), "CHART_MONTH_LABELS");
   };
+  const comparison = (body, from, to) => {
+    check(!body.actions?.chart && !body.actions?.salesExport, "COMPARISON_NO_STALE_ACTIONS");
+    for (const year of [2023, 2024]) {
+      const first = `01/${String(from).padStart(2, "0")}/${year}`;
+      const last = `${new Date(Date.UTC(year, to, 0)).getUTCDate()}/${String(to).padStart(2, "0")}/${year}`;
+      check(clean(body.response).includes(`${year}: ${first} a ${last}.`), "COMPARISON_PERIODS");
+    }
+    const table = body.response.split("\n").filter((line) => /^\s*\|/.test(line)).map((line) => line.split("|").slice(1, -1).map(clean));
+    check(JSON.stringify(table[0]) === JSON.stringify(["Mes", "Ventas 2023", "Facturas 2023", "Ventas 2024", "Facturas 2024"]), "COMPARISON_COLUMNS");
+    const rows = table.slice(1).filter((row) => !row.every((cell) => /^:?-+:?$/.test(cell)));
+    check(rows.length === to - from + 1 && rows.every((row, index) => row.length === 5 && row[0].toLowerCase() === monthNames[from + index - 1]), "COMPARISON_MONTH_ORDER");
+    let missing = true, numbers = true, currency = true;
+    const comparable = [];
+    rows.forEach((row, index) => {
+      const month = from + index;
+      if (comparisonControls[2023][month - 1] && comparisonControls[2024][month - 1]) comparable.push(month);
+      [2023, 2024].forEach((year, column) => {
+        const values = comparisonControls[year][month - 1], offset = 1 + column * 2;
+        if (!values) missing &&= row[offset].toLowerCase() === "sin registros" && row[offset + 1].toLowerCase() === "sin registros";
+        else {
+          numbers &&= numeric(row[offset]) === values[0] && numeric(row[offset + 1]) === values[1];
+          currency &&= row[offset].startsWith("₲ ") && !row[offset + 1].includes("₲");
+        }
+      });
+    });
+    check(missing, "COMPARISON_MISSING_IS_NOT_ZERO");
+    check(numbers, "COMPARISON_CONTROL_VALUES");
+    check(currency, "COMPARISON_PYG_AND_COUNTS");
+    const notes = body.response.split("\n").map(clean).filter((line) => /^-\s/.test(line));
+    check(notes.length === comparable.length * 2 && notes.every((line) => comparable.some((month) => line.toLowerCase().startsWith(`- ${monthNames[month - 1]}:`))), "COMPARISON_COMPARABLE_NOTES");
+    for (const month of comparable) for (const metric of [0, 1]) {
+      const delta = comparisonControls[2024][month - 1][metric] - comparisonControls[2023][month - 1][metric];
+      const subject = metric === 0 ? "las ventas" : "la cantidad de facturas";
+      const direction = metric === 0 ? (delta > 0 ? "fueron mayores" : delta < 0 ? "fueron menores" : "fueron iguales") : (delta > 0 ? "fue mayor" : delta < 0 ? "fue menor" : "fue igual");
+      const note = notes.find((line) => line.toLowerCase().startsWith(`- ${monthNames[month - 1]}: ${subject}`));
+      check(Boolean(note) && note.includes(`${subject} de 2024 ${direction} que en 2023`), "COMPARISON_NOTE_DIRECTIONS");
+      const difference = `${metric === 0 ? "₲ " : ""}${new Intl.NumberFormat("es-PY").format(delta)}`;
+      check(note.includes(`diferencia: ${difference})`), "COMPARISON_NOTE_DIFFERENCES");
+    }
+    if (!comparable.length) check(/No hay valores disponibles en ambos años para comparar/.test(body.response), "COMPARISON_NO_PAIRED_VALUES");
+    check(/ausencia de filas/.test(body.response) && /no se reemplaza por cero/.test(body.response), "COMPARISON_MISSING_EXPLANATION");
+    check(!/no (?:se registraron|hubo) ventas/i.test(body.response), "COMPARISON_NO_FALSE_ZERO_CLAIM");
+  };
   const january = { from: "01/01/2023", to: "31/01/2023", month: "01", group: "customer", total: controls.january, rows: controls.january.rows };
   const cases = [
     ["reset-conversation", async () => {
@@ -186,7 +234,7 @@ export const runApiTests = async (config, { fetchImpl = fetch, loadWorkbook = de
     ["equivalent-january-sales", async () => excel(await chat("Muéstrame las ventas por local de enero de 2023, incluyendo importes y número de facturas"), january)],
     ["change-to-february", async () => excel(await chat("Muéstrame las ventas por local de febrero de 2023, incluyendo importes y número de facturas"), { ...january, from: "01/02/2023", to: "28/02/2023", month: "02", rows: undefined, total: controls.february })],
   ];
-  if (config.suite === "charts") cases.splice(1);
+  if (["charts", "comparisons"].includes(config.suite)) cases.splice(1);
   if (["sales", "all"].includes(config.suite)) cases.push(
     ["january-by-category", async () => excel(await chat("Ventas de enero de 2023 por rubro, con monto total y cantidad de facturas"), { ...january, group: "category", rows: 34 })],
     ["filter-sports", async () => {
@@ -232,6 +280,11 @@ export const runApiTests = async (config, { fetchImpl = fetch, loadWorkbook = de
     ["chart-sales-lines", async () => chart(await chat("Ahora el mismo gráfico en líneas, conserva el período y el monto total de ventas"), "line", controls.monthly)],
     ["chart-sales-new-period", async () => chart(await chat("Ventas de enero a febrero de 2023 por mes en un gráfico de barras, solo el monto total"), "bar", controls.monthly.slice(0, 2))],
   );
+  if (["comparisons", "all"].includes(config.suite)) cases.push(
+    ["compare-full-years", async () => comparison(await chat("Compara las ventas de 2023 contra 2024, mes a mes, con monto total y cantidad de facturas"), 1, 12)],
+    ["compare-january-may", async () => comparison(await chat("Ahora compara únicamente enero a mayo de ambos años"), 1, 5)],
+    ["compare-august", async () => comparison(await chat("Ahora compara únicamente agosto a agosto de ambos años"), 8, 8)],
+  );
   let stopped = false;
   for (const [id, execute] of cases) {
     step = { id, status: "skipped", requests: [], checks: [] }; report.steps.push(step);
@@ -251,7 +304,7 @@ export const runApiTests = async (config, { fetchImpl = fetch, loadWorkbook = de
 
 const main = async () => {
   if (process.argv.includes("--help")) {
-    console.log("Variables: BOT_TEST_SESSION_ID (obligatorio), BOT_TEST_BASE_URL, BOT_TEST_SUITE=quick|sales|charts|all, BOT_TEST_TIMEOUT_MS=90000, BOT_TEST_REPORT. Reinicia solo la conversación de esta sesión. Ejecutar en DEV. Reporte predeterminado: directorio temporal/chatbot-api-tests.json. No inicia sesión ni cambia su expiración.");
+    console.log("Variables: BOT_TEST_SESSION_ID (obligatorio), BOT_TEST_BASE_URL, BOT_TEST_SUITE=quick|sales|charts|comparisons|all, BOT_TEST_TIMEOUT_MS=90000, BOT_TEST_REPORT. Reinicia solo la conversación de esta sesión. Ejecutar en DEV. Reporte predeterminado: directorio temporal/chatbot-api-tests.json. No inicia sesión ni cambia su expiración.");
     return;
   }
   let config;

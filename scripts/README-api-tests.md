@@ -42,7 +42,7 @@ concreta, el reporte identifica su paso y horario.
 | --- | --- | --- |
 | `BOT_TEST_SESSION_ID` | Obligatorio | Sesión válida con permisos de consulta. |
 | `BOT_TEST_BASE_URL` | `http://localhost:5400/chatbot/api/bot` | URL sin credenciales ni parámetros. |
-| `BOT_TEST_SUITE` | `all` | `quick`, `sales`, `charts` o `all`. |
+| `BOT_TEST_SUITE` | `all` | `quick`, `sales`, `charts`, `comparisons` o `all`. |
 | `BOT_TEST_TIMEOUT_MS` | `90000` | Límite por petición; máximo 600000. |
 | `BOT_TEST_REPORT` | Directorio temporal + `chatbot-api-tests.json` | Ruta del reporte; la carpeta debe existir. |
 
@@ -58,14 +58,27 @@ docker exec -e BOT_TEST_SESSION_ID -e BOT_TEST_SUITE=quick api-delsol-chatbot-de
   eliminación del filtro, con validación de las exportaciones correspondientes.
 - `charts`: 5 pasos. Reinicio, serie de ventas enero–mayo de 2023 con ambas métricas,
   gráfico de barras solo del importe, cambio a líneas y gráfico de enero–febrero.
-- `all`: 16 pasos. Incluye `sales`, cambio de tema a vehículos de 2025 y seguimiento
-  por género (sin arrastrar exportaciones), y las cuatro comprobaciones de gráficos.
+- `comparisons`: 4 pasos. Reinicio, comparación mensual 2023 contra 2024,
+  seguimiento limitado a enero–mayo y seguimiento limitado a agosto.
+- `all`: 19 pasos. Incluye `sales`, cambio de tema a vehículos de 2025 y seguimiento
+  por género (sin arrastrar exportaciones), las cuatro comprobaciones de gráficos
+  y las tres comparaciones entre años.
 
 Para ejecutar únicamente el nuevo bloque de gráficos:
 
 ```powershell
 $env:BOT_TEST_SESSION_ID = Read-Host "Pega un sessionId vigente de DEV"
 docker exec -e BOT_TEST_SESSION_ID -e BOT_TEST_SUITE=charts api-delsol-chatbot-dev node scripts/run-api-tests.mjs
+$report = Join-Path ([Environment]::GetFolderPath("Desktop")) "chatbot-api-tests.json"
+docker cp api-delsol-chatbot-dev:/tmp/chatbot-api-tests.json "$report"
+Remove-Item Env:BOT_TEST_SESSION_ID
+```
+
+Para ejecutar únicamente las comparaciones entre años:
+
+```powershell
+$env:BOT_TEST_SESSION_ID = Read-Host "Pega un sessionId vigente de DEV"
+docker exec -e BOT_TEST_SESSION_ID -e BOT_TEST_SUITE=comparisons api-delsol-chatbot-dev node scripts/run-api-tests.mjs
 $report = Join-Path ([Environment]::GetFolderPath("Desktop")) "chatbot-api-tests.json"
 docker cp api-delsol-chatbot-dev:/tmp/chatbot-api-tests.json "$report"
 Remove-Item Env:BOT_TEST_SESSION_ID
@@ -93,6 +106,20 @@ regresión. Las constantes de ventas se encuentran al inicio del ejecutor; los
 controles de rubros y vehículos están en sus casos correspondientes.
 La serie mensual de enero a mayo de 2023 para gráficos está en `controls.monthly`:
 cada mes tiene sus propios controles de importe y facturas.
+Los datos mensuales de las comparaciones se encuentran en `comparisonControls`.
+En esta copia DEV, 2023 tiene filas de enero a agosto y 2024 en agosto, octubre
+y noviembre. Los demás meses se representan con `null` en los controles porque
+no tienen filas, no porque sus ventas sean cero.
+
+Agosto compara ₲ 100.004 y 228 facturas (2023) con ₲ 5.000.000 y 1 factura (2024):
+la diferencia de ventas es ₲ 4.899.996 y la de facturas es -227. En enero–mayo no
+hay pares de valores para comparar. La suite comprueba las fechas de ambos años,
+el orden y la cantidad de meses, cada importe/cantidad, la moneda, las celdas
+«Sin registros», los meses admitidos en las observaciones y el signo/valor de
+sus diferencias. Rechaza sustituir ausencias por cero, atribuirles ausencia de
+ventas o mantener el rango anual después de pedir un rango menor. No guarda
+tablas ni observaciones completas en el reporte. Si cambia la base DEV, deben
+revisarse también los controles de meses con y sin filas.
 
 Para cada Excel, se comprueba HTTP 200, MIME, firma ZIP, apertura con ExcelJS,
 hojas, columnas, métricas numéricas, moneda PYG, cantidad completa de filas,
