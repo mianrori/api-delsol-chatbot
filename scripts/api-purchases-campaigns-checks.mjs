@@ -42,7 +42,7 @@ export const createPurchaseCases = ({ chat, check, monthlyControls }) => {
     check(parsed[0].rows.length === expected.length, "PURCHASES_GROUP_COUNT");
     const rows = parsed[0].rows.map((row, index) => {
       const offset = monthly ? 1 : 0, [currency, sales, amount, count, members, percentage] = row.slice(offset);
-      check(row.length === headers.length && currency === "₲", "PURCHASES_PYG_CURRENCY");
+      check(row.length === headers.length && ["₲", "PYG"].includes(currency), "PURCHASES_PYG_CURRENCY");
       if (monthly) check(row[0] === `2023-${expected[index].month}`, "PURCHASES_MONTHS_AND_ORDER");
       const result = { sales: numeric(sales), amount: numeric(amount), count: numeric(count), members: numeric(members), percentage: numeric(percentage) };
       check(Object.values(result).every(Number.isFinite) && Number.isInteger(result.count) && result.count >= 0

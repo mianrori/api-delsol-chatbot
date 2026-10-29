@@ -240,6 +240,7 @@ No requieren documento de socio ni cambian el reloj. `purchases` comprueba los
 **canjes agregados frente a ventas**, no el detalle individual de compras de un
 socio. Requiere canjes registrados en enero–mayo de 2023. Compara los importes y
 conteos de canjes entre respuestas mensual/total/enero y calcula el porcentaje;
+la columna Moneda admite `PYG` o `₲`, y rechaza monedas distintas;
 los socios distintos del total deben estar entre el máximo mensual y la suma
 mensual. Esta coherencia no sustituye una conciliación independiente con Oracle.
 

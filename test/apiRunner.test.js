@@ -62,7 +62,7 @@ const mockApi = async (options = {}) => {
       const args = { dateFrom: "01/01/2023", dateTo: january ? "31/01/2023" : "31/05/2023", breakdownBy: monthly ? ["month"] : [], orderBy: "dimension", orderDirection: "asc" };
       const connection = { execute: async (sql) => ({ rows: groups.map((row) => ({
         DIMENSION_1_ID: row.label, DIMENSION_1_NAME: row.label,
-        CURRENCY_DESCRIPTION: "GUARANIES", CURRENCY_SYMBOL: "₲",
+        CURRENCY_DESCRIPTION: "GUARANIES", CURRENCY_SYMBOL: options.purchaseCurrency ?? "PYG",
         ...(sql.includes("VW_BOT_VENTAS_LOCALES") ? { SALES_AMOUNT: row.sales } : {
           EXCHANGE_AMOUNT: row.amount, INVOICE_COUNT: row.count, MEMBER_COUNT: row.members,
         }),
@@ -409,11 +409,13 @@ test("soles suite rejects a response that ignores the requested reference and us
 
 
 test("purchase suite reconciles monthly and total canjes, distinct members and a changed period", async () => {
-  const { report, counts } = await execute({ suite: "purchases", validateSolesPii: true });
-  assert.equal(report.success, true, JSON.stringify(report));
-  assert.equal(report.summary.passed, 4);
-  assert.deepEqual(counts, { chats: 3, downloads: 0 });
-  for (const secret of [session, "1000000", "15000000", "PRIVATE_"]) assert.ok(!JSON.stringify(report).includes(secret));
+  for (const purchaseCurrency of ["PYG", "₲"]) {
+    const { report, counts } = await execute({ suite: "purchases", purchaseCurrency, validateSolesPii: true });
+    assert.equal(report.success, true, JSON.stringify(report));
+    assert.equal(report.summary.passed, 4);
+    assert.deepEqual(counts, { chats: 3, downloads: 0 });
+    for (const secret of [session, "1000000", "15000000", "PRIVATE_"]) assert.ok(!JSON.stringify(report).includes(secret));
+  }
 });
 
 test("purchase suite detects wrong periods, totals, currency, percentages and nonadditive members", async () => {
