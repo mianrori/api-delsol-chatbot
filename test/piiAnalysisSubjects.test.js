@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import {
   protectPiiText, protectPiiDeep, restorePiiText,
 } from "../src/services/ai/pii.service.js";
@@ -216,5 +217,21 @@ test("preserving a grouping period does not expose commercial fields or personal
   assert.equal(restorePiiText(session, protectedText), text);
   const row = protectPiiDeep(session, { customerName: "Enero de 2023" });
   assert.match(row.customerName, /^\[PII_CUSTOMER_NAME_\d+\]$/);
+  clearPiiSession(session);
+});
+
+test("soles identities remain protected when a comma separates the subject from the grouping", () => {
+  const session = "pii-soles-grouping-comma";
+  const generatedDocument = randomUUID().replace(/\D/g, "").padEnd(9, "7").slice(0, 9);
+  const formattedDocument = generatedDocument.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  for (const subject of [generatedDocument, formattedDocument, "Persona Ejemplo"]) for (const suffix of [", por tipo de soles", ", por vencimiento", " , por fecha de vencimiento"]) {
+    const text = `Volvamos al saldo de soles de ${subject}${suffix}`;
+    const protectedText = protectPiiText(session, text);
+    assert.ok(!protectedText.includes(subject));
+    assert.match(protectedText, /\[PII_(?:DOCUMENT|NAME)_\d+\]/);
+    assert.ok(protectedText.endsWith(suffix));
+    assert.equal(restorePiiText(session, protectedText), text);
+    assert.equal(protectPiiText(session, protectedText), protectedText);
+  }
   clearPiiSession(session);
 });
