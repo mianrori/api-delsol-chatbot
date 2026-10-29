@@ -1,5 +1,7 @@
 import { resolveSalesYearComparison, buildSalesYearComparisonResponse } from "./salesYearComparison.service.js";
-import { resolveRepeatedSalesExport, resolveSalesCategoryRemoval } from "./salesExportFollowup.service.js";
+import { needsSalesRefresh, SALES_REFRESH_INSTRUCTION } from "./salesHistory.service.js";
+import { buildSalesSampleResponse } from "./salesSamplePresentation.service.js";
+import { resolveRepeatedSalesExport, resolveSalesCategoryRemoval, resolveEquivalentSalesExport } from "./salesExportFollowup.service.js";
 import { ACCESS_DENIED_CODE, ACCESS_DENIED_MESSAGE, isAccessDenied } from "./toolErrors.service.js";
 import { buildSalesSeriesResponse } from "./salesSeriesPresentation.service.js";
 import { chartsPrompt } from "../../prompts/sections/charts.prompt.js";
@@ -282,6 +284,7 @@ Para ventas por metro cuadrado:
 - evita expresiones ambiguas como "la superficie contractual no estaba disponible" cuando puedan interpretarse como ausencia de dato en el contrato; utiliza preferentemente "no se dispone de una superficie contractual aplicable para ese período";
 - una disminución de ventas o ventas por m² puede describirse como una caída del indicador; no la conviertas automáticamente en una afirmación sobre disminución de actividad comercial, flujo de clientes, demanda, eficiencia comercial u otra causa no demostrada por los datos;
 - en get_sales, interpreta totalAmount y totalInvoices por separado: una subida de ventas no implica una subida de facturas;
+- para responder una nueva consulta de ventas, ejecuta get_sales aunque exista un resultado histórico con los mismos filtros; reutiliza los identificadores y filtros resueltos, no una muestra ni una supuesta exportación antigua. Esto incluye preguntas equivalentes y cambios de filtros o desglose. Para un gráfico solicitado sobre un resultado completo, conserva las reglas específicas de gráficos;
 - una pendiente de regresión positiva o un aumento entre el primer y último período no demuestra crecimiento sostenido: revisa todas las variaciones consecutivas de esa métrica;
 - si alguna variación es negativa, no afirmes crecimiento sostenido ni aumentos en todos los períodos; describe las subidas y bajadas observadas;
 - no describas una serie como "incremento sostenido", "caída sostenida", "tendencia ascendente" o "tendencia descendente" si existen observaciones intermedias que contradigan esa dirección; si no existe una tendencia monotónica clara, limita el análisis a máximos, mínimos y variaciones observadas;
@@ -1567,6 +1570,7 @@ export const chatService = async ({ message, sessionId }) => {
   let bedrockIteration = 0;
   let conversationActions = {};
   let conversationInternalContext = {};
+  let salesRefreshRetried = false;
   let followupAnswer = clarifyInitialBreakdown({ message, history: protectedHistory });
 
   const followupInput = resolveMemberAnalysisFollowup({
@@ -1580,6 +1584,7 @@ export const chatService = async ({ message, sessionId }) => {
   const salesYearComparison = resolveSalesYearComparison({ message, history: protectedHistory });
   const salesRefreshRequest = { message: messages.at(-1).content[0].text, history: protectedHistory };
   const salesRefreshInput = resolveSalesCategoryRemoval(salesRefreshRequest)
+    ?? resolveEquivalentSalesExport(salesRefreshRequest)
     ?? resolveRepeatedSalesExport(salesRefreshRequest);
   const promotionPage = resolvePromotionSearchPage({ message, history: protectedHistory });
   const solesPage = resolveVehiclePage({ message, history: protectedHistory })
@@ -1610,6 +1615,7 @@ export const chatService = async ({ message, sessionId }) => {
     toolIterations = 1;
     // The fresh tool result, rather than the previous narrative/sample, is the
     // source for the answer. The standard executor rechecks Oracle permissions.
+    followupAnswer = buildSalesSampleResponse(executed.internalContext.presentationCalls, { exportAvailable: Boolean(conversationActions.salesExport?.available) });
   } else if (solesPage) {
     if (solesPage.answer) followupAnswer = solesPage.answer;
     else {
@@ -1689,6 +1695,7 @@ export const chatService = async ({ message, sessionId }) => {
           {
             text: RUNTIME_CAPABILITIES_PROMPT,
           },
+          ...(salesRefreshRetried ? [{ text: SALES_REFRESH_INSTRUCTION }] : []),
         ],
         messages,
         toolConfig: {
@@ -1778,6 +1785,7 @@ export const chatService = async ({ message, sessionId }) => {
       // A complete breakdown is authoritative even when the model requested
       // it after changing dates or filters. Do not ask the model to rewrite it.
       followupAnswer = buildSalesYearComparisonResponse(conversationInternalContext.presentationCalls)
+        ?? buildSalesSampleResponse(conversationInternalContext.presentationCalls, { exportAvailable: Boolean(conversationActions.salesExport?.available) })
         ?? buildSalesSeriesResponse(conversationInternalContext.presentationCalls, { message })
         ?? buildVehicleResponse(conversationInternalContext.presentationCalls)
         ?? buildSolesUsageResponse(conversationInternalContext.presentationCalls)
@@ -1811,6 +1819,23 @@ export const chatService = async ({ message, sessionId }) => {
       extractText(safeOutputMessage),
     );
 
+    if (!conversationInternalContext.accessDenied && needsSalesRefresh({
+      message, answer: safeAssistantText, history: protectedHistory,
+      calls: conversationInternalContext.presentationCalls, chartRequested,
+    })) {
+      // Give the model one opportunity to resolve the current request through
+      // its normal tool schema. Never guess filters from an old narrative.
+      if (!salesRefreshRetried) {
+        messages.pop();
+        salesRefreshRetried = true;
+        continue;
+      }
+      followupAnswer = "No fue posible actualizar la consulta de ventas. Vuelve a intentarlo.";
+      conversationActions = {};
+      messages.pop();
+      continue;
+    }
+
     const monthlyIncidenceText = buildMonthlyIncidenceResponse(
       conversationInternalContext.monthlyIncidenceResult,
     );
@@ -1821,6 +1846,7 @@ export const chatService = async ({ message, sessionId }) => {
       ? "Aquí tienes el gráfico solicitado."
       : monthlyIncidenceText ??
       buildSalesYearComparisonResponse(conversationInternalContext.presentationCalls) ??
+      buildSalesSampleResponse(conversationInternalContext.presentationCalls, { exportAvailable: Boolean(conversationActions.salesExport?.available) }) ??
       buildSalesSeriesResponse(conversationInternalContext.presentationCalls, { message }) ??
       buildVehicleResponse(conversationInternalContext.presentationCalls) ??
       buildSolesUsageResponse(conversationInternalContext.presentationCalls) ??

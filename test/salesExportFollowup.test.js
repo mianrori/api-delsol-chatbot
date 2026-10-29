@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { resolveRepeatedSalesExport, resolveSalesCategoryRemoval } from "../src/services/ai/salesExportFollowup.service.js";
+import { resolveRepeatedSalesExport, resolveSalesCategoryRemoval, resolveEquivalentSalesExport } from "../src/services/ai/salesExportFollowup.service.js";
 
 const question = "Ventas de enero a mayo de 2023 por local, con monto total y cantidad de facturas";
 const input = { dateFrom: "01/01/2023", dateTo: "31/05/2023", groupBy: ["customer"], metrics: ["totalAmount", "totalInvoices"], customerIds: ["[PII_CUSTOMER_ID_1]"], categoryIds: ["[PII_CATEGORY_ID_1]"], dayType: "weekend" };
@@ -109,4 +109,68 @@ test("category removal can recover the same request previously answered without 
   const result = resolveSalesCategoryRemoval({ message: removal, history });
   assert.equal(result.dateTo, "31/01/2023");
   assert.ok(!Object.hasOwn(result, "categoryIds"));
+});
+
+const equivalentQuestion = "Muéstrame las ventas por local de enero de 2023, incluyendo importes y número de facturas";
+const globalTurn = () => {
+  const h = filteredTurn();
+  h[0].content[0].text = "Ventas de enero de 2023 por local, con monto total y cantidad de facturas";
+  delete h[1].content[0].toolUse.input.customerIds;
+  delete h[1].content[0].toolUse.input.categoryIds;
+  delete h[1].content[0].toolUse.input.dayType;
+  h[2].content[0].toolResult.content[0].json.resultSet = { fullResultAvailableInExport: true, truncated: true, totalRecords: 180 };
+  return h;
+};
+
+test("equivalent monthly sales wording resolves directly to the authorized prior arguments", () => {
+  const history = globalTurn();
+  for (const message of [equivalentQuestion, "Ventas de enero de 2023 por local, con importe total y facturas", "Mostrame las ventas por local de enero 2023, con montos totales y cantidad de facturas"]) {
+    assert.deepEqual(resolveEquivalentSalesExport({ message, history }), history[1].content[0].toolUse.input);
+  }
+});
+
+test("equivalent requests recover from consecutive no-tool and controlled error answers", () => {
+  const history = [...globalTurn(), { role: "user", content: [{ text: equivalentQuestion }] }, { role: "assistant", content: [{ text: "No fue posible actualizar la consulta de ventas. Vuelve a intentarlo." }] }];
+  assert.ok(resolveEquivalentSalesExport({ message: equivalentQuestion, history }));
+});
+
+test("equivalence cannot add or remove filters, dates, metrics, grouping or unknown arguments", () => {
+  for (const change of [
+    (h) => { h[1].content[0].toolUse.input.categoryIds = ["protected-category"]; },
+    (h) => { h[1].content[0].toolUse.input.customerIds = ["protected-customer"]; },
+    (h) => { h[1].content[0].toolUse.input.dayType = "weekend"; },
+    (h) => { h[1].content[0].toolUse.input.dateTo = "31/05/2023"; },
+    (h) => { h[1].content[0].toolUse.input.metrics = ["totalAmount"]; },
+    (h) => { h[1].content[0].toolUse.input.groupBy = ["category"]; },
+    (h) => { h[1].content[0].toolUse.input.futureFilter = "value"; },
+  ]) {
+    const history = globalTurn(); change(history);
+    assert.equal(resolveEquivalentSalesExport({ message: equivalentQuestion, history }), null);
+  }
+});
+
+test("equivalent sales grammar never discards named entities, additional conditions or analysis", () => {
+  for (const message of [equivalentQuestion + " solo deportes", equivalentQuestion + " solo fines de semana", equivalentQuestion.replace("enero", "febrero"), "Ventas de Marca Ejemplo por local de enero de 2023", "Ventas por local de enero de 2023 con anomalías", "Ahora por local"]) {
+    assert.equal(resolveEquivalentSalesExport({ message, history: globalTurn() }), null);
+  }
+});
+
+test("equivalent requests cannot cross topics or replay failed or ambiguous queries", () => {
+  for (const change of [
+    (h) => h.push({ role: "user", content: [{ text: "Vehículos registrados en 2025" }] }),
+    (h) => { h[2].content[0].toolResult.status = "error"; },
+    (h) => { h[1].content.push({ toolUse: { name: "get_sales", toolUseId: "second", input } }); },
+  ]) {
+    const history = globalTurn(); change(history);
+    assert.equal(resolveEquivalentSalesExport({ message: equivalentQuestion, history }), null);
+  }
+  assert.equal(resolveEquivalentSalesExport({ message: equivalentQuestion, history: [] }), null);
+});
+
+test("equivalence handles leap months and category/count-only breakdowns", () => {
+  const history = globalTurn();
+  Object.assign(history[1].content[0].toolUse.input, { dateFrom: "01/02/2024", dateTo: "29/02/2024", groupBy: ["category"], metrics: ["totalInvoices"] });
+  const result = resolveEquivalentSalesExport({ message: "Ventas por rubro de febrero de 2024, con número de facturas", history });
+  assert.equal(result.dateTo, "29/02/2024");
+  assert.deepEqual(result.metrics, ["totalInvoices"]);
 });

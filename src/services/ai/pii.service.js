@@ -275,6 +275,16 @@ const isGenericAnalysisSubject = (value) => {
   return new RegExp(`^(?:${month}(?: (?:y|a|hasta) ${month})?|20\\d{2}|hoy|ayer|(?:este|el) (?:mes|ano))$`).test(normalized);
 };
 
+// After "por local/cliente", a complete calendar qualifier describes the
+// grouping period. This exception never applies to an explicitly named local.
+const isGroupingCalendarQualifier = (value) => {
+  const normalized = value.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ");
+  const month = "(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)";
+  const year = "(?:19|20)\\d{2}";
+  const monthYear = `${month}(?: (?:de )?${year})?`;
+  return new RegExp(`^(?:de|del|en|durante|desde|entre) (?:${monthYear}(?: (?:a|y|hasta) ${monthYear})?|(?:el ano |ano )?${year}|hoy|ayer|(?:este|el|ese|aquel|el mismo) (?:mes|ano))$`).test(normalized);
+};
+
 const protectKnownTextPatterns = (sessionId, text) => {
   let protectedText = String(text ?? "");
 
@@ -347,8 +357,10 @@ const protectKnownTextPatterns = (sessionId, text) => {
    */
   protectedText = protectedText.replace(
     /\b((?:cliente|local)\s+(?:(?:llamado|llamada|denominado|denominada)\s+)?)([A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9&.'’ -]{2,80})(?=\s*(?:[,.!?;:]|$))/gi,
-    (_match, prefix, value) =>
-      `${prefix}${protectPiiValue(sessionId, "BUSINESS_ENTITY", value.trim())}`,
+    (match, prefix, value, offset, source) => {
+      if (/^(?:local|cliente)\s+$/i.test(prefix) && /\bpor\s+$/i.test(source.slice(0, offset)) && isGroupingCalendarQualifier(value)) return match;
+      return `${prefix}${protectPiiValue(sessionId, "BUSINESS_ENTITY", value.trim())}`;
+    },
   );
 
   protectedText = protectedText.replace(

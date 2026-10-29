@@ -166,3 +166,55 @@ test("commercial names containing years remain protected in year comparison requ
   assert.equal(restorePiiText(session, protectPiiText(session, explicit)), explicit);
   clearPiiSession(session);
 });
+
+test("sales grouped by local preserve the exact calendar wording from the reported failure", () => {
+  const session = "pii-local-calendar-regression";
+  const text = "Muéstrame las ventas por local de enero de 2023, incluyendo importes y número de facturas";
+  assert.equal(protectPiiText(session, text), text);
+  assert.equal(protectPiiDeep(session, [{ role: "user", content: [{ text }] }])[0].content[0].text, text);
+  assert.equal(protectPiiText(session, protectPiiText(session, text)), text);
+  clearPiiSession(session);
+});
+
+test("grouping calendar qualifiers support months, ranges, years and relative periods", () => {
+  const session = "pii-grouping-calendars";
+  const qualifiers = [
+    ...["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "setiembre", "octubre", "noviembre", "diciembre"].map((month) => `de ${month} de 2023`),
+    "de enero a mayo de 2023", "entre enero y mayo de 2023", "desde enero de 2023 hasta mayo de 2023",
+    "del 2023", "del año 2023", "en 2023", "durante enero de 2023", "de este mes", "de ayer",
+  ];
+  for (const group of ["local", "cliente"]) for (const qualifier of qualifiers) {
+    const text = `Ventas por ${group} ${qualifier}, con monto total y cantidad de facturas`;
+    assert.equal(protectPiiText(session, text), text, text);
+  }
+  clearPiiSession(session);
+});
+
+test("explicit commercial identities and calendar-like names remain protected", () => {
+  const session = "pii-calendar-brands";
+  for (const text of [
+    "Ventas del local Enero de 2023", "Ventas del cliente de enero de 2023",
+    "Ventas por local llamado Enero de 2023", "Ventas por cliente denominado Enero de 2023",
+    "Ventas por local de Enero Store", "Ventas por local de enero de 2023 Outlet",
+    "Ventas del local 2023", "Ventas del local Marca Ejemplo en enero de 2023",
+  ]) {
+    const protectedText = protectPiiText(session, text);
+    assert.match(protectedText, /\[PII_BUSINESS_ENTITY_\d+\]/, text);
+    assert.equal(restorePiiText(session, protectedText), text);
+    assert.equal(protectPiiText(session, protectedText), protectedText);
+  }
+  clearPiiSession(session);
+});
+
+test("preserving a grouping period does not expose commercial fields or personal data", () => {
+  const session = "pii-grouping-private-fields";
+  const text = "Ventas por local de enero de 2023, documento 1234567 y correo persona@example.test";
+  const protectedText = protectPiiText(session, text);
+  assert.ok(protectedText.includes("por local de enero de 2023"));
+  assert.ok(!protectedText.includes("1234567"));
+  assert.ok(!protectedText.includes("persona@example.test"));
+  assert.equal(restorePiiText(session, protectedText), text);
+  const row = protectPiiDeep(session, { customerName: "Enero de 2023" });
+  assert.match(row.customerName, /^\[PII_CUSTOMER_NAME_\d+\]$/);
+  clearPiiSession(session);
+});
