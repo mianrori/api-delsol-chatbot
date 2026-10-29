@@ -21,7 +21,7 @@ const fakeWorkbook = (buffer) => {
   return { getWorksheet: (name) => name === "Ventas" ? sheet(rows) : name === "Información" ? sheet(info) : undefined };
 };
 const mockApi = async (options = {}) => {
-  const exports = new Map(); let chats = 0, downloads = 0, balanceCalls = 0, solesPage = 0;
+  const exports = new Map(); let chats = 0, downloads = 0, balanceCalls = 0, solesPage = 0, solesReferenceDate;
   const memberName = "PERSONA PRIVADA DE PRUEBA";
   const movements = [3.5, -1, .5, 2, 1, 1.25, 2.75].slice(0, options.singleSolesPage ? 3 : 7).map((quantity, index) => ({
     memberName, movementDate: index % 2 ? `2023-02-${String(index + 1).padStart(2, "0")}T12:00:00.000Z` : `${String(index + 1).padStart(2, "0")}/02/2023`, solesTypeDescription: index < 4 ? "PRIVATE_TYPE_A" : "PRIVATE_TYPE_B",
@@ -51,14 +51,18 @@ const mockApi = async (options = {}) => {
     const solesPeriod = { dateFrom: "01/01/2023", dateTo: "31/05/2023" };
     if (question.includes("saldo de soles") || question === "detallar por vencimiento") {
       const expiration = question === "detallar por vencimiento";
-      if (!expiration) balanceCalls++;
+      if (!expiration) {
+        balanceCalls++;
+        solesReferenceDate = / con fecha de referencia (\d{2}\/\d{2}\/\d{4})/.exec(question)?.[1];
+        assert.equal(solesReferenceDate, options.solesReferenceDate ?? "30/06/2023", "The request must specify the test reference date explicitly");
+      }
       const rows = expiration ? [
         { typeDescription: "PRIVATE_TYPE_A", balance: 6.25 + (options.wrongSolesExpiration ? 1 : 0), expirationDate: "31/12/2098", recordCount: 1 },
         { typeDescription: "PRIVATE_TYPE_A", balance: 4.25, expirationDate: "31/12/2099", recordCount: 1 },
         { typeDescription: "PRIVATE_TYPE_B", balance: 4, expirationDate: "31/12/2099", recordCount: 1 },
       ] : [{ typeDescription: "PRIVATE_TYPE_A", balance: options.wrongSolesReturn && balanceCalls > 1 ? 5 : 10.5, recordCount: 2 }, { typeDescription: "PRIVATE_TYPE_B", balance: 4, recordCount: 1 }];
       const result = { data: rows, summary: { memberName: options.changedSolesMember && expiration ? "OTRA PERSONA PRIVADA" : memberName },
-        queryContext: { mode: "summary", status: "current", referenceDate: "29/10/2026", balanceOnly: true, groupBy: expiration ? ["type", "expirationDate"] : ["type"] } };
+        queryContext: { mode: "summary", status: "current", referenceDate: options.ignoredSolesReference ? "29/10/2026" : solesReferenceDate, balanceOnly: true, groupBy: expiration ? ["type", "expirationDate"] : ["type"] } };
       let response = buildMemberSolesResponse([{ name: "get_member_soles", result }]);
       if (options.solesAsCurrency) response = response.replace("10,5", "₲ 10,5");
       return json(200, { success: true, response, actions: {} });
@@ -151,6 +155,7 @@ const execute = async (options = {}) => {
   try {
     const report = await runApiTests({ ...readConfig({ BOT_TEST_SESSION_ID: session, BOT_TEST_SUITE: options.suite ?? "quick", BOT_TEST_BASE_URL: api.baseUrl,
       BOT_TEST_MEMBER_DOCUMENT: options.memberDocument ?? (options.suite === "soles" ? memberDocument : undefined),
+      BOT_TEST_SOLES_REFERENCE_DATE: options.solesReferenceDate,
       BOT_TEST_SOLES_PAGE_SIZE: String(options.solesPageSize ?? 5), BOT_TEST_SOLES_MAX_PAGES: String(options.solesMaxPages ?? 10),
     }), timeoutMs: options.timeout ? 100 : 3000 }, { loadWorkbook: fakeWorkbook, progress: () => {} });
     return { report, counts: api.counts() };
@@ -316,4 +321,20 @@ test("soles traversal is bounded and configuration validates the private fixture
     assert.throws(() => readConfig({ ...env, BOT_TEST_MEMBER_DOCUMENT: memberDocument, ...period }), /INVALID_SOLES_USAGE_PERIOD/);
   }
   assert.throws(() => readConfig({ ...env, BOT_TEST_MEMBER_DOCUMENT: memberDocument, BOT_TEST_SOLES_PAGE_SIZE: "201" }), /INVALID_SOLES_PAGINATION/);
+  assert.throws(() => readConfig({ ...env, BOT_TEST_MEMBER_DOCUMENT: memberDocument, BOT_TEST_SOLES_REFERENCE_DATE: "31/06/2023" }), /INVALID_SOLES_REFERENCE_DATE/);
+});
+
+test("soles date profile defaults to the DEV snapshot and supports another explicit reference", async () => {
+  const current = await execute({ suite: "soles", validateSolesPii: true });
+  assert.equal(current.report.success, true);
+  assert.equal(current.report.profile.solesReferenceDate, "30/06/2023");
+  const changed = await execute({ suite: "soles", solesReferenceDate: "31/05/2023", validateSolesPii: true });
+  assert.equal(changed.report.success, true);
+  assert.equal(changed.report.profile.solesReferenceDate, "31/05/2023");
+});
+
+test("soles suite rejects a response that ignores the requested reference and uses the real current year", async () => {
+  const { report } = await execute({ suite: "soles", ignoredSolesReference: true });
+  assert.equal(report.steps[1].error, "SOLES_REQUESTED_REFERENCE_DATE");
+  assert.equal(report.summary.skipped, 4);
 });

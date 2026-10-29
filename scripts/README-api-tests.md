@@ -47,6 +47,7 @@ concreta, el reporte identifica su paso y horario.
 | `BOT_TEST_TIMEOUT_MS` | `90000` | Límite por petición; máximo 600000. |
 | `BOT_TEST_REPORT` | Directorio temporal + `chatbot-api-tests.json` | Ruta del reporte; la carpeta debe existir. |
 | `BOT_TEST_MEMBER_DOCUMENT` | Solo obligatorio en `soles` | Documento local del socio de prueba; activa también soles en `all`. |
+| `BOT_TEST_SOLES_REFERENCE_DATE` | `30/06/2023` | Fecha explícita para clasificar vigencia en la copia DEV. |
 | `BOT_TEST_SOLES_FROM` | `01/01/2023` | Inicio inclusivo del período de usos, DD/MM/YYYY. |
 | `BOT_TEST_SOLES_TO` | `31/05/2023` | Fin inclusivo del período de usos. |
 | `BOT_TEST_SOLES_PAGE_SIZE` | `5` | Movimientos por página, de 1 a 200. |
@@ -97,14 +98,15 @@ Remove-Item Env:BOT_TEST_SESSION_ID
 
 ## Pruebas de soles con un documento local
 
-Elige un socio que tenga **saldo vigente positivo y usos registrados** entre
-enero y mayo de 2023, o ajusta el período de usos. Ingresa el número de documento
+Elige un socio que tenga **saldo registrado positivo con vencimiento vigente
+respecto del 30/06/2023** y usos registrados entre enero y mayo de 2023, o ajusta
+la referencia y el período de usos. Ingresa el número de documento
 sin puntos, solo en tu entorno; no hace falta enviarlo por chat ni versionarlo.
 
 ```powershell
 $env:BOT_TEST_SESSION_ID = Read-Host "Pega un sessionId vigente de DEV"
 $env:BOT_TEST_MEMBER_DOCUMENT = Read-Host "Documento del socio de prueba, sin puntos"
-docker exec -e BOT_TEST_SESSION_ID -e BOT_TEST_MEMBER_DOCUMENT -e BOT_TEST_SUITE=soles api-delsol-chatbot-dev node scripts/run-api-tests.mjs
+docker exec -e BOT_TEST_SESSION_ID -e BOT_TEST_MEMBER_DOCUMENT -e BOT_TEST_SUITE=soles -e BOT_TEST_SOLES_REFERENCE_DATE=30/06/2023 api-delsol-chatbot-dev node scripts/run-api-tests.mjs
 $report = Join-Path ([Environment]::GetFolderPath("Desktop")) "chatbot-api-tests.json"
 docker cp api-delsol-chatbot-dev:/tmp/chatbot-api-tests.json "$report"
 Remove-Item Env:BOT_TEST_SESSION_ID, Env:BOT_TEST_MEMBER_DOCUMENT
@@ -112,9 +114,17 @@ Remove-Item Env:BOT_TEST_SESSION_ID, Env:BOT_TEST_MEMBER_DOCUMENT
 
 Para otro período, añade al comando Docker, por ejemplo,
 `-e BOT_TEST_SOLES_FROM=01/01/2024 -e BOT_TEST_SOLES_TO=31/12/2024`.
-Estas fechas filtran **usos**, no reconstruyen un saldo histórico. El saldo
-vigente utiliza la referencia del backend; el seguimiento por vencimiento debe
-conservar esa referencia y el mismo nombre del socio.
+Estas fechas filtran **usos**. La suite solicita explícitamente la fecha
+`BOT_TEST_SOLES_REFERENCE_DATE` para saldo y vuelta al saldo, y comprueba que el
+backend la aplique también al seguimiento por vencimiento. El reporte incluye
+la referencia en `profile.solesReferenceDate`. El valor predeterminado corresponde
+al corte de junio de 2023 de la copia DEV; puede cambiarse mediante `-e`.
+
+Esto no cambia el reloj del servidor ni de Oracle, la fecha global del chat,
+la vigencia real de sesiones ni la expiración de exportaciones. La referencia
+clasifica vencimientos sobre el **saldo almacenado en DEV**; no reconstruye un
+saldo histórico ni revierte consumos posteriores. Si el registro almacenado ya
+tiene saldo cero, cambiar la referencia no lo convierte en un saldo positivo.
 
 La suite comprueba que cada tipo tenga saldo numérico sin símbolo monetario,
 que se ofrezca el detalle por vencimiento y que los vencimientos sumen el saldo

@@ -60,6 +60,7 @@ export const runApiTests = async (config, { fetchImpl = fetch, loadWorkbook = de
     description: "DEV regression using 2023/2024 control totals. No session IDs, export IDs, names, response bodies, SVG images or workbook rows are stored.", steps: [] };
   const exportIds = new Set();
   if (config.suite === "all") report.optionalSuites = { soles: config.soles ? "configured" : "not_configured" };
+  if (config.soles) report.profile = { solesReferenceDate: config.soles.referenceDate };
   let step;
   const check = (condition, code) => {
     step.checks.push({ code, passed: Boolean(condition) });
@@ -310,7 +311,7 @@ export const runApiTests = async (config, { fetchImpl = fetch, loadWorkbook = de
 
 const main = async () => {
   if (process.argv.includes("--help")) {
-    console.log("Variables: BOT_TEST_SESSION_ID (obligatorio), BOT_TEST_BASE_URL, BOT_TEST_SUITE=quick|sales|charts|comparisons|soles|all, BOT_TEST_TIMEOUT_MS=90000, BOT_TEST_REPORT. Soles requiere BOT_TEST_MEMBER_DOCUMENT; opciones BOT_TEST_SOLES_FROM=01/01/2023, BOT_TEST_SOLES_TO=31/05/2023, BOT_TEST_SOLES_PAGE_SIZE=5, BOT_TEST_SOLES_MAX_PAGES=10. Reinicia solo la conversación de esta sesión. Ejecutar en DEV. Reporte predeterminado: directorio temporal/chatbot-api-tests.json. No inicia sesión ni cambia su expiración.");
+    console.log("Variables: BOT_TEST_SESSION_ID (obligatorio), BOT_TEST_BASE_URL, BOT_TEST_SUITE=quick|sales|charts|comparisons|soles|all, BOT_TEST_TIMEOUT_MS=90000, BOT_TEST_REPORT. Soles requiere BOT_TEST_MEMBER_DOCUMENT; opciones BOT_TEST_SOLES_REFERENCE_DATE=30/06/2023, BOT_TEST_SOLES_FROM=01/01/2023, BOT_TEST_SOLES_TO=31/05/2023, BOT_TEST_SOLES_PAGE_SIZE=5, BOT_TEST_SOLES_MAX_PAGES=10. Reinicia solo la conversación de esta sesión. Ejecutar en DEV. Reporte predeterminado: directorio temporal/chatbot-api-tests.json. No inicia sesión ni cambia su expiración.");
     return;
   }
   let config;

@@ -31,11 +31,13 @@ export const readSolesConfig = (env, suite, fail) => {
   if (suite !== "soles" && !(suite === "all" && documentNumber)) return null;
   if (!documentNumber) return fail("SOLES_MEMBER_DOCUMENT_REQUIRED");
   if (!/^[A-Za-z0-9][A-Za-z0-9. -]{2,29}$/.test(documentNumber)) return fail("INVALID_SOLES_MEMBER_DOCUMENT");
+  const referenceDate = env.BOT_TEST_SOLES_REFERENCE_DATE || "30/06/2023";
+  if (date(referenceDate) === null) return fail("INVALID_SOLES_REFERENCE_DATE");
   const dateFrom = env.BOT_TEST_SOLES_FROM || "01/01/2023", dateTo = env.BOT_TEST_SOLES_TO || "31/05/2023";
   if (date(dateFrom) === null || date(dateTo) === null || date(dateFrom) > date(dateTo)) return fail("INVALID_SOLES_USAGE_PERIOD");
   const pageSize = Number(env.BOT_TEST_SOLES_PAGE_SIZE || 5), maxPages = Number(env.BOT_TEST_SOLES_MAX_PAGES || 10);
   if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 200 || !Number.isInteger(maxPages) || maxPages < 1 || maxPages > 100) return fail("INVALID_SOLES_PAGINATION");
-  return { documentNumber, dateFrom, dateTo, pageSize, maxPages };
+  return { documentNumber, referenceDate, dateFrom, dateTo, pageSize, maxPages };
 };
 
 // Personal names, amounts and the document remain in this closure only. The
@@ -53,6 +55,7 @@ export const createSolesCases = ({ config, chat, check, progress, coverage }) =>
     const name = /^Socio:\s*(.+)\.$/m.exec(clean(body.response))?.[1];
     const ref = /Fecha de referencia para la vigencia: (\d{2}\/\d{2}\/\d{4})\./.exec(body.response)?.[1];
     check(Boolean(name) && date(ref) !== null, "SOLES_MEMBER_AND_REFERENCE");
+    check(ref === config.referenceDate, "SOLES_REQUESTED_REFERENCE_DATE");
     if (memberName) check(normalize(name) === normalize(memberName) && ref === referenceDate, "SOLES_MEMBER_AND_REFERENCE_PRESERVED");
     else { memberName = name; referenceDate = ref; }
     const parsed = table(body.response), expected = expiration ? ["Tipo", "Vencimiento", "Saldo de soles"] : ["Tipo", "Saldo de soles"];
@@ -76,7 +79,7 @@ export const createSolesCases = ({ config, chat, check, progress, coverage }) =>
     check(/no representan el saldo vigente de soles/.test(body.response), "SOLES_USAGE_IS_NOT_BALANCE");
   };
   return [
-    ["soles-balance-by-type", async () => { balances = balance(await chat(`Saldo de soles de ${config.documentNumber}`)); }],
+    ["soles-balance-by-type", async () => { balances = balance(await chat(`Saldo de soles de ${config.documentNumber} con fecha de referencia ${config.referenceDate}`)); }],
     ["soles-by-expiration", async () => { balance(await chat("Detallar por vencimiento"), true); }],
     ["soles-usage-by-member-and-type", async () => {
       const body = await chat(`Soles utilizados del mismo socio entre ${config.dateFrom} y ${config.dateTo}, agrupados por tipo de soles y por socio, con cantidad de soles utilizados y cantidad de movimientos`);
@@ -121,7 +124,7 @@ export const createSolesCases = ({ config, chat, check, progress, coverage }) =>
       check(/^No hay más páginas de movimientos/.test(exhausted.response), "SOLES_USAGE_END_OF_PAGES");
     }],
     ["soles-return-to-balance", async () => {
-      const current = balance(await chat(`Volvamos al saldo de soles de ${config.documentNumber}, por tipo de soles`));
+      const current = balance(await chat(`Volvamos al saldo de soles de ${config.documentNumber} con fecha de referencia ${config.referenceDate}, por tipo de soles`));
       check(sameTotals(balances, current), "SOLES_BALANCE_PRESERVED_AFTER_USAGE");
     }],
   ];
