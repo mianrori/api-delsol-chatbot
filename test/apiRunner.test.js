@@ -2,8 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { once } from "node:events";
-import { readConfig, runApiTests, controls } from "../scripts/run-api-tests.mjs";
+import { readConfig, runApiTests, controls, comparisonControls } from "../scripts/run-api-tests.mjs";
 import { generateChart } from "../src/services/charts/chart.service.js";
+import { buildSalesYearComparisonResponse } from "../src/services/ai/salesYearComparison.service.js";
 
 const session = "test-session-secret";
 const num = (value) => new Intl.NumberFormat("es-PY").format(value);
@@ -31,6 +32,25 @@ const mockApi = async (options = {}) => {
     chats++;
     if (options.timeout) return;
     const question = data.message.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    if (question.includes("2023 contra 2024") || question.includes("ambos anos")) {
+      let from = 1, to = 12;
+      if (question.includes("ambos anos") && !options.staleComparisonPeriod) {
+        if (question.includes("enero a mayo")) to = 5;
+        else from = to = 8;
+      }
+      const calls = [2023, 2024].map((year) => ({ name: "get_sales", input: {
+        dateFrom: `01/${String(from).padStart(2, "0")}/${year}`, dateTo: `${new Date(Date.UTC(year, to, 0)).getUTCDate()}/${String(to).padStart(2, "0")}/${year}`,
+        groupBy: ["month"], metrics: ["totalAmount", "totalInvoices"],
+      }, result: { data: comparisonControls[year].flatMap((metrics, index) => !metrics || index < from - 1 || index >= to ? [] : [{ month: String(index + 1).padStart(2, "0"), totalAmount: metrics[0], totalInvoices: metrics[1], currency: { abbreviation: "PYG", symbol: "₲" } }]) } }));
+      let response = buildSalesYearComparisonResponse(calls);
+      if (options.comparisonMissingAsZero) response = response.replaceAll("| Sin registros | Sin registros |", "| ₲ 0 | 0 |");
+      if (options.wrongComparisonValue) response = response.replace("₲ 58.706.137.966", "₲ 58.706.137.965");
+      if (options.inventedComparison) response += "\n- Noviembre: las ventas de 2024 fueron mayores que en 2023.";
+      if (options.wrongComparisonDirection) response = response.replaceAll("las ventas de 2024 fueron mayores", "las ventas de 2024 fueron menores");
+      if (options.wrongComparisonDifference) response = response.replaceAll("4.899.996", "4.899.995");
+      if (options.falseZeroClaim) response += "\nEn enero a mayo de 2024 no se registraron ventas.";
+      return json(200, { success: true, response, actions: {} });
+    }
     if (/\bgrafic/.test(question)) {
       const newPeriod = question.includes("enero a febrero");
       const points = newPeriod && !options.staleChartPeriod ? controls.monthly.slice(0, 2) : controls.monthly;
@@ -98,8 +118,36 @@ test("runner detects a full Excel total mismatch and stops dependent steps", asy
 test("full runner preserves the sports/category and vehicle sequence without stale exports", async () => {
   const { report, counts } = await execute({ suite: "all" });
   assert.equal(report.success, true, JSON.stringify(report));
-  assert.equal(report.summary.passed, 16);
-  assert.deepEqual(counts, { chats: 13, downloads: 5 });
+  assert.equal(report.summary.passed, 19);
+  assert.deepEqual(counts, { chats: 16, downloads: 5 });
+});
+
+test("comparison suite validates both years, an empty range and the common August month", async () => {
+  const { report, counts } = await execute({ suite: "comparisons" });
+  assert.equal(report.success, true, JSON.stringify(report));
+  assert.equal(report.summary.passed, 4);
+  assert.deepEqual(counts, { chats: 3, downloads: 0 });
+  assert.ok(report.steps[2].checks.some((check) => check.code === "COMPARISON_NO_PAIRED_VALUES" && check.passed));
+  assert.ok(report.steps[3].checks.some((check) => check.code === "COMPARISON_NOTE_DIFFERENCES" && check.passed));
+  assert.doesNotMatch(JSON.stringify(report), /58\.706\.137\.966|4\.899\.996/);
+});
+
+test("comparison suite rejects zero for missing rows, incorrect values and unsupported comparisons", async () => {
+  for (const [flag, code] of [
+    ["comparisonMissingAsZero", "COMPARISON_MISSING_IS_NOT_ZERO"], ["wrongComparisonValue", "COMPARISON_CONTROL_VALUES"],
+    ["inventedComparison", "COMPARISON_COMPARABLE_NOTES"], ["wrongComparisonDirection", "COMPARISON_NOTE_DIRECTIONS"],
+    ["wrongComparisonDifference", "COMPARISON_NOTE_DIFFERENCES"], ["falseZeroClaim", "COMPARISON_NO_FALSE_ZERO_CLAIM"],
+  ]) {
+    const { report } = await execute({ suite: "comparisons", [flag]: true });
+    assert.equal(report.steps[1].error, code);
+    assert.equal(report.summary.skipped, 2);
+  }
+});
+
+test("comparison suite detects a follow-up that keeps the full-year dates", async () => {
+  const { report } = await execute({ suite: "comparisons", staleComparisonPeriod: true });
+  assert.equal(report.steps[2].error, "COMPARISON_PERIODS");
+  assert.equal(report.summary.skipped, 1);
 });
 
 test("chart suite validates real SVG bars, lines and a new period without storing images", async () => {
