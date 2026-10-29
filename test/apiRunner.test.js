@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { once } from "node:events";
 import { readConfig, runApiTests, controls } from "../scripts/run-api-tests.mjs";
+import { generateChart } from "../src/services/charts/chart.service.js";
 
 const session = "test-session-secret";
 const num = (value) => new Intl.NumberFormat("es-PY").format(value);
@@ -29,6 +30,26 @@ const mockApi = async (options = {}) => {
     }
     chats++;
     if (options.timeout) return;
+    const question = data.message.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    if (/\bgrafic/.test(question)) {
+      const newPeriod = question.includes("enero a febrero");
+      const points = newPeriod && !options.staleChartPeriod ? controls.monthly.slice(0, 2) : controls.monthly;
+      const rows = points.map((point) => ({ month: point.month, totalAmount: point.amount, currency: { abbreviation: "PYG" } }));
+      if (options.wrongChartAmount) rows[0].totalAmount = 1;
+      const generated = await generateChart({ type: question.includes("lineas") ? "line" : "bar", title: "Ventas 2023", labelPaths: ["month"], datasets: [{ label: "Ventas", valuePath: "totalAmount" }] }, { sources: { example: { name: "get_sales", result: { data: rows } } } });
+      const chart = generated.chart;
+      if (options.wrongChartUnit) chart.valuePrefix = "US$";
+      let svg = Buffer.from(chart.url.split(",")[1], "base64").toString();
+      if (options.missingChartValues) svg = svg.replaceAll('data-value-label="true"', 'data-hidden-value="true"');
+      if (options.activeSvg) svg = svg.replace("</svg>", "<script>alert(1)</script></svg>");
+      chart.url = `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
+      if (options.invalidChartData) chart.url = "data:image/svg+xml;base64,%%%";
+      return json(200, { success: true, response: "Aquí tienes el gráfico solicitado.", actions: { chart } });
+    }
+    if (question.includes("enero a mayo")) {
+      const response = "Período: 01/01/2023 a 31/05/2023.\n| Mes | Ventas | Facturas |\n| --- | --- | --- |\n" + controls.monthly.map((row) => `| ${row.name} | ₲ ${num(row.amount)} | ${num(row.invoices)} |`).join("\n");
+      return json(200, { success: true, response, actions: {} });
+    }
     if (data.message.includes("vehículos")) return json(200, { success: true, response: "Fecha de registro: 01/01/2025 a 31/12/2025.\nRegistros: **23**. Matrículas únicas: **23**. Socios identificados: **7**.", actions: {} });
     if (data.message === "Ahora por género") return json(200, { success: true, response: "Fecha de registro: 01/01/2025 a 31/12/2025.\n| Género | Registros | Matrículas únicas | Socios identificados |\n| --- | --- | --- | --- |\n| F | 2 | 2 | 1 |\n| M | 21 | 21 | 6 |", actions: {} });
     if (data.message === "Ahora solo del rubro deportes") return json(200, { success: true, response: "DEPORTES: ₲ 2.994.866.457 y 7.049 facturas.", actions: {} });
@@ -77,8 +98,36 @@ test("runner detects a full Excel total mismatch and stops dependent steps", asy
 test("full runner preserves the sports/category and vehicle sequence without stale exports", async () => {
   const { report, counts } = await execute({ suite: "all" });
   assert.equal(report.success, true, JSON.stringify(report));
-  assert.equal(report.summary.passed, 12);
-  assert.deepEqual(counts, { chats: 9, downloads: 5 });
+  assert.equal(report.summary.passed, 16);
+  assert.deepEqual(counts, { chats: 13, downloads: 5 });
+});
+
+test("chart suite validates real SVG bars, lines and a new period without storing images", async () => {
+  const { report, counts } = await execute({ suite: "charts" });
+  assert.equal(report.success, true, JSON.stringify(report));
+  assert.equal(report.summary.passed, 5);
+  assert.deepEqual(counts, { chats: 4, downloads: 0 });
+  for (const code of ["CHART_EXACT_MONTHLY_AMOUNTS", "CHART_MONTH_LABELS", "CHART_VALUE_ANCHORS_IN_VIEWBOX"]) {
+    assert.ok(report.steps.at(-1).checks.some((check) => check.code === code && check.passed));
+  }
+  assert.doesNotMatch(JSON.stringify(report), /data:image|<svg|58\.706\.137\.966/);
+});
+
+test("chart suite detects incorrect units, hidden values, wrong amounts and active SVG content", async () => {
+  for (const [flag, code] of [
+    ["wrongChartUnit", "CHART_PYG_UNIT"], ["missingChartValues", "CHART_VISIBLE_VALUE_COUNT"],
+    ["wrongChartAmount", "CHART_EXACT_MONTHLY_AMOUNTS"], ["activeSvg", "CHART_NO_ACTIVE_OR_EXTERNAL_CONTENT"],
+    ["invalidChartData", "CHART_DATA_URL"],
+  ]) {
+    const { report } = await execute({ suite: "charts", [flag]: true });
+    assert.equal(report.steps[2].error, code);
+    assert.equal(report.summary.skipped, 2);
+  }
+});
+
+test("chart suite detects when a changed period retains points from the old chart", async () => {
+  const { report } = await execute({ suite: "charts", staleChartPeriod: true });
+  assert.equal(report.steps[4].error, "CHART_POINTS_AND_SERIES");
 });
 
 test("runner rejects reused export IDs and invalid download MIME types", async () => {

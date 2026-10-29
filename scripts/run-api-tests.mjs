@@ -8,6 +8,13 @@ export const controls = {
   january: { amount: 58706137966, invoices: 366427, rows: 180 },
   february: { amount: 63255876492, invoices: 358354 },
   sports: { amount: 2994866457, invoices: 7049, rows: 5 },
+  monthly: [
+    { month: "01", name: "enero", amount: 58706137966, invoices: 366427 },
+    { month: "02", name: "febrero", amount: 63255876492, invoices: 358354 },
+    { month: "03", name: "marzo", amount: 64924535090, invoices: 360316 },
+    { month: "04", name: "abril", amount: 72875754527, invoices: 361387 },
+    { month: "05", name: "mayo", amount: 86767167311, invoices: 432821 },
+  ],
 };
 const xlsxType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const clean = (value) => String(value ?? "").replace(/\*\*/g, "").replace(/[\u00a0\u202f]/g, " ").trim();
@@ -28,7 +35,7 @@ export const readConfig = (env = process.env) => {
   const timeoutMs = Number(env.BOT_TEST_TIMEOUT_MS || 90000);
   if (!Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 600000) throw new Failure("INVALID_TIMEOUT");
   const suite = env.BOT_TEST_SUITE || "all";
-  if (!["quick", "sales", "all"].includes(suite)) throw new Failure("INVALID_SUITE");
+  if (!["quick", "sales", "charts", "all"].includes(suite)) throw new Failure("INVALID_SUITE");
   return { baseUrl, sessionId, timeoutMs, suite, reportPath: env.BOT_TEST_REPORT || join(tmpdir(), "chatbot-api-tests.json") };
 };
 
@@ -43,7 +50,7 @@ const defaultLoadWorkbook = async (bytes) => {
 // request follows the same HTTP/session contract as Insomnia.
 export const runApiTests = async (config, { fetchImpl = fetch, loadWorkbook = defaultLoadWorkbook, progress = console.log } = {}) => {
   const report = { version: 1, suite: config.suite, startedAt: new Date().toISOString(),
-    description: "DEV regression using January/February 2023 control totals. No session IDs, export IDs, names, response bodies or workbook rows are stored.", steps: [] };
+    description: "DEV regression using 2023 control totals. No session IDs, export IDs, names, response bodies, SVG images or workbook rows are stored.", steps: [] };
   const exportIds = new Set();
   let step;
   const check = (condition, code) => {
@@ -129,6 +136,41 @@ export const runApiTests = async (config, { fetchImpl = fetch, loadWorkbook = de
     check(metadata.get("Export ID") === action.exportId && metadata.get("Registros exportados") === records, "XLSX_EXPORT_METADATA");
     // Store only validation outcomes, not cells, totals or protected identities.
   };
+  const chart = (body, type, points) => {
+    const action = body.actions?.chart;
+    check(action?.available === true, "CHART_AVAILABLE");
+    check(action.type === type && action.format === "svg" && action.mimeType === "image/svg+xml", "CHART_TYPE_AND_FORMAT");
+    check(action.pointCount === points.length && action.datasetCount === 1, "CHART_POINTS_AND_SERIES");
+    check(action.valuePrefix === "₲" && !action.valueSuffix, "CHART_PYG_UNIT");
+    check(!body.actions?.salesExport, "NO_STALE_EXPORT_WITH_CHART");
+    check(!/!\[|data:image|<svg/i.test(body.response), "NO_IMAGE_DATA_IN_RESPONSE_TEXT");
+    const encoded = /^data:image\/svg\+xml;base64,([A-Za-z0-9+/]+={0,2})$/.exec(action.url ?? "")?.[1];
+    check(Boolean(encoded) && encoded.length % 4 === 0 && encoded.length < 2800000, "CHART_DATA_URL");
+    const bytes = Buffer.from(encoded, "base64"), svg = bytes.toString("utf8");
+    check(bytes.toString("base64") === encoded && !svg.includes("\uFFFD"), "CHART_BASE64_UTF8");
+    const root = /^\s*<svg\b([^>]*)>/i.exec(svg);
+    check(Boolean(root) && /<\/svg>\s*$/.test(svg), "CHART_SVG_ROOT");
+    check(!/<(?:script|foreignObject)\b|<!DOCTYPE|<!ENTITY|\bon\w+\s*=|\b(?:href|src)\s*=/i.test(svg), "CHART_NO_ACTIVE_OR_EXTERNAL_CONTENT");
+    check(!/\[PII_[A-Z_]+_\d+\]|\b(?:NaN|Infinity|undefined)\b/.test(svg), "CHART_VALID_CONTENT");
+    const attribute = (text, name) => new RegExp(`\\b${name}=["']([^"']+)["']`).exec(text)?.[1];
+    check(Number.isInteger(action.width) && action.width >= 300 && action.width <= 999
+      && Number.isInteger(action.height) && action.height >= 250 && action.height <= 999, "CHART_DIMENSIONS");
+    check(Number(attribute(root[1], "width")) === action.width && Number(attribute(root[1], "height")) === action.height
+      && attribute(root[1], "viewBox") === `0 0 ${action.width} ${action.height}`, "CHART_VIEWBOX");
+    const decode = (value) => value.replace(/&#(?:x([0-9a-f]+)|(\d+));/gi, (_, hex, decimal) => {
+      const code = Number.parseInt(hex ?? decimal, hex ? 16 : 10);
+      return code <= 0x10ffff ? String.fromCodePoint(code) : "\uFFFD";
+    }).replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, "&");
+    const texts = [...svg.matchAll(/<text\b([^>]*)>([^<]*)<\/text>/gi)].map((match) => ({ attributes: match[1], value: clean(decode(match[2])) }));
+    const values = texts.filter((item) => attribute(item.attributes, "data-value-label") === "true");
+    check(values.length === points.length, "CHART_VISIBLE_VALUE_COUNT");
+    check(values.every((item, index) => item.value === `₲ ${new Intl.NumberFormat("es-PY").format(points[index].amount)}`), "CHART_EXACT_MONTHLY_AMOUNTS");
+    check(values.every((item) => {
+      const x = Number(attribute(item.attributes, "x")), y = Number(attribute(item.attributes, "y"));
+      return Number.isFinite(x) && Number.isFinite(y) && x >= 0 && x <= action.width && y >= 0 && y <= action.height;
+    }), "CHART_VALUE_ANCHORS_IN_VIEWBOX");
+    check(points.every((point) => texts.some((item) => [point.month, `2023-${point.month}`, point.name].includes(item.value.toLowerCase()))), "CHART_MONTH_LABELS");
+  };
   const january = { from: "01/01/2023", to: "31/01/2023", month: "01", group: "customer", total: controls.january, rows: controls.january.rows };
   const cases = [
     ["reset-conversation", async () => {
@@ -144,7 +186,8 @@ export const runApiTests = async (config, { fetchImpl = fetch, loadWorkbook = de
     ["equivalent-january-sales", async () => excel(await chat("Muéstrame las ventas por local de enero de 2023, incluyendo importes y número de facturas"), january)],
     ["change-to-february", async () => excel(await chat("Muéstrame las ventas por local de febrero de 2023, incluyendo importes y número de facturas"), { ...january, from: "01/02/2023", to: "28/02/2023", month: "02", rows: undefined, total: controls.february })],
   ];
-  if (config.suite !== "quick") cases.push(
+  if (config.suite === "charts") cases.splice(1);
+  if (["sales", "all"].includes(config.suite)) cases.push(
     ["january-by-category", async () => excel(await chat("Ventas de enero de 2023 por rubro, con monto total y cantidad de facturas"), { ...january, group: "category", rows: 34 })],
     ["filter-sports", async () => {
       const body = await chat("Ahora solo del rubro deportes");
@@ -175,6 +218,20 @@ export const runApiTests = async (config, { fetchImpl = fetch, loadWorkbook = de
       check(!body.actions?.salesExport, "NO_STALE_SALES_EXPORT");
     }],
   );
+  if (["charts", "all"].includes(config.suite)) cases.push(
+    ["chart-monthly-sales-source", async () => {
+      const body = await chat("Ventas de enero a mayo de 2023 por mes, con monto total y cantidad de facturas");
+      const rows = tableRows(body.response);
+      check(rows.length === controls.monthly.length, "CHART_SOURCE_COMPLETE_MONTHS");
+      check(body.response.includes("01/01/2023") && body.response.includes("31/05/2023"), "CHART_SOURCE_PERIOD");
+      check(rows.every((row, index) => [controls.monthly[index].month, controls.monthly[index].name].includes(row[0].toLowerCase())
+        && numeric(row.at(-2)) === controls.monthly[index].amount && numeric(row.at(-1)) === controls.monthly[index].invoices), "CHART_SOURCE_CONTROL_TOTALS");
+      check(!body.actions?.chart && !body.actions?.salesExport, "NO_UNREQUESTED_CHART_OR_EXPORT");
+    }],
+    ["chart-sales-bars", async () => chart(await chat("Grafícalo en barras, usando únicamente el monto total de ventas"), "bar", controls.monthly)],
+    ["chart-sales-lines", async () => chart(await chat("Ahora el mismo gráfico en líneas, conserva el período y el monto total de ventas"), "line", controls.monthly)],
+    ["chart-sales-new-period", async () => chart(await chat("Ventas de enero a febrero de 2023 por mes en un gráfico de barras, solo el monto total"), "bar", controls.monthly.slice(0, 2))],
+  );
   let stopped = false;
   for (const [id, execute] of cases) {
     step = { id, status: "skipped", requests: [], checks: [] }; report.steps.push(step);
@@ -194,7 +251,7 @@ export const runApiTests = async (config, { fetchImpl = fetch, loadWorkbook = de
 
 const main = async () => {
   if (process.argv.includes("--help")) {
-    console.log("Variables: BOT_TEST_SESSION_ID (obligatorio), BOT_TEST_BASE_URL, BOT_TEST_SUITE=quick|sales|all, BOT_TEST_TIMEOUT_MS=90000, BOT_TEST_REPORT. Reinicia solo la conversación de esta sesión. Ejecutar en DEV. Reporte predeterminado: directorio temporal/chatbot-api-tests.json. No inicia sesión ni cambia su expiración.");
+    console.log("Variables: BOT_TEST_SESSION_ID (obligatorio), BOT_TEST_BASE_URL, BOT_TEST_SUITE=quick|sales|charts|all, BOT_TEST_TIMEOUT_MS=90000, BOT_TEST_REPORT. Reinicia solo la conversación de esta sesión. Ejecutar en DEV. Reporte predeterminado: directorio temporal/chatbot-api-tests.json. No inicia sesión ni cambia su expiración.");
     return;
   }
   let config;
