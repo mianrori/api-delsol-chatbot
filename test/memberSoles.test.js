@@ -1,9 +1,10 @@
 import test from "node:test";
+import { randomUUID } from "node:crypto";
 import assert from "node:assert/strict";
 import { getMemberSoles, getSolesGenerationPeriodStart } from "../src/services/soles/memberSoles.service.js";
 import { searchSolesTypes } from "../src/services/soles/searchSolesTypes.service.js";
-import { buildMemberSolesResponse, resolveMemberSolesPage, resolveMemberSolesBreakdown } from "../src/services/ai/memberSolesPresentation.service.js";
-import { protectPiiDeep, restorePiiDeep } from "../src/services/ai/pii.service.js";
+import { buildMemberSolesResponse, resolveMemberSolesPage, resolveMemberSolesBreakdown, resolveMemberSolesBalance } from "../src/services/ai/memberSolesPresentation.service.js";
+import { protectPiiText, protectPiiDeep, restorePiiDeep } from "../src/services/ai/pii.service.js";
 import { runWithRequestSignal } from "../src/services/requestContext.service.js";
 
 const basic = { documentNumber: "1234567", referenceDate: "28/10/2026" };
@@ -189,4 +190,24 @@ test("expiration follow-up preserves identity, type and temporal filters and can
   assert.equal(input.groupBy, undefined);
   assert.equal(resolveMemberSolesBreakdown({ message: "Por vencimiento en 2022", history }), null);
   assert.equal(resolveMemberSolesBreakdown({ message: "Por vencimiento", history: [...history, { role: "user", content: [{ text: "Ventas de enero" }] }] }), null);
+});
+
+
+test("explicit protected-document balances requery after usage without reusing totals or filters", () => {
+  const documentNumber = "[PII_DOCUMENT_1]";
+  const syntheticDocument = randomUUID().replace(/\D/g, "").padEnd(9, "7").slice(0, 9);
+  const protectedMessage = protectPiiText("balance-return-fixture", `Volvamos al saldo de soles de ${syntheticDocument} con fecha de referencia 31/12/2023, por tipo de soles`);
+  assert.ok(!protectedMessage.includes(syntheticDocument));
+  assert.ok(resolveMemberSolesBalance({ message: protectedMessage }));
+  const result = resolveMemberSolesBalance({ message: `Volvamos al saldo de soles de ${documentNumber} con fecha de referencia 31/12/2023, por tipo de soles` });
+  assert.deepEqual(result, { input: { documentNumber, status: "current", mode: "balance", groupBy: ["type"], referenceDate: "31/12/2023" } });
+  assert.deepEqual(resolveMemberSolesBalance({ message: `Saldo de soles de ${documentNumber}` }), {
+    input: { documentNumber, status: "current", mode: "balance", groupBy: ["type"] },
+  });
+  for (const message of ["Volvamos al saldo del mismo socio", `Saldo de soles de ${documentNumber} vencidos`,
+    `Saldo de soles de ${documentNumber} por tipo de soles y por mes`,
+    `Saldo de soles de ${documentNumber} entre 01/01/2023 y 31/12/2023`,
+    `Saldo de soles de ${documentNumber} solo obsequio`, "Saldo de soles de Otra Persona"]) {
+    assert.equal(resolveMemberSolesBalance({ message }), null);
+  }
 });

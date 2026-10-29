@@ -84,3 +84,15 @@ export const resolveMemberSolesBreakdown = ({ message, history = [] }) => {
   if (response?.status !== "success" || !result?.queryContext?.referenceDate) return null;
   return { input: { ...structuredClone(queries[0].input), mode: "balance", groupBy: ["type", "expirationDate"], referenceDate: result.queryContext.referenceDate } };
 };
+
+
+// Only fully recognized requests with an explicit protected document bypass the
+// model. Requery through the normal executor so permissions and balances are fresh.
+export const resolveMemberSolesBalance = ({ message }) => {
+  const text = String(message ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[\u00a0\u202f]/g, " ").replace(/\s+/g, " ").trim();
+  const match = /^(?:(?:volvamos al|volver al|vuelve al|muestra el|mostrar el) )?saldo de soles de (\[PII_DOCUMENT_\d+\])(?: con fecha de referencia (\d{2}\/\d{2}\/\d{4}))?(?:\s*,?\s+por tipo de soles)?[.!?]?$/i.exec(text);
+  if (!match) return null;
+  return { input: { documentNumber: match[1], status: "current", mode: "balance", groupBy: ["type"],
+    ...(match[2] ? { referenceDate: match[2] } : {}) } };
+};

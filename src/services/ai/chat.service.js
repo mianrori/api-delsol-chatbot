@@ -8,7 +8,7 @@ import { chartsPrompt } from "../../prompts/sections/charts.prompt.js";
 import { getChartSources, isChartRequest, isChartSourceTool } from "../charts/chartSource.service.js";
 import { buildVehicleResponse, resolveVehiclePage } from "./vehiclePresentation.service.js";
 import { buildSolesUsageResponse, resolveSolesUsagePage } from "./solesUsagePresentation.service.js";
-import { buildMemberSolesResponse, resolveMemberSolesPage, resolveMemberSolesBreakdown } from "./memberSolesPresentation.service.js";
+import { buildMemberSolesResponse, resolveMemberSolesPage, resolveMemberSolesBreakdown, resolveMemberSolesBalance } from "./memberSolesPresentation.service.js";
 import { buildPromotionSearchResponse, resolvePromotionSearchPage } from "./promotionSearchPresentation.service.js";
 import { buildCampaignSalesPerformanceResponse } from "./campaignSalesPerformancePresentation.service.js";
 import { buildMemberPurchasesVsSalesResponse } from "./memberPurchasesVsSalesPresentation.service.js";
@@ -1590,7 +1590,8 @@ export const chatService = async ({ message, sessionId }) => {
   const solesPage = resolveVehiclePage({ message, history: protectedHistory })
     ?? resolveSolesUsagePage({ message, history: protectedHistory })
     ?? resolveMemberSolesPage({ message, history: protectedHistory })
-    ?? resolveMemberSolesBreakdown({ message, history: protectedHistory });
+    ?? resolveMemberSolesBreakdown({ message, history: protectedHistory })
+    ?? resolveMemberSolesBalance({ message: messages.at(-1).content[0].text });
   if (salesYearComparison) {
     const content = salesYearComparison.inputs.map((input) => ({ toolUse: {
       toolUseId: `sales_comparison_${randomUUID()}`, name: "get_sales", input,
