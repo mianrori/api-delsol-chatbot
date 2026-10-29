@@ -2,11 +2,17 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { once } from "node:events";
+import { randomUUID } from "node:crypto";
 import { readConfig, runApiTests, controls, comparisonControls } from "../scripts/run-api-tests.mjs";
 import { generateChart } from "../src/services/charts/chart.service.js";
 import { buildSalesYearComparisonResponse } from "../src/services/ai/salesYearComparison.service.js";
+import { buildMemberSolesResponse } from "../src/services/ai/memberSolesPresentation.service.js";
+import { buildSolesUsageResponse } from "../src/services/ai/solesUsagePresentation.service.js";
+import { protectPiiText } from "../src/services/ai/pii.service.js";
 
 const session = "test-session-secret";
+// Generated only for the isolated mock server; never a real member fixture.
+const memberDocument = randomUUID().replace(/\D/g, "").padEnd(9, "7").slice(0, 9);
 const num = (value) => new Intl.NumberFormat("es-PY").format(value);
 const fakeWorkbook = (buffer) => {
   const { rows, info } = JSON.parse(buffer.subarray(2));
@@ -15,7 +21,12 @@ const fakeWorkbook = (buffer) => {
   return { getWorksheet: (name) => name === "Ventas" ? sheet(rows) : name === "Información" ? sheet(info) : undefined };
 };
 const mockApi = async (options = {}) => {
-  const exports = new Map(); let chats = 0, downloads = 0;
+  const exports = new Map(); let chats = 0, downloads = 0, balanceCalls = 0, solesPage = 0, solesReferenceDate;
+  const memberName = "PERSONA PRIVADA DE PRUEBA";
+  const movements = (options.missingSolesQuantities ? [3.5, -1, .5, 2, 0, null, null] : [3.5, -1, .5, 2, 1, 1.25, 2.75]).slice(0, options.singleSolesPage ? 3 : 7).map((quantity, index) => ({
+    memberName, movementDate: index % 2 ? `2023-02-${String(index + 1).padStart(2, "0")}T12:00:00.000Z` : `${String(index + 1).padStart(2, "0")}/02/2023`, solesTypeDescription: index < 4 ? "PRIVATE_TYPE_A" : "PRIVATE_TYPE_B",
+    movementType: "PRIVATE_MOVEMENT", destinationType: "LOCAL", destinationName: "PRIVATE_DESTINATION", solesUsed: quantity,
+  }));
   const server = createServer(async (req, res) => {
     let body = ""; for await (const part of req) body += part;
     const data = body ? JSON.parse(body) : null;
@@ -32,6 +43,56 @@ const mockApi = async (options = {}) => {
     chats++;
     if (options.timeout) return;
     const question = data.message.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    if (options.validateSolesPii) {
+      const protectedText = protectPiiText("api-runner-soles-fixture", data.message);
+      if (data.message.includes(memberDocument)) assert.ok(!protectedText.includes(memberDocument));
+      else assert.equal(protectedText, data.message, "Calendar dates and grouping words must remain readable");
+    }
+    const solesPeriod = { dateFrom: "01/01/2023", dateTo: "31/05/2023" };
+    if (question.includes("saldo de soles") || question === "detallar por vencimiento") {
+      const expiration = question === "detallar por vencimiento";
+      if (!expiration) {
+        balanceCalls++;
+        solesReferenceDate = / con fecha de referencia (\d{2}\/\d{2}\/\d{4})/.exec(question)?.[1];
+        assert.equal(solesReferenceDate, options.solesReferenceDate ?? "30/06/2023", "The request must specify the test reference date explicitly");
+      }
+      const rows = expiration ? [
+        { typeDescription: "PRIVATE_TYPE_A", balance: 6.25 + (options.wrongSolesExpiration ? 1 : 0), expirationDate: "31/12/2098", recordCount: 1 },
+        { typeDescription: "PRIVATE_TYPE_A", balance: 4.25, expirationDate: "31/12/2099", recordCount: 1 },
+        { typeDescription: "PRIVATE_TYPE_B", balance: 4, expirationDate: "31/12/2099", recordCount: 1 },
+      ] : [{ typeDescription: "PRIVATE_TYPE_A", balance: options.wrongSolesReturn && balanceCalls > 1 ? 5 : 10.5, recordCount: 2 }, { typeDescription: "PRIVATE_TYPE_B", balance: 4, recordCount: 1 }];
+      const result = { data: rows, summary: { memberName: options.changedSolesMember && expiration ? "OTRA PERSONA PRIVADA" : memberName },
+        queryContext: { mode: "summary", status: "current", referenceDate: options.ignoredSolesReference ? "29/10/2026" : solesReferenceDate, balanceOnly: true, groupBy: expiration ? ["type", "expirationDate"] : ["type"] } };
+      let response = buildMemberSolesResponse([{ name: "get_member_soles", result }]);
+      if (options.solesAsCurrency) response = response.replace("10,5", "₲ 10,5");
+      return json(200, { success: true, response, actions: {} });
+    }
+    if (question.startsWith("soles utilizados")) {
+      const groups = new Map();
+      for (const movement of movements) {
+        const previous = groups.get(movement.solesTypeDescription) ?? { memberName: options.wrongSolesUsageMember ? "OTRA PERSONA PRIVADA" : memberName,
+          solesTypeDescription: movement.solesTypeDescription, totalSolesUsed: 0, movementCount: 0 };
+        previous.totalSolesUsed += movement.solesUsed; previous.movementCount++; groups.set(movement.solesTypeDescription, previous);
+      }
+      if (options.wrongSolesUsageTotal) groups.values().next().value.totalSolesUsed += 1;
+      const result = { mode: "summary", queryContext: solesPeriod, groupBy: ["solesType", "member"], metrics: ["totalSolesUsed", "movementCount"],
+        data: options.emptySolesUsage ? [] : [...groups.values()], summary: { hasMore: Boolean(options.truncatedSolesUsage), returnedGroups: groups.size, totalGroups: groups.size + 1 } };
+      return json(200, { success: true, response: buildSolesUsageResponse([{ name: "get_soles_usage", result }]), actions: {} });
+    }
+    if (question.startsWith("detalla los movimientos") || question === "siguiente pagina") {
+      const pageSize = options.solesPageSize ?? 5, totalPages = Math.ceil(movements.length / pageSize);
+      solesPage = question.startsWith("detalla") ? 1 : solesPage + 1;
+      if (solesPage > totalPages) return json(200, { success: true, response: "No hay más páginas de movimientos para los filtros consultados.", actions: {} });
+      const data = movements.slice((solesPage - 1) * pageSize, solesPage * pageSize).map((row) => ({ ...row,
+        ...(options.invalidSolesQuantity ? { solesUsed: NaN } : {}),
+        ...(options.emptySolesDetailType ? { solesTypeDescription: "" } : {}),
+        ...(options.wrongSolesDetailDate ? { movementDate: "01/01/2024" } : {}),
+      }));
+      const result = { mode: "detail", data, queryContext: solesPeriod, pagination: {
+        page: options.repeatedSolesPage ? 1 : solesPage, totalPages, totalRows: movements.length, hasMore: solesPage < totalPages,
+      } };
+      return json(200, { success: true, response: buildSolesUsageResponse([{ name: "get_soles_usage", result }]), actions: {} });
+    }
     if (question.includes("2023 contra 2024") || question.includes("ambos anos")) {
       let from = 1, to = 12;
       if (question.includes("ambos anos") && !options.staleComparisonPeriod) {
@@ -94,7 +155,11 @@ const mockApi = async (options = {}) => {
 const execute = async (options = {}) => {
   const api = await mockApi(options);
   try {
-    const report = await runApiTests({ ...readConfig({ BOT_TEST_SESSION_ID: session, BOT_TEST_SUITE: options.suite ?? "quick", BOT_TEST_BASE_URL: api.baseUrl }), timeoutMs: options.timeout ? 100 : 3000 }, { loadWorkbook: fakeWorkbook, progress: () => {} });
+    const report = await runApiTests({ ...readConfig({ BOT_TEST_SESSION_ID: session, BOT_TEST_SUITE: options.suite ?? "quick", BOT_TEST_BASE_URL: api.baseUrl,
+      BOT_TEST_MEMBER_DOCUMENT: options.memberDocument ?? (options.suite === "soles" ? memberDocument : undefined),
+      BOT_TEST_SOLES_REFERENCE_DATE: options.solesReferenceDate,
+      BOT_TEST_SOLES_PAGE_SIZE: String(options.solesPageSize ?? 5), BOT_TEST_SOLES_MAX_PAGES: String(options.solesMaxPages ?? 10),
+    }), timeoutMs: options.timeout ? 100 : 3000 }, { loadWorkbook: fakeWorkbook, progress: () => {} });
     return { report, counts: api.counts() };
   } finally { await api.close(); }
 };
@@ -198,4 +263,89 @@ test("runner configuration requires a session and rejects credentials in URLs", 
   assert.throws(() => readConfig({ BOT_TEST_SESSION_ID: session, BOT_TEST_BASE_URL: "http://user:password@localhost:5400" }), /INVALID_BASE_URL/);
   assert.throws(() => readConfig({ BOT_TEST_SESSION_ID: session, BOT_TEST_TIMEOUT_MS: "0" }), /INVALID_TIMEOUT/);
   assert.throws(() => readConfig({ BOT_TEST_SESSION_ID: session, BOT_TEST_SUITE: "unknown" }), /INVALID_SUITE/);
+});
+
+test("soles suite checks balances, expirations, signed fractional usage, multiple pages and return to balance", async () => {
+  const { report, counts } = await execute({ suite: "soles", validateSolesPii: true });
+  assert.equal(report.success, true, JSON.stringify(report));
+  assert.equal(report.summary.passed, 6);
+  assert.deepEqual(counts, { chats: 7, downloads: 0 });
+  assert.equal(report.coverage.solesUsageMultiplePages, true);
+  for (const secret of [session, memberDocument, "PERSONA PRIVADA", "PRIVATE_TYPE", "PRIVATE_DESTINATION", "PRIVATE_MOVEMENT"]) assert.ok(!JSON.stringify(report).includes(secret));
+});
+
+test("all optionally includes soles only when the local document is configured", async () => {
+  const regular = readConfig({ BOT_TEST_SESSION_ID: session });
+  assert.equal(regular.soles, null);
+  const { report, counts } = await execute({ suite: "all", memberDocument });
+  assert.equal(report.success, true, JSON.stringify(report));
+  assert.equal(report.optionalSuites.soles, "configured");
+  assert.equal(report.summary.passed, 24);
+  assert.deepEqual(counts, { chats: 23, downloads: 5 });
+});
+
+test("single-page soles fixtures disclose that multiple pages were not exercised", async () => {
+  const { report, counts } = await execute({ suite: "soles", singleSolesPage: true });
+  assert.equal(report.success, true, JSON.stringify(report));
+  assert.equal(report.coverage.solesUsageMultiplePages, false);
+  assert.deepEqual(counts, { chats: 6, downloads: 0 });
+});
+
+test("soles suite catches identity, unit, expiration and usage inconsistencies", async () => {
+  for (const [flag, step, code] of [
+    ["solesAsCurrency", 1, "SOLES_ARE_LOYALTY_UNITS"],
+    ["wrongSolesExpiration", 2, "SOLES_EXPIRATION_MATCHES_TYPE_BALANCES"],
+    ["changedSolesMember", 2, "SOLES_MEMBER_AND_REFERENCE_PRESERVED"],
+    ["wrongSolesUsageMember", 3, "SOLES_USAGE_MEMBER_PRESERVED"],
+    ["emptySolesUsage", 3, "SOLES_USAGE_FIXTURE_REQUIRED"],
+    ["truncatedSolesUsage", 3, "SOLES_USAGE_SUMMARY_COMPLETE"],
+    ["invalidSolesQuantity", 4, "SOLES_USAGE_DETAIL_NUMERIC"],
+    ["emptySolesDetailType", 4, "SOLES_USAGE_DETAIL_TYPE_PRESENT"],
+    ["wrongSolesDetailDate", 4, "SOLES_DETAIL_DATE_WITHIN_PERIOD"],
+    ["repeatedSolesPage", 4, "SOLES_USAGE_PAGINATION"],
+    ["wrongSolesUsageTotal", 4, "SOLES_USAGE_DETAIL_MATCHES_SUMMARY_BY_TYPE"],
+    ["wrongSolesReturn", 5, "SOLES_BALANCE_PRESERVED_AFTER_USAGE"],
+  ]) {
+    const { report } = await execute({ suite: "soles", [flag]: true });
+    assert.equal(report.steps[step].error, code, flag);
+    assert.equal(report.summary.failed, 1);
+    assert.equal(report.summary.skipped, 5 - step);
+    assert.ok(!JSON.stringify(report).includes(memberDocument));
+  }
+});
+
+test("soles traversal is bounded and configuration validates the private fixture and dates", async () => {
+  const { report, counts } = await execute({ suite: "soles", solesMaxPages: 1 });
+  assert.equal(report.steps[4].error, "SOLES_PAGE_LIMIT_CHOOSE_SMALLER_PERIOD");
+  assert.equal(counts.chats, 3);
+  const env = { BOT_TEST_SESSION_ID: session, BOT_TEST_SUITE: "soles" };
+  assert.throws(() => readConfig(env), /SOLES_MEMBER_DOCUMENT_REQUIRED/);
+  assert.throws(() => readConfig({ ...env, BOT_TEST_MEMBER_DOCUMENT: "<invalid>" }), /INVALID_SOLES_MEMBER_DOCUMENT/);
+  for (const period of [{ BOT_TEST_SOLES_FROM: "31/02/2023" }, { BOT_TEST_SOLES_TO: "31/12/2022" }]) {
+    assert.throws(() => readConfig({ ...env, BOT_TEST_MEMBER_DOCUMENT: memberDocument, ...period }), /INVALID_SOLES_USAGE_PERIOD/);
+  }
+  assert.throws(() => readConfig({ ...env, BOT_TEST_MEMBER_DOCUMENT: memberDocument, BOT_TEST_SOLES_PAGE_SIZE: "201" }), /INVALID_SOLES_PAGINATION/);
+  assert.throws(() => readConfig({ ...env, BOT_TEST_MEMBER_DOCUMENT: memberDocument, BOT_TEST_SOLES_REFERENCE_DATE: "31/06/2023" }), /INVALID_SOLES_REFERENCE_DATE/);
+});
+
+test("soles date profile defaults to the DEV snapshot and supports another explicit reference", async () => {
+  const current = await execute({ suite: "soles", validateSolesPii: true });
+  assert.equal(current.report.success, true);
+  assert.equal(current.report.profile.solesReferenceDate, "30/06/2023");
+  const changed = await execute({ suite: "soles", solesReferenceDate: "31/05/2023", validateSolesPii: true });
+  assert.equal(changed.report.success, true);
+  assert.equal(changed.report.profile.solesReferenceDate, "31/05/2023");
+});
+
+test("soles suite rejects a response that ignores the requested reference and uses the real current year", async () => {
+  const { report } = await execute({ suite: "soles", ignoredSolesReference: true });
+  assert.equal(report.steps[1].error, "SOLES_REQUESTED_REFERENCE_DATE");
+  assert.equal(report.summary.skipped, 4);
+});
+
+ test("soles detail preserves missing quantities and zero while reconciling COUNT and SUM semantics", async () => {
+  const { report } = await execute({ suite: "soles", missingSolesQuantities: true });
+  assert.equal(report.success, true, JSON.stringify(report));
+  assert.equal(report.coverage.solesUsageMissingQuantities, true);
+  assert.equal(report.summary.passed, 6);
 });

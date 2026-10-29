@@ -341,7 +341,7 @@ const protectKnownTextPatterns = (sessionId, text) => {
   // In these short balance requests, the final subject is a member even when
   // the word socio is omitted. Keep the balance intent and any date visible.
   protectedText = protectedText.replace(
-    /\b((?:saldo\s+de\s+soles\s+(?:de|del)|cu[aá]ntos\s+soles\s+(?:dispone|tiene)(?:\s+(?:de|del))?)\s+(?:(?:el\s+|la\s+)?soci[oa]\s+)?)(["“]?)([A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9'’.-]+(?:\s+[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9'’.-]+){0,7}?)(["”]?)(?=\s*(?:,\s*)?(?:al|a\s+la\s+fecha|con\s+fecha\s+de\s+referencia)\s+\d{1,2}\/\d{1,2}\/\d{4}|\s+por\s+(?:tipo|vencimiento|fecha\s+de\s+vencimiento)\b|\s*[?!.;:]?\s*$)/gi,
+    /\b((?:saldo\s+de\s+soles\s+(?:de|del)|cu[aá]ntos\s+soles\s+(?:dispone|tiene)(?:\s+(?:de|del))?)\s+(?:(?:el\s+|la\s+)?soci[oa]\s+)?)(["“]?)([A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9'’.-]+(?:\s+[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9'’.-]+){0,7}?)(["”]?)(?=\s*(?:,\s*)?(?:al|a\s+la\s+fecha|con\s+fecha\s+de\s+referencia)\s+\d{1,2}\/\d{1,2}\/\d{4}|(?:\s+|\s*,\s*)por\s+(?:tipo|vencimiento|fecha\s+de\s+vencimiento)\b|\s*[?!.;:]?\s*$)/gi,
     (match, prefix, quote, value, closingQuote) => {
       if (isGenericAnalysisSubject(value) || /^(?:mi|mis|su|sus|el|la|los|las)$/i.test(value)) return match;
       const document = /^[0-9][0-9. -]*$/.test(value);

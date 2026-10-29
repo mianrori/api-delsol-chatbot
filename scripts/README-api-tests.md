@@ -33,7 +33,8 @@ OneDrive). No hace falta copiar cada respuesta ni enviar
 los Excel: se abren y verifican en memoria, sin guardarlos. El reporte contiene
 códigos de comprobación, estados HTTP y duraciones; omite sesiones, identificadores
 de exportación, usuarios Oracle, nombres comerciales, filas de Excel y respuestas
-completas ni imágenes SVG. No incluye los logs del servidor; si hace falta investigar una consulta
+completas ni imágenes SVG. Tampoco incluye documentos, nombres de socios, tipos,
+destinos ni cantidades de soles. No incluye los logs del servidor; si hace falta investigar una consulta
 concreta, el reporte identifica su paso y horario.
 
 ## Suites y configuración
@@ -42,9 +43,15 @@ concreta, el reporte identifica su paso y horario.
 | --- | --- | --- |
 | `BOT_TEST_SESSION_ID` | Obligatorio | Sesión válida con permisos de consulta. |
 | `BOT_TEST_BASE_URL` | `http://localhost:5400/chatbot/api/bot` | URL sin credenciales ni parámetros. |
-| `BOT_TEST_SUITE` | `all` | `quick`, `sales`, `charts`, `comparisons` o `all`. |
+| `BOT_TEST_SUITE` | `all` | `quick`, `sales`, `charts`, `comparisons`, `soles` o `all`. |
 | `BOT_TEST_TIMEOUT_MS` | `90000` | Límite por petición; máximo 600000. |
 | `BOT_TEST_REPORT` | Directorio temporal + `chatbot-api-tests.json` | Ruta del reporte; la carpeta debe existir. |
+| `BOT_TEST_MEMBER_DOCUMENT` | Solo obligatorio en `soles` | Documento local del socio de prueba; activa también soles en `all`. |
+| `BOT_TEST_SOLES_REFERENCE_DATE` | `30/06/2023` | Fecha explícita para clasificar vigencia en la copia DEV. |
+| `BOT_TEST_SOLES_FROM` | `01/01/2023` | Inicio inclusivo del período de usos, DD/MM/YYYY. |
+| `BOT_TEST_SOLES_TO` | `31/05/2023` | Fin inclusivo del período de usos. |
+| `BOT_TEST_SOLES_PAGE_SIZE` | `5` | Movimientos por página, de 1 a 200. |
+| `BOT_TEST_SOLES_MAX_PAGES` | `10` | Máximo de páginas a recorrer, de 1 a 100. |
 
 Con Docker, pasa las opciones adicionales mediante `-e`, por ejemplo:
 
@@ -60,9 +67,14 @@ docker exec -e BOT_TEST_SESSION_ID -e BOT_TEST_SUITE=quick api-delsol-chatbot-de
   gráfico de barras solo del importe, cambio a líneas y gráfico de enero–febrero.
 - `comparisons`: 4 pasos. Reinicio, comparación mensual 2023 contra 2024,
   seguimiento limitado a enero–mayo y seguimiento limitado a agosto.
+- `soles`: 6 pasos. Reinicio, saldo vigente por tipo, vencimientos, resumen de
+  usos por socio/tipo, detalle paginado de usos y vuelta al saldo por tipo.
 - `all`: 19 pasos. Incluye `sales`, cambio de tema a vehículos de 2025 y seguimiento
   por género (sin arrastrar exportaciones), las cuatro comprobaciones de gráficos
-  y las tres comparaciones entre años.
+  y las tres comparaciones entre años. Si se configura `BOT_TEST_MEMBER_DOCUMENT`,
+  añade los cinco casos de soles y tiene 24 pasos. Sin documento, el reporte
+  indica `optionalSuites.soles=not_configured`; no ejecuta consultas globales de
+  socios como sustitución de la prueba personal.
 
 Para ejecutar únicamente el nuevo bloque de gráficos:
 
@@ -83,6 +95,57 @@ $report = Join-Path ([Environment]::GetFolderPath("Desktop")) "chatbot-api-tests
 docker cp api-delsol-chatbot-dev:/tmp/chatbot-api-tests.json "$report"
 Remove-Item Env:BOT_TEST_SESSION_ID
 ```
+
+## Pruebas de soles con un documento local
+
+Elige un socio que tenga **saldo registrado positivo con vencimiento vigente
+respecto del 30/06/2023** y usos registrados entre enero y mayo de 2023, o ajusta
+la referencia y el período de usos. Ingresa el número de documento
+sin puntos, solo en tu entorno; no hace falta enviarlo por chat ni versionarlo.
+
+```powershell
+$env:BOT_TEST_SESSION_ID = Read-Host "Pega un sessionId vigente de DEV"
+$env:BOT_TEST_MEMBER_DOCUMENT = Read-Host "Documento del socio de prueba, sin puntos"
+docker exec -e BOT_TEST_SESSION_ID -e BOT_TEST_MEMBER_DOCUMENT -e BOT_TEST_SUITE=soles -e BOT_TEST_SOLES_REFERENCE_DATE=30/06/2023 api-delsol-chatbot-dev node scripts/run-api-tests.mjs
+$report = Join-Path ([Environment]::GetFolderPath("Desktop")) "chatbot-api-tests.json"
+docker cp api-delsol-chatbot-dev:/tmp/chatbot-api-tests.json "$report"
+Remove-Item Env:BOT_TEST_SESSION_ID, Env:BOT_TEST_MEMBER_DOCUMENT
+```
+
+Para otro período, añade al comando Docker, por ejemplo,
+`-e BOT_TEST_SOLES_FROM=01/01/2024 -e BOT_TEST_SOLES_TO=31/12/2024`.
+Estas fechas filtran **usos**. La suite solicita explícitamente la fecha
+`BOT_TEST_SOLES_REFERENCE_DATE` para saldo y vuelta al saldo, y comprueba que el
+backend la aplique también al seguimiento por vencimiento. El reporte incluye
+la referencia en `profile.solesReferenceDate`. El valor predeterminado corresponde
+al corte de junio de 2023 de la copia DEV; puede cambiarse mediante `-e`.
+
+Esto no cambia el reloj del servidor ni de Oracle, la fecha global del chat,
+la vigencia real de sesiones ni la expiración de exportaciones. La referencia
+clasifica vencimientos sobre el **saldo almacenado en DEV**; no reconstruye un
+saldo histórico ni revierte consumos posteriores. Si el registro almacenado ya
+tiene saldo cero, cambiar la referencia no lo convierte en un saldo positivo.
+
+La suite comprueba que cada tipo tenga saldo numérico sin símbolo monetario,
+que se ofrezca el detalle por vencimiento y que los vencimientos sumen el saldo
+de cada tipo. Los usos deben conservar el socio y el período, agruparse por tipo
+y distinguirse del saldo. El detalle recorre todas las páginas permitidas,
+valida sus fechas y su cantidad de movimientos y suma los usos **por tipo** para
+compararlos con el resumen, incluyendo fracciones y movimientos con signo.
+Finalmente pide otra vez el saldo para comprobar que no se sustituya por el uso.
+
+Si falta saldo o uso, fallará con un código `SOLES_*FIXTURE*`: elige otro socio
+o ajusta el rango. Si supera el límite de páginas, reduce el período o ajusta
+`BOT_TEST_SOLES_PAGE_SIZE` / `BOT_TEST_SOLES_MAX_PAGES`. El reporte indica en
+`coverage.solesUsageMultiplePages` si se ejercitaron varias páginas; con cinco
+usos o menos, el tamaño predeterminado solo permite probar una página y su fin.
+Para forzar varias páginas con pocos usos, baja el tamaño a 1 o 2.
+
+El nombre, documento, tipos y cantidades se comparan solo en memoria. El reporte
+guarda códigos de comprobación, tiempos y ese indicador de cobertura. Estas son
+comprobaciones de coherencia entre respuestas; no un control independiente del
+saldo o de la relación documento/nombre contra Oracle. La prueba termina ante
+el primer fallo, con los mismos límites y códigos de salida de las otras suites.
 
 El código de salida es `0` si todo pasó, `1` si falló una comprobación y `2` si
 la configuración es inválida o no se pudo guardar el reporte. Las respuestas
@@ -142,3 +205,9 @@ solas que un seguimiento haya evitado una nueva consulta Oracle.
 Si ya tienes Node y las dependencias del proyecto instaladas, también puedes
 ejecutar `node scripts/run-api-tests.mjs` desde Windows con las mismas variables.
 La ruta del reporte se imprime al terminar.
+
+El detalle admite cantidades ausentes únicamente con el marcador `—`, distinto
+de cero. Todos los movimientos cuentan en la conciliación; se suman las cantidades
+informadas, conforme a `COUNT(*)` y `SUM(NVL(SOLES_UTILIZADOS, 0))` del resumen.
+`coverage.solesUsageMissingQuantities` indica si se encontraron cantidades ausentes,
+sin registrar sus valores. Otros textos no numéricos siguen haciendo fallar la prueba.

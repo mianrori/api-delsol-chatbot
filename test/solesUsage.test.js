@@ -173,3 +173,21 @@ test("destination lookup presentation shows choices and names without internal c
     assert.equal(buildSolesUsageResponse([{ name: "search_members", result }, { name: "search_soles_usage_destinations", result }]), null);
   }
 });
+
+
+test("usage detail accepts rows alias and preserves canonical pageSize precedence", async () => {
+  for (const pagination of [{ rows: 5 }, { rows: 5, pageSize: null }, { rows: 2, pageSize: 5 }]) {
+    const connection = connectionFor(() => [{ TOTAL_ROWS: 23, RN: null }]);
+    const result = await getSolesUsage({ ...dates, mode: "detail", page: 2, ...pagination }, connection);
+    assert.equal(result.pagination.pageSize, 5);
+    assert.equal(result.pagination.totalPages, 5);
+    assert.equal(result.pagination.nextPage, 3);
+    assert.equal(connection.queries[0].binds.rowFrom, 6);
+    assert.equal(connection.queries[0].binds.rowTo, 10);
+  }
+  for (const rows of [0, -1, 201, 1.5, "5", NaN]) {
+    await assert.rejects(getSolesUsage({ ...dates, mode: "detail", rows }, {
+      execute: () => assert.fail("Invalid pagination must not query Oracle"),
+    }));
+  }
+});
