@@ -1,5 +1,6 @@
-const clean = (v) => String(v ?? "").replace(/\*\*/g, "").trim();
-const number = (v) => /^-?\d+(?:\.\d{3})*(?:,\d+)?$/.test(clean(v)) ? Number(clean(v).replace(/\./g, "").replace(",", ".")) : null;
+const clean = (v) => String(v ?? "").replace(/\*\*/g, "").replace(/[\u00a0\u202f]/g, " ").trim();
+const number = (v) => /^-?(?:\d+|\d{1,3}(?:\.\d{3})+|\d{1,3}(?: \d{3})+)(?:,\d+)?$/.test(clean(v))
+  ? Number(clean(v).replace(/[. ]/g, "").replace(",", ".")) : null;
 const day = (v) => {
   const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(v ?? ""); if (!m) return null;
   const d = new Date(Date.UTC(+m[3], +m[2]-1, +m[1]));

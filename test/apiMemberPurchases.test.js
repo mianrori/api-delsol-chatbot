@@ -14,13 +14,13 @@ const execute = async (flag) => {
     let table;
     if (calls < 5) {
       const dimension = [null,"Mes","Local","Rubro"][calls-1];
-      table = `| ${dimension ? dimension+" | " : ""}Moneda | Importe | Compras |\n| --- | --- | --- |\n| ${dimension ? (dimension === "Mes" ? "2023-01" : "PRIVATE_LABEL")+" | " : ""}${flag === "currency" ? "USD" : "PYG"} | ${flag === "total" && calls === 2 ? "7" : "6"} | 3 |`;
+      table = `| ${dimension ? dimension+" | " : ""}Moneda | Importe | Compras |\n| --- | --- | --- |\n| ${dimension ? (dimension === "Mes" ? "2023-01" : "PRIVATE_LABEL")+" | " : ""}${flag === "currency" ? "USD" : "PYG"} | ${flag === "total" && calls === 2 ? "7000" : "6000"} | 3 |`;
     } else {
       const page = calls-4, count = page === 1 ? 2 : 1;
       table = `Página ${flag === "page" ? 1 : page} de 2; 3 compras en total.\n| Fecha | Local | Rubro | Moneda | Importe |\n| --- | --- | --- | --- | --- |\n`+
-        Array.from({length: count}, () => `| ${flag === "date" ? "01/01/2024" : "01/01/2023"} | PRIVATE_LOCAL | PRIVATE_CATEGORY | PYG | ${flag === "detail" ? "3" : "2"} |`).join("\n");
+        Array.from({length: count}, () => `| ${flag === "date" ? "01/01/2024" : "01/01/2023"} | PRIVATE_LOCAL | PRIVATE_CATEGORY | PYG | ${flag === "detail" ? "3000" : "2000"} |`).join("\n");
     }
-    return Response.json({env: "development", success: true, response: prefix+table, actions: {}});
+    return Response.json({env: "development", success: true, response: flag === "unicode" ? (prefix+table).replace("Documento: ", "**Documento:**\u202f").replaceAll("6000", "6\u202f000").replaceAll("2000", "2\u00a0000") : flag === "malformed" ? (prefix+table).replaceAll("6000", "6 00") : prefix+table, actions: {}});
   } });
 };
 test("personal purchase suite reconciles summaries and all pages without storing private data", async () => {
@@ -43,4 +43,12 @@ test("personal purchase configuration requires private fixture and bounds calend
   for (const invalid of [{BOT_TEST_PURCHASES_FROM:"31/02/2023"},{BOT_TEST_PURCHASES_TO:"01/01/2022"},{BOT_TEST_PURCHASES_PAGE_SIZE:"101"},{BOT_TEST_PURCHASES_MAX_PAGES:"0"}]) {
     assert.throws(()=>readConfig({...env,BOT_TEST_PURCHASES_DOCUMENT:document,...invalid}),/INVALID_MEMBER_PURCHASES/);
   }
+});
+
+
+test("purchase checks accept bold Unicode headers and correctly grouped Unicode thousands", async () => {
+  const report = await execute("unicode");
+  assert.equal(report.success, true, JSON.stringify(report));
+  const invalid = await execute("malformed");
+  assert.equal(invalid.steps.find(s => s.status === "failed")?.error, "MEMBER_PURCHASES_NUMERIC_PYG");
 });

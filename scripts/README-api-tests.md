@@ -314,3 +314,8 @@ ni filas. Son controles de coherencia de respuestas HTTP; no prueban por sí
 solos la correspondencia documento/persona ni sustituyen un control independiente
 contra Oracle. No modifica el backend, sesiones ni reloj. Pendiente validar el
 formato solicitado contra DEV; los tests locales usan respuestas simuladas.
+
+La suite personal admite negrita y espacios Unicode en encabezados y separadores
+de miles (por ejemplo, `1 234`), además de `1.234`. Solo admite grupos de
+tres dígitos; no elimina espacios arbitrarios para convertir textos inválidos
+en números. Estos formatos no alteran la comprobación del documento.
