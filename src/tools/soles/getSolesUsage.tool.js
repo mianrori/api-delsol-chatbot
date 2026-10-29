@@ -192,7 +192,11 @@ export const getSolesUsageTool = {
               "number",
               "null"
             ],
-            "description": "Cantidad de movimientos por página. Máximo 200."
+            "description": "Cantidad de movimientos por página. Máximo 200. Tiene prioridad sobre rows."
+          },
+          "rows": {
+            "type": ["number", "null"],
+            "description": "Alias de pageSize para mode=detail. Entero entre 1 y 200. Preferir pageSize."
           }
         },
         "required": [],

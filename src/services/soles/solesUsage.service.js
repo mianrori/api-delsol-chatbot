@@ -125,7 +125,7 @@ const validateArgs = (args) => {
   if ((args.groupBy ?? []).some((value) => !SUPPORTED_GROUP_BY.has(value)) || (args.metrics ?? []).some((value) => !SUPPORTED_METRICS.has(value))) throw new Error("Agrupación o métrica no soportada.");
   if (args.documentNumber != null && (typeof args.documentNumber !== "string" || !args.documentNumber.trim())) throw new Error("Número de documento inválido.");
   if (args.transactionNumber != null && (!/^-?\d+$/.test(String(args.transactionNumber)) || (typeof args.transactionNumber === "number" && !Number.isSafeInteger(args.transactionNumber)))) throw new Error("Número de transacción inválido.");
-  for (const [key, maximum] of [["limit", 500], ["pageSize", 200], ["page", Number.MAX_SAFE_INTEGER]]) {
+  for (const [key, maximum] of [["limit", 500], ["pageSize", 200], ["rows", 200], ["page", Number.MAX_SAFE_INTEGER]]) {
     if (args[key] != null && (!Number.isSafeInteger(args[key]) || args[key] < 1 || args[key] > maximum)) throw new Error(`${key} debe ser un entero entre 1 y ${maximum}.`);
   }
   if (!Number.isSafeInteger((args.page ?? 1) * (args.pageSize ?? 50))) throw new Error("Página fuera de rango.");
@@ -375,6 +375,8 @@ export const getSolesUsage = async (args = {}, connection) => {
     throw new Error("No existe una conexión Oracle disponible.");
   }
 
+  // Accept the pagination alias used by other tools; canonical pageSize wins.
+  args = { ...args, pageSize: args.pageSize ?? args.rows };
   validateArgs(args);
   const mode = args.mode === "detail" ? "detail" : "summary";
 
