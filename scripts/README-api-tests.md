@@ -43,7 +43,7 @@ concreta, el reporte identifica su paso y horario.
 | --- | --- | --- |
 | `BOT_TEST_SESSION_ID` | Obligatorio | Sesión válida con permisos de consulta. |
 | `BOT_TEST_BASE_URL` | `http://localhost:5400/chatbot/api/bot` | URL sin credenciales ni parámetros. |
-| `BOT_TEST_SUITE` | `all` | `quick`, `sales`, `charts`, `comparisons`, `soles`, `purchases`, `campaigns` o `all`. |
+| `BOT_TEST_SUITE` | `all` | `quick`, `sales`, `charts`, `comparisons`, `soles`, `purchases`, `campaigns`, `member-purchases` o `all`. |
 | `BOT_TEST_TIMEOUT_MS` | `90000` | Límite por petición; máximo 600000. |
 | `BOT_TEST_REPORT` | Directorio temporal + `chatbot-api-tests.json` | Ruta del reporte; la carpeta debe existir. |
 | `BOT_TEST_MEMBER_DOCUMENT` | Solo obligatorio en `soles` | Documento local del socio de prueba; activa también soles en `all`. |
@@ -268,3 +268,49 @@ anterior con una consulta de vehículos exitosa. Los seguimientos con fechas o
 filtros adicionales siguen el flujo habitual. La prueba acepta las etiquetas
 `Femenino`/`Masculino` o `F`/`M`, valida los conteos de las tres métricas y exige
 una tabla; unos argumentos JSON escritos como respuesta no constituyen un resultado.
+
+
+## Compras individuales de un socio
+
+`BOT_TEST_SUITE=member-purchases` ejecuta seis casos: reinicio, total del socio,
+compras mensuales, por local, por rubro y detalle completo paginado. Es una suite
+separada; `all` conserva sus 29 casos cuando se configura soles.
+
+Elige un socio con compras en el período y configura el documento solo en tu
+entorno. Se prioriza `BOT_TEST_PURCHASES_DOCUMENT`; si falta, usa
+`BOT_TEST_MEMBER_DOCUMENT`. Esta suite no necesita saldo ni usos de soles.
+
+```powershell
+$env:BOT_TEST_SESSION_ID = Read-Host "Pega un sessionId vigente de DEV"
+$env:BOT_TEST_PURCHASES_DOCUMENT = Read-Host "Documento del socio con compras en DEV"
+docker exec -e BOT_TEST_SESSION_ID -e BOT_TEST_PURCHASES_DOCUMENT -e BOT_TEST_SUITE=member-purchases api-delsol-chatbot-dev node scripts/run-api-tests.mjs
+$report = Join-Path ([Environment]::GetFolderPath("Desktop")) "chatbot-api-tests-member-purchases.json"
+docker cp api-delsol-chatbot-dev:/tmp/chatbot-api-tests.json "$report"
+Remove-Item Env:BOT_TEST_SESSION_ID, Env:BOT_TEST_PURCHASES_DOCUMENT
+```
+
+| Variable | Predeterminado | Uso |
+| --- | --- | --- |
+| BOT_TEST_PURCHASES_FROM | 01/01/2023 | Inicio inclusivo |
+| BOT_TEST_PURCHASES_TO | 31/05/2023 | Fin inclusivo |
+| BOT_TEST_PURCHASES_PAGE_SIZE | 20 | De 1 a 100 compras por página |
+| BOT_TEST_PURCHASES_MAX_PAGES | 20 | Límite de páginas entre 1 y 100 |
+
+Pasa opciones mediante `docker exec -e`, como en las otras suites. Si hay más
+páginas que el límite, reduce el período o configura el límite/tamaño. Con cero
+compras falla la precondición; no se considera cobertura exitosa.
+
+Las preguntas solicitan tablas con columnas definidas para comprobar importes y
+conteos. Se validan documento y período visibles, moneda PYG, meses dentro del
+rango, conciliación de cada desglose con el total y todas las filas del detalle
+hasta agotar las páginas previstas por el conteo. No se suministran al modelo
+los importes, conteos ni metadatos esperados de página. Se conservan signos y
+fracciones. Una etiqueta compartida por dos locales/rubros no se considera una
+identidad única; los meses sí deben ser únicos.
+
+El reporte contiene solo fechas del perfil, códigos de comprobación, tiempos y
+`coverage.memberPurchasesMultiplePages`, sin documento, locales, rubros, importes
+ni filas. Son controles de coherencia de respuestas HTTP; no prueban por sí
+solos la correspondencia documento/persona ni sustituyen un control independiente
+contra Oracle. No modifica el backend, sesiones ni reloj. Pendiente validar el
+formato solicitado contra DEV; los tests locales usan respuestas simuladas.
