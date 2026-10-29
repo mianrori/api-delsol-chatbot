@@ -9,6 +9,12 @@ import { buildSalesYearComparisonResponse } from "../src/services/ai/salesYearCo
 import { buildMemberSolesResponse } from "../src/services/ai/memberSolesPresentation.service.js";
 import { buildSolesUsageResponse } from "../src/services/ai/solesUsagePresentation.service.js";
 import { protectPiiText } from "../src/services/ai/pii.service.js";
+import { campaignControl } from "../scripts/api-purchases-campaigns-checks.mjs";
+import { buildMemberPurchasesVsSalesResponse } from "../src/services/ai/memberPurchasesVsSalesPresentation.service.js";
+import { buildCampaignSalesPerformanceResponse } from "../src/services/ai/campaignSalesPerformancePresentation.service.js";
+import { buildPromotionSearchResponse } from "../src/services/ai/promotionSearchPresentation.service.js";
+import { getCampaignSalesPerformance } from "../src/services/sales/campaignSalesPerformance.service.js";
+import { compareMemberPurchasesVsSales } from "../src/services/members/memberPurchasesVsSales.service.js";
 
 const session = "test-session-secret";
 // Generated only for the isolated mock server; never a real member fixture.
@@ -21,7 +27,7 @@ const fakeWorkbook = (buffer) => {
   return { getWorksheet: (name) => name === "Ventas" ? sheet(rows) : name === "Información" ? sheet(info) : undefined };
 };
 const mockApi = async (options = {}) => {
-  const exports = new Map(); let chats = 0, downloads = 0, balanceCalls = 0, solesPage = 0, solesReferenceDate;
+  const exports = new Map(); let chats = 0, downloads = 0, balanceCalls = 0, solesPage = 0, solesReferenceDate, campaignPage = 0;
   const memberName = "PERSONA PRIVADA DE PRUEBA";
   const movements = (options.missingSolesQuantities ? [3.5, -1, .5, 2, 0, null, null] : [3.5, -1, .5, 2, 1, 1.25, 2.75]).slice(0, options.singleSolesPage ? 3 : 7).map((quantity, index) => ({
     memberName, movementDate: index % 2 ? `2023-02-${String(index + 1).padStart(2, "0")}T12:00:00.000Z` : `${String(index + 1).padStart(2, "0")}/02/2023`, solesTypeDescription: index < 4 ? "PRIVATE_TYPE_A" : "PRIVATE_TYPE_B",
@@ -47,6 +53,57 @@ const mockApi = async (options = {}) => {
       const protectedText = protectPiiText("api-runner-soles-fixture", data.message);
       if (data.message.includes(memberDocument)) assert.ok(!protectedText.includes(memberDocument));
       else assert.equal(protectedText, data.message, "Calendar dates and grouping words must remain readable");
+    }
+    if (question.includes("canjes de facturas de socios frente a") || question.includes("comparacion de canjes de facturas")) {
+      const monthly = question.includes("mes a mes"), january = question.includes("unicamente enero");
+      const source = controls.monthly.slice(0, january ? 1 : 5);
+      const groups = monthly ? source.map((row, index) => ({ label: `2023-${row.month}`, sales: row.amount, amount: (index + 1) * 1000000, count: (index + 1) * 10, members: index + 1 }))
+        : [{ sales: source.reduce((sum, row) => sum + row.amount, 0), amount: january ? 1000000 : 15000000, count: january ? 10 : 150, members: january ? 1 : 5 }];
+      const args = { dateFrom: "01/01/2023", dateTo: january ? "31/01/2023" : "31/05/2023", breakdownBy: monthly ? ["month"] : [], orderBy: "dimension", orderDirection: "asc" };
+      const connection = { execute: async (sql) => ({ rows: groups.map((row) => ({
+        DIMENSION_1_ID: row.label, DIMENSION_1_NAME: row.label,
+        CURRENCY_DESCRIPTION: "GUARANIES", CURRENCY_SYMBOL: options.purchaseCurrency ?? "PYG",
+        ...(sql.includes("VW_BOT_VENTAS_LOCALES") ? { SALES_AMOUNT: row.sales } : {
+          EXCHANGE_AMOUNT: row.amount, INVOICE_COUNT: row.count, MEMBER_COUNT: row.members,
+        }),
+      })) }) };
+      const result = await compareMemberPurchasesVsSales(args, connection);
+      if (options.wrongPurchasePeriod) result.period.dateTo = "30/05/2023";
+      if (options.wrongPurchaseSales) result.results[0].auditedSalesAmount++;
+      if (options.wrongPurchasePercentage) result.results[0].percentage++;
+      if (options.wrongPurchaseTotal && !monthly && !january) { result.results[0].exchangeAmount++; result.results[0].percentage = result.results[0].exchangeAmount / result.results[0].auditedSalesAmount * 100; }
+      if (options.wrongPurchaseMembers && !monthly && !january) result.results[0].memberCount = 16;
+      if (options.wrongPurchaseJanuary && january) result.results[0].invoiceCount++;
+      if (options.emptyPurchases) for (const row of result.results) { row.invoiceCount = 0; row.memberCount = 0; row.exchangeAmount = 0; row.percentage = 0; }
+      if (options.wrongPurchaseCurrency) result.results[0].currency.symbol = "USD";
+      if (options.wrongPurchaseMonth && monthly) result.results[0].dimensions[0].name = "2024-01";
+      if (options.truncatedPurchases) result.summary.hasMore = true;
+      return json(200, { success: true, response: buildMemberPurchasesVsSalesResponse([{ name: "compare_member_purchases_vs_sales", result }]), actions: {} });
+    }
+    if (question.includes("campana navidad") || campaignPage && question === "siguiente pagina") {
+      campaignPage++;
+      const nextPage = options.campaignMultiPage && campaignPage === 1;
+      const entries = Array.from({ length: 10 }, (_, index) => ({ optionId: index + 1,
+        promotionName: "PRIVATE_PROMOTION", campaignName: index === 3 && !nextPage && !options.missingCampaign ? campaignControl.name : `PRIVATE_NAVIDAD_${index}`,
+        dateFrom: options.wrongCampaignDates ? "16/11/2018" : "15/11/2018", dateTo: "06/01/2019" }));
+      const result = { status: "AMBIGUOUS", totalRows: options.campaignMultiPage ? 20 : 10, page: campaignPage, totalPages: options.campaignMultiPage ? 2 : 1, options: entries, hasMore: nextPage };
+      return json(200, { success: true, response: options.silentCampaignSelection ? "Elegí una campaña sin preguntar." : buildPromotionSearchResponse([{ name: "search_promotions", result }]), actions: {} });
+    }
+    if (question.startsWith("opcion ")) {
+      assert.ok(question.startsWith("opcion 4."), "The selection must come from the returned options");
+      const input = { promotionId: "SYNTHETIC_PROMO", campaignId: "SYNTHETIC_CAMPAIGN", campaignDateFrom: "15/11/2018", campaignDateTo: "06/01/2019" };
+      let index = 0;
+      const result = await getCampaignSalesPerformance(input, { execute: async (sql) => {
+        if (sql.includes("VW_BOT_PROMOCIONES")) return { rows: [{ COD_PROMOCION: input.promotionId, COD_CAMPANIA: input.campaignId,
+          NOMBRE_PROMOCION: "PRIVATE_PROMOTION", NOMBRE_CAMPANIA: campaignControl.name, FECHA_DESDE: input.campaignDateFrom, FECHA_HASTA: input.campaignDateTo }] };
+        const row = campaignControl.periods[index++]; return { rows: [{ TOTAL_AMOUNT: row.amount, TOTAL_INVOICES: row.invoices, CURRENCY_DESCRIPTION: "GUARANIES", CURRENCY_ABBREVIATION: "PYG" }] };
+      } });
+      if (options.wrongCampaignTotals) result.periods.before.totalAmount++;
+      if (options.wrongCampaignAverage) result.periods.during.averageDailyAmount++;
+      if (options.wrongCampaignVariation) Object.values(result.comparisons)[0].totalInvoices.absoluteChange++;
+      let response = buildCampaignSalesPerformanceResponse([{ name: "analyze_campaign_sales_performance", result }]);
+      if (options.causalCampaign) response = response.replace("Estas variaciones describen las ventas observadas; no demuestran que la campaña haya causado los cambios.", "La campaña causó el aumento.");
+      return json(200, { success: true, response, actions: {} });
     }
     const solesPeriod = { dateFrom: "01/01/2023", dateTo: "31/05/2023" };
     if (question.includes("saldo de soles") || question === "detallar por vencimiento") {
@@ -183,8 +240,8 @@ test("runner detects a full Excel total mismatch and stops dependent steps", asy
 test("full runner preserves the sports/category and vehicle sequence without stale exports", async () => {
   const { report, counts } = await execute({ suite: "all" });
   assert.equal(report.success, true, JSON.stringify(report));
-  assert.equal(report.summary.passed, 19);
-  assert.deepEqual(counts, { chats: 16, downloads: 5 });
+  assert.equal(report.summary.passed, 24);
+  assert.deepEqual(counts, { chats: 21, downloads: 5 });
 });
 
 test("comparison suite validates both years, an empty range and the common August month", async () => {
@@ -280,8 +337,8 @@ test("all optionally includes soles only when the local document is configured",
   const { report, counts } = await execute({ suite: "all", memberDocument });
   assert.equal(report.success, true, JSON.stringify(report));
   assert.equal(report.optionalSuites.soles, "configured");
-  assert.equal(report.summary.passed, 24);
-  assert.deepEqual(counts, { chats: 23, downloads: 5 });
+  assert.equal(report.summary.passed, 29);
+  assert.deepEqual(counts, { chats: 28, downloads: 5 });
 });
 
 test("single-page soles fixtures disclose that multiple pages were not exercised", async () => {
@@ -348,4 +405,62 @@ test("soles suite rejects a response that ignores the requested reference and us
   assert.equal(report.success, true, JSON.stringify(report));
   assert.equal(report.coverage.solesUsageMissingQuantities, true);
   assert.equal(report.summary.passed, 6);
+});
+
+
+test("purchase suite reconciles monthly and total canjes, distinct members and a changed period", async () => {
+  for (const purchaseCurrency of ["PYG", "₲"]) {
+    const { report, counts } = await execute({ suite: "purchases", purchaseCurrency, validateSolesPii: true });
+    assert.equal(report.success, true, JSON.stringify(report));
+    assert.equal(report.summary.passed, 4);
+    assert.deepEqual(counts, { chats: 3, downloads: 0 });
+    for (const secret of [session, "1000000", "15000000", "PRIVATE_"]) assert.ok(!JSON.stringify(report).includes(secret));
+  }
+});
+
+test("purchase suite detects wrong periods, totals, currency, percentages and nonadditive members", async () => {
+  for (const [flag, step, code] of [
+    ["wrongPurchasePeriod", 1, "PURCHASES_PERIOD"],
+    ["wrongPurchaseSales", 1, "PURCHASES_SALES_CONTROL_TOTALS"],
+    ["wrongPurchasePercentage", 1, "PURCHASES_PERCENTAGE_ARITHMETIC"],
+    ["wrongPurchaseCurrency", 1, "PURCHASES_PYG_CURRENCY"],
+    ["wrongPurchaseMonth", 1, "PURCHASES_MONTHS_AND_ORDER"],
+    ["truncatedPurchases", 1, "PURCHASES_ALL_GROUPS"],
+    ["emptyPurchases", 1, "PURCHASES_REGISTERED_CANJES_FIXTURE_REQUIRED"],
+    ["wrongPurchaseTotal", 2, "PURCHASES_TOTAL_MATCHES_MONTHS"],
+    ["wrongPurchaseMembers", 2, "PURCHASES_DISTINCT_MEMBERS_BOUNDS"],
+    ["wrongPurchaseJanuary", 3, "PURCHASES_CHANGED_PERIOD_MATCHES_JANUARY"],
+  ]) {
+    const { report } = await execute({ suite: "purchases", [flag]: true });
+    assert.equal(report.steps[step].error, code, flag);
+    assert.equal(report.summary.skipped, 3 - step);
+  }
+});
+
+test("campaign suite selects from partial search and checks actual presentation of the three periods", async () => {
+  for (const multiple of [false, true]) {
+    const { report, counts } = await execute({ suite: "campaigns", campaignMultiPage: multiple });
+    assert.equal(report.success, true, JSON.stringify(report));
+    assert.equal(report.summary.passed, 3);
+    assert.equal(report.coverage.campaignSearchMultiplePages, multiple);
+    assert.deepEqual(counts, { chats: multiple ? 3 : 2, downloads: 0 });
+    assert.ok(!JSON.stringify(report).includes("PRIVATE_PROMOTION"));
+    assert.ok(!JSON.stringify(report).includes(String(campaignControl.periods[0].amount)));
+  }
+});
+
+test("campaign suite catches silent selection, missing fixtures, dates, totals, averages and causality", async () => {
+  for (const [flag, step, code] of [
+    ["silentCampaignSelection", 1, "CAMPAIGNS_AMBIGUITY_REQUIRES_SELECTION"],
+    ["missingCampaign", 1, "CAMPAIGNS_HISTORICAL_FIXTURE_REQUIRED"],
+    ["wrongCampaignDates", 1, "CAMPAIGNS_SELECTED_DATES"],
+    ["wrongCampaignTotals", 2, "CAMPAIGNS_CONTROL_TOTALS_AND_CURRENCY"],
+    ["wrongCampaignAverage", 2, "CAMPAIGNS_DAILY_AVERAGE"],
+    ["wrongCampaignVariation", 2, "CAMPAIGNS_VARIATIONS_ARITHMETIC"],
+    ["causalCampaign", 2, "CAMPAIGNS_NO_CAUSAL_ATTRIBUTION"],
+  ]) {
+    const { report } = await execute({ suite: "campaigns", [flag]: true });
+    assert.equal(report.steps[step].error, code, flag);
+    assert.equal(report.summary.skipped, 2 - step);
+  }
 });
