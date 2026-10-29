@@ -259,3 +259,12 @@ no elige otra silenciosamente. `coverage.campaignSearchMultiplePages` indica si
 necesitó varias páginas para encontrarla; no implica que recorriera todo el catálogo.
 Los nombres y valores de las respuestas se usan en memoria y no se incluyen en
 el reporte. Ambas suites comprueban que no se arrastren gráficos ni exportaciones.
+
+
+El seguimiento simple «Ahora por género» de registros de vehículos se resuelve
+con una consulta nueva que conserva las fechas y filtros de la consulta anterior,
+sin depender de que el modelo emita otra llamada. Se limita al turno inmediatamente
+anterior con una consulta de vehículos exitosa. Los seguimientos con fechas o
+filtros adicionales siguen el flujo habitual. La prueba acepta las etiquetas
+`Femenino`/`Masculino` o `F`/`M`, valida los conteos de las tres métricas y exige
+una tabla; unos argumentos JSON escritos como respuesta no constituyen un resultado.

@@ -56,3 +56,24 @@ export const resolveVehiclePage = ({ message, history = [] }) => {
   const { timezone, ...input } = structuredClone(result.queryContext);
   return { toolName: "get_vehicle_registrations", input: { ...input, page: result.pagination.nextPage } };
 };
+
+// Resolve only an unqualified gender breakdown of the immediately preceding
+// successful registration query. The normal executor still authorizes Oracle.
+export const resolveVehicleGenderBreakdown = ({ message, history = [] }) => {
+  const text = String(message ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+    .replace(/[¿?¡!.,;:]/g, "").replace(/\s+/g, " ").trim();
+  if (!/^(?:ahora )?(?:(?:desglosa|desglosar|segmenta|segmentar|muestra|mostrar) )?por (?:genero|sexo)$/.test(text)) return null;
+  let start = -1;
+  for (let i = history.length - 1; i >= 0; i--) {
+    if (history[i].role === "user" && history[i].content?.some((block) => typeof block.text === "string")) { start = i; break; }
+  }
+  if (start < 0) return null;
+  const blocks = history.slice(start).flatMap((item) => item.content ?? []);
+  const calls = blocks.map((block) => block.toolUse).filter(Boolean);
+  if (calls.length !== 1 || calls[0].name !== "get_vehicle_registrations") return null;
+  const response = blocks.map((block) => block.toolResult).find((item) => item?.toolUseId === calls[0].toolUseId);
+  const result = response?.content?.find((block) => block.json)?.json;
+  if (response?.status !== "success" || !result?.queryContext || !["summary", "detail"].includes(result.mode)) return null;
+  const { timezone, ...input } = structuredClone(result.queryContext);
+  return { toolName: "get_vehicle_registrations", input: { ...input, mode: "summary", groupBy: ["gender"], page: 1 } };
+};

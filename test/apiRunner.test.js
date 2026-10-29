@@ -16,6 +16,8 @@ import { buildPromotionSearchResponse } from "../src/services/ai/promotionSearch
 import { getCampaignSalesPerformance } from "../src/services/sales/campaignSalesPerformance.service.js";
 import { compareMemberPurchasesVsSales } from "../src/services/members/memberPurchasesVsSales.service.js";
 
+import { buildVehicleResponse } from "../src/services/ai/vehiclePresentation.service.js";
+
 const session = "test-session-secret";
 // Generated only for the isolated mock server; never a real member fixture.
 const memberDocument = randomUUID().replace(/\D/g, "").padEnd(9, "7").slice(0, 9);
@@ -188,8 +190,17 @@ const mockApi = async (options = {}) => {
       const response = "Período: 01/01/2023 a 31/05/2023.\n| Mes | Ventas | Facturas |\n| --- | --- | --- |\n" + controls.monthly.map((row) => `| ${row.name} | ₲ ${num(row.amount)} | ${num(row.invoices)} |`).join("\n");
       return json(200, { success: true, response, actions: {} });
     }
-    if (data.message.includes("vehículos")) return json(200, { success: true, response: "Fecha de registro: 01/01/2025 a 31/12/2025.\nRegistros: **23**. Matrículas únicas: **23**. Socios identificados: **7**.", actions: {} });
-    if (data.message === "Ahora por género") return json(200, { success: true, response: "Fecha de registro: 01/01/2025 a 31/12/2025.\n| Género | Registros | Matrículas únicas | Socios identificados |\n| --- | --- | --- | --- |\n| F | 2 | 2 | 1 |\n| M | 21 | 21 | 6 |", actions: {} });
+    if (data.message.includes("vehículos") || data.message === "Ahora por género") {
+      const groupBy = data.message === "Ahora por género" ? ["gender"] : [];
+      const result = { mode: "summary", groupBy, queryContext: { dateFrom: "01/01/2025", dateTo: "31/12/2025", groupBy },
+        totals: { vehicleCount: 23, plateCount: 23, memberCount: 7 },
+        data: groupBy.length ? [{ gender: "F", vehicleCount: 2, plateCount: 2, memberCount: 1 },
+          { gender: "M", vehicleCount: options.wrongVehicleGenderCount ? 20 : 21, plateCount: 21, memberCount: 6 }] : [] };
+      let response = buildVehicleResponse([{ name: "get_vehicle_registrations", result }]);
+      if (options.vehicleGenderCodes) response = response.replace("Femenino", "F").replace("Masculino", "M");
+      if (options.vehicleArgsAsText && groupBy.length) response = JSON.stringify({ dateFrom: "01/01/2025", dateTo: "31/12/2025", groupBy });
+      return json(200, { success: true, response, actions: {} });
+    }
     if (data.message === "Ahora solo del rubro deportes") return json(200, { success: true, response: "DEPORTES: ₲ 2.994.866.457 y 7.049 facturas.", actions: {} });
     const sports = data.message === "Ahora por local", category = data.message.includes("por rubro");
     const february = data.message.includes("febrero"), month = february ? "02" : "01", end = february ? "28" : "31";
@@ -462,5 +473,16 @@ test("campaign suite catches silent selection, missing fixtures, dates, totals, 
     const { report } = await execute({ suite: "campaigns", [flag]: true });
     assert.equal(report.steps[step].error, code, flag);
     assert.equal(report.summary.skipped, 2 - step);
+  }
+});
+
+
+test("vehicle regression accepts real presentation labels and rejects raw arguments and incorrect counts", async () => {
+  const valid = await execute({ suite: "all", vehicleGenderCodes: true });
+  assert.equal(valid.report.success, true, JSON.stringify(valid.report));
+  for (const [flag, code] of [["wrongVehicleGenderCount", "VEHICLE_GENDER_COUNTS"], ["vehicleArgsAsText", "VEHICLE_GENDER_COLUMNS"]]) {
+    const { report } = await execute({ suite: "all", [flag]: true });
+    assert.equal(report.steps[11].error, code);
+    assert.equal(report.summary.skipped, 12);
   }
 });

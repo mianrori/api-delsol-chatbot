@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { normalizeVehicleRegistrationArgs, getVehicleRegistrations } from "../src/services/vehicles/vehicleRegistrations.service.js";
 import { getMemberVehicles } from "../src/services/members/memberVehicle.service.js";
-import { buildVehicleResponse, resolveVehiclePage } from "../src/services/ai/vehiclePresentation.service.js";
+import { buildVehicleResponse, resolveVehiclePage, resolveVehicleGenderBreakdown } from "../src/services/ai/vehiclePresentation.service.js";
 import { protectPiiText, protectPiiDeep, restorePiiDeep } from "../src/services/ai/pii.service.js";
 import { runWithRequestSignal } from "../src/services/requestContext.service.js";
 const range = { dateFrom: "01/01/2023", dateTo: "31/05/2023" };
@@ -173,4 +173,31 @@ test("plate whitespace is removed before lookup and split plates remain protecte
   const input = "Chapa abc 123 registrada en 2023";
   assert.match(protectPiiText(session, input), /\[PII_PLATE_\d+\] registrada en 2023$/);
   await assert.rejects(getMemberVehicles({ plate: "   " }, { execute: () => assert.fail("Empty plate queried Oracle") }), /vacía/);
+});
+
+
+test("gender followup freezes filters and dates and runs a fresh summary through the executor", async () => {
+  const result = await getVehicleRegistrations({ ...range, mode: "detail", page: 2, rows: 3, ageMin: 18,
+    ageReference: "registration", referenceDate: "28/10/2026", brand: "Marca sintética", automaticDebit: true },
+    connectionFor([{ VEHICLE_COUNT: 0, PLATE_COUNT: 0, MEMBER_COUNT: 0, RN: null }]));
+  const history = [{ role: "user", content: [{ text: "Registros de vehículos" }] },
+    { role: "assistant", content: [{ toolUse: { name: "get_vehicle_registrations", toolUseId: "vehicle", input: {} } }] },
+    { role: "user", content: [{ toolResult: { toolUseId: "vehicle", status: "success", content: [{ json: result }] } }] }];
+  const original = structuredClone(history);
+  const { timezone, ...context } = result.queryContext;
+  const expected = { toolName: "get_vehicle_registrations", input: { ...context, mode: "summary", groupBy: ["gender"], page: 1 } };
+  for (const message of ["Ahora por género", "Por sexo", "Desglosa por género"]) {
+    const resolved = resolveVehicleGenderBreakdown({ message, history });
+    assert.deepEqual(resolved, expected);
+    assert.doesNotThrow(() => normalizeVehicleRegistrationArgs(resolved.input));
+  }
+  assert.deepEqual(history, original);
+  for (const message of ["Ahora por género en 2024", "Por género y edad", "Por género solo mayores de 30"]) {
+    assert.equal(resolveVehicleGenderBreakdown({ message, history }), null);
+  }
+  assert.equal(resolveVehicleGenderBreakdown({ message: "Ahora por género", history: [...history, { role: "user", content: [{ text: "Ventas de enero" }] }] }), null);
+  const failed = structuredClone(history); failed[2].content[0].toolResult.status = "error";
+  assert.equal(resolveVehicleGenderBreakdown({ message: "Ahora por género", history: failed }), null);
+  const otherTool = structuredClone(history); otherTool[1].content[0].toolUse.name = "get_sales";
+  assert.equal(resolveVehicleGenderBreakdown({ message: "Ahora por género", history: otherTool }), null);
 });

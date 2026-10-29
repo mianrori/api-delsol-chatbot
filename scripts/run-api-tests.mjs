@@ -267,7 +267,10 @@ export const runApiTests = async (config, { fetchImpl = fetch, loadWorkbook = de
     ["vehicles-by-gender", async () => {
       const body = await chat("Ahora por género"), rows = tableRows(body.response);
       check(body.response.includes("01/01/2025") && body.response.includes("31/12/2025"), "VEHICLE_PERIOD_PRESERVED");
-      check(rows.some((row) => row[0] === "F" && numeric(row[1]) === 2) && rows.some((row) => row[0] === "M" && numeric(row[1]) === 21), "VEHICLE_GENDER_COUNTS");
+      check(/\| Género \| Registros \| Matrículas únicas \| Socios identificados \|/.test(body.response), "VEHICLE_GENDER_COLUMNS");
+      const matches = (row, labels, counts) => labels.includes(row[0]) && row.length === 4 && counts.every((value, index) => numeric(row[index + 1]) === value);
+      check(rows.length === 2 && rows.some((row) => matches(row, ["F", "Femenino"], [2, 2, 1]))
+        && rows.some((row) => matches(row, ["M", "Masculino"], [21, 21, 6])), "VEHICLE_GENDER_COUNTS");
       check(!body.actions?.salesExport, "NO_STALE_SALES_EXPORT");
     }],
   );
