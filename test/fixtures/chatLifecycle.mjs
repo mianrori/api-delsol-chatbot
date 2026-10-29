@@ -55,13 +55,13 @@ const chat = await load("../../src/services/ai/chat.service.js", {
   "@aws-sdk/client-bedrock-runtime": {
     BedrockRuntimeClient: class { async send(_command, options) {
       modelCalls++;
-      if (mode === "sales-export-repeat" || mode === "sales-export-denied") {
-        assert.notEqual(mode, "sales-export-denied", "Permission denial must bypass the model");
+      if (mode.startsWith("sales-export-")) {
+        assert.ok(!mode.endsWith("denied"), "Permission denial must bypass the model");
         assert.equal(comparisonStep++, 0);
         const latest = _command.input.messages.at(-1).content[0].toolResult;
         assert.equal(latest.status, "success");
         assert.ok(latest.content[0].json.resultSet.fullResultAvailableInExport);
-        return { stopReason: "end_turn", output: { message: { role: "assistant", content: [{ text: "Se muestran 12 de 187 locales. El detalle completo está disponible para exportación." }] } } };
+        return { stopReason: "end_turn", output: { message: { role: "assistant", content: [{ text: `Se muestran 12 de ${latest.content[0].json.resultSet.totalRecords} locales. El detalle completo está disponible para exportación.` }] } } };
       }
       if (mode === "direct-followup" || mode === "partial-followup" || mode === "cancel-between") {
         assert.fail("A summary follow-up must not invoke Bedrock");
@@ -187,14 +187,20 @@ const chat = await load("../../src/services/ai/chat.service.js", {
   "../../tools/index.js": { tools: [] },
   "./toolExecutor.service.js": { executeTool: async (call) => {
     toolCalls++;
-    if (mode === "sales-export-repeat" || mode === "sales-export-denied") {
+    if (mode.startsWith("sales-export-")) {
       assert.equal(call.name, "get_sales");
-      assert.equal(call.arguments.dateTo, "31/05/2023");
+      const removing = mode.includes("removal");
+      assert.equal(call.arguments.dateTo, removing ? "31/01/2023" : "31/05/2023");
       assert.equal(call.arguments.dayType, "weekend");
       assert.equal(JSON.stringify(call.arguments.customerIds), '["[PII_CUSTOMER_ID_1]"]');
-      if (mode === "sales-export-denied") throw Object.assign(new Error("Access denied"), { code: "ACCESS_DENIED" });
-      return { data: Array.from({ length: 187 }, (_, i) => ({ customerName: `Local ${i}`, totalAmount: i, totalInvoices: 1 })),
-        export: { available: true, exportId: `fresh-${toolCalls}`, totalRecords: 187, expiresAt: new Date(Date.now() + 600000).toISOString() } };
+      if (removing) {
+        assert.ok(!Object.hasOwn(call.arguments, "categoryIds"));
+        assert.equal(JSON.stringify(call.arguments.groupBy), '["customer"]');
+      }
+      if (mode.endsWith("denied")) throw Object.assign(new Error("Access denied"), { code: "ACCESS_DENIED" });
+      const totalRecords = removing ? 180 : 187;
+      return { data: Array.from({ length: totalRecords }, (_, i) => ({ customerName: `Local ${i}`, totalAmount: i, totalInvoices: 1 })),
+        export: { available: true, exportId: `fresh-${toolCalls}`, totalRecords, expiresAt: new Date(Date.now() + 600000).toISOString() } };
     }
     if (mode === "sales-year-comparison") {
       assert.equal(call.name, "get_sales");
@@ -549,6 +555,33 @@ const deniedExport = await chat.chatService({ sessionId: "test", message: export
 assert.equal(deniedExport.answer, "El usuario no tiene permisos para consultar esta información.");
 assert.equal(JSON.stringify(deniedExport.actions), "{}");
 assert.equal(modelCalls, beforeDeniedExportModels);
+
+const removalQuestion = "Ahora todos los rubros, manteniendo enero de 2023 y el desglose por local";
+const seedCategoryHistory = () => [
+  { role: "user", content: [{ text: "Ventas de enero de 2023 por local" }] },
+  { role: "assistant", content: [{ toolUse: { name: "get_sales", toolUseId: "old-all-categories", input: { ...exportInput, dateTo: "31/01/2023" } } }] },
+  { role: "user", content: [{ toolResult: { toolUseId: "old-all-categories", status: "success", content: [{ json: { data: [], resultSet: { fullResultAvailableInExport: true } } }] } }] },
+  { role: "assistant", content: [{ text: "Muestra de 12 de 180 locales." }] },
+  { role: "user", content: [{ text: "Ahora por local solo del rubro deportes" }] },
+  { role: "assistant", content: [{ toolUse: { name: "get_sales", toolUseId: "filtered-categories", input: { ...exportInput, dateTo: "31/01/2023", categoryIds: ["[PII_CATEGORY_ID_9]"] } } }] },
+  { role: "user", content: [{ toolResult: { toolUseId: "filtered-categories", status: "success", content: [{ json: { data: [{ totalAmount: 2994866457, totalInvoices: 7049 }] } }] } }] },
+  { role: "assistant", content: [{ text: "Cinco locales de deportes." }] },
+];
+for (const removalMode of ["sales-export-removal", "sales-export-removal-denied"]) {
+  mode = removalMode; comparisonStep = 0; storedHistory = seedCategoryHistory();
+  const before = toolCalls, beforeModels = modelCalls;
+  const result = await chat.chatService({ sessionId: "test", message: removalQuestion });
+  assert.equal(toolCalls - before, 1, "Removing a filter must execute a fresh query even when an older matching sample exists");
+  if (mode.endsWith("denied")) {
+    assert.equal(result.answer, "El usuario no tiene permisos para consultar esta información.");
+    assert.equal(JSON.stringify(result.actions), "{}");
+    assert.equal(modelCalls, beforeModels);
+  } else {
+    assert.equal(result.actions.salesExport.totalRecords, 180);
+    assert.equal(result.actions.salesExport.available, true);
+    assert.match(result.actions.salesExport.exportId, /^fresh-/);
+  }
+}
 
 mode = "sales-year-comparison"; storedHistory = [];
 const beforeYearModels = modelCalls, beforeYearTools = toolCalls;
