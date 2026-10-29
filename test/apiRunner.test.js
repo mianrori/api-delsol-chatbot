@@ -23,7 +23,7 @@ const fakeWorkbook = (buffer) => {
 const mockApi = async (options = {}) => {
   const exports = new Map(); let chats = 0, downloads = 0, balanceCalls = 0, solesPage = 0, solesReferenceDate;
   const memberName = "PERSONA PRIVADA DE PRUEBA";
-  const movements = [3.5, -1, .5, 2, 1, 1.25, 2.75].slice(0, options.singleSolesPage ? 3 : 7).map((quantity, index) => ({
+  const movements = (options.missingSolesQuantities ? [3.5, -1, .5, 2, 0, null, null] : [3.5, -1, .5, 2, 1, 1.25, 2.75]).slice(0, options.singleSolesPage ? 3 : 7).map((quantity, index) => ({
     memberName, movementDate: index % 2 ? `2023-02-${String(index + 1).padStart(2, "0")}T12:00:00.000Z` : `${String(index + 1).padStart(2, "0")}/02/2023`, solesTypeDescription: index < 4 ? "PRIVATE_TYPE_A" : "PRIVATE_TYPE_B",
     movementType: "PRIVATE_MOVEMENT", destinationType: "LOCAL", destinationName: "PRIVATE_DESTINATION", solesUsed: quantity,
   }));
@@ -84,6 +84,8 @@ const mockApi = async (options = {}) => {
       solesPage = question.startsWith("detalla") ? 1 : solesPage + 1;
       if (solesPage > totalPages) return json(200, { success: true, response: "No hay más páginas de movimientos para los filtros consultados.", actions: {} });
       const data = movements.slice((solesPage - 1) * pageSize, solesPage * pageSize).map((row) => ({ ...row,
+        ...(options.invalidSolesQuantity ? { solesUsed: NaN } : {}),
+        ...(options.emptySolesDetailType ? { solesTypeDescription: "" } : {}),
         ...(options.wrongSolesDetailDate ? { movementDate: "01/01/2024" } : {}),
       }));
       const result = { mode: "detail", data, queryContext: solesPeriod, pagination: {
@@ -297,6 +299,8 @@ test("soles suite catches identity, unit, expiration and usage inconsistencies",
     ["wrongSolesUsageMember", 3, "SOLES_USAGE_MEMBER_PRESERVED"],
     ["emptySolesUsage", 3, "SOLES_USAGE_FIXTURE_REQUIRED"],
     ["truncatedSolesUsage", 3, "SOLES_USAGE_SUMMARY_COMPLETE"],
+    ["invalidSolesQuantity", 4, "SOLES_USAGE_DETAIL_NUMERIC"],
+    ["emptySolesDetailType", 4, "SOLES_USAGE_DETAIL_TYPE_PRESENT"],
     ["wrongSolesDetailDate", 4, "SOLES_DETAIL_DATE_WITHIN_PERIOD"],
     ["repeatedSolesPage", 4, "SOLES_USAGE_PAGINATION"],
     ["wrongSolesUsageTotal", 4, "SOLES_USAGE_DETAIL_MATCHES_SUMMARY_BY_TYPE"],
@@ -337,4 +341,11 @@ test("soles suite rejects a response that ignores the requested reference and us
   const { report } = await execute({ suite: "soles", ignoredSolesReference: true });
   assert.equal(report.steps[1].error, "SOLES_REQUESTED_REFERENCE_DATE");
   assert.equal(report.summary.skipped, 4);
+});
+
+ test("soles detail preserves missing quantities and zero while reconciling COUNT and SUM semantics", async () => {
+  const { report } = await execute({ suite: "soles", missingSolesQuantities: true });
+  assert.equal(report.success, true, JSON.stringify(report));
+  assert.equal(report.coverage.solesUsageMissingQuantities, true);
+  assert.equal(report.summary.passed, 6);
 });

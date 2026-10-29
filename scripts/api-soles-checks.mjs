@@ -103,6 +103,7 @@ export const createSolesCases = ({ config, chat, check, progress, coverage }) =>
       check(pages <= config.maxPages, "SOLES_PAGE_LIMIT_CHOOSE_SMALLER_PERIOD");
       coverage("solesUsageMultiplePages", pages > 1);
       const detail = new Map();
+      let hasMissingQuantities = false;
       for (let page = 1; page <= pages; page++) {
         progress(`Comprobando página ${page} de ${pages} de movimientos de soles...`);
         const message = page === 1 ? `Detalla los movimientos de soles utilizados del mismo socio entre ${config.dateFrom} y ${config.dateTo}, página 1 con ${config.pageSize} movimientos por página` : "Siguiente página";
@@ -114,11 +115,17 @@ export const createSolesCases = ({ config, chat, check, progress, coverage }) =>
         for (const row of parsed.rows) {
           const amount = number(row[6]), movementDate = movementDay(row[1]);
           check(row.length === fields.length && normalize(row[0]) === normalize(memberName), "SOLES_DETAIL_MEMBER_PRESERVED");
-          check(amount !== null && Number.isFinite(amount) && Boolean(row[2]), "SOLES_USAGE_DETAIL_NUMERIC");
+          const missing = row[6] === "—";
+          check(Boolean(row[2]), "SOLES_USAGE_DETAIL_TYPE_PRESENT");
+          check(missing || amount !== null && Number.isFinite(amount), "SOLES_USAGE_DETAIL_NUMERIC");
+          hasMissingQuantities ||= missing;
           check(movementDate !== null && movementDate >= date(config.dateFrom) && movementDate <= date(config.dateTo), "SOLES_DETAIL_DATE_WITHIN_PERIOD");
-          add(detail, normalize(row[2]), amount, 1);
+          // COUNT(*) includes missing quantities; SUM(NVL(..., 0)) adds only
+          // known quantities. Keep the display marker distinct from numeric zero.
+          add(detail, normalize(row[2]), missing ? 0 : amount, 1);
         }
       }
+      coverage("solesUsageMissingQuantities", hasMissingQuantities);
       check(sameTotals(usages, detail, true), "SOLES_USAGE_DETAIL_MATCHES_SUMMARY_BY_TYPE");
       const exhausted = await chat("Siguiente página"); common(exhausted);
       check(/^No hay más páginas de movimientos/.test(exhausted.response), "SOLES_USAGE_END_OF_PAGES");

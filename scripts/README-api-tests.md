@@ -205,3 +205,9 @@ solas que un seguimiento haya evitado una nueva consulta Oracle.
 Si ya tienes Node y las dependencias del proyecto instaladas, también puedes
 ejecutar `node scripts/run-api-tests.mjs` desde Windows con las mismas variables.
 La ruta del reporte se imprime al terminar.
+
+El detalle admite cantidades ausentes únicamente con el marcador `—`, distinto
+de cero. Todos los movimientos cuentan en la conciliación; se suman las cantidades
+informadas, conforme a `COUNT(*)` y `SUM(NVL(SOLES_UTILIZADOS, 0))` del resumen.
+`coverage.solesUsageMissingQuantities` indica si se encontraron cantidades ausentes,
+sin registrar sus valores. Otros textos no numéricos siguen haciendo fallar la prueba.
