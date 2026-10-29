@@ -1,7 +1,7 @@
 import { resolveSalesYearComparison, buildSalesYearComparisonResponse } from "./salesYearComparison.service.js";
 import { needsSalesRefresh, SALES_REFRESH_INSTRUCTION } from "./salesHistory.service.js";
 import { buildSalesSampleResponse } from "./salesSamplePresentation.service.js";
-import { resolveRepeatedSalesExport, resolveSalesCategoryRemoval } from "./salesExportFollowup.service.js";
+import { resolveRepeatedSalesExport, resolveSalesCategoryRemoval, resolveEquivalentSalesExport } from "./salesExportFollowup.service.js";
 import { ACCESS_DENIED_CODE, ACCESS_DENIED_MESSAGE, isAccessDenied } from "./toolErrors.service.js";
 import { buildSalesSeriesResponse } from "./salesSeriesPresentation.service.js";
 import { chartsPrompt } from "../../prompts/sections/charts.prompt.js";
@@ -1584,6 +1584,7 @@ export const chatService = async ({ message, sessionId }) => {
   const salesYearComparison = resolveSalesYearComparison({ message, history: protectedHistory });
   const salesRefreshRequest = { message: messages.at(-1).content[0].text, history: protectedHistory };
   const salesRefreshInput = resolveSalesCategoryRemoval(salesRefreshRequest)
+    ?? resolveEquivalentSalesExport(salesRefreshRequest)
     ?? resolveRepeatedSalesExport(salesRefreshRequest);
   const promotionPage = resolvePromotionSearchPage({ message, history: protectedHistory });
   const solesPage = resolveVehiclePage({ message, history: protectedHistory })

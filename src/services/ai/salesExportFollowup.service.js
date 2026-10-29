@@ -2,6 +2,58 @@ const normalize = (value) => String(value ?? "").trim().toLowerCase().replace(/\
 
 const months = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 
+const explicitMonthlySales = (message) => {
+  const request = normalize(message).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/,/g, "").replace(/\s+/g, " ")
+    .replace(/^(?:muestrame|mostrame|mostrar|dame|consulta|consultar|ver) (?:las )?/, "");
+  const periodFirst = /^ventas (?:de|del) ([a-z]+) (?:de )?((?:19|20)\d{2}) por (local|rubro)(?: (?:con|incluyendo) (.+))?$/.exec(request);
+  const groupFirst = /^ventas por (local|rubro) (?:de|del) ([a-z]+) (?:de )?((?:19|20)\d{2})(?: (?:con|incluyendo) (.+))?$/.exec(request);
+  if (!periodFirst && !groupFirst) return null;
+  const [, monthName, year, group, metricText] = periodFirst ?? [null, groupFirst[2], groupFirst[3], groupFirst[1], groupFirst[4]];
+  const month = months.indexOf(monthName === "setiembre" ? "septiembre" : monthName) + 1;
+  if (!month) return null;
+  let metrics = ["totalAmount", "totalInvoices"];
+  if (metricText) {
+    const amount = "(?:montos?(?: total(?:es)?)?|importes?(?: total(?:es)?)?)";
+    const invoices = "(?:(?:cantidad|numero) de )?facturas";
+    if (new RegExp(`^${amount} y ${invoices}$`).test(metricText)) metrics = ["totalAmount", "totalInvoices"];
+    else if (new RegExp(`^${amount}$`).test(metricText)) metrics = ["totalAmount"];
+    else if (new RegExp(`^${invoices}$`).test(metricText)) metrics = ["totalInvoices"];
+    else return null;
+  }
+  const padded = String(month).padStart(2, "0");
+  return { dateFrom: `01/${padded}/${year}`, dateTo: `${new Date(Date.UTC(Number(year), month, 0)).getUTCDate()}/${padded}/${year}`, groupBy: [group === "local" ? "customer" : "category"], metrics };
+};
+
+export const resolveEquivalentSalesExport = ({ message, history = [] }) => {
+  const requested = explicitMonthlySales(message);
+  if (!requested) return null;
+  const starts = history.flatMap((item, index) => item.role === "user" && item.content?.some((block) => typeof block.text === "string") ? [index] : []);
+  for (let turn = starts.length - 1; turn >= 0; turn--) {
+    const blocks = history.slice(starts[turn] + 1, starts[turn + 1] ?? history.length).flatMap((item) => item.content ?? []);
+    const calls = blocks.map((block) => block.toolUse).filter(Boolean);
+    if (!calls.length) {
+      const previous = history[starts[turn]].content.filter((block) => typeof block.text === "string").map((block) => block.text).join("\n");
+      if (JSON.stringify(explicitMonthlySales(previous)) !== JSON.stringify(requested)) return null;
+      continue;
+    }
+    const sales = calls.filter((call) => call.name === "get_sales");
+    if (sales.length !== 1 || calls.some((call) => !["get_sales", "search_customers", "search_categories"].includes(call.name))) return null;
+    const call = sales[0], input = call.input;
+    const response = blocks.map((block) => block.toolResult).find((result) => result?.toolUseId === call.toolUseId);
+    const result = response?.content?.find((block) => block.json)?.json;
+    if (response?.status !== "success" || result?.resultSet?.fullResultAvailableInExport !== true || !Array.isArray(result.data)) return null;
+    // This grammar describes an unfiltered monthly breakdown. Do not replay a
+    // named/local/category/day filter that the new wording cannot confirm.
+    if (!input || Object.keys(input).some((key) => !["dateFrom", "dateTo", "groupBy", "metrics", "customerIds", "categoryIds", "dayType"].includes(key))) return null;
+    if ([input.customerIds, input.categoryIds].some((ids) => ids != null && (!Array.isArray(ids) || ids.length)) || input.dayType != null) return null;
+    if (input.dateFrom !== requested.dateFrom || input.dateTo !== requested.dateTo || JSON.stringify(input.groupBy) !== JSON.stringify(requested.groupBy)) return null;
+    const priorMetrics = input.metrics ?? ["totalAmount", "totalInvoices"];
+    if (!Array.isArray(priorMetrics) || JSON.stringify([...priorMetrics].sort()) !== JSON.stringify([...requested.metrics].sort())) return null;
+    return structuredClone(input);
+  }
+  return null;
+};
+
 export const resolveSalesCategoryRemoval = ({ message, history = [] }) => {
   const request = normalize(message).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/,/g, "").replace(/\s+/g, " ");
   // Match the entire instruction: extra filters, dates or analyses must stay in

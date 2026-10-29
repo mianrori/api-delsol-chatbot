@@ -58,6 +58,7 @@ const chat = await load("../../src/services/ai/chat.service.js", {
   "@aws-sdk/client-bedrock-runtime": {
     BedrockRuntimeClient: class { async send(_command, options) {
       modelCalls++;
+      if (mode.startsWith("sales-equivalent-")) assert.fail("Verified equivalent sales queries must refresh without invoking Bedrock");
       if (mode.startsWith("sales-history-")) {
         const step = comparisonStep++;
         assert.ok(step < 2, "A historical sales reuse can retry only once");
@@ -200,6 +201,15 @@ const chat = await load("../../src/services/ai/chat.service.js", {
   "../../tools/index.js": { tools: [] },
   "./toolExecutor.service.js": { executeTool: async (call) => {
     toolCalls++;
+    if (mode.startsWith("sales-equivalent-")) {
+      assert.equal(call.name, "get_sales");
+      assert.equal(call.arguments.dateFrom, "01/01/2023");
+      assert.equal(call.arguments.dateTo, "31/01/2023");
+      assert.ok(!call.arguments.customerIds?.length && !call.arguments.categoryIds?.length);
+      if (mode.endsWith("denied")) throw Object.assign(new Error("Access denied"), { code: "ACCESS_DENIED" });
+      return { data: Array.from({ length: 180 }, (_, i) => ({ customerName: `Local ${i}`, totalAmount: i * 1000, totalInvoices: i, currency: { symbol: "₲", abbreviation: "PYG" } })),
+        export: { available: true, exportId: `direct-equivalent-${toolCalls}`, totalRecords: 180, expiresAt: new Date(Date.now() + 600000).toISOString() } };
+    }
     if (mode.startsWith("sales-history-")) {
       assert.equal(call.name, "get_sales");
       assert.equal(call.arguments.dateTo, "31/01/2023");
@@ -624,6 +634,28 @@ for (const reuseMode of ["sales-history-reuse", "sales-history-stubborn", "sales
     assert.equal(result.actions.salesExport.exportId, "current-equivalent-export");
   }
 }
+
+mode = "sales-equivalent-direct";
+storedHistory = seedCategoryHistory().slice(0, 4);
+delete storedHistory[1].content[0].toolUse.input.customerIds;
+delete storedHistory[1].content[0].toolUse.input.dayType;
+storedHistory.push({ role: "user", content: [{ text: "Muéstrame las ventas por local de enero de 2023, incluyendo importes y número de facturas" }] },
+  { role: "assistant", content: [{ text: "No fue posible actualizar la consulta de ventas. Vuelve a intentarlo." }] });
+const beforeDirectModels = modelCalls, beforeDirectTools = toolCalls;
+let directExport;
+for (const question of ["Ventas de enero de 2023 por local, con monto total y cantidad de facturas", "Muéstrame las ventas por local de enero de 2023, incluyendo importes y número de facturas"]) {
+  const result = await chat.chatService({ sessionId: "test", message: question });
+  assert.match(result.answer, /Se muestran 12 de 180 registros/);
+  assert.notEqual(result.actions.salesExport.exportId, directExport);
+  directExport = result.actions.salesExport.exportId;
+}
+assert.equal(modelCalls, beforeDirectModels);
+assert.equal(toolCalls - beforeDirectTools, 2);
+mode = "sales-equivalent-denied";
+const deniedEquivalent = await chat.chatService({ sessionId: "test", message: "Muéstrame las ventas por local de enero de 2023, incluyendo importes y número de facturas" });
+assert.equal(deniedEquivalent.answer, "El usuario no tiene permisos para consultar esta información.");
+assert.equal(JSON.stringify(deniedEquivalent.actions), "{}");
+assert.equal(modelCalls, beforeDirectModels);
 
 mode = "sales-year-comparison"; storedHistory = [];
 const beforeYearModels = modelCalls, beforeYearTools = toolCalls;
