@@ -43,7 +43,7 @@ concreta, el reporte identifica su paso y horario.
 | --- | --- | --- |
 | `BOT_TEST_SESSION_ID` | Obligatorio | Sesión válida con permisos de consulta. |
 | `BOT_TEST_BASE_URL` | `http://localhost:5400/chatbot/api/bot` | URL sin credenciales ni parámetros. |
-| `BOT_TEST_SUITE` | `all` | `quick`, `sales`, `charts`, `comparisons`, `soles` o `all`. |
+| `BOT_TEST_SUITE` | `all` | `quick`, `sales`, `charts`, `comparisons`, `soles`, `purchases`, `campaigns` o `all`. |
 | `BOT_TEST_TIMEOUT_MS` | `90000` | Límite por petición; máximo 600000. |
 | `BOT_TEST_REPORT` | Directorio temporal + `chatbot-api-tests.json` | Ruta del reporte; la carpeta debe existir. |
 | `BOT_TEST_MEMBER_DOCUMENT` | Solo obligatorio en `soles` | Documento local del socio de prueba; activa también soles en `all`. |
@@ -69,12 +69,20 @@ docker exec -e BOT_TEST_SESSION_ID -e BOT_TEST_SUITE=quick api-delsol-chatbot-de
   seguimiento limitado a enero–mayo y seguimiento limitado a agosto.
 - `soles`: 6 pasos. Reinicio, saldo vigente por tipo, vencimientos, resumen de
   usos por socio/tipo, detalle paginado de usos y vuelta al saldo por tipo.
-- `all`: 19 pasos. Incluye `sales`, cambio de tema a vehículos de 2025 y seguimiento
-  por género (sin arrastrar exportaciones), las cuatro comprobaciones de gráficos
-  y las tres comparaciones entre años. Si se configura `BOT_TEST_MEMBER_DOCUMENT`,
-  añade los cinco casos de soles y tiene 24 pasos. Sin documento, el reporte
-  indica `optionalSuites.soles=not_configured`; no ejecuta consultas globales de
-  socios como sustitución de la prueba personal.
+- `purchases`: 4 pasos. Reinicio, canjes de facturas de socios frente a ventas
+  por mes (enero–mayo de 2023), conciliación con el total del mismo período y
+  cambio a enero. Verifica ventas de control, porcentajes y límites coherentes
+  para socios distintos; no suma personas que reaparecen en distintos meses.
+- `campaigns`: 3 pasos. Reinicio, búsqueda parcial de Navidad y selección de
+  «TU LUZ HACE LA MAGIA DE LA NAVIDAD» (15/11/2018–06/01/2019) para comparar
+  antes/durante/después. Busca hasta diez páginas si es necesario y usa el número
+  de opción devuelto, sin asumir su posición. Valida fechas, importes/facturas de
+  control, promedios diarios, variaciones y la advertencia de no atribuir causalidad.
+- `all`: 24 pasos. Incluye `sales`, vehículos de 2025 y seguimiento por género,
+  gráficos, comparaciones entre años, canjes frente a ventas y campañas. Si se
+  configura `BOT_TEST_MEMBER_DOCUMENT`, añade cinco casos de soles y tiene
+  **29 pasos**. Sin documento, indica `optionalSuites.soles=not_configured` y
+  omite las consultas personales de saldo/usos; los canjes son agregados globales.
 
 Para ejecutar únicamente el nuevo bloque de gráficos:
 
@@ -211,3 +219,42 @@ de cero. Todos los movimientos cuentan en la conciliación; se suman las cantida
 informadas, conforme a `COUNT(*)` y `SUM(NVL(SOLES_UTILIZADOS, 0))` del resumen.
 `coverage.solesUsageMissingQuantities` indica si se encontraron cantidades ausentes,
 sin registrar sus valores. Otros textos no numéricos siguen haciendo fallar la prueba.
+
+
+## Canjes de socios y campañas históricas
+
+Ejecuta las dos suites por separado antes de la regresión completa:
+
+```powershell
+$env:BOT_TEST_SESSION_ID = Read-Host "Pega un sessionId vigente de DEV"
+docker exec -e BOT_TEST_SESSION_ID -e BOT_TEST_SUITE=purchases api-delsol-chatbot-dev node scripts/run-api-tests.mjs
+$report = Join-Path ([Environment]::GetFolderPath("Desktop")) "chatbot-api-tests-purchases.json"
+docker cp api-delsol-chatbot-dev:/tmp/chatbot-api-tests.json "$report"
+docker exec -e BOT_TEST_SESSION_ID -e BOT_TEST_SUITE=campaigns api-delsol-chatbot-dev node scripts/run-api-tests.mjs
+$report = Join-Path ([Environment]::GetFolderPath("Desktop")) "chatbot-api-tests-campaigns.json"
+docker cp api-delsol-chatbot-dev:/tmp/chatbot-api-tests.json "$report"
+Remove-Item Env:BOT_TEST_SESSION_ID
+```
+
+No requieren documento de socio ni cambian el reloj. `purchases` comprueba los
+**canjes agregados frente a ventas**, no el detalle individual de compras de un
+socio. Requiere canjes registrados en enero–mayo de 2023. Compara los importes y
+conteos de canjes entre respuestas mensual/total/enero y calcula el porcentaje;
+los socios distintos del total deben estar entre el máximo mensual y la suma
+mensual. Esta coherencia no sustituye una conciliación independiente con Oracle.
+
+`campaigns` usa una campaña histórica ya validada en DEV y los siguientes
+controles, en períodos consecutivos de 53 días:
+
+| Período | Desde | Hasta | Ventas (PYG) | Facturas |
+| --- | --- | --- | ---: | ---: |
+| Antes | 23/09/2018 | 14/11/2018 | 81.975.498.634 | 651.507 |
+| Durante | 15/11/2018 | 06/01/2019 | 120.490.114.653 | 857.905 |
+| Después | 07/01/2019 | 28/02/2019 | 79.632.388.020 | 854.475 |
+
+La búsqueda exige al menos diez coincidencias de Navidad y la campaña de control.
+Si la copia DEV cambia o falta esa campaña, falla con un código `CAMPAIGNS_*`;
+no elige otra silenciosamente. `coverage.campaignSearchMultiplePages` indica si
+necesitó varias páginas para encontrarla; no implica que recorriera todo el catálogo.
+Los nombres y valores de las respuestas se usan en memoria y no se incluyen en
+el reporte. Ambas suites comprueban que no se arrastren gráficos ni exportaciones.

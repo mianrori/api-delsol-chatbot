@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { readSolesConfig, createSolesCases } from "./api-soles-checks.mjs";
+import { createPurchaseCases, createCampaignCases } from "./api-purchases-campaigns-checks.mjs";
 
 export const controls = {
   january: { amount: 58706137966, invoices: 366427, rows: 180 },
@@ -41,7 +42,7 @@ export const readConfig = (env = process.env) => {
   const timeoutMs = Number(env.BOT_TEST_TIMEOUT_MS || 90000);
   if (!Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 600000) throw new Failure("INVALID_TIMEOUT");
   const suite = env.BOT_TEST_SUITE || "all";
-  if (!["quick", "sales", "charts", "comparisons", "soles", "all"].includes(suite)) throw new Failure("INVALID_SUITE");
+  if (!["quick", "sales", "charts", "comparisons", "soles", "purchases", "campaigns", "all"].includes(suite)) throw new Failure("INVALID_SUITE");
   const soles = readSolesConfig(env, suite, (code) => { throw new Failure(code); });
   return { baseUrl, sessionId, timeoutMs, suite, soles, reportPath: env.BOT_TEST_REPORT || join(tmpdir(), "chatbot-api-tests.json") };
 };
@@ -57,7 +58,7 @@ const defaultLoadWorkbook = async (bytes) => {
 // request follows the same HTTP/session contract as Insomnia.
 export const runApiTests = async (config, { fetchImpl = fetch, loadWorkbook = defaultLoadWorkbook, progress = console.log } = {}) => {
   const report = { version: 1, suite: config.suite, startedAt: new Date().toISOString(),
-    description: "DEV regression using 2023/2024 control totals. No session IDs, export IDs, names, response bodies, SVG images or workbook rows are stored.", steps: [] };
+    description: "DEV historical regression using verified sales and campaign controls. No session IDs, export IDs, names, response bodies, SVG images or workbook rows are stored.", steps: [] };
   const exportIds = new Set();
   if (config.suite === "all") report.optionalSuites = { soles: config.soles ? "configured" : "not_configured" };
   if (config.soles) report.profile = { solesReferenceDate: config.soles.referenceDate };
@@ -238,7 +239,7 @@ export const runApiTests = async (config, { fetchImpl = fetch, loadWorkbook = de
     ["equivalent-january-sales", async () => excel(await chat("Muéstrame las ventas por local de enero de 2023, incluyendo importes y número de facturas"), january)],
     ["change-to-february", async () => excel(await chat("Muéstrame las ventas por local de febrero de 2023, incluyendo importes y número de facturas"), { ...january, from: "01/02/2023", to: "28/02/2023", month: "02", rows: undefined, total: controls.february })],
   ];
-  if (["charts", "comparisons", "soles"].includes(config.suite)) cases.splice(1);
+  if (["charts", "comparisons", "soles", "purchases", "campaigns"].includes(config.suite)) cases.splice(1);
   if (["sales", "all"].includes(config.suite)) cases.push(
     ["january-by-category", async () => excel(await chat("Ventas de enero de 2023 por rubro, con monto total y cantidad de facturas"), { ...january, group: "category", rows: 34 })],
     ["filter-sports", async () => {
@@ -292,6 +293,10 @@ export const runApiTests = async (config, { fetchImpl = fetch, loadWorkbook = de
   if (config.soles) cases.push(...createSolesCases({ config: config.soles, chat, check, progress,
     coverage: (key, value) => { report.coverage ??= {}; report.coverage[key] = value; },
   }));
+  if (["purchases", "all"].includes(config.suite)) cases.push(...createPurchaseCases({ chat, check, monthlyControls: controls.monthly }));
+  if (["campaigns", "all"].includes(config.suite)) cases.push(...createCampaignCases({ chat, check,
+    coverage: (key, value) => { report.coverage ??= {}; report.coverage[key] = value; },
+  }));
   let stopped = false;
   for (const [id, execute] of cases) {
     step = { id, status: "skipped", requests: [], checks: [] }; report.steps.push(step);
@@ -311,7 +316,7 @@ export const runApiTests = async (config, { fetchImpl = fetch, loadWorkbook = de
 
 const main = async () => {
   if (process.argv.includes("--help")) {
-    console.log("Variables: BOT_TEST_SESSION_ID (obligatorio), BOT_TEST_BASE_URL, BOT_TEST_SUITE=quick|sales|charts|comparisons|soles|all, BOT_TEST_TIMEOUT_MS=90000, BOT_TEST_REPORT. Soles requiere BOT_TEST_MEMBER_DOCUMENT; opciones BOT_TEST_SOLES_REFERENCE_DATE=30/06/2023, BOT_TEST_SOLES_FROM=01/01/2023, BOT_TEST_SOLES_TO=31/05/2023, BOT_TEST_SOLES_PAGE_SIZE=5, BOT_TEST_SOLES_MAX_PAGES=10. Reinicia solo la conversación de esta sesión. Ejecutar en DEV. Reporte predeterminado: directorio temporal/chatbot-api-tests.json. No inicia sesión ni cambia su expiración.");
+    console.log("Variables: BOT_TEST_SESSION_ID (obligatorio), BOT_TEST_BASE_URL, BOT_TEST_SUITE=quick|sales|charts|comparisons|soles|purchases|campaigns|all, BOT_TEST_TIMEOUT_MS=90000, BOT_TEST_REPORT. Soles requiere BOT_TEST_MEMBER_DOCUMENT; opciones BOT_TEST_SOLES_REFERENCE_DATE=30/06/2023, BOT_TEST_SOLES_FROM=01/01/2023, BOT_TEST_SOLES_TO=31/05/2023, BOT_TEST_SOLES_PAGE_SIZE=5, BOT_TEST_SOLES_MAX_PAGES=10. Reinicia solo la conversación de esta sesión. Ejecutar en DEV. Reporte predeterminado: directorio temporal/chatbot-api-tests.json. No inicia sesión ni cambia su expiración.");
     return;
   }
   let config;
