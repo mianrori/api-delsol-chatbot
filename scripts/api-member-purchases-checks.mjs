@@ -37,6 +37,7 @@ export const createMemberPurchaseCases = ({ config: c, chat, check, coverage }) 
       const offset = dimension ? 1 : 0, a = number(row[offset+1]), n = number(row[offset+2]);
       check(row.length === columns.length && row[offset] === "PYG" && a !== null && Number.isInteger(n) && n > 0, "MEMBER_PURCHASES_NUMERIC_PYG");
       if (dimension) check(Boolean(row[0]), "MEMBER_PURCHASES_GROUP_LABEL");
+      if (dimension === "Mes") row[0] = row[0].replace(/[\u2010\u2011]/g, "-");
       if (dimension === "Mes") { check(!keys.has(row[0]), "MEMBER_PURCHASES_UNIQUE_MONTHS"); keys.add(row[0]); }
       if (dimension === "Mes") {
         const m = /^(\d{4})-(\d{2})$/.exec(row[0]);

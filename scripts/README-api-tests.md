@@ -319,3 +319,7 @@ La suite personal admite negrita y espacios Unicode en encabezados y separadores
 de miles (por ejemplo, `1 234`), además de `1.234`. Solo admite grupos de
 tres dígitos; no elimina espacios arbitrarios para convertir textos inválidos
 en números. Estos formatos no alteran la comprobación del documento.
+
+En las etiquetas mensuales se normalizan los guiones tipográficos U+2010 y
+U+2011 al guion ASCII antes de validar YYYY-MM, unicidad y pertenencia al período.
+Los meses fuera de rango siguen haciendo fallar la suite.

@@ -20,7 +20,7 @@ const execute = async (flag) => {
       table = `Página ${flag === "page" ? 1 : page} de 2; 3 compras en total.\n| Fecha | Local | Rubro | Moneda | Importe |\n| --- | --- | --- | --- | --- |\n`+
         Array.from({length: count}, () => `| ${flag === "date" ? "01/01/2024" : "01/01/2023"} | PRIVATE_LOCAL | PRIVATE_CATEGORY | PYG | ${flag === "detail" ? "3000" : "2000"} |`).join("\n");
     }
-    return Response.json({env: "development", success: true, response: flag === "unicode" ? (prefix+table).replace("Documento: ", "**Documento:**\u202f").replaceAll("6000", "6\u202f000").replaceAll("2000", "2\u00a0000") : flag === "malformed" ? (prefix+table).replaceAll("6000", "6 00") : prefix+table, actions: {}});
+    return Response.json({env: "development", success: true, response: flag === "unicode" ? (prefix+table).replace("Documento: ", "**Documento:**\u202f").replaceAll("6000", "6\u202f000").replaceAll("2000", "2\u00a0000").replaceAll("2023-01", "2023\u201101") : flag === "month" ? (prefix+table).replaceAll("2023-01", "2024-01") : flag === "malformed" ? (prefix+table).replaceAll("6000", "6 00") : prefix+table, actions: {}});
   } });
 };
 test("personal purchase suite reconciles summaries and all pages without storing private data", async () => {
@@ -49,6 +49,8 @@ test("personal purchase configuration requires private fixture and bounds calend
 test("purchase checks accept bold Unicode headers and correctly grouped Unicode thousands", async () => {
   const report = await execute("unicode");
   assert.equal(report.success, true, JSON.stringify(report));
+  const outside = await execute("month");
+  assert.equal(outside.steps.find(s => s.status === "failed")?.error, "MEMBER_PURCHASES_MONTHS_WITHIN_PERIOD");
   const invalid = await execute("malformed");
   assert.equal(invalid.steps.find(s => s.status === "failed")?.error, "MEMBER_PURCHASES_NUMERIC_PYG");
 });
