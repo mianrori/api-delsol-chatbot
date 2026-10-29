@@ -1,3 +1,4 @@
+import { buildMemberPurchasesResponse } from "./memberPurchasesPresentation.service.js";
 import { resolveSalesYearComparison, buildSalesYearComparisonResponse } from "./salesYearComparison.service.js";
 import { needsSalesRefresh, SALES_REFRESH_INSTRUCTION } from "./salesHistory.service.js";
 import { buildSalesSampleResponse } from "./salesSamplePresentation.service.js";
@@ -1451,7 +1452,7 @@ const executeToolRequests = async ({ content, sessionId, sourceMessages = [], ch
       if (isChartSourceTool(name) && protectedResultForModel && typeof protectedResultForModel === "object" && !Array.isArray(protectedResultForModel)) {
         protectedResultForModel.chartSourceId = toolUseId;
       }
-      if (["get_sales", "analyze_members", "compare_member_purchases_vs_sales", "analyze_campaign_sales_performance", "search_promotions", "get_member_soles", "get_soles_usage", "search_soles_usage_destinations", "search_soles_usage_movement_types", "get_vehicle_registrations", "get_member_vehicles"].includes(name)) {
+      if (["get_member_purchases", "get_sales", "analyze_members", "compare_member_purchases_vs_sales", "analyze_campaign_sales_performance", "search_promotions", "get_member_soles", "get_soles_usage", "search_soles_usage_destinations", "search_soles_usage_movement_types", "get_vehicle_registrations", "get_member_vehicles"].includes(name)) {
         presentationCall.result = protectedResultForModel;
       }
 
@@ -1794,6 +1795,7 @@ export const chatService = async ({ message, sessionId }) => {
         ?? buildMemberSolesResponse(conversationInternalContext.presentationCalls)
         ?? buildPromotionSearchResponse(conversationInternalContext.presentationCalls)
         ?? buildCampaignSalesPerformanceResponse(conversationInternalContext.presentationCalls)
+        ?? buildMemberPurchasesResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) })
         ?? buildMemberPurchasesVsSalesResponse(conversationInternalContext.presentationCalls)
         ?? buildMemberAnalysisBreakdownResponse(conversationInternalContext.presentationCalls);
 
@@ -1855,6 +1857,7 @@ export const chatService = async ({ message, sessionId }) => {
       buildMemberSolesResponse(conversationInternalContext.presentationCalls) ??
       buildPromotionSearchResponse(conversationInternalContext.presentationCalls) ??
       buildCampaignSalesPerformanceResponse(conversationInternalContext.presentationCalls) ??
+      buildMemberPurchasesResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) }) ??
       buildMemberPurchasesVsSalesResponse(conversationInternalContext.presentationCalls) ??
       buildMemberSummaryResponse(conversationInternalContext.presentationCalls) ??
       buildMemberAnalysisBreakdownResponse(conversationInternalContext.presentationCalls) ??

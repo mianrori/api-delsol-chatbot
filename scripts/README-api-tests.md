@@ -312,7 +312,7 @@ El reporte contiene solo fechas del perfil, códigos de comprobación, tiempos y
 `coverage.memberPurchasesMultiplePages`, sin documento, locales, rubros, importes
 ni filas. Son controles de coherencia de respuestas HTTP; no prueban por sí
 solos la correspondencia documento/persona ni sustituyen un control independiente
-contra Oracle. No modifica el backend, sesiones ni reloj. Pendiente validar el
+contra Oracle. No modifica sesiones ni reloj. Pendiente validar el
 formato solicitado contra DEV; los tests locales usan respuestas simuladas.
 
 La suite personal admite negrita y espacios Unicode en encabezados y separadores
@@ -323,3 +323,9 @@ en números. Estos formatos no alteran la comprobación del documento.
 En las etiquetas mensuales se normalizan los guiones tipográficos U+2010 y
 U+2011 al guion ASCII antes de validar YYYY-MM, unicidad y pertenencia al período.
 Los meses fuera de rango siguen haciendo fallar la suite.
+
+Las tablas de get_member_purchases se generan ahora desde el resultado de la
+herramienta mediante un presentador del backend: resumen con todas las filas y
+métricas solicitadas, detalle con metadatos de página reales. Las celdas restauran
+PII antes de escapar separadores Markdown, sin exponer IDs comerciales. No se
+cambian las consultas, permisos ni filtros; el modelo sigue resolviendo la consulta.
