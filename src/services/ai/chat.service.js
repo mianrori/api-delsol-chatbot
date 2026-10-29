@@ -1,4 +1,5 @@
 import { resolveSalesYearComparison, buildSalesYearComparisonResponse } from "./salesYearComparison.service.js";
+import { resolveRepeatedSalesExport } from "./salesExportFollowup.service.js";
 import { ACCESS_DENIED_CODE, ACCESS_DENIED_MESSAGE, isAccessDenied } from "./toolErrors.service.js";
 import { buildSalesSeriesResponse } from "./salesSeriesPresentation.service.js";
 import { chartsPrompt } from "../../prompts/sections/charts.prompt.js";
@@ -1577,6 +1578,7 @@ export const chatService = async ({ message, sessionId }) => {
     history: protectedHistory,
   });
   const salesYearComparison = resolveSalesYearComparison({ message, history: protectedHistory });
+  const repeatedSalesExport = resolveRepeatedSalesExport({ message: messages.at(-1).content[0].text, history: protectedHistory });
   const promotionPage = resolvePromotionSearchPage({ message, history: protectedHistory });
   const solesPage = resolveVehiclePage({ message, history: protectedHistory })
     ?? resolveSolesUsagePage({ message, history: protectedHistory })
@@ -1594,6 +1596,18 @@ export const chatService = async ({ message, sessionId }) => {
     toolIterations = 1;
     followupAnswer = buildSalesYearComparisonResponse(executed.internalContext.presentationCalls)
       ?? "No fue posible completar la comparación de ambos años. Vuelve a intentarlo.";
+  } else if (repeatedSalesExport) {
+    const content = [{ toolUse: {
+      toolUseId: `sales_export_refresh_${randomUUID()}`, name: "get_sales", input: repeatedSalesExport,
+    } }];
+    messages.push({ role: "assistant", content });
+    const executed = await executeToolRequests({ content, sessionId });
+    messages.push({ role: "user", content: executed.toolResults });
+    conversationActions = executed.actions;
+    conversationInternalContext = executed.internalContext;
+    toolIterations = 1;
+    // The fresh tool result, rather than the previous narrative/sample, is the
+    // source for the answer. The standard executor rechecks Oracle permissions.
   } else if (solesPage) {
     if (solesPage.answer) followupAnswer = solesPage.answer;
     else {
