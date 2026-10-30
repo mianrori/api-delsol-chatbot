@@ -1,3 +1,4 @@
+import { executeOracleQuery } from "../../database/oracle-query.database.js";
 // src/repositories/contractConcepts.repository.js
 // Oracle 11g.
 
@@ -60,9 +61,9 @@ export const getContractConceptsRepository = async ({
     ORDER BY DES_CONCEPTO, COD_CONCEPTO
   `;
 
-  const result = await connection.execute(sql, binds, { outFormat: 4002 });
+  const rows = await executeOracleQuery(connection, sql, binds);
 
-  return (result.rows ?? []).map((row) => ({
+  return rows.map((row) => ({
     contract: {
       type: row.TIP_CONTRATO ?? null,
       series: row.SER_CONTRATO ?? null,

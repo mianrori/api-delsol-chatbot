@@ -1,5 +1,7 @@
 import { buildMemberPurchasesResponse, resolveMemberPurchasesPage } from "./memberPurchasesPresentation.service.js";
 import { preserveSalesPerSqmFollowup } from "./salesPerSqmFollowup.service.js";
+import { preserveContractIncidenceFollowup } from "./contractIncidenceFollowup.service.js";
+import { buildContractIncidenceResponse } from "./contractIncidencePresentation.service.js";
 import { buildSalesPerSqmResponse } from "./salesPerSqmPresentation.service.js";
 import { resolveSalesYearComparison, buildSalesYearComparisonResponse } from "./salesYearComparison.service.js";
 import { needsSalesRefresh, SALES_REFRESH_INSTRUCTION } from "./salesHistory.service.js";
@@ -317,9 +319,12 @@ Para consultas contractuales:
 - cuando groupBy="month", presenta los conceptos como COLUMNAS y los meses como FILAS para facilitar la comparación visual;
 - la tabla mensual debe incluir: Mes, una columna por cada concepto oficial configurado, Total costo shopping, Superficie contractual aplicable, Ventas auditadas e Incidencia;
 - la superficie mensual debe provenir exclusivamente del campo area retornado por analyze_contract_cost_incidence; no uses la superficie actual del contrato para completar períodos históricos;
-- si un período no tiene contrato histórico aplicable pero existen importes facturados de los conceptos oficiales, considera esos importes y utiliza la superficie del contrato más próximo al período; explica que se trata de una referencia contractual próxima y no de un contrato vigente;
+- exige un único contrato histórico que cubra el intervalo solicitado de cada mes; si hay varios, cobertura parcial o ninguno, conserva el motivo y no calcules incidencia ni uses contratos próximos;
 - si un período no tiene contrato histórico aplicable y tampoco existen importes facturados de los conceptos oficiales, muestra costo, superficie e incidencia como no disponibles;
-- los conceptos e importes de cada mes deben corresponder al contrato aplicable o, únicamente en el fallback anterior, al contrato más próximo usado como referencia; nunca reutilices indiscriminadamente el contrato actual para meses anteriores;
+- los conceptos e importes de cada mes deben corresponder al contrato histórico aplicable y a la vigencia de cada concepto; nunca reutilices el contrato actual para meses anteriores;
+- conserva customerId, localNumber, identidad contractual, período y agrupación en seguimientos de incidencia, cambiando solo los filtros solicitados; resuelve nombres con search_customers;
+- NO_SALES significa ausencia de registros; ZERO_SALES significa ventas registradas con total cero. Ambos dejan incidencePercentage sin calcular; PARTIAL_COST también deja sin calcular la incidencia total;
+- los equivalentes USD usan una cotización de venta actual solo para presentación; nunca la uses para calcular una incidencia histórica entre monedas distintas;
 - si area.changedWithinPeriod=true y min/max son distintos, muestra el rango de superficies del período; si area.available=false, muestra que no hay superficie contractual aplicable;
 - el valor de cada columna de concepto debe provenir exclusivamente de data[].shoppingCost.concepts[].amountExcludingTax del mismo mes;
 - si un concepto oficial está en data[].shoppingCost.missingConcepts, presenta "Sin importe" en su columna; no presentes cero;
@@ -1375,6 +1380,10 @@ const executeToolRequests = async ({ content, sessionId, sourceMessages = [], ch
       input = preserveSalesPerSqmFollowup({ ...sqmFollowup, input }) ?? input;
       block.toolUse.input = input;
     }
+    if (name === "analyze_contract_cost_incidence" && sqmFollowup) {
+      input = preserveContractIncidenceFollowup({ ...sqmFollowup, input }) ?? input;
+      block.toolUse.input = input;
+    }
     const presentationCall = { name, input };
     internalContext.presentationCalls.push(presentationCall);
 
@@ -1471,6 +1480,7 @@ const executeToolRequests = async ({ content, sessionId, sourceMessages = [], ch
         presentationCall.result = protectedResultForModel;
       }
 
+      if (name === "analyze_contract_cost_incidence") presentationCall.result = protectedResultForModel;
       if (
         name === "analyze_contract_cost_incidence" &&
         protectedResultForModel?.groupBy === "month" &&
@@ -1820,7 +1830,8 @@ export const chatService = async ({ message, sessionId }) => {
 
       // A complete breakdown is authoritative even when the model requested
       // it after changing dates or filters. Do not ask the model to rewrite it.
-      followupAnswer = buildSalesPerSqmResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) })
+      followupAnswer = buildContractIncidenceResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) })
+        ?? buildSalesPerSqmResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) })
         ?? buildSalesYearComparisonResponse(conversationInternalContext.presentationCalls)
         ?? buildSalesSampleResponse(conversationInternalContext.presentationCalls, { exportAvailable: Boolean(conversationActions.salesExport?.available) })
         ?? buildSalesSeriesResponse(conversationInternalContext.presentationCalls, { message })
@@ -1882,7 +1893,7 @@ export const chatService = async ({ message, sessionId }) => {
       ? ACCESS_DENIED_MESSAGE
       : conversationActions.chart?.available
       ? "Aquí tienes el gráfico solicitado."
-      : monthlyIncidenceText ??
+      : buildContractIncidenceResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) }) ?? monthlyIncidenceText ??
       buildSalesPerSqmResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) }) ??
       buildSalesYearComparisonResponse(conversationInternalContext.presentationCalls) ??
       buildSalesSampleResponse(conversationInternalContext.presentationCalls, { exportAvailable: Boolean(conversationActions.salesExport?.available) }) ??
