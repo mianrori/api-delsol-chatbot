@@ -1,4 +1,4 @@
-import { buildMemberPurchasesResponse } from "./memberPurchasesPresentation.service.js";
+import { buildMemberPurchasesResponse, resolveMemberPurchasesPage } from "./memberPurchasesPresentation.service.js";
 import { resolveSalesYearComparison, buildSalesYearComparisonResponse } from "./salesYearComparison.service.js";
 import { needsSalesRefresh, SALES_REFRESH_INSTRUCTION } from "./salesHistory.service.js";
 import { buildSalesSampleResponse } from "./salesSamplePresentation.service.js";
@@ -1595,6 +1595,8 @@ export const chatService = async ({ message, sessionId }) => {
     ?? resolveEquivalentSalesExport(salesRefreshRequest)
     ?? resolveRepeatedSalesExport(salesRefreshRequest);
   const promotionPage = resolvePromotionSearchPage({ message, history: protectedHistory });
+  const purchasePage = resolveMemberPurchasesPage({ message: messages.at(-1).content[0].text, history: protectedHistory,
+    restoreValue: (value) => restorePiiDeep(sessionId, value) });
   const solesPage = resolveVehiclePage({ message, history: protectedHistory })
     ?? resolveVehicleGenderBreakdown({ message, history: protectedHistory })
     ?? resolveSolesUsagePage({ message, history: protectedHistory })
@@ -1626,6 +1628,20 @@ export const chatService = async ({ message, sessionId }) => {
     // The fresh tool result, rather than the previous narrative/sample, is the
     // source for the answer. The standard executor rechecks Oracle permissions.
     followupAnswer = buildSalesSampleResponse(executed.internalContext.presentationCalls, { exportAvailable: Boolean(conversationActions.salesExport?.available) });
+  } else if (purchasePage) {
+    if (purchasePage.answer) followupAnswer = purchasePage.answer;
+    else {
+      const content = [{ toolUse: { toolUseId: `member_purchase_page_${randomUUID()}`, name: "get_member_purchases", input: purchasePage.input } }];
+      messages.push({ role: "assistant", content });
+      const executed = await executeToolRequests({ content, sessionId });
+      messages.push({ role: "user", content: executed.toolResults });
+      conversationActions = executed.actions;
+      conversationInternalContext = executed.internalContext;
+      toolIterations = 1;
+      followupAnswer = executed.internalContext.accessDenied ? ACCESS_DENIED_MESSAGE
+        : buildMemberPurchasesResponse(executed.internalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) })
+          ?? "No fue posible consultar la página de compras. Vuelve a intentarlo.";
+    }
   } else if (solesPage) {
     if (solesPage.answer) followupAnswer = solesPage.answer;
     else {

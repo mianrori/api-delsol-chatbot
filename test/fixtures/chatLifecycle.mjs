@@ -58,6 +58,13 @@ const chat = await load("../../src/services/ai/chat.service.js", {
   "@aws-sdk/client-bedrock-runtime": {
     BedrockRuntimeClient: class { async send(_command, options) {
       modelCalls++;
+      if (mode === "member-purchase-pages") {
+        assert.equal(comparisonStep++, 0, "Purchase page continuations must not invoke the model");
+        return { stopReason: "tool_use", output: { message: { role: "assistant", content: [{ toolUse: {
+          name: "get_member_purchases", toolUseId: "purchase-page-1", input: { documentNumber: "SYNTHETIC-DOCUMENT", dateFrom: "01/01/2023", dateTo: "31/05/2023", mode: "detail", page: 1, rows: 10 },
+        } }] } } };
+      }
+      if (mode === "member-purchase-pages-denied") assert.fail("Denied purchase continuation cannot invoke Bedrock");
       if (mode.startsWith("sales-equivalent-")) assert.fail("Verified equivalent sales queries must refresh without invoking Bedrock");
       if (mode.startsWith("sales-history-")) {
         const step = comparisonStep++;
@@ -201,6 +208,19 @@ const chat = await load("../../src/services/ai/chat.service.js", {
   "../../tools/index.js": { tools: [] },
   "./toolExecutor.service.js": { executeTool: async (call) => {
     toolCalls++;
+    if (mode.startsWith("member-purchase-pages")) {
+      assert.equal(call.name, "get_member_purchases");
+      const input = call.arguments;
+      assert.equal(input.documentNumber, "SYNTHETIC-DOCUMENT");
+      assert.equal(input.rows, 10);
+      assert.equal(input.dateFrom, "01/01/2023");
+      assert.equal(input.dateTo, "31/05/2023");
+      if (mode.endsWith("denied")) throw Object.assign(new Error("Denied"), { code: "ACCESS_DENIED" });
+      if (input.page > 1) assert.equal(input.knownTotalRows, 170);
+      return { documentNumber: input.documentNumber, mode: "detail", page: input.page, rows: 10, totalRows: 170, totalPages: 17,
+        returnedRows: 10, startRow: (input.page - 1) * 10 + 1, endRow: input.page * 10, hasMore: input.page < 17, nextPage: input.page < 17 ? input.page + 1 : null,
+        data: Array.from({ length: 10 }, () => ({ purchaseDate: "01/01/2023", customer: { name: "Synthetic shop" }, category: { name: "Synthetic category" }, currency: { symbol: "PYG" }, amount: 1 })) };
+    }
     if (mode.startsWith("sales-equivalent-")) {
       assert.equal(call.name, "get_sales");
       assert.equal(call.arguments.dateFrom, "01/01/2023");
@@ -892,6 +912,25 @@ for (const [name, arguments_] of [
   }
   assert.equal(proxyClosed, before + 3, "Every successful or denied operation closes its session proxy");
 }
+mode = "member-purchase-pages"; comparisonStep = 0; storedHistory = [];
+const purchaseModels = modelCalls, purchaseTools = toolCalls;
+let firstPurchaseHistory;
+for (let page = 1; page <= 17; page++) {
+  const response = await chat.chatService({ sessionId: "test", message: page === 1 ? "Detalle de compras, diez por página" : "Siguiente página" });
+  assert.match(response.answer, /Documento: SYNTHETIC-DOCUMENT/);
+  assert.ok(response.answer.includes(`Página ${page} de 17; 170 compras en total.`));
+  if (page === 1) firstPurchaseHistory = structuredClone(storedHistory);
+}
+assert.equal(modelCalls - purchaseModels, 1);
+assert.equal(toolCalls - purchaseTools, 17);
+const purchaseEnd = await chat.chatService({ sessionId: "test", message: "Siguiente página" });
+assert.match(purchaseEnd.answer, /No hay más páginas de compras/);
+assert.equal(toolCalls - purchaseTools, 17);
+mode = "member-purchase-pages-denied"; storedHistory = firstPurchaseHistory;
+const deniedPurchase = await chat.chatService({ sessionId: "test", message: "Siguiente página" });
+assert.equal(deniedPurchase.answer, "El usuario no tiene permisos para consultar esta información.");
+assert.equal(JSON.stringify(deniedPurchase.actions), "{}");
+assert.equal(modelCalls - purchaseModels, 1);
 const mixedCurrencyPresentation = chat.buildMonthlyIncidenceResponse({ groupBy: "month", dateFrom: "01/01/2023", dateTo: "31/01/2023",
   data: [{ month: "01/2023", status: "CURRENCY_MISMATCH", contract: {}, incidencePercentage: null,
     shoppingCost: { amount: null, concepts: [{ conceptCode: "6", description: "Concepto sintético", amountExcludingTax: 100, currency: { code: "USD" } }] },

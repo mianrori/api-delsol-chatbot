@@ -340,6 +340,15 @@ una tabla; unos argumentos JSON escritos como respuesta no constituyen un result
 
 ## Compras individuales de un socio
 
+Las continuaciones simples de compras se resuelven desde la última consulta de
+detalle exitosa: conservan documento, fechas, filtros y tamaño de página, toman
+`page=nextPage` y reutilizan el conteo de ese mismo resultado. No dependen de que
+el modelo vuelva a elegir la identidad ni de que el turno inicial permanezca en
+el historial recortado. Cada página sigue consultando Oracle mediante la sesión
+proxy habitual. Los cambios de identidad, fechas o filtros usan el flujo normal.
+Solo se informa el fin cuando el último resultado real tiene `hasMore=false` y
+`nextPage=null`; el tamaño de página y el conteo no se deducen de una narración.
+
 `BOT_TEST_SUITE=member-purchases` ejecuta seis casos: reinicio, total del socio,
 compras mensuales, por local, por rubro y detalle completo paginado. Es una suite
 separada; `all` conserva sus 29 casos cuando se configura soles.
