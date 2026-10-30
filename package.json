@@ -6,6 +6,7 @@
   "description": "API independiente para el chatbot del ERP delSol.",
   "main": "index.js",
   "scripts": {
+    "test": "node --test test/*.test.js",
     "dev": "set NODE_ENV=development&& nodemon index.js",
     "start": "node index.js",
     "prod": "set NODE_ENV=production&& node index.js"

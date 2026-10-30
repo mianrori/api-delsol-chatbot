@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { resolveRepeatedSalesExport, resolveSalesCategoryRemoval, resolveEquivalentSalesExport } from "../src/services/ai/salesExportFollowup.service.js";
+import { resolveRepeatedSalesExport, resolveSalesCategoryRemoval, resolveEquivalentSalesExport, resolveSalesBreakdown } from "../src/services/ai/salesExportFollowup.service.js";
 
 const question = "Ventas de enero a mayo de 2023 por local, con monto total y cantidad de facturas";
 const input = { dateFrom: "01/01/2023", dateTo: "31/05/2023", groupBy: ["customer"], metrics: ["totalAmount", "totalInvoices"], customerIds: ["[PII_CUSTOMER_ID_1]"], categoryIds: ["[PII_CATEGORY_ID_1]"], dayType: "weekend" };
@@ -56,6 +56,32 @@ const filteredTurn = () => {
   return history;
 };
 const removal = "Ahora todos los rubros, manteniendo enero de 2023 y el desglose por local";
+
+test("sales breakdown follow-up copies the latest authorized filters even after a scalar summary", () => {
+  const history = filteredTurn();
+  history[2].content[0].toolResult.content[0].json = { totalAmount: 10, totalInvoices: 2 };
+  const result = resolveSalesBreakdown({ message: "Ahora por local", history });
+  assert.deepEqual(result, { ...history[1].content[0].toolUse.input, groupBy: ["customer"] });
+  assert.deepEqual(resolveSalesBreakdown({ message: "Ahora por rubro", history }).groupBy, ["category"]);
+  result.categoryIds.push("other");
+  assert.equal(history[1].content[0].toolUse.input.categoryIds.length, 1);
+});
+
+test("sales breakdown cannot cross topics, failed turns, multiple queries or extra restrictions", () => {
+  for (const change of [
+    (h) => { h.push({ role: "user", content: [{ text: "Contratos" }] }); },
+    (h) => { h[2].content[0].toolResult.status = "error"; },
+    (h) => { h[1].content[0].toolUse.name = "get_invoices"; },
+    (h) => { h[1].content[0].toolUse.input.unsupportedFilter = "restricted"; },
+    (h) => { h[1].content.push({ toolUse: { name: "get_sales", toolUseId: "other", input } }); },
+  ]) {
+    const history = filteredTurn(); change(history);
+    assert.equal(resolveSalesBreakdown({ message: "Ahora por local", history }), null);
+  }
+  for (const message of ["Ahora por local solo deportes", "Ahora por local en febrero", "Grafícalo por local"]) {
+    assert.equal(resolveSalesBreakdown({ message, history: filteredTurn() }), null);
+  }
+});
 
 test("removing a category uses the latest query, preserves other filters and does not need an existing export", () => {
   const history = filteredTurn();

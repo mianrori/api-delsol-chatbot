@@ -160,6 +160,15 @@ export const getContractConditions = async (
 
   let contract = null;
 
+  const identityParts = [contractType, contractSeries, contractNumber];
+  const suppliedParts = identityParts.filter((value) => value !== undefined && value !== null && value !== "").length;
+  if (suppliedParts > 0 && suppliedParts < 3) {
+    throw new Error("La identidad del contrato debe estar completa.");
+  }
+  if (suppliedParts === 3 && (!Number.isInteger(Number(contractNumber)) || Number(contractNumber) < 0)) {
+    throw new Error("Número de contrato inválido.");
+  }
+
   const hasExactIdentity =
     contractType &&
     contractSeries &&
@@ -174,7 +183,9 @@ export const getContractConditions = async (
       contractNumber,
     });
 
-    if (!contract || String(contract.customerId) !== String(customerId)) {
+    const hasLocalFilter = localNumber !== undefined && localNumber !== null && localNumber !== "";
+    if (!contract || String(contract.customerId) !== String(customerId)
+      || (hasLocalFilter && String(contract.localNumber).trim() !== String(localNumber).trim())) {
       return {
         status: "NOT_FOUND",
       };

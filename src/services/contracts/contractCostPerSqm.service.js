@@ -101,7 +101,7 @@ export const getContractCostPerSqm = async (
 
   const amountExcludingTax = Number(lastBilled.amountExcludingTax);
 
-  if (!Number.isFinite(amountExcludingTax)) {
+  if (lastBilled.amountExcludingTax === null || lastBilled.amountExcludingTax === undefined || !Number.isFinite(amountExcludingTax)) {
     return {
       status: "BILLED_AMOUNT_NOT_FOUND",
       contract,

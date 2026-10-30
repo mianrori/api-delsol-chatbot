@@ -2,6 +2,28 @@ const normalize = (value) => String(value ?? "").trim().toLowerCase().replace(/\
 
 const months = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 
+export const resolveSalesBreakdown = ({ message, history = [] }) => {
+  const match = /^ahora por (local|rubro)$/.exec(normalize(message));
+  if (!match) return null;
+  let start = -1;
+  for (let index = history.length - 1; index >= 0; index--) {
+    if (history[index].role === "user" && history[index].content?.some((block) => typeof block.text === "string")) { start = index; break; }
+  }
+  if (start < 0) return null;
+  const blocks = history.slice(start + 1).flatMap((item) => item.content ?? []);
+  const calls = blocks.map((block) => block.toolUse).filter(Boolean);
+  const sales = calls.filter((call) => call.name === "get_sales");
+  if (sales.length !== 1 || calls.some((call) => !["get_sales", "search_customers", "search_categories"].includes(call.name))) return null;
+  const call = sales[0];
+  const response = blocks.map((block) => block.toolResult).find((result) => result?.toolUseId === call.toolUseId);
+  const result = response?.content?.find((block) => block.json)?.json;
+  if (response?.status !== "success" || !result || result.success === false || result.error) return null;
+  if (!Array.isArray(result.data) && typeof result.totalAmount !== "number" && typeof result.totalInvoices !== "number") return null;
+  if (Object.keys(call.input ?? {}).some((key) => !["dateFrom", "dateTo", "customerIds", "categoryIds", "dayType", "groupBy", "metrics"].includes(key))) return null;
+  if (!/^\d{2}\/\d{2}\/\d{4}$/.test(call.input?.dateFrom ?? "") || !/^\d{2}\/\d{2}\/\d{4}$/.test(call.input?.dateTo ?? "")) return null;
+  return { ...structuredClone(call.input), groupBy: [match[1] === "local" ? "customer" : "category"] };
+};
+
 const explicitMonthlySales = (message) => {
   const request = normalize(message).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/,/g, "").replace(/\s+/g, " ")
     .replace(/^(?:muestrame|mostrame|mostrar|dame|consulta|consultar|ver) (?:las )?/, "");
