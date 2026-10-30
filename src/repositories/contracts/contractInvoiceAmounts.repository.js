@@ -1,3 +1,4 @@
+import { executeOracleQuery } from "../../database/oracle-query.database.js";
 // src/repositories/contractInvoiceAmounts.repository.js
 // Oracle 11g.
 
@@ -107,6 +108,7 @@ export const getMonthlyBilledAmountsByConceptRepository = async ({
   conceptCodes,
   dateFrom,
   dateTo,
+  allCandidates = false,
 }) => {
   if (!connection) throw new Error("connection es obligatorio.");
   if (!customerId) throw new Error("customerId es obligatorio.");
@@ -142,7 +144,7 @@ export const getMonthlyBilledAmountsByConceptRepository = async ({
         F.FECHA_EMISION,
         F.NRO_FACTURA,
         F.SIMBOLO_MONEDA,
-        NVL(F.IMPORTE, 0) - NVL(F.IVA, 0) AS IMPORTE_SIN_IVA,
+        CASE WHEN F.IMPORTE IS NULL THEN NULL ELSE F.IMPORTE - NVL(F.IVA, 0) END AS IMPORTE_SIN_IVA,
         ROW_NUMBER() OVER (
           PARTITION BY
             TRUNC(F.FECHA_EMISION, 'MM'),
@@ -159,19 +161,19 @@ export const getMonthlyBilledAmountsByConceptRepository = async ({
         AND NVL(F.ANULADO, 'N') <> 'S'
         AND NVL(F.USER_CAN_CONSULT, 'S') <> 'N'
     )
-    WHERE RN = 1
+    ${allCandidates ? "" : "WHERE RN = 1"}
     ORDER BY PERIOD_MONTH, COD_CONCEPTO
   `;
 
-  const result = await connection.execute(sql, binds, { outFormat: 4002 });
+  const rows = await executeOracleQuery(connection, sql, binds);
 
-  return (result.rows ?? []).map((row) => ({
+  return rows.map((row) => ({
     periodMonth: row.PERIOD_MONTH ?? null,
     conceptCode: row.COD_CONCEPTO ?? null,
     billingPeriod: row.PERIODO ?? null,
     invoiceDate: row.FECHA_EMISION ?? null,
     invoiceNumber: row.NRO_FACTURA ?? null,
     currencySymbol: row.SIMBOLO_MONEDA ?? null,
-    amountExcludingTax: Number(row.IMPORTE_SIN_IVA ?? 0),
+    amountExcludingTax: row.IMPORTE_SIN_IVA == null ? null : Number(row.IMPORTE_SIN_IVA),
   }));
 };

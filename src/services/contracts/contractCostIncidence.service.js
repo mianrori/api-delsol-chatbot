@@ -2,563 +2,144 @@ import { contractBusinessConfig } from "../../config/contractBusiness.config.js"
 import { getMonthlyBilledAmountsByConceptRepository } from "../../repositories/contracts/contractInvoiceAmounts.repository.js";
 import { getHistoricalContractByMonthRepository } from "../../repositories/contracts/contractHistoryByPeriod.repository.js";
 import { getContractConceptsRepository } from "../../repositories/contracts/contractConcepts.repository.js";
-import { getSalesRepository } from "../../repositories/sales/sales.repository.js";
+import { getIncidenceSalesRepository } from "../../repositories/contracts/incidenceSales.repository.js";
+import { getCurrentUsdSellRateFromMaxicambios } from "../exchange/maxicambios.service.js";
+import { throwIfRequestAborted } from "../requestContext.service.js";
 
-const parseDate = (value) => {
-  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(value ?? ""));
-
-  if (!match) return null;
-
-  const [, dayText, monthText, yearText] = match;
-  const date = new Date(
-    Date.UTC(Number(yearText), Number(monthText) - 1, Number(dayText)),
-  );
-
-  if (
-    date.getUTCFullYear() !== Number(yearText) ||
-    date.getUTCMonth() !== Number(monthText) - 1 ||
-    date.getUTCDate() !== Number(dayText)
-  ) {
-    return null;
-  }
-
-  return date;
+const date = (s) => {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(s ?? ""));
+  if (!m) return null;
+  const d = new Date(Date.UTC(+m[3], +m[2] - 1, +m[1]));
+  return d.getUTCFullYear() === +m[3] && d.getUTCMonth() === +m[2] - 1 && d.getUTCDate() === +m[1] ? d : null;
+};
+const monthKey = (d) => `${String(d.getUTCMonth() + 1).padStart(2, "0")}/${d.getUTCFullYear()}`;
+const normalizeMonth = (v) => /^\d{2}\/\d{4}$/.test(String(v)) ? v : monthKey(new Date(v));
+const time = (v) => v == null ? -Infinity : new Date(v).getTime();
+const key = (c) => [c.type, c.series, c.number].join("|");
+const currency = (v) => {
+  const s = String(v ?? "").trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  if (["PYG", "GS", "GS.", "₲"].includes(s) || s.includes("GUARANI")) return "PYG";
+  if (["USD", "$", "US$"].includes(s) || s.includes("DOLAR")) return "USD";
+  return null;
+};
+const currencyInfo = (code) => ({ code, symbol: code === "PYG" ? "₲" : code });
+const summarizeAmounts = (rows) => {
+  const codes = new Set(rows.map((r) => r.code));
+  const valid = rows.every((r) => r.code && Number.isFinite(r.amount)) && codes.size === 1;
+  return { amount: valid ? rows.reduce((n, r) => n + r.amount, 0) : null,
+    currency: currencyInfo(valid ? rows[0].code : null),
+    byCurrency: [...codes].map((code) => ({ code, amount: code && rows.filter((r) => r.code === code).every((r) => Number.isFinite(r.amount))
+      ? rows.filter((r) => r.code === code).reduce((n, r) => n + r.amount, 0) : null })) };
+};
+const reasons = {
+  CONTRACT_NOT_AVAILABLE: "No existe contrato histórico aplicable al período.",
+  CONTRACT_AMBIGUOUS: "Varios contratos coinciden en el período; las facturas por cliente no permiten atribuirles un costo único.",
+  CONTRACT_PARTIAL_PERIOD: "El contrato no cubre todo el intervalo solicitado del mes; no se extrapolan costos ni vigencias.",
+  COST_NOT_AVAILABLE: "No hay importes válidos de los conceptos oficiales vigentes.",
+  PARTIAL_COST: "Faltan importes de uno o más conceptos oficiales; el costo total y su incidencia no están completos.",
+  BILLING_AMBIGUOUS: "La última factura no es única para un concepto; no se elige una fila arbitrariamente.",
+  CURRENCY_MISMATCH: "Las monedas son distintas, desconocidas o contradictorias; no se calcula incidencia entre monedas.",
+  NO_SALES: "No hay registros de ventas en el período.", ZERO_SALES: "Las ventas registradas suman cero; no se divide por cero.",
+  INVALID_AMOUNT: "Hay importes ausentes o no finitos; no se sustituyen por cero.",
 };
 
-const formatMonth = (date) =>
-  `${String(date.getUTCMonth() + 1).padStart(2, "0")}/${date.getUTCFullYear()}`;
-
-const enumerateMonths = (dateFrom, dateTo) => {
-  const start = parseDate(dateFrom);
-  const end = parseDate(dateTo);
-
-  if (!start || !end || start > end) {
-    throw new Error("Rango de fechas inválido.");
+const buildPeriod = ({ month, start, end, history, concepts, invoices, salesRows }) => {
+  const sourceSales = salesRows.filter((r) => r.month === month);
+  const normalizedSales = sourceSales.map((r) => {
+    const abbreviation = currency(r.code), description = currency(r.description);
+    const code = String(r.code ?? "").trim() && !abbreviation ? null : abbreviation && description && abbreviation !== description ? null : abbreviation ?? description;
+    return { code, amount: r.invalidRows > 0 ? null : r.amount };
+  });
+  const sales = sourceSales.length ? summarizeAmounts(normalizedSales) : { amount: 0, currency: currencyInfo(null), byCurrency: [] };
+  sales.rowCount = sourceSales.reduce((n, r) => n + r.rowCount, 0);
+  const applicable = history?.applicable === true;
+  const configured = applicable ? concepts.filter((c) => c.effectiveFrom == null || (Number.isFinite(time(c.effectiveFrom)) && time(c.effectiveFrom) < end)) : [];
+  const configuredCodes = [...new Set(configured.map((c) => String(c.conceptCode)))];
+  const selected = [], missing = [];
+  let billingAmbiguous = false;
+  for (const code of configuredCodes) {
+    const candidates = invoices.filter((r) => normalizeMonth(r.periodMonth) === month && String(r.conceptCode) === code
+      && time(r.invoiceDate) >= start && time(r.invoiceDate) < end
+      && configured.some((c) => String(c.conceptCode) === code && (c.effectiveFrom == null || time(c.effectiveFrom) <= time(r.invoiceDate))))
+      .sort((a, b) => time(b.invoiceDate) - time(a.invoiceDate) || String(b.invoiceNumber).localeCompare(String(a.invoiceNumber), "en", { numeric: true }));
+    const latest = candidates[0];
+    if (!latest) { missing.push({ conceptCode: code, description: configured.find((c) => String(c.conceptCode) === code)?.description ?? null }); continue; }
+    if (candidates.length > 1 && time(candidates[1].invoiceDate) === time(latest.invoiceDate) && String(candidates[1].invoiceNumber) === String(latest.invoiceNumber)) billingAmbiguous = true;
+    selected.push({ conceptCode: code, description: configured.find((c) => String(c.conceptCode) === code)?.description ?? null,
+      amountExcludingTax: latest.amountExcludingTax, currency: currencyInfo(currency(latest.currencySymbol)) });
   }
+  const amounts = summarizeAmounts(selected.map((r) => ({ amount: r.amountExcludingTax, code: r.currency.code })));
+  if (billingAmbiguous) amounts.amount = null;
+  const shoppingCost = { ...amounts, complete: applicable && configuredCodes.length > 0 && !missing.length && selected.length === configuredCodes.length && !billingAmbiguous && amounts.amount !== null,
+    concepts: selected, missingConcepts: missing };
+  let status = !applicable ? history?.resolution ?? "CONTRACT_NOT_AVAILABLE"
+    : billingAmbiguous ? "BILLING_AMBIGUOUS"
+    : !selected.length ? "COST_NOT_AVAILABLE"
+    : selected.some((r) => !Number.isFinite(r.amountExcludingTax)) || sourceSales.some((r) => r.invalidRows > 0) ? "INVALID_AMOUNT"
+    : amounts.amount === null || (sourceSales.length && (sales.amount === null || sales.currency.code !== amounts.currency.code)) ? "CURRENCY_MISMATCH"
+    : !sales.rowCount ? "NO_SALES"
+    : sales.amount === 0 ? "ZERO_SALES"
+    : !shoppingCost.complete ? "PARTIAL_COST" : "OK";
+  const area = applicable ? history.totalLocalArea : null;
+  return { month, status, reason: reasons[status] ?? null, sales, shoppingCost,
+    contract: applicable ? { ...history.contract, applicable: true, resolution: "APPLICABLE" } : null,
+    area: { min: area ?? null, max: area ?? null, available: area != null, changedWithinPeriod: false, unit: "m2" },
+    incidencePercentage: status === "OK" ? Number((shoppingCost.amount / sales.amount * 100).toFixed(4)) : null,
+    incidenceBasis: status === "OK" ? "COMPLETE_COST" : null };
+};
 
+export const analyzeContractCostIncidence = async (input, connection, { getUsdSellRate = getCurrentUsdSellRateFromMaxicambios } = {}) => {
+  const { customerId, dateFrom, dateTo, groupBy = "summary", localNumber, contractType, contractSeries, contractNumber } = input;
+  throwIfRequestAborted();
+  const start = date(dateFrom), end = date(dateTo);
+  if (!start || !end || start > end) throw new Error("Rango de fechas inválido.");
+  if (!["summary", "month"].includes(groupBy)) throw new Error("Agrupación inválida.");
+  for (const value of [customerId, ...[localNumber, contractType, contractSeries, contractNumber].filter((v) => v !== undefined && v !== null)]) {
+    if (!["string", "number"].includes(typeof value) || !String(value).trim() || (typeof value === "number" && !Number.isFinite(value))) throw new Error("Identificadores inválidos.");
+  }
+  const provided = [contractType, contractSeries, contractNumber].filter((v) => v !== undefined && v !== null).length;
+  if (provided && (provided !== 3 || !Number.isSafeInteger(Number(contractNumber)) || Number(contractNumber) < 0)) throw new Error("Identidad contractual incompleta o inválida.");
   const months = [];
-  const cursor = new Date(
-    Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1),
-  );
-  const last = new Date(
-    Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), 1),
-  );
-
-  while (cursor <= last) {
-    months.push(formatMonth(cursor));
-    cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+  for (let d = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1)); d <= end; d.setUTCMonth(d.getUTCMonth() + 1)) months.push(new Date(d));
+  const history = await getHistoricalContractByMonthRepository({ connection, customerId, dateFrom, dateTo, localNumber, contractType, contractSeries, contractNumber });
+  const byContract = new Map();
+  for (const h of history.filter((h) => h.applicable)) {
+    if (!byContract.has(key(h.contract))) byContract.set(key(h.contract), await getContractConceptsRepository({ connection, contractType: h.contract.type,
+      contractSeries: h.contract.series, contractNumber: h.contract.number, conceptCodes: contractBusinessConfig.incidenceConceptCodes }));
   }
-
-  return months;
-};
-
-const normalizePeriodMonth = (value) => {
-  if (!value) return null;
-
-  const text = String(value).trim();
-  const directMatch = /^(\d{2})\/(\d{4})$/.exec(text);
-
-  if (directMatch) {
-    return text;
-  }
-
-  const date = value instanceof Date ? value : new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  return formatMonth(
-    new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1)),
-  );
-};
-
-const normalizeCurrencyCode = (value) => {
-  const normalized = String(value ?? "")
-    .trim()
-    .toUpperCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-
-  if (
-    normalized === "PYG" ||
-    normalized === "GS" ||
-    normalized === "GS." ||
-    normalized === "₲" ||
-    normalized.includes("GUARANI")
-  ) {
-    return "PYG";
-  }
-
-  if (
-    normalized === "USD" ||
-    normalized === "$" ||
-    normalized === "US$" ||
-    normalized.includes("DOLAR")
-  ) {
-    return "USD";
-  }
-
-  return normalized || null;
-};
-
-const currencySymbol = (code) =>
-  code === "PYG" ? "₲" : code === "USD" ? "USD" : code;
-
-const getSalesCurrency = (salesRow) =>
-  normalizeCurrencyCode(
-    salesRow?.currency?.abbreviation ??
-      salesRow?.currency?.description ??
-      salesRow?.currency?.symbol,
-  );
-
-const getCostCurrencies = (rows) =>
-  Array.from(
-    new Set(
-      rows
-        .map((row) => normalizeCurrencyCode(row.currencySymbol))
-        .filter(Boolean),
-    ),
-  );
-
-const mapConcept = (concept) => ({
-  conceptCode: String(concept.conceptCode),
-  description: concept.description ?? null,
-});
-
-const buildPeriodResult = ({
-  month,
-  salesRow,
-  billedRows,
-  configuredConcepts,
-  contractRow,
-}) => {
-  const salesAmount = Number(salesRow?.totalAmount ?? 0);
-  const salesCurrency = getSalesCurrency(salesRow);
-  const billedByConcept = new Map(
-    billedRows.map((row) => [String(row.conceptCode), row]),
-  );
-
-  const missingConcepts = configuredConcepts
-    .filter((concept) => !billedByConcept.has(String(concept.conceptCode)))
-    .map(mapConcept);
-
-  const costCurrencies = getCostCurrencies(billedRows);
-  const costCurrenciesKnown = billedRows.every((row) => normalizeCurrencyCode(row.currencySymbol) !== null);
-  const costCurrency =
-    costCurrencies.length === 1 ? costCurrencies[0] : null;
-  const totalCost = billedRows.reduce(
-    (sum, row) => sum + Number(row.amountExcludingTax ?? 0),
-    0,
-  );
-
-  const currencyCompatible =
-    costCurrenciesKnown &&
-    costCurrencies.length <= 1 &&
-    (!salesRow || Boolean(salesCurrency && costCurrency && salesCurrency === costCurrency));
-
-  let status = "OK";
-
-  if (billedRows.length === 0) {
-    status = "COST_NOT_AVAILABLE";
-  } else if (!currencyCompatible) {
-    status = "CURRENCY_MISMATCH";
-  } else if (salesAmount === 0) {
-    status = "NO_SALES";
-  } else if (missingConcepts.length > 0) {
-    status = "PARTIAL_COST";
-  }
-
-  const incidencePercentage =
-    billedRows.length > 0 &&
-    currencyCompatible &&
-    salesAmount !== 0
-      ? Number(((totalCost / salesAmount) * 100).toFixed(4))
-      : null;
-
-  return {
-    month,
-    status,
-    sales: {
-      amount: salesAmount,
-      currency: {
-        code: salesCurrency,
-        symbol: currencySymbol(salesCurrency),
-      },
-    },
-    contract: contractRow?.contract
-      ? {
-          type: contractRow.contract.type,
-          series: contractRow.contract.series,
-          number: contractRow.contract.number,
-          contractDate: contractRow.contractDate ?? null,
-          expirationDate: contractRow.expirationDate ?? null,
-          localNumber: contractRow.localNumber ?? null,
-          resolution: contractRow.resolution ?? null,
-          applicable: contractRow.applicable === true,
-        }
-      : null,
-    area: {
-      min: contractRow?.totalLocalArea ?? null,
-      max: contractRow?.totalLocalArea ?? null,
-      distinctValues:
-        contractRow?.totalLocalArea === null ||
-        contractRow?.totalLocalArea === undefined
-          ? 0
-          : 1,
-      changedWithinPeriod: false,
-      available:
-        contractRow?.totalLocalArea !== null &&
-        contractRow?.totalLocalArea !== undefined,
-      unit: "m2",
-    },
-    shoppingCost: {
-      amount: !costCurrenciesKnown || costCurrencies.length > 1 ? null : totalCost,
-      currency: {
-        code: costCurrency,
-        symbol: currencySymbol(costCurrency),
-      },
-      complete: missingConcepts.length === 0 && billedRows.length > 0,
-      missingConcepts,
-      concepts: billedRows.map((row) => {
-        const concept = configuredConcepts.find(
-          (item) => String(item.conceptCode) === String(row.conceptCode),
-        );
-
-        return {
-          conceptCode: String(row.conceptCode),
-          description: concept?.description ?? null,
-          amountExcludingTax: Number(row.amountExcludingTax ?? 0),
-          currency: {
-            code: normalizeCurrencyCode(row.currencySymbol),
-            symbol: currencySymbol(normalizeCurrencyCode(row.currencySymbol)),
-          },
-          invoiceNumber: row.invoiceNumber ?? null,
-          invoiceDate: row.invoiceDate ?? null,
-          billingPeriod: row.billingPeriod ?? null,
-        };
-      }),
-    },
-    incidencePercentage,
-    incidenceBasis:
-      status === "PARTIAL_COST"
-        ? "AVAILABLE_COST_ONLY"
-        : incidencePercentage !== null
-          ? "COMPLETE_COST"
-          : null,
-  };
-};
-
-const buildSummary = (periods) => {
-  const totalSales = periods.reduce(
-    (sum, item) => sum + Number(item.sales.amount ?? 0),
-    0,
-  );
-  const totalCost = periods.reduce(
-    (sum, item) => sum + Number(item.shoppingCost.amount ?? 0),
-    0,
-  );
-
-  const salesCurrencies = Array.from(
-    new Set(periods.map((item) => item.sales.currency.code).filter(Boolean)),
-  );
-  const costCurrencies = Array.from(
-    new Set(
-      periods.map((item) => item.shoppingCost.currency.code).filter(Boolean),
-    ),
-  );
-
-  const salesCurrency =
-    salesCurrencies.length === 1 ? salesCurrencies[0] : null;
-  const costCurrency =
-    costCurrencies.length === 1 ? costCurrencies[0] : null;
-  const currencyCompatible =
-    periods.every((item) => item.status !== "CURRENCY_MISMATCH") &&
-    salesCurrencies.length <= 1 &&
-    costCurrencies.length <= 1 &&
-    (!salesCurrency || !costCurrency || salesCurrency === costCurrency);
-
-  const missingConceptsByPeriod = periods
-    .filter((item) => item.shoppingCost.missingConcepts.length > 0)
-    .map((item) => ({
-      month: item.month,
-      concepts: item.shoppingCost.missingConcepts,
-    }));
-
-  const hasAnyCost = periods.some(
-    (item) => item.shoppingCost.concepts.length > 0,
-  );
-  const costComplete =
-    hasAnyCost &&
-    periods.every((item) => item.shoppingCost.complete === true);
-
-  let status = "OK";
-
-  if (!hasAnyCost) {
-    status = "COST_NOT_AVAILABLE";
-  } else if (!currencyCompatible) {
-    status = "CURRENCY_MISMATCH";
-  } else if (totalSales === 0) {
-    status = "NO_SALES";
-  } else if (!costComplete) {
-    status = "PARTIAL_COST";
-  }
-
-  const incidencePercentage =
-    hasAnyCost &&
-    currencyCompatible &&
-    totalSales !== 0
-      ? Number(((totalCost / totalSales) * 100).toFixed(4))
-      : null;
-
-  return {
-    status,
-    sales: {
-      amount: salesCurrencies.length > 1 ? null : totalSales,
-      currency: {
-        code: salesCurrency,
-        symbol: currencySymbol(salesCurrency),
-      },
-    },
-    shoppingCost: {
-      amount: costCurrencies.length > 1 || periods.some((item) => item.shoppingCost.amount === null) ? null : totalCost,
-      currency: {
-        code: costCurrency,
-        symbol: currencySymbol(costCurrency),
-      },
-      complete: costComplete,
-      missingConceptsByPeriod,
-      conceptBreakdownByPeriod: periods.map((item) => ({
-        month: item.month,
-        concepts: item.shoppingCost.concepts,
-        missingConcepts: item.shoppingCost.missingConcepts,
-      })),
-      ...(periods.length === 1
-        ? {
-            concepts: periods[0].shoppingCost.concepts,
-            missingConcepts: periods[0].shoppingCost.missingConcepts,
-          }
-        : {}),
-    },
-    incidencePercentage,
-    incidenceBasis:
-      status === "PARTIAL_COST"
-        ? "AVAILABLE_COST_ONLY"
-        : incidencePercentage !== null
-          ? "COMPLETE_COST"
-          : null,
-  };
-};
-
-export const analyzeContractCostIncidence = async (
-  {
-    customerId,
-    dateFrom,
-    dateTo,
-    groupBy = "summary",
-    localNumber,
-    contractType,
-    contractSeries,
-    contractNumber,
-  },
-  connection,
-) => {
-  if (!customerId) {
-    throw new Error("customerId es obligatorio.");
-  }
-
-  if (!dateFrom || !dateTo) {
-    throw new Error("dateFrom y dateTo son obligatorios.");
-  }
-
-  if (!["summary", "month"].includes(groupBy)) {
-    throw new Error(`groupBy no soportado: ${groupBy}`);
-  }
-
-  const months = enumerateMonths(dateFrom, dateTo);
-  const incidenceCodes = new Set(
-    contractBusinessConfig.incidenceConceptCodes.map(String),
-  );
-
-  const historicalContracts = await getHistoricalContractByMonthRepository({
-    connection,
-    customerId,
-    dateFrom,
-    dateTo,
-    localNumber,
-    contractType,
-    contractSeries,
-    contractNumber,
+  const invoices = await getMonthlyBilledAmountsByConceptRepository({ connection, customerId, dateFrom, dateTo,
+    conceptCodes: contractBusinessConfig.incidenceConceptCodes, allCandidates: true });
+  const salesRows = await getIncidenceSalesRepository({ connection, customerId, dateFrom, dateTo });
+  const periods = months.map((d) => {
+    const month = monthKey(d), h = history.find((r) => r.periodMonth === month);
+    return buildPeriod({ month, start: Math.max(+start, +d), end: Math.min(+end + 86400000, Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1)),
+      history: h, concepts: h?.contract ? byContract.get(key(h.contract)) ?? [] : [], invoices, salesRows });
   });
-
-  const contractByMonth = new Map(
-    (historicalContracts ?? []).map((row) => [
-      normalizePeriodMonth(row.periodMonth),
-      row,
-    ]),
-  );
-
-  const contractIdentityKey = (contract) =>
-    contract
-      ? `${contract.type}|${contract.series}|${contract.number}`
-      : null;
-
-  const uniqueContracts = Array.from(
-    new Map(
-      (historicalContracts ?? [])
-        .filter((row) => row?.contract)
-        .map((row) => [contractIdentityKey(row.contract), row.contract]),
-    ).values(),
-  );
-
-  const conceptsByContract = new Map();
-
-  await Promise.all(
-    uniqueContracts.map(async (contract) => {
-      const concepts = await getContractConceptsRepository({
-        connection,
-        contractType: contract.type,
-        contractSeries: contract.series,
-        contractNumber: contract.number,
-        conceptCodes: contractBusinessConfig.incidenceConceptCodes,
-      });
-
-      conceptsByContract.set(
-        contractIdentityKey(contract),
-        (concepts ?? []).filter((concept) =>
-          incidenceCodes.has(String(concept.conceptCode)),
-        ),
-      );
-    }),
-  );
-
-  const allConfiguredConcepts = Array.from(
-    new Map(
-      Array.from(conceptsByContract.values())
-        .flat()
-        .map((concept) => [String(concept.conceptCode), concept]),
-    ).values(),
-  );
-
-  const conceptCodes =
-    allConfiguredConcepts.length > 0
-      ? allConfiguredConcepts.map((concept) => String(concept.conceptCode))
-      : contractBusinessConfig.incidenceConceptCodes.map(String);
-
-  const [billedRows, salesResult] = await Promise.all([
-    getMonthlyBilledAmountsByConceptRepository({
-      connection,
-      customerId,
-      conceptCodes,
-      dateFrom,
-      dateTo,
-    }),
-    getSalesRepository({
-      connection,
-      customerIds: [String(customerId)],
-      dateFrom,
-      dateTo,
-      groupBy: ["year", "month"],
-      metrics: ["totalAmount"],
-    }),
-  ]);
-
-  const salesRows = Array.isArray(salesResult?.data)
-    ? salesResult.data
-    : [];
-  const salesByMonth = new Map(
-    salesRows.map((row) => [
-      `${String(row.month).padStart(2, "0")}/${row.year}`,
-      row,
-    ]),
-  );
-
-  const billedByMonth = new Map();
-
-  for (const row of billedRows) {
-    const month = normalizePeriodMonth(row.periodMonth);
-
-    if (!month) continue;
-
-    if (!billedByMonth.has(month)) {
-      billedByMonth.set(month, []);
-    }
-
-    billedByMonth.get(month).push(row);
+  const aggregate = (field) => summarizeAmounts(periods.map((r) => ({ amount: r[field].amount, code: r[field].currency.code })));
+  const sales = aggregate("sales"), shoppingCost = aggregate("shoppingCost");
+  const failures = [...new Set(periods.filter((r) => r.status !== "OK").map((r) => r.status))];
+  if (!failures.length && (sales.amount === null || shoppingCost.amount === null || sales.currency.code !== shoppingCost.currency.code)) failures.push("CURRENCY_MISMATCH");
+  if (!failures.length && sales.amount === 0) failures.push("ZERO_SALES");
+  const summary = { status: failures[0] ?? "OK", reason: failures.length ? failures.map((c) => reasons[c]).join(" ") : null, nonCalculableReasons: failures,
+    sales: { ...sales, rowCount: periods.reduce((n, r) => n + r.sales.rowCount, 0) },
+    shoppingCost: { ...shoppingCost, complete: periods.every((r) => r.shoppingCost.complete),
+      missingConceptsByPeriod: periods.filter((r) => r.shoppingCost.missingConcepts.length).map((r) => ({ month: r.month, concepts: r.shoppingCost.missingConcepts })),
+      conceptBreakdownByPeriod: periods.map((r) => ({ month: r.month, concepts: r.shoppingCost.concepts, missingConcepts: r.shoppingCost.missingConcepts })),
+      ...(periods.length === 1 ? { concepts: periods[0].shoppingCost.concepts, missingConcepts: periods[0].shoppingCost.missingConcepts } : {}) },
+    incidencePercentage: failures.length ? null : Number((shoppingCost.amount / sales.amount * 100).toFixed(4)), incidenceBasis: failures.length ? null : "COMPLETE_COST" };
+  let exchange = { available: false, reason: "EXCHANGE_RATE_NOT_REQUIRED", currentRate: true, rateType: "sell" };
+  if (periods.some((r) => [r.sales, r.shoppingCost].some((v) => v.currency.code === "PYG" && v.amount !== null))) {
+    try { const r = await getUsdSellRate(); if (!Number.isFinite(r?.sellRate) || r.sellRate <= 0) throw Error("Invalid rate");
+      exchange = { available: true, sellRate: r.sellRate, source: r.source, currentRate: true, rateType: "sell" }; }
+    catch { exchange.reason = "EXCHANGE_RATE_UNAVAILABLE"; }
+    throwIfRequestAborted();
   }
-
-  const periods = months.map((month) => {
-    const resolvedContractRow = contractByMonth.get(month) ?? null;
-    const configuredConcepts = resolvedContractRow?.contract
-      ? conceptsByContract.get(
-          contractIdentityKey(resolvedContractRow.contract),
-        ) ?? []
-      : [];
-    const configuredCodes = new Set(
-      configuredConcepts.map((concept) => String(concept.conceptCode)),
-    );
-    const monthlyBilledRows = (billedByMonth.get(month) ?? []).filter((row) =>
-      configuredCodes.has(String(row.conceptCode)),
-    );
-
-    const useNearestContractFallback =
-      resolvedContractRow?.resolution === "NEAREST" &&
-      monthlyBilledRows.length > 0;
-
-    const contractRow =
-      resolvedContractRow?.applicable === true ||
-      useNearestContractFallback
-        ? {
-            ...resolvedContractRow,
-            resolution: useNearestContractFallback
-              ? "NEAREST_BILLED_FALLBACK"
-              : "APPLICABLE",
-          }
-        : null;
-
-    return buildPeriodResult({
-      month,
-      salesRow: salesByMonth.get(month) ?? null,
-      billedRows: contractRow ? monthlyBilledRows : [],
-      configuredConcepts: contractRow ? configuredConcepts : [],
-      contractRow,
-    });
-  });
-
-  const identitySource =
-    (historicalContracts ?? []).find((row) => row?.customerId) ?? null;
-
-  const common = {
-    customer: {
-      id: String(customerId),
-      name: identitySource?.customerName ?? null,
-      businessName: identitySource?.businessName ?? null,
-    },
-    dateFrom,
-    dateTo,
-    groupBy,
-    configuredCostConcepts: allConfiguredConcepts.map(mapConcept),
-    queryContext: {
-      costDefinition: "officialConfiguredConceptsByHistoricalContract",
-      contractRule: "applicableContractByMonthOrNearestWhenOfficialConceptsWereBilled",
-      billedAmountRule:
-        "latestInvoiceByCustomerConfiguredConceptAndInvoiceMonthExcludingTax",
-      salesRule: "auditedSalesSamePeriod",
-    },
-  };
-
-  if (groupBy === "month") {
-    return {
-      status: periods.some((item) => item.status !== "NO_SALES")
-        ? "OK"
-        : "NO_SALES",
-      ...common,
-      data: periods,
-    };
+  for (const r of [...periods, summary]) for (const field of ["sales", "shoppingCost"]) {
+    const v = r[field]; v.usd = v.currency.code === "USD" ? v.amount : v.currency.code === "PYG" && v.amount !== null && exchange.available ? v.amount / exchange.sellRate : null;
   }
-
-  return {
-    ...common,
-    ...buildSummary(periods),
-  };
+  const concepts = [...new Map([...byContract.values()].flat().map((c) => [String(c.conceptCode), { conceptCode: String(c.conceptCode), description: c.description ?? null }])).values()];
+  const common = { customer: { id: String(customerId), name: history.find((h) => h.customerName)?.customerName ?? null }, dateFrom, dateTo, groupBy, exchange,
+    configuredCostConcepts: concepts, queryContext: { costDefinition: "officialConfiguredConceptsByHistoricalContract", contractRule: "uniqueContractCoveringRequestedMonthlyInterval",
+      billedAmountRule: "latestValidInvoiceByCustomerConceptAndInvoiceMonthExcludingTax", salesRule: "auditedSalesSameExactInterval", conversionRule: "currentSellRateForDisplayOnlyNeverForCrossCurrencyHistoricalIncidence" } };
+  return groupBy === "month" ? { ...common, status: summary.status, reason: summary.reason, data: periods } : { ...common, ...summary };
 };

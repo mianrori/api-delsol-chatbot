@@ -114,43 +114,44 @@ test("incidence rejects invalid calendar ranges and unsupported grouping before 
 });
 
 const incidenceConnection = (currencies = ["PYG"], sales = 10000) => ({ async execute(sql) {
-  if (sql.includes("VW_BOT_CONTRATOS_LOCALES")) return { rows: [{ ...contract, PERIOD_MONTH: "01/2023", IS_APPLICABLE: 1 }] };
-  if (sql.includes("VW_BOT_CONTRATOS_CONCEPTOS")) return { rows: currencies.map((currency, index) => ({ ...concept, COD_CONCEPTO: ["6", "2"][index], SIGLAS_MONEDA_FACTURA: currency })) };
-  if (sql.includes("VW_BOT_FACTURAS")) return { rows: currencies.map((currency, index) => ({ ...billed, PERIOD_MONTH: "01/2023", COD_CONCEPTO: ["6", "2"][index], SIMBOLO_MONEDA: currency })) };
-  return { rows: [{ YEAR: "2023", MONTH: "01", TOTAL_AMOUNT: sales, CURRENCY_ABBREVIATION: "PYG" }] };
+  if (sql.includes("VW_BOT_CONTRATOS_LOCALES")) return { rows: [{ ...contract, PERIOD_MONTH: "01/2023", MATCH_COUNT: 1, COVERS_PERIOD: 1 }] };
+  if (sql.includes("VW_BOT_CONTRATOS_CONCEPTOS")) return { rows: currencies.map((currency, index) => ({ ...concept, FEC_DESDE: new Date("2023-01-01T00:00:00Z"), COD_CONCEPTO: ["6", "2"][index], SIGLAS_MONEDA_FACTURA: currency })) };
+  if (sql.includes("VW_BOT_FACTURAS")) return { rows: currencies.map((currency, index) => ({ ...billed, FECHA_EMISION: new Date("2023-01-31T00:00:00Z"), PERIOD_MONTH: "01/2023", COD_CONCEPTO: ["6", "2"][index], SIMBOLO_MONEDA: currency })) };
+  return { rows: [{ PERIOD_MONTH: "01/2023", TOTAL_AMOUNT: sales, CURRENCY_CODE: "PYG", SALES_ROWS: 1 }] };
 } });
+const incidenceRate = { getUsdSellRate: async () => ({ sellRate: 2, source: "Synthetic" }) };
 
 test("contract incidence computes real billed cost and keeps missing months visible", async () => {
-  const result = await analyzeContractCostIncidence({ ...args, dateFrom: "01/01/2023", dateTo: "28/02/2023", groupBy: "month" }, incidenceConnection());
+  const result = await analyzeContractCostIncidence({ ...args, dateFrom: "01/01/2023", dateTo: "28/02/2023", groupBy: "month" }, incidenceConnection(), incidenceRate);
   assert.equal(result.data.length, 2);
   assert.equal(result.data[0].shoppingCost.amount, 1000);
   assert.equal(result.data[0].incidencePercentage, 10);
-  assert.equal(result.data[1].status, "COST_NOT_AVAILABLE");
+  assert.equal(result.data[1].status, "CONTRACT_NOT_AVAILABLE");
   assert.equal(result.data[1].incidencePercentage, null);
 });
 
 test("mixed cost currencies cannot produce summed costs or a summary percentage", async () => {
   const input = { ...args, dateFrom: "01/01/2023", dateTo: "31/01/2023" };
-  const monthly = await analyzeContractCostIncidence({ ...input, groupBy: "month" }, incidenceConnection(["PYG", "USD"]));
+  const monthly = await analyzeContractCostIncidence({ ...input, groupBy: "month" }, incidenceConnection(["PYG", "USD"]), incidenceRate);
   assert.equal(monthly.data[0].status, "CURRENCY_MISMATCH");
   assert.equal(monthly.data[0].incidencePercentage, null);
   assert.equal(monthly.data[0].shoppingCost.amount, null);
   assert.equal(monthly.data[0].shoppingCost.concepts.length, 2);
-  const summary = await analyzeContractCostIncidence(input, incidenceConnection(["PYG", "USD"]));
+  const summary = await analyzeContractCostIncidence(input, incidenceConnection(["PYG", "USD"]), incidenceRate);
   assert.equal(summary.status, "CURRENCY_MISMATCH");
   assert.equal(summary.shoppingCost.amount, null);
   assert.equal(summary.incidencePercentage, null);
 });
 
 test("zero sales do not produce an invented incidence percentage", async () => {
-  const result = await analyzeContractCostIncidence({ ...args, dateFrom: "01/01/2023", dateTo: "31/01/2023" }, incidenceConnection(["PYG"], 0));
-  assert.equal(result.status, "NO_SALES");
+  const result = await analyzeContractCostIncidence({ ...args, dateFrom: "01/01/2023", dateTo: "31/01/2023" }, incidenceConnection(["PYG"], 0), incidenceRate);
+  assert.equal(result.status, "ZERO_SALES");
   assert.equal(result.incidencePercentage, null);
 });
 
 test("unknown cost currencies do not inherit the currency of other concepts", async () => {
   for (const currencies of [[null], ["PYG", null]]) {
-    const result = await analyzeContractCostIncidence({ ...args, dateFrom: "01/01/2023", dateTo: "31/01/2023" }, incidenceConnection(currencies));
+    const result = await analyzeContractCostIncidence({ ...args, dateFrom: "01/01/2023", dateTo: "31/01/2023" }, incidenceConnection(currencies), incidenceRate);
     assert.equal(result.status, "CURRENCY_MISMATCH");
     assert.equal(result.shoppingCost.amount, null);
     assert.equal(result.incidencePercentage, null);
