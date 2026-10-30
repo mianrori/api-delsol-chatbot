@@ -58,15 +58,22 @@ const buildPeriod = ({ month, start, end, history, concepts, invoices, salesRows
   const selected = [], missing = [];
   let billingAmbiguous = false;
   for (const code of configuredCodes) {
+    const invoiceOrder = (a, b) => time(b.invoiceDate) - time(a.invoiceDate)
+      || String(b.invoiceNumber).localeCompare(String(a.invoiceNumber), "en", { numeric: true });
     const candidates = invoices.filter((r) => normalizeMonth(r.periodMonth) === month && String(r.conceptCode) === code
       && time(r.invoiceDate) >= start && time(r.invoiceDate) < end
       && configured.some((c) => String(c.conceptCode) === code && (c.effectiveFrom == null || time(c.effectiveFrom) <= time(r.invoiceDate))))
-      .sort((a, b) => time(b.invoiceDate) - time(a.invoiceDate) || String(b.invoiceNumber).localeCompare(String(a.invoiceNumber), "en", { numeric: true }));
+      .sort(invoiceOrder);
     const latest = candidates[0];
     if (!latest) { missing.push({ conceptCode: code, description: configured.find((c) => String(c.conceptCode) === code)?.description ?? null }); continue; }
-    if (candidates.length > 1 && time(candidates[1].invoiceDate) === time(latest.invoiceDate) && String(candidates[1].invoiceNumber) === String(latest.invoiceNumber)) billingAmbiguous = true;
+    const latestCandidates = candidates.filter((r) => invoiceOrder(r, latest) === 0);
+    const ambiguous = latestCandidates.length > 1;
+    if (ambiguous) billingAmbiguous = true;
+    const latestCurrencies = new Set(latestCandidates.map((r) => currency(r.currencySymbol)));
+    const conceptCurrency = latestCurrencies.size === 1 ? [...latestCurrencies][0] : null;
     selected.push({ conceptCode: code, description: configured.find((c) => String(c.conceptCode) === code)?.description ?? null,
-      amountExcludingTax: latest.amountExcludingTax, currency: currencyInfo(currency(latest.currencySymbol)) });
+      amountExcludingTax: ambiguous ? null : latest.amountExcludingTax, currency: currencyInfo(conceptCurrency),
+      ...(ambiguous ? { status: "BILLING_AMBIGUOUS", reason: reasons.BILLING_AMBIGUOUS } : {}) });
   }
   const amounts = summarizeAmounts(selected.map((r) => ({ amount: r.amountExcludingTax, code: r.currency.code })));
   if (billingAmbiguous) amounts.amount = null;

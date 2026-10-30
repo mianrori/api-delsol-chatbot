@@ -71,6 +71,43 @@ test('no sales, real zero sales and missing source amounts have distinct reasons
  }
 });
 
+test('latest invoice ties preserve concepts with null amounts and identical results/presentation in either order',async()=>{
+ for(const groupBy of ['summary','month'])for(const tied of [
+  [invoice(),invoice({IMPORTE_SIN_IVA:999})],
+  [invoice(),invoice({IMPORTE_SIN_IVA:999,SIMBOLO_MONEDA:'USD'})],
+  [invoice({SIMBOLO_MONEDA:null}),invoice({SIMBOLO_MONEDA:'USD'})],
+  [invoice(),invoice()],
+  [invoice(),invoice({IMPORTE_SIN_IVA:999}),invoice({IMPORTE_SIN_IVA:-10})],
+  [invoice(),invoice({NRO_FACTURA:'02',IMPORTE_SIN_IVA:999})],
+ ]){
+  const options={concepts:[concept(),concept({COD_CONCEPTO:'2',DES_CONCEPTO:'Unaffected cost'})]};
+  const invoices=[...tied,invoice({FECHA_EMISION:new Date('2023-01-20T00:00:00Z'),IMPORTE_SIN_IVA:333}),invoice({COD_CONCEPTO:'2',IMPORTE_SIN_IVA:50})];
+  const args={...input,dateTo:'31/01/2023',groupBy};
+  const forward=await analyzeContractCostIncidence(args,db({...options,invoices}),fx);
+  const reverse=await analyzeContractCostIncidence(args,db({...options,invoices:[...invoices].reverse()}),fx);
+  assert.deepEqual(forward,reverse);
+  const p=groupBy==='month'?forward.data[0]:forward;
+  assert.equal(p.status,'BILLING_AMBIGUOUS');assert.equal(p.incidencePercentage,null);
+  assert.equal(p.shoppingCost.amount,null);assert.equal(p.shoppingCost.usd,null);assert.equal(p.shoppingCost.complete,false);
+  const affected=p.shoppingCost.concepts.find(c=>c.conceptCode==='6');
+  assert.equal(affected.description,'Synthetic cost');assert.equal(affected.amountExcludingTax,null);
+  assert.equal(affected.status,'BILLING_AMBIGUOUS');assert.ok(affected.reason);
+  assert.equal(p.shoppingCost.concepts.find(c=>c.conceptCode==='2').amountExcludingTax,50);
+  if(groupBy==='summary')assert.equal(p.shoppingCost.conceptBreakdownByPeriod[0].concepts.find(c=>c.conceptCode==='6').amountExcludingTax,null);
+  const render=r=>buildContractIncidenceResponse([{name:'analyze_contract_cost_incidence',result:r}]);
+  const text=render(forward);assert.equal(text,render(reverse));
+  assert.match(text,/Synthetic cost: sin calcular \(La última factura no es única/);
+  assert.match(text,/Unaffected cost: ₲ 50/);assert.doesNotMatch(text,/\b(?:100|999|333)\b/);
+ }
+});
+
+test('ties among older invoices do not invalidate a unique latest invoice',async()=>{
+ const args={...input,dateTo:'31/01/2023',groupBy:'summary'};
+ const invoices=[invoice({IMPORTE_SIN_IVA:200}),invoice({FECHA_EMISION:new Date('2023-01-20T00:00:00Z')}),invoice({FECHA_EMISION:new Date('2023-01-20T00:00:00Z'),IMPORTE_SIN_IVA:999})];
+ const a=await analyzeContractCostIncidence(args,db({invoices}),fx),b=await analyzeContractCostIncidence(args,db({invoices:[...invoices].reverse()}),fx);
+ assert.deepEqual(a,b);assert.equal(a.status,'OK');assert.equal(a.shoppingCost.concepts[0].amountExcludingTax,200);assert.equal(a.incidencePercentage,20);
+});
+
 test('native USD needs no FX, mixed or conflicting sales currencies cannot be divided or summed',async()=>{
  const args={...input,dateTo:'31/01/2023'};
  const usd=await analyzeContractCostIncidence(args,db({sales:[sale('01/2023',1000,{CURRENCY_CODE:'USD',CURRENCY_DESCRIPTION:'DOLARES'})],invoices:[invoice({SIMBOLO_MONEDA:'USD'})]}),{getUsdSellRate:async()=>assert.fail('No FX for native USD')});

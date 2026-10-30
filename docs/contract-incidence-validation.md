@@ -87,6 +87,32 @@ usuario distinto sin permisos, esa cobertura queda pendiente, no aprobada.
 
 ## Evidencia y pendientes
 
+### Corrección de facturas empatadas
+
+La revisión detectó que `BILLING_AMBIGUOUS` anulaba el total y el porcentaje,
+pero dejaba en el concepto el importe de la primera fila empatada. La selección
+ahora examina todas las filas con la misma prioridad de fecha/número, incluidos
+números equivalentes para el comparador como `2` y `02`. Conserva el concepto y
+su descripción, pero devuelve `amountExcludingTax=null`, estado y motivo propios.
+Solo conserva su moneda si todas las filas empatadas coinciden en una moneda
+identificada. La presentación muestra **sin calcular** y explica la ambigüedad.
+Los conceptos no afectados conservan sus importes.
+
+Las pruebas enfocadas de esta corrección pasan **29/29 en Node 22**, sin red ni
+credenciales. Comparan objetos completos y texto con las facturas invertidas,
+en resumen y por mes: importes distintos, monedas distintas/desconocidas, filas
+idénticas, tres empates y números equivalentes. Comprueban también que un empate
+entre facturas antiguas no invalide una última factura única.
+
+`scripts/check-contract-incidence-ties.mjs` añade los casos de empate al contraste
+Oracle del ejecutor con `BOT_TEST_INCIDENCE_TIES=true`. Ejecuta los repositorios
+reales contra CTE sintéticas y revierte las filas facturadas recibidas antes de
+comparar las respuestas. Comprueba nulos, motivos, conceptos no afectados,
+desgloses mensuales/resumen y texto sin importes arbitrarios. No fabrica datos
+persistentes. La nueva ejecución DEV se consignará en la PR cuando termine.
+
+### Evidencia anterior a esta corrección
+
 - Medición inicial sobre la base: 108 controles; 14 fallidos, principalmente por
   calcular incidencia con costo incompleto o sin una vigencia contractual inequívoca.
 - Pruebas controladas: 263/263 aprobadas en Node 22, contenedor aislado sin red,
@@ -95,7 +121,7 @@ usuario distinto sin permisos, esa cobertura queda pendiente, no aprobada.
   cancelación, presentación y preservación de filtros. Los tests del dispatcher
   comprueban autorización por `sessionId`, ignoran `username` en argumentos y
   verifican cierre tanto en éxito como ante ORA-00942/01031.
-- **213/213 controles finales aprobados** contra Oracle DEV y mediante HTTP
+- **213/213 controles aprobados antes de la corrección de empates** contra Oracle DEV y mediante HTTP
   sobre el código de `f48e163`, para enero–mayo de 2023. Se conciliaron costos,
   ventas e incidencia mensual/resumen, selección exacta de contrato/local y un
   filtro de local sin coincidencias. Los nueve archivos candidatos comparados

@@ -98,6 +98,11 @@ try{
    verify(summary,controls,prefix);
   }
   if(process.env.BOT_TEST_INCIDENCE_HTTP==='true'){
+   if(process.env.BOT_TEST_INCIDENCE_TIES==='true'){
+    const {checkContractIncidenceTies}=await import('./check-contract-incidence-ties.mjs');
+    await checkContractIncidenceTies(connection,check);
+    report.coverage.syntheticInvoiceTiesInOracle=true;
+   }
    const filteredCustomer=selected.find(k=>months.some(m=>control(k,m).valid));
    if(filteredCustomer){
     const month=months.find(m=>control(filteredCustomer,m).valid),c=control(filteredCustomer,month),contract=c.contract;

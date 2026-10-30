@@ -17,7 +17,7 @@ export const buildContractIncidenceResponse = (calls = [], { restoreValue = (v) 
   for (const p of rows) {
     if (p.reason) lines.push("", `${cell(p.month ?? "Resumen")}: ${cell(p.reason)}`);
     const breakdown = p.shoppingCost.conceptBreakdownByPeriod ?? [{ month: p.month, concepts: p.shoppingCost.concepts ?? [], missingConcepts: p.shoppingCost.missingConcepts ?? [] }];
-    for (const b of breakdown) for (const c of b.concepts ?? []) lines.push("", `${cell(b.month ?? "Período")} · ${cell(c.description ?? "Concepto oficial")}: ${money({ amount: c.amountExcludingTax, currency: c.currency })}.`);
+    for (const b of breakdown) for (const c of b.concepts ?? []) lines.push("", `${cell(b.month ?? "Período")} · ${cell(c.description ?? "Concepto oficial")}: ${c.status === "BILLING_AMBIGUOUS" ? `sin calcular (${cell(c.reason)})` : money({ amount: c.amountExcludingTax, currency: c.currency })}.`);
     for (const b of breakdown) for (const c of b.missingConcepts ?? []) lines.push("", `${cell(b.month ?? "Período")} · ${cell(c.description ?? "Concepto oficial")}: sin importe válido.`);
   }
   lines.push("", "Importes según la última factura válida por mes y concepto, no la suma de todas las facturas. Sin IVA; meses extremos limitados a las fechas solicitadas.");
