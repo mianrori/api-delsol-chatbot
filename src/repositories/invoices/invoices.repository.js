@@ -60,6 +60,25 @@ export const getInvoicesRepository = async ({
   groupBy = normalizeArray(groupBy);
   metrics = normalizeArray(metrics);
 
+  if (!["detail", "summary"].includes(mode)) throw new Error("mode no soportado.");
+  if (groupBy.some((item) => !VALID_GROUP_BY.includes(item))) throw new Error("groupBy no soportado.");
+  if (!metrics.length || metrics.some((item) => !VALID_METRICS.includes(item))) throw new Error("metrics no soportado.");
+  if (!Number.isInteger(page) || page < 1 || !Number.isInteger(rows) || rows < 1 || rows > 100) {
+    throw new Error("Paginación inválida.");
+  }
+  if (cancelled !== undefined && typeof cancelled !== "boolean") throw new Error("cancelled debe ser booleano.");
+  const parseDate = (value) => {
+    const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(value));
+    if (!match) throw new Error("Fecha inválida.");
+    const [, day, month, year] = match.map(Number);
+    const date = new Date(Date.UTC(year, month - 1, day));
+    if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) throw new Error("Fecha inválida.");
+    return date;
+  };
+  const from = dateFrom === undefined ? null : parseDate(dateFrom);
+  const to = dateTo === undefined ? null : parseDate(dateTo);
+  if (from && to && from > to) throw new Error("Rango de fechas inválido.");
+
   const safeGroupBy = groupBy.filter((item) => VALID_GROUP_BY.includes(item));
 
   const safeMetrics = metrics.filter((item) => VALID_METRICS.includes(item));
@@ -429,15 +448,10 @@ export const getInvoicesRepository = async ({
     select.push("COUNT(DISTINCT NRO_FACTURA) AS INVOICE_COUNT");
   }
 
-  /*
-   * NOTA:
-   * MAX(SIMBOLO_MONEDA) conserva la implementación inicial.
-   *
-   * Si una misma consulta puede devolver más de una moneda,
-   * lo recomendable será agrupar también por moneda en una
-   * siguiente iteración para impedir mezclas de importes.
-   */
-  select.push("MAX(SIMBOLO_MONEDA) AS CURRENCY_SYMBOL");
+  // Cada moneda conserva sus propios importes y conteos, también sin dimensiones.
+  select.push("SIMBOLO_MONEDA AS CURRENCY_SYMBOL");
+  groupBySql.push("SIMBOLO_MONEDA");
+  orderBySql.push("SIMBOLO_MONEDA");
 
   const groupClause =
     groupBySql.length > 0 ? `GROUP BY ${groupBySql.join(", ")}` : "";
@@ -484,7 +498,7 @@ export const getInvoicesRepository = async ({
     currencySymbol: row.CURRENCY_SYMBOL ?? null,
   }));
 
-  if (safeGroupBy.length === 0) {
+  if (safeGroupBy.length === 0 && mapped.length <= 1) {
     return (
       mapped[0] ?? {
         totalAmount: 0,

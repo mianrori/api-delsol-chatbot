@@ -1,8 +1,8 @@
-import { buildMemberPurchasesResponse } from "./memberPurchasesPresentation.service.js";
+import { buildMemberPurchasesResponse, resolveMemberPurchasesPage } from "./memberPurchasesPresentation.service.js";
 import { resolveSalesYearComparison, buildSalesYearComparisonResponse } from "./salesYearComparison.service.js";
 import { needsSalesRefresh, SALES_REFRESH_INSTRUCTION } from "./salesHistory.service.js";
 import { buildSalesSampleResponse } from "./salesSamplePresentation.service.js";
-import { resolveRepeatedSalesExport, resolveSalesCategoryRemoval, resolveEquivalentSalesExport } from "./salesExportFollowup.service.js";
+import { resolveRepeatedSalesExport, resolveSalesCategoryRemoval, resolveEquivalentSalesExport, resolveSalesBreakdown } from "./salesExportFollowup.service.js";
 import { ACCESS_DENIED_CODE, ACCESS_DENIED_MESSAGE, isAccessDenied } from "./toolErrors.service.js";
 import { buildSalesSeriesResponse } from "./salesSeriesPresentation.service.js";
 import { chartsPrompt } from "../../prompts/sections/charts.prompt.js";
@@ -1167,7 +1167,9 @@ const formatIncidenceArea = (area = {}) => {
 };
 
 const formatIncidenceMoney = (amount, currency = {}) => {
-  const numericAmount = Number(amount ?? 0);
+  if (amount === null || amount === undefined || amount === "") return "—";
+  const numericAmount = Number(amount);
+  if (!Number.isFinite(numericAmount)) return "—";
   const formatted = new Intl.NumberFormat("es-PY", {
     maximumFractionDigits: 2,
   }).format(numericAmount);
@@ -1176,7 +1178,7 @@ const formatIncidenceMoney = (amount, currency = {}) => {
   return symbol ? `${symbol} ${formatted}` : formatted;
 };
 
-const buildMonthlyIncidenceResponse = (result) => {
+export const buildMonthlyIncidenceResponse = (result) => {
   if (
     result?.groupBy !== "month" ||
     !Array.isArray(result?.data) ||
@@ -1294,7 +1296,7 @@ const buildMonthlyIncidenceResponse = (result) => {
             ),
         formatIncidenceArea(period?.area),
         formatIncidenceMoney(
-          Number(period?.sales?.amount ?? 0),
+          period?.sales?.amount,
           period?.sales?.currency,
         ),
         incidence === null ? "—" : `**${incidence} %**`,
@@ -1336,6 +1338,10 @@ const buildMonthlyIncidenceResponse = (result) => {
     } else if (period?.status === "COST_NOT_AVAILABLE") {
       lines.push(
         `- **${period?.month ?? "Período"}:** existe un contrato aplicable, pero no se dispone de importes facturados de los conceptos oficiales para calcular la incidencia.`,
+      );
+    } else if (period?.status === "CURRENCY_MISMATCH") {
+      lines.push(
+        `- **${period?.month ?? "Período"}:** las monedas son incompatibles o no están identificadas; no corresponde sumar importes entre monedas ni calcular incidencia.`,
       );
     } else if (Number(period?.sales?.amount ?? 0) === 0) {
       lines.push(
@@ -1585,9 +1591,12 @@ export const chatService = async ({ message, sessionId }) => {
   const salesYearComparison = resolveSalesYearComparison({ message, history: protectedHistory });
   const salesRefreshRequest = { message: messages.at(-1).content[0].text, history: protectedHistory };
   const salesRefreshInput = resolveSalesCategoryRemoval(salesRefreshRequest)
+    ?? resolveSalesBreakdown(salesRefreshRequest)
     ?? resolveEquivalentSalesExport(salesRefreshRequest)
     ?? resolveRepeatedSalesExport(salesRefreshRequest);
   const promotionPage = resolvePromotionSearchPage({ message, history: protectedHistory });
+  const purchasePage = resolveMemberPurchasesPage({ message: messages.at(-1).content[0].text, history: protectedHistory,
+    restoreValue: (value) => restorePiiDeep(sessionId, value) });
   const solesPage = resolveVehiclePage({ message, history: protectedHistory })
     ?? resolveVehicleGenderBreakdown({ message, history: protectedHistory })
     ?? resolveSolesUsagePage({ message, history: protectedHistory })
@@ -1619,6 +1628,20 @@ export const chatService = async ({ message, sessionId }) => {
     // The fresh tool result, rather than the previous narrative/sample, is the
     // source for the answer. The standard executor rechecks Oracle permissions.
     followupAnswer = buildSalesSampleResponse(executed.internalContext.presentationCalls, { exportAvailable: Boolean(conversationActions.salesExport?.available) });
+  } else if (purchasePage) {
+    if (purchasePage.answer) followupAnswer = purchasePage.answer;
+    else {
+      const content = [{ toolUse: { toolUseId: `member_purchase_page_${randomUUID()}`, name: "get_member_purchases", input: purchasePage.input } }];
+      messages.push({ role: "assistant", content });
+      const executed = await executeToolRequests({ content, sessionId });
+      messages.push({ role: "user", content: executed.toolResults });
+      conversationActions = executed.actions;
+      conversationInternalContext = executed.internalContext;
+      toolIterations = 1;
+      followupAnswer = executed.internalContext.accessDenied ? ACCESS_DENIED_MESSAGE
+        : buildMemberPurchasesResponse(executed.internalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) })
+          ?? "No fue posible consultar la página de compras. Vuelve a intentarlo.";
+    }
   } else if (solesPage) {
     if (solesPage.answer) followupAnswer = solesPage.answer;
     else {

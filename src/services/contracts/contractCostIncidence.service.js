@@ -144,6 +144,7 @@ const buildPeriodResult = ({
     .map(mapConcept);
 
   const costCurrencies = getCostCurrencies(billedRows);
+  const costCurrenciesKnown = billedRows.every((row) => normalizeCurrencyCode(row.currencySymbol) !== null);
   const costCurrency =
     costCurrencies.length === 1 ? costCurrencies[0] : null;
   const totalCost = billedRows.reduce(
@@ -152,8 +153,9 @@ const buildPeriodResult = ({
   );
 
   const currencyCompatible =
+    costCurrenciesKnown &&
     costCurrencies.length <= 1 &&
-    (!salesCurrency || !costCurrency || salesCurrency === costCurrency);
+    (!salesRow || Boolean(salesCurrency && costCurrency && salesCurrency === costCurrency));
 
   let status = "OK";
 
@@ -211,7 +213,7 @@ const buildPeriodResult = ({
       unit: "m2",
     },
     shoppingCost: {
-      amount: totalCost,
+      amount: !costCurrenciesKnown || costCurrencies.length > 1 ? null : totalCost,
       currency: {
         code: costCurrency,
         symbol: currencySymbol(costCurrency),
@@ -271,6 +273,7 @@ const buildSummary = (periods) => {
   const costCurrency =
     costCurrencies.length === 1 ? costCurrencies[0] : null;
   const currencyCompatible =
+    periods.every((item) => item.status !== "CURRENCY_MISMATCH") &&
     salesCurrencies.length <= 1 &&
     costCurrencies.length <= 1 &&
     (!salesCurrency || !costCurrency || salesCurrency === costCurrency);
@@ -311,14 +314,14 @@ const buildSummary = (periods) => {
   return {
     status,
     sales: {
-      amount: totalSales,
+      amount: salesCurrencies.length > 1 ? null : totalSales,
       currency: {
         code: salesCurrency,
         symbol: currencySymbol(salesCurrency),
       },
     },
     shoppingCost: {
-      amount: totalCost,
+      amount: costCurrencies.length > 1 || periods.some((item) => item.shoppingCost.amount === null) ? null : totalCost,
       currency: {
         code: costCurrency,
         symbol: currencySymbol(costCurrency),

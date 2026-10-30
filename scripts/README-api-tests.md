@@ -1,5 +1,73 @@
 # Pruebas automáticas del endpoint DEV
 
+## Introducir sesión y documentos sin guardarlos
+
+Desde PowerShell, en la carpeta del proyecto:
+
+```powershell
+powershell -NoProfile -File .\scripts\run-personal-api-tests.ps1
+```
+
+El script pide la sesión y los documentos de soles y compras con entrada oculta
+(`Read-Host -AsSecureString`). Los documentos pueden corresponder a socios
+distintos. Los valores solo se pasan al proceso Docker mediante variables de
+entorno; no se escriben en `.env`, archivos, argumentos del comando ni reportes.
+Al terminar restaura las variables del proceso a sus valores anteriores, incluso
+si falla una suite. No inicia sesión ni cambia la expiración.
+
+Antes de pedir los datos comprueba que DEV esté disponible y que
+`BEDROCK_DEBUG_PAYLOADS` y `PII_DEBUG_SHOW_RAW` estén desactivados. Si no, falla
+con `DEV_REQUIRED_OR_UNSAFE_DEBUG_CONFIGURATION`. No cambia esas opciones.
+
+Guarda los reportes sanitizados en `logs/chatbot-api-tests-soles.json` y
+`logs/chatbot-api-tests-member-purchases.json`, ignorados por Git y Docker.
+Las dos suites se ejecutan aunque una falle; el script termina con error si hay
+fallos. Reinicia la conversación de la sesión de pruebas al comenzar cada suite.
+Evita consultar simultáneamente desde el frontend con esa misma sesión.
+
+Para repetir solo soles o compras utiliza `-Suite soles` o
+`-Suite member-purchases`. Antes de ejecutar el script se pueden configurar
+en esa misma terminal las variables de períodos y paginación de las tablas
+inferiores. Por ejemplo, `$env:BOT_TEST_SOLES_PAGE_SIZE='1'` o
+`$env:BOT_TEST_PURCHASES_PAGE_SIZE='1'` ejercitan varias páginas si hay más de
+un movimiento o compra. La muestra de soles debe tener saldo positivo vigente
+al 30/06/2023 y usos entre enero y mayo de 2023, salvo que se configuren otras
+fechas. La falta de usos falla con `SOLES_USAGE_FIXTURE_REQUIRED`; no prueba
+por sí sola una regresión.
+
+## Facturación y contratos contra Oracle DEV
+
+`node scripts/run-business-tests.mjs` ejecuta comprobaciones de integración de
+los servicios y repositorios contra Oracle mediante `BOT_TEST_SESSION_ID`.
+Es complementario a las suites HTTP: no evalúa la interpretación del modelo ni
+el formato de sus respuestas. Requiere `NODE_ENV=development` y usa el flujo
+habitual PostgreSQL → usuario proxy; cierra la conexión al terminar y no cambia
+la expiración de sesiones.
+
+```powershell
+docker exec -e BOT_TEST_SESSION_ID api-delsol-chatbot-dev node scripts/run-business-tests.mjs
+docker cp api-delsol-chatbot-dev:/tmp/chatbot-business-tests.json ./logs/chatbot-business-tests.json
+```
+
+Comprueba enero–mayo de 2023: importes separados por moneda, conciliación de
+totales mensuales, límites del conteo de facturas distintas y dos páginas de
+detalle. Busca un cliente con contrato entre los primeros 30 clientes facturados
+distintos, o utiliza `BOT_TEST_CONTRACT_CUSTOMER_ID` si se configura localmente.
+No imprime ni guarda esos identificadores. Si no encuentra contrato o conceptos,
+falla la precondición; no informa cobertura exitosa sin una muestra real.
+
+Verifica selección contractual exacta, rechazo de un cliente ajeno, vigencia del
+último importe facturado y costo por m² sin IVA, usando la misma moneda para
+evitar una cotización externa. `coverage.costPerSqmCalculated` distingue un
+cálculo real de una indisponibilidad explícita de área o facturación. El reporte
+contiene solo códigos, resultados, tiempos e indicadores de cobertura; omite
+filas, nombres, identificadores, importes y mensajes de excepción. Estas son
+conciliaciones entre consultas, no una auditoría independiente de los datos ERP.
+
+Las pruebas locales y las del contenedor se ejecutan con `npm test` (o
+`node --test test/*.test.js`). Esto excluye el auxiliar de integración del ciclo
+de chat, que su prueba principal ejecuta con las opciones de Node necesarias.
+
 Ejecuta las secuencias que antes se enviaban manualmente en Insomnia. Utiliza
 únicamente el contrato HTTP y un `sessionId` válido; no inicia sesión ni necesita
 credenciales Oracle, PostgreSQL o Bedrock. No modifica la expiración de sesiones.
@@ -271,6 +339,15 @@ una tabla; unos argumentos JSON escritos como respuesta no constituyen un result
 
 
 ## Compras individuales de un socio
+
+Las continuaciones simples de compras se resuelven desde la última consulta de
+detalle exitosa: conservan documento, fechas, filtros y tamaño de página, toman
+`page=nextPage` y reutilizan el conteo de ese mismo resultado. No dependen de que
+el modelo vuelva a elegir la identidad ni de que el turno inicial permanezca en
+el historial recortado. Cada página sigue consultando Oracle mediante la sesión
+proxy habitual. Los cambios de identidad, fechas o filtros usan el flujo normal.
+Solo se informa el fin cuando el último resultado real tiene `hasMore=false` y
+`nextPage=null`; el tamaño de página y el conteo no se deducen de una narración.
 
 `BOT_TEST_SUITE=member-purchases` ejecuta seis casos: reinicio, total del socio,
 compras mensuales, por local, por rubro y detalle completo paginado. Es una suite

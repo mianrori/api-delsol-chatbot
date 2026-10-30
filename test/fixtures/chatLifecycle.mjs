@@ -58,6 +58,13 @@ const chat = await load("../../src/services/ai/chat.service.js", {
   "@aws-sdk/client-bedrock-runtime": {
     BedrockRuntimeClient: class { async send(_command, options) {
       modelCalls++;
+      if (mode === "member-purchase-pages") {
+        assert.equal(comparisonStep++, 0, "Purchase page continuations must not invoke the model");
+        return { stopReason: "tool_use", output: { message: { role: "assistant", content: [{ toolUse: {
+          name: "get_member_purchases", toolUseId: "purchase-page-1", input: { documentNumber: "SYNTHETIC-DOCUMENT", dateFrom: "01/01/2023", dateTo: "31/05/2023", mode: "detail", page: 1, rows: 10 },
+        } }] } } };
+      }
+      if (mode === "member-purchase-pages-denied") assert.fail("Denied purchase continuation cannot invoke Bedrock");
       if (mode.startsWith("sales-equivalent-")) assert.fail("Verified equivalent sales queries must refresh without invoking Bedrock");
       if (mode.startsWith("sales-history-")) {
         const step = comparisonStep++;
@@ -201,6 +208,19 @@ const chat = await load("../../src/services/ai/chat.service.js", {
   "../../tools/index.js": { tools: [] },
   "./toolExecutor.service.js": { executeTool: async (call) => {
     toolCalls++;
+    if (mode.startsWith("member-purchase-pages")) {
+      assert.equal(call.name, "get_member_purchases");
+      const input = call.arguments;
+      assert.equal(input.documentNumber, "SYNTHETIC-DOCUMENT");
+      assert.equal(input.rows, 10);
+      assert.equal(input.dateFrom, "01/01/2023");
+      assert.equal(input.dateTo, "31/05/2023");
+      if (mode.endsWith("denied")) throw Object.assign(new Error("Denied"), { code: "ACCESS_DENIED" });
+      if (input.page > 1) assert.equal(input.knownTotalRows, 170);
+      return { documentNumber: input.documentNumber, mode: "detail", page: input.page, rows: 10, totalRows: 170, totalPages: 17,
+        returnedRows: 10, startRow: (input.page - 1) * 10 + 1, endRow: input.page * 10, hasMore: input.page < 17, nextPage: input.page < 17 ? input.page + 1 : null,
+        data: Array.from({ length: 10 }, () => ({ purchaseDate: "01/01/2023", customer: { name: "Synthetic shop" }, category: { name: "Synthetic category" }, currency: { symbol: "PYG" }, amount: 1 })) };
+    }
     if (mode.startsWith("sales-equivalent-")) {
       assert.equal(call.name, "get_sales");
       assert.equal(call.arguments.dateFrom, "01/01/2023");
@@ -677,6 +697,11 @@ for (const match of dispatcherText.matchAll(/import \{([^}]+)\} from "([^"]+)";/
   dispatcherStubs[match[2]] = Object.fromEntries(match[1].split(",").map((name) => [name.trim(), () => assert.fail("Unexpected unrelated tool")]));
 }
 let proxyClosed = 0; let proxyDenied = false;
+const proxyQueries = [];
+dispatcherStubs["../invoices/invoices.service.js"] = await import("../../src/services/invoices/invoices.service.js");
+dispatcherStubs["../contracts/contractConditions.service.js"] = await import("../../src/services/contracts/contractConditions.service.js");
+dispatcherStubs["../contracts/contractCostPerSqm.service.js"] = await import("../../src/services/contracts/contractCostPerSqm.service.js");
+dispatcherStubs["../contracts/contractCostIncidence.service.js"] = await import("../../src/services/contracts/contractCostIncidence.service.js");
 dispatcherStubs["../charts/chart.service.js"] = { generateChart };
 dispatcherStubs["../vehicles/vehicleRegistrations.service.js"] = { getVehicleRegistrations };
 dispatcherStubs["../soles/solesUsage.service.js"] = { getSolesUsage };
@@ -686,7 +711,8 @@ dispatcherStubs["../sales/campaignSalesPerformance.service.js"] = { getCampaignS
 dispatcherStubs["../members/memberPurchasesVsSales.service.js"] = { compareMemberPurchasesVsSales };
 dispatcherStubs["../sessions/oracleSession.service.js"] = { withOracleProxySession: async (id, callback) => {
   assert.equal(id, "authorized-session");
-  try { return await callback({ username: "SYNTHETIC", connection: { execute: async (sql) => {
+  try { return await callback({ username: "SYNTHETIC", connection: { execute: async (sql, binds) => {
+    proxyQueries.push({ sql, binds });
     if (proxyDenied) throw Object.assign(new Error("Denied"), { errorNum: typeof proxyDenied === "number" ? proxyDenied : 942 });
     return { rows: sql.includes("VW_BOT_PROMOCIONES") ? [{ COD_PROMOCION: "P1", COD_CAMPANIA: "C1",
       NOMBRE_PROMOCION: "Promoción sintética", NOMBRE_CAMPANIA: "Campaña sintética", FECHA_DESDE: "01/05/2023", FECHA_HASTA: "10/05/2023" }] : [] };
@@ -858,4 +884,58 @@ for (const errorNum of [942, 1031]) {
   });
 }
 assert.equal(proxyClosed, beforeSpecificDenials + 2);
+for (const [name, arguments_] of [
+  ["get_invoices", { mode: "summary", customerIds: ["SYNTHETIC-CUSTOMER"], conceptIds: ["6"], cancelled: false, dateFrom: "01/01/2023", dateTo: "31/01/2023" }],
+  ["get_contract_conditions", { customerId: "SYNTHETIC-CUSTOMER", localNumber: "SYNTHETIC-LOCAL" }],
+  ["get_contract_cost_per_sqm", { customerId: "SYNTHETIC-CUSTOMER", conceptCode: "6" }],
+  ["analyze_contract_cost_incidence", { customerId: "SYNTHETIC-CUSTOMER", dateFrom: "01/01/2023", dateTo: "31/01/2023" }],
+]) {
+  const request = { name, arguments: { ...arguments_, username: "UNTRUSTED-FRONTEND" }, context: { sessionId: "authorized-session" } };
+  const before = proxyClosed, queryStart = proxyQueries.length;
+  proxyDenied = false;
+  await dispatcher.executeTool(request);
+  assert.equal(proxyClosed, before + 1);
+  assert.ok(proxyQueries.length > queryStart);
+  assert.ok(!JSON.stringify(proxyQueries.slice(queryStart)).includes("UNTRUSTED-FRONTEND"));
+  if (name === "get_invoices") {
+    const { sql, binds } = proxyQueries[queryStart];
+    assert.equal(binds.customerId0, arguments_.customerIds[0]);
+    assert.equal(binds.conceptId0, "6");
+    assert.equal(binds.cancelled, "N");
+    assert.equal(binds.dateFrom, arguments_.dateFrom);
+    assert.equal(binds.dateTo, arguments_.dateTo);
+    assert.match(sql, /NVL\(USER_CAN_CONSULT, 'S'\) <> 'N'/);
+  }
+  for (const errorNum of [942, 1031]) {
+    proxyDenied = errorNum;
+    await assert.rejects(dispatcher.executeTool(request), (error) => error.code === "ACCESS_DENIED" && error.errorNum === errorNum);
+  }
+  assert.equal(proxyClosed, before + 3, "Every successful or denied operation closes its session proxy");
+}
+mode = "member-purchase-pages"; comparisonStep = 0; storedHistory = [];
+const purchaseModels = modelCalls, purchaseTools = toolCalls;
+let firstPurchaseHistory;
+for (let page = 1; page <= 17; page++) {
+  const response = await chat.chatService({ sessionId: "test", message: page === 1 ? "Detalle de compras, diez por página" : "Siguiente página" });
+  assert.match(response.answer, /Documento: SYNTHETIC-DOCUMENT/);
+  assert.ok(response.answer.includes(`Página ${page} de 17; 170 compras en total.`));
+  if (page === 1) firstPurchaseHistory = structuredClone(storedHistory);
+}
+assert.equal(modelCalls - purchaseModels, 1);
+assert.equal(toolCalls - purchaseTools, 17);
+const purchaseEnd = await chat.chatService({ sessionId: "test", message: "Siguiente página" });
+assert.match(purchaseEnd.answer, /No hay más páginas de compras/);
+assert.equal(toolCalls - purchaseTools, 17);
+mode = "member-purchase-pages-denied"; storedHistory = firstPurchaseHistory;
+const deniedPurchase = await chat.chatService({ sessionId: "test", message: "Siguiente página" });
+assert.equal(deniedPurchase.answer, "El usuario no tiene permisos para consultar esta información.");
+assert.equal(JSON.stringify(deniedPurchase.actions), "{}");
+assert.equal(modelCalls - purchaseModels, 1);
+const mixedCurrencyPresentation = chat.buildMonthlyIncidenceResponse({ groupBy: "month", dateFrom: "01/01/2023", dateTo: "31/01/2023",
+  data: [{ month: "01/2023", status: "CURRENCY_MISMATCH", contract: {}, incidencePercentage: null,
+    shoppingCost: { amount: null, concepts: [{ conceptCode: "6", description: "Concepto sintético", amountExcludingTax: 100, currency: { code: "USD" } }] },
+    sales: { amount: 1000, currency: { symbol: "₲" } } }] });
+assert.match(mixedCurrencyPresentation, /USD 100/);
+assert.match(mixedCurrencyPresentation, /\| 01\/2023 \| USD 100 \| — \| — \| ₲ 1\.000 \| — \|/);
+assert.match(mixedCurrencyPresentation, /no corresponde sumar importes entre monedas/);
 console.log("Lifecycle integration passed");
