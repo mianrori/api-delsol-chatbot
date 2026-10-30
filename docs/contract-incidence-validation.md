@@ -109,7 +109,20 @@ Oracle del ejecutor con `BOT_TEST_INCIDENCE_TIES=true`. Ejecuta los repositorios
 reales contra CTE sintéticas y revierte las filas facturadas recibidas antes de
 comparar las respuestas. Comprueba nulos, motivos, conceptos no afectados,
 desgloses mensuales/resumen y texto sin importes arbitrarios. No fabrica datos
-persistentes. La nueva ejecución DEV se consignará en la PR cuando termine.
+persistentes.
+
+La ejecución final sobre **`dcd9530` aprobó 309/309 controles**: los 213 controles
+de incidencia, conciliación y HTTP se repitieron sobre la corrección; se sumaron
+96 comprobaciones Oracle de empates (seis escenarios, resumen/mes y ocho
+comprobaciones por combinación). En ambos órdenes se conservaron conceptos y
+motivos, con importes afectados nulos, sin subtotales ni texto arbitrarios.
+Los diez archivos candidatos comparados coinciden con la copia ejecutada.
+También pasaron la denegación con otro usuario Oracle real y los controles de
+cierre. `ORA-00942` fue la denegación esperada; los logs compactos del servicio
+no muestran errores de cierre, controlador ni carga de módulos.
+
+Se conserva el pendiente de muestra real `ZERO_SALES` descrito abajo. La PR
+permanece en borrador hasta revisar esta corrección, sin merge ni despliegue.
 
 ### Evidencia anterior a esta corrección
 
