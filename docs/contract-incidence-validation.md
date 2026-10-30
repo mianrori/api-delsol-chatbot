@@ -95,7 +95,34 @@ usuario distinto sin permisos, esa cobertura queda pendiente, no aprobada.
   cancelación, presentación y preservación de filtros. Los tests del dispatcher
   comprueban autorización por `sessionId`, ignoran `username` en argumentos y
   verifican cierre tanto en éxito como ante ORA-00942/01031.
-- El contraste final DEV y sus muestras faltantes se consignan en la PR.
+- **213/213 controles finales aprobados** contra Oracle DEV y mediante HTTP
+  sobre el código de `f48e163`, para enero–mayo de 2023. Se conciliaron costos,
+  ventas e incidencia mensual/resumen, selección exacta de contrato/local y un
+  filtro de local sin coincidencias. Los nueve archivos candidatos comparados
+  coinciden con los ejecutados en la copia aislada.
+- **7/7 límites de vigencia aprobados en Oracle** usando el SQL real y CTE
+  sintéticas: inicio exacto, vencimiento exacto, vencimiento abierto, inicio un
+  segundo tarde, vencimiento un segundo temprano, contrato expirado o futuro y
+  coincidencias superpuestas. Inicio exacto y vencimiento abierto comparten caso.
+- Los tres seguimientos HTTP (resumen, período y local) ejecutaron nuevas
+  consultas, conservaron los demás filtros y se contrastaron con los controles
+  independientes. Las equivalencias PYG/USD se conciliaron con la tasa actual
+  retornada, sin usarla para habilitar porcentajes entre monedas distintas.
+- Se comprobaron dos usuarios Oracle distintos sin publicar sus identidades,
+  denegación real sin datos y cierre de las conexiones de control y denegación.
+  `ORA-00942` fue la denegación esperada. No aparecieron errores de cierre,
+  controlador o carga de módulos en los logs compactos del servicio.
+- **Pendiente real DEV:** no se encontró una muestra de ventas registradas con
+  total cero. El caso `ZERO_SALES` pasa con datos controlados; no se fabricaron
+  ventas para obtener esa cobertura. Hay muestras reales sin registros de ventas,
+  con costo parcial, contrato ausente/ambiguo/parcial y monedas incompatibles.
+
+La preparación final del helper se corrigió para copiar `src/prompts` como parte
+de `src`, capturar stdout/stderr sin imprimirlos y registrar etapa/versión en un
+diagnóstico sanitizado. El lanzador local `logs/run-contract-incidence-final.ps1`
+fuerza la etapa final; `-Preflight` solo comprueba la preparación, sin sesiones.
+Estos helpers y todos los reportes continúan ignorados por Git. El servicio
+desplegado no se reconstruyó ni reinició para esta validación.
 
 Los controles validan las vistas autorizadas, no auditan las tablas ERP subyacentes.
 No se fabrican muestras reales para obtener cobertura. El modo HTTP no prueba todas
