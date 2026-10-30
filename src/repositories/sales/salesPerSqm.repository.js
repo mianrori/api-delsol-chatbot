@@ -35,6 +35,12 @@ const GROUP_BY_CONFIG = {
       customerName: row.CUSTOMER_NAME ?? null,
     }),
   },
+  category: {
+    select: "COD_RUBRO AS CATEGORY_ID, DES_RUBRO AS CATEGORY_NAME",
+    groupBy: "COD_RUBRO, DES_RUBRO",
+    orderBy: "DES_RUBRO",
+    map: (row) => ({ categoryId: row.CATEGORY_ID == null ? null : String(row.CATEGORY_ID), categoryName: row.CATEGORY_NAME ?? null }),
+  },
 };
 
 const createInFilter = ({ column, values, bindPrefix, binds }) => {
@@ -74,8 +80,9 @@ const mapMetricRow = (row, groupBy) => {
 
   return {
     ...mapped,
-    totalSales: Number(row.TOTAL_AMOUNT ?? 0),
+    totalSales: Number(row.CURRENCY_COUNT ?? 0) > 1 ? null : Number(row.TOTAL_AMOUNT ?? 0),
     totalInvoices: Number(row.TOTAL_INVOICES ?? 0),
+    salesRowCount: Number(row.SALES_ROW_COUNT ?? 0),
     sourceSalesPerSqm:
       row.SALES_PER_SQM_SOURCE == null
         ? null
@@ -86,7 +93,9 @@ const mapMetricRow = (row, groupBy) => {
       changedWithinPeriod: areaValueCount > 1,
       distinctValues: areaValueCount,
       missingSalesRows: missingAreaRows,
-      complete: missingAreaRows === 0 && minArea !== null,
+      ambiguousSalesRows: Number(row.AMBIGUOUS_AREA_ROWS ?? 0),
+      invalidSalesRows: Number(row.INVALID_AREA_ROWS ?? 0),
+      complete: missingAreaRows === 0 && minArea !== null && minArea > 0,
     },
     currency: mapCurrency(row),
   };
@@ -95,6 +104,8 @@ const mapMetricRow = (row, groupBy) => {
 export const getSalesPerSqmRepository = async ({
   connection,
   customerIds = [],
+  categoryIds = [],
+  dayType,
   dateFrom,
   dateTo,
   groupBy = [],
@@ -131,6 +142,11 @@ export const getSalesPerSqmRepository = async ({
   });
 
   if (customerFilter) filters.push(customerFilter);
+  const categoryFilter = createInFilter({ column: "V.COD_RUBRO", values: categoryIds, bindPrefix: "categoryId", binds });
+  if (categoryFilter) filters.push(categoryFilter);
+  if (dayType === "weekend") filters.push("(TRUNC(V.FECHA) - TRUNC(V.FECHA, 'IW')) IN (5, 6)");
+  if (dayType === "weekday") filters.push("(TRUNC(V.FECHA) - TRUNC(V.FECHA, 'IW')) BETWEEN 0 AND 4");
+  if (dayType !== undefined && !["weekend", "weekday"].includes(dayType)) throw new Error("dayType no soportado.");
 
   const selectDimensions = groupBy.map(
     (dimension) => GROUP_BY_CONFIG[dimension].select,
@@ -144,44 +160,46 @@ export const getSalesPerSqmRepository = async ({
     (dimension) => GROUP_BY_CONFIG[dimension].orderBy,
   );
 
+  const contractPredicate = `C.COD_CLIENTE = V.COD_CLIENTE
+            AND C.TIP_CONTRATO = :contractType
+            AND C.FEC_CONTRATO <= V.FECHA
+            AND (C.FEC_VENCIMIENTO IS NULL OR C.FEC_VENCIMIENTO >= V.FECHA)`;
+  const currencyKey = "NVL(UPPER(TRIM(SIGLAS_MONEDA)), NVL(UPPER(TRIM(DES_MONEDA)), '[UNKNOWN]'))";
   const sql = `
-    WITH SALES_WITH_AREA AS (
+    WITH SALES_WITH_CONTRACT AS (
       SELECT
         V.FECHA,
         V.COD_CLIENTE,
         V.NOMBRE_CLIENTE,
+        V.COD_RUBRO,
+        V.DES_RUBRO,
         V.MONTO_TOTAL,
         V.CANTIDAD_FACTURAS,
         V.DES_MONEDA,
         V.SIGLAS_MONEDA,
-        (
-          SELECT
-            MAX(C.TOTAL_SUP_LOCAL)
-              KEEP (
-                DENSE_RANK LAST
-                ORDER BY C.FEC_CONTRATO, C.NRO_CONTRATO, C.SER_CONTRATO
-              )
+        (SELECT COUNT(*)
           FROM VW_BOT_CONTRATOS_LOCALES C
-          WHERE C.COD_CLIENTE = V.COD_CLIENTE
-            AND C.TIP_CONTRATO = :contractType
-            AND C.FEC_CONTRATO <= V.FECHA
-            AND (
-              C.FEC_VENCIMIENTO IS NULL
-              OR C.FEC_VENCIMIENTO >= V.FECHA
-            )
-            AND C.TOTAL_SUP_LOCAL > 0
-        ) AS TOTAL_SUP_LOCAL
+          WHERE ${contractPredicate}) AS CONTRACT_COUNT,
+        (SELECT MAX(C.TOTAL_SUP_LOCAL)
+          FROM VW_BOT_CONTRATOS_LOCALES C
+          WHERE ${contractPredicate}) AS CONTRACT_AREA
       FROM VW_BOT_VENTAS_LOCALES V
       WHERE
         ${filters.join("\n        AND ")}
+    ), SALES_WITH_AREA AS (
+      SELECT S.*,
+        CASE WHEN CONTRACT_COUNT = 1 AND CONTRACT_AREA > 0 THEN CONTRACT_AREA ELSE NULL END AS TOTAL_SUP_LOCAL
+      FROM SALES_WITH_CONTRACT S
     )
     SELECT
       ${selectDimensions.length > 0 ? `${selectDimensions.join(",\n      ")},` : ""}
-      NVL(SUM(MONTO_TOTAL), 0) AS TOTAL_AMOUNT,
+      CASE WHEN COUNT(DISTINCT ${currencyKey}) > 1 THEN NULL ELSE NVL(SUM(MONTO_TOTAL), 0) END AS TOTAL_AMOUNT,
       NVL(SUM(CANTIDAD_FACTURAS), 0) AS TOTAL_INVOICES,
+      COUNT(*) AS SALES_ROW_COUNT,
       CASE
-        WHEN SUM(CASE WHEN TOTAL_SUP_LOCAL IS NULL THEN 1 ELSE 0 END) = 0
-        THEN NVL(SUM(MONTO_TOTAL / TOTAL_SUP_LOCAL), 0)
+        WHEN COUNT(*) > 0 AND COUNT(DISTINCT ${currencyKey}) <= 1
+          AND SUM(CASE WHEN TOTAL_SUP_LOCAL IS NULL THEN 1 ELSE 0 END) = 0
+        THEN NVL(SUM(MONTO_TOTAL / NULLIF(TOTAL_SUP_LOCAL, 0)), 0)
         ELSE NULL
       END AS SALES_PER_SQM_SOURCE,
       MIN(TOTAL_SUP_LOCAL) AS MIN_AREA,
@@ -189,9 +207,11 @@ export const getSalesPerSqmRepository = async ({
       COUNT(DISTINCT TOTAL_SUP_LOCAL) AS AREA_VALUE_COUNT,
       SUM(CASE WHEN TOTAL_SUP_LOCAL IS NULL THEN 1 ELSE 0 END)
         AS MISSING_AREA_ROWS,
+      SUM(CASE WHEN CONTRACT_COUNT > 1 THEN 1 ELSE 0 END) AS AMBIGUOUS_AREA_ROWS,
+      SUM(CASE WHEN CONTRACT_COUNT = 1 AND (CONTRACT_AREA IS NULL OR CONTRACT_AREA <= 0) THEN 1 ELSE 0 END) AS INVALID_AREA_ROWS,
       MAX(DES_MONEDA) AS CURRENCY_DESCRIPTION,
       MAX(SIGLAS_MONEDA) AS CURRENCY_ABBREVIATION,
-      COUNT(DISTINCT SIGLAS_MONEDA) AS CURRENCY_COUNT
+      COUNT(DISTINCT ${currencyKey}) AS CURRENCY_COUNT
     FROM SALES_WITH_AREA
     ${groupDimensions.length > 0
       ? `GROUP BY ${groupDimensions.join(",\n      ")}`
