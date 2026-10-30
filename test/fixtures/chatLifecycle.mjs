@@ -23,7 +23,7 @@ const synthetic = (exports) => new vm.SyntheticModule(Object.keys(exports), func
 const load = async (path, stubs) => {
   const main = new vm.SourceTextModule(await readFile(new URL(path, import.meta.url), "utf8"), { context });
   await main.link(async (spec) => {
-    if (["./salesHistory.service.js", "./salesSamplePresentation.service.js"].includes(spec)) {
+    if (["./salesHistory.service.js", "./salesSamplePresentation.service.js", "./salesPerSqmFollowup.service.js", "./salesPerSqmPresentation.service.js"].includes(spec)) {
       return new vm.SourceTextModule(await readFile(new URL("../../src/services/ai/" + spec.slice(2), import.meta.url), "utf8"), { context });
     }
     if (["./salesExportFollowup.service.js", "./salesYearComparison.service.js", "./toolErrors.service.js", "./salesSeriesPresentation.service.js", "./vehiclePresentation.service.js", "./solesUsagePresentation.service.js", "./memberSolesPresentation.service.js", "./promotionSearchPresentation.service.js", "./campaignSalesPerformancePresentation.service.js", "./memberPurchasesVsSalesPresentation.service.js", "./memberPurchasesPresentation.service.js", "./conversationClarification.service.js", "./memberAnalysisFollowup.service.js", "./memberRankingPresentation.service.js", "./memberSummaryPresentation.service.js"].includes(spec)) {
@@ -58,6 +58,15 @@ const chat = await load("../../src/services/ai/chat.service.js", {
   "@aws-sdk/client-bedrock-runtime": {
     BedrockRuntimeClient: class { async send(_command, options) {
       modelCalls++;
+      if (mode === "sqm-followup") {
+        const step = comparisonStep++;
+        assert.ok(step < 3, "SQM presentation must not ask the model to rewrite returned metrics");
+        return { stopReason: "tool_use", output: { message: { role: "assistant", content: [{ toolUse: {
+          name: "get_sales_per_sqm", toolUseId: `sqm-follow-${step}`, input: [
+            { dateFrom: "01/02/2023", dateTo: "28/02/2023" }, { customerIds: ["RESOLVED-OTHER"] }, { categoryIds: ["RESOLVED-CATEGORY"] },
+          ][step],
+        } }] } } };
+      }
       if (mode === "member-purchase-pages") {
         assert.equal(comparisonStep++, 0, "Purchase page continuations must not invoke the model");
         return { stopReason: "tool_use", output: { message: { role: "assistant", content: [{ toolUse: {
@@ -208,6 +217,19 @@ const chat = await load("../../src/services/ai/chat.service.js", {
   "../../tools/index.js": { tools: [] },
   "./toolExecutor.service.js": { executeTool: async (call) => {
     toolCalls++;
+    if (mode === "sqm-followup") {
+      const input = call.arguments;
+      assert.equal(call.name, "get_sales_per_sqm");
+      assert.equal(input.dayType, "weekend");
+      assert.equal(input.dateFrom, "01/02/2023");
+      assert.equal(input.dateTo, "28/02/2023");
+      assert.equal(JSON.stringify(input.groupBy), '["month"]');
+      assert.equal(JSON.stringify(input.customerIds), comparisonStep === 1 ? '["ORIGINAL-CUSTOMER"]' : '["RESOLVED-OTHER"]');
+      assert.equal(JSON.stringify(input.categoryIds), comparisonStep === 3 ? '["RESOLVED-CATEGORY"]' : '["ORIGINAL-CATEGORY"]');
+      return { ...input, status: "OK", exchange: { available: false, reason: "EXCHANGE_RATE_NOT_REQUIRED" }, data: [{
+        month: "02/2023", status: "OK", sourceCurrency: "PYG", area: { min: 100, max: 100, complete: true }, sales: { pyg: 1000, usd: null }, salesPerSqm: { pyg: 10, usd: null },
+      }] };
+    }
     if (mode.startsWith("member-purchase-pages")) {
       assert.equal(call.name, "get_member_purchases");
       const input = call.arguments;
@@ -702,6 +724,7 @@ dispatcherStubs["../invoices/invoices.service.js"] = await import("../../src/ser
 dispatcherStubs["../contracts/contractConditions.service.js"] = await import("../../src/services/contracts/contractConditions.service.js");
 dispatcherStubs["../contracts/contractCostPerSqm.service.js"] = await import("../../src/services/contracts/contractCostPerSqm.service.js");
 dispatcherStubs["../contracts/contractCostIncidence.service.js"] = await import("../../src/services/contracts/contractCostIncidence.service.js");
+dispatcherStubs["../sales/salesPerSqm.service.js"] = await import("../../src/services/sales/salesPerSqm.service.js");
 dispatcherStubs["../charts/chart.service.js"] = { generateChart };
 dispatcherStubs["../vehicles/vehicleRegistrations.service.js"] = { getVehicleRegistrations };
 dispatcherStubs["../soles/solesUsage.service.js"] = { getSolesUsage };
@@ -885,6 +908,7 @@ for (const errorNum of [942, 1031]) {
 }
 assert.equal(proxyClosed, beforeSpecificDenials + 2);
 for (const [name, arguments_] of [
+  ["get_sales_per_sqm", { customerIds: ["SYNTHETIC-CUSTOMER"], categoryIds: ["SYNTHETIC-CATEGORY"], dateFrom: "01/01/2023", dateTo: "31/01/2023", dayType: "weekday" }],
   ["get_invoices", { mode: "summary", customerIds: ["SYNTHETIC-CUSTOMER"], conceptIds: ["6"], cancelled: false, dateFrom: "01/01/2023", dateTo: "31/01/2023" }],
   ["get_contract_conditions", { customerId: "SYNTHETIC-CUSTOMER", localNumber: "SYNTHETIC-LOCAL" }],
   ["get_contract_cost_per_sqm", { customerId: "SYNTHETIC-CUSTOMER", conceptCode: "6" }],
@@ -912,6 +936,23 @@ for (const [name, arguments_] of [
   }
   assert.equal(proxyClosed, before + 3, "Every successful or denied operation closes its session proxy");
 }
+mode = "sqm-followup"; comparisonStep = 0;
+const sqmInput = { customerIds: ["ORIGINAL-CUSTOMER"], categoryIds: ["ORIGINAL-CATEGORY"], dayType: "weekend", dateFrom: "01/01/2023", dateTo: "31/05/2023", groupBy: ["month"] };
+storedHistory = [
+  { role: "user", content: [{ text: "Ventas por m²" }] },
+  { role: "assistant", content: [{ toolUse: { name: "get_sales_per_sqm", toolUseId: "previous-sqm", input: sqmInput } }] },
+  { role: "user", content: [{ toolResult: { toolUseId: "previous-sqm", status: "success", content: [{ json: { dateFrom: sqmInput.dateFrom, dateTo: sqmInput.dateTo } }] } }] },
+];
+const sqmModels = modelCalls, sqmTools = toolCalls;
+for (const message of ["Ahora cambia el período a 01/02/2023 al 28/02/2023; conserva los demás filtros",
+  'Ahora cambia el local a "Otro local"; conserva los demás filtros', 'Ahora cambia el rubro a "Otro rubro"; conserva los demás filtros']) {
+  const result = await chat.chatService({ sessionId: "test", message });
+  assert.match(result.answer, /Ventas por m²/);
+  assert.match(result.answer, /1\.000/);
+  assert.ok(!result.actions.salesExport);
+}
+assert.equal(modelCalls - sqmModels, 3);
+assert.equal(toolCalls - sqmTools, 3);
 mode = "member-purchase-pages"; comparisonStep = 0; storedHistory = [];
 const purchaseModels = modelCalls, purchaseTools = toolCalls;
 let firstPurchaseHistory;

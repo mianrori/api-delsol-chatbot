@@ -19,6 +19,12 @@ export const getSalesPerSqmTool = {
             type: "string",
             description: "Fecha inicial en formato DD/MM/YYYY.",
           },
+          categoryIds: {
+            type: "array",
+            items: { type: "string" },
+            description: "Rubros previamente resueltos; conservarlos al cambiar período o local salvo cambio explícito.",
+          },
+          dayType: { type: "string", enum: ["weekday", "weekend"], description: "Filtro de días laborales o fines de semana; conservarlo en seguimientos compatibles." },
           dateTo: {
             type: "string",
             description: "Fecha final en formato DD/MM/YYYY.",
@@ -27,7 +33,7 @@ export const getSalesPerSqmTool = {
             type: "array",
             items: {
               type: "string",
-              enum: ["day", "month", "year", "customer"],
+              enum: ["day", "month", "year", "customer", "category"],
             },
             description:
               "Dimensiones para agrupar el resultado. Para consultas globales sin customerIds debe incluir customer.",

@@ -1,5 +1,6 @@
 import { getSalesPerSqmRepository } from "../../repositories/sales/salesPerSqm.repository.js";
 import { getCurrentUsdSellRateFromMaxicambios } from "../exchange/maxicambios.service.js";
+import { throwIfRequestAborted } from "../requestContext.service.js";
 
 const normalizeArray = (value) => {
   if (Array.isArray(value)) return value;
@@ -155,51 +156,26 @@ const completeMonthlySeries = ({
 };
 
 const normalizeCurrencyCode = (currency) => {
-  const values = [
-    currency?.abbreviation,
-    currency?.description,
-  ]
-    .filter(Boolean)
-    .map((value) =>
-      String(value)
-        .trim()
-        .toUpperCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, ""),
-    );
-
-  if (
-    values.some(
-      (value) =>
-        value === "PYG" ||
-        value === "GS" ||
-        value === "GS." ||
-        value.includes("GUARANI"),
-    )
-  ) {
-    return "PYG";
-  }
-
-  if (
-    values.some(
-      (value) =>
-        value === "USD" ||
-        value === "$" ||
-        value.includes("DOLAR"),
-    )
-  ) {
-    return "USD";
-  }
-
-  return null;
+  const identify = (raw) => {
+    const value = String(raw ?? "").trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    if (["PYG", "GS", "GS.", "₲"].includes(value) || value.includes("GUARANI")) return "PYG";
+    if (["USD", "$", "US$"].includes(value) || value.includes("DOLAR")) return "USD";
+    return null;
+  };
+  const abbreviation = identify(currency?.abbreviation), description = identify(currency?.description);
+  if (String(currency?.abbreviation ?? "").trim() && !abbreviation) return null;
+  if (abbreviation && description && abbreviation !== description) return null;
+  return abbreviation ?? description;
 };
 
 const hasSales = (row) =>
+  Number(row?.salesRowCount ?? 0) > 0 ||
   Number(row?.totalSales ?? 0) !== 0 ||
   Number(row?.totalInvoices ?? 0) !== 0;
 
 const rowNeedsUsdConversion = (row) =>
   hasSales(row) &&
+  Number(row.currency?.distinctCurrencyCount ?? 0) <= 1 &&
   normalizeCurrencyCode(row?.currency) === "PYG";
 
 const TEMPORAL_DIMENSION_FIELDS = {
@@ -242,6 +218,8 @@ const buildTemporalAvailabilitySummary = (rows, groupBy) => {
 };
 
 const buildTemporalAnalysisSummary = (rows, groupBy) => {
+  // Never compare native USD with PYG or label an unknown/mixed amount as PYG.
+  if (rows.some((row) => hasSales(row) && row.sourceCurrency !== "PYG")) return null;
   if (groupBy.length !== 1) {
     return null;
   }
@@ -379,6 +357,10 @@ const enrichRow = (row, exchangeRate) => {
     status = "NO_SALES";
   } else if (Number(row.currency?.distinctCurrencyCount ?? 0) > 1) {
     status = "MIXED_CURRENCY";
+  } else if (!currencyCode) {
+    status = "CURRENCY_NOT_SUPPORTED";
+  } else if (Number(row.area?.ambiguousSalesRows ?? 0) > 0) {
+    status = "AREA_AMBIGUOUS";
   } else if (!row.area?.complete || row.sourceSalesPerSqm === null) {
     const hasSomeApplicableArea =
       row.area?.min !== null &&
@@ -388,8 +370,6 @@ const enrichRow = (row, exchangeRate) => {
     status = hasSomeApplicableArea
       ? "AREA_PARTIALLY_AVAILABLE"
       : "AREA_NOT_AVAILABLE";
-  } else if (!currencyCode) {
-    status = "CURRENCY_NOT_SUPPORTED";
   }
 
   const result = {
@@ -455,14 +435,25 @@ const enrichRow = (row, exchangeRate) => {
 export const getSalesPerSqm = async (
   {
     customerIds,
+    categoryIds,
+    dayType,
     dateFrom,
     dateTo,
     groupBy,
   },
   connection,
+  { getUsdSellRate = getCurrentUsdSellRateFromMaxicambios } = {},
 ) => {
+  throwIfRequestAborted();
   const normalizedCustomerIds = normalizeArray(customerIds);
+  const normalizedCategoryIds = normalizeArray(categoryIds);
   const normalizedGroupBy = normalizeArray(groupBy);
+  const start = parseDate(dateFrom), end = parseDate(dateTo);
+  if (!start || !end || start > end) throw new Error("Rango de fechas inválido.");
+  for (const ids of [normalizedCustomerIds, normalizedCategoryIds]) {
+    if (ids.some((id) => !["string", "number"].includes(typeof id) || !String(id).trim() || (typeof id === "number" && !Number.isFinite(id)))) throw new Error("Identificadores inválidos.");
+  }
+  if (normalizedGroupBy.some((key) => !["day", "month", "year", "customer", "category"].includes(key)) || new Set(normalizedGroupBy).size !== normalizedGroupBy.length) throw new Error("Agrupación inválida.");
 
   if (
     normalizedCustomerIds.length === 0 &&
@@ -472,10 +463,13 @@ export const getSalesPerSqm = async (
       "Debe indicarse al menos un cliente o agrupar por cliente.",
     );
   }
+  if (normalizedCustomerIds.length > 1 && !normalizedGroupBy.includes("customer")) throw new Error("Para varios locales debe agruparse por cliente.");
 
   const repositoryResult = await getSalesPerSqmRepository({
     connection,
     customerIds: normalizedCustomerIds,
+    categoryIds: normalizedCategoryIds,
+    dayType,
     dateFrom,
     dateTo,
     groupBy: normalizedGroupBy,
@@ -504,10 +498,13 @@ export const getSalesPerSqm = async (
 
   if (rows.some(rowNeedsUsdConversion)) {
     try {
-      exchangeRate = await getCurrentUsdSellRateFromMaxicambios();
+      exchangeRate = await getUsdSellRate();
+      if (!Number.isFinite(exchangeRate?.sellRate) || exchangeRate.sellRate <= 0) throw new Error("Cotización inválida.");
     } catch (error) {
+      exchangeRate = null;
       exchangeRateError = error;
     }
+    throwIfRequestAborted();
   }
 
   const enrichedRows = rows.map((row) =>

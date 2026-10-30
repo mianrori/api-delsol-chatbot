@@ -1,4 +1,6 @@
 import { buildMemberPurchasesResponse, resolveMemberPurchasesPage } from "./memberPurchasesPresentation.service.js";
+import { preserveSalesPerSqmFollowup } from "./salesPerSqmFollowup.service.js";
+import { buildSalesPerSqmResponse } from "./salesPerSqmPresentation.service.js";
 import { resolveSalesYearComparison, buildSalesYearComparisonResponse } from "./salesYearComparison.service.js";
 import { needsSalesRefresh, SALES_REFRESH_INSTRUCTION } from "./salesHistory.service.js";
 import { buildSalesSampleResponse } from "./salesSamplePresentation.service.js";
@@ -251,6 +253,8 @@ Para ventas por metro cuadrado:
 - resuelve primero el local mediante search_customers si todavía no existe un cliente inequívocamente resuelto; nunca interpretes [PII_BUSINESS_ENTITY_*] ni [PII_CUSTOMER_NAME_*] como customerId;
 - para una serie mensual usa groupBy=["month"]; para una serie anual usa groupBy=["year"]; para detalle diario usa groupBy=["day"];
 - la herramienta determina la superficie contractual aplicable en cada fecha de venta; no sustituyas esa superficie por la del contrato actual;
+- conserva categoryIds, customerIds, dayType y agrupación en seguimientos de ventas por m², modificando solo los filtros solicitados; resuelve rubros con search_categories;
+- si status="AREA_AMBIGUOUS", hay más de un contrato histórico aplicable: presenta las ventas pero indica que la superficie es ambigua y que no se calcula ventas por m²; nunca elijas un contrato por tu cuenta;
 - si la superficie cambia dentro de un período, conserva el cálculo explícito devuelto por la herramienta y puedes indicar que hubo más de una superficie aplicable;
 - para ventas originalmente en Guaraníes, presenta siempre ventas y ventas por m² en ₲ y, si exchange.available=true, también sus equivalentes en USD;
 - la conversión USD usa la cotización de VENTA actual de Maxicambios retornada por la herramienta;
@@ -1357,7 +1361,7 @@ export const buildMonthlyIncidenceResponse = (result) => {
   return lines.join("\n");
 };
 
-const executeToolRequests = async ({ content, sessionId, sourceMessages = [], chartRequested = false }) => {
+const executeToolRequests = async ({ content, sessionId, sourceMessages = [], chartRequested = false, sqmFollowup }) => {
   const toolResults = [];
   let actions = {};
   let internalContext = { presentationCalls: [] };
@@ -1365,7 +1369,12 @@ const executeToolRequests = async ({ content, sessionId, sourceMessages = [], ch
 
   for (const block of toolUses) {
     throwIfRequestAborted();
-    const { toolUseId, name, input = {} } = block.toolUse;
+    const { toolUseId, name } = block.toolUse;
+    let input = block.toolUse.input ?? {};
+    if (name === "get_sales_per_sqm" && sqmFollowup) {
+      input = preserveSalesPerSqmFollowup({ ...sqmFollowup, input }) ?? input;
+      block.toolUse.input = input;
+    }
     const presentationCall = { name, input };
     internalContext.presentationCalls.push(presentationCall);
 
@@ -1458,7 +1467,7 @@ const executeToolRequests = async ({ content, sessionId, sourceMessages = [], ch
       if (isChartSourceTool(name) && protectedResultForModel && typeof protectedResultForModel === "object" && !Array.isArray(protectedResultForModel)) {
         protectedResultForModel.chartSourceId = toolUseId;
       }
-      if (["get_member_purchases", "get_sales", "analyze_members", "compare_member_purchases_vs_sales", "analyze_campaign_sales_performance", "search_promotions", "get_member_soles", "get_soles_usage", "search_soles_usage_destinations", "search_soles_usage_movement_types", "get_vehicle_registrations", "get_member_vehicles"].includes(name)) {
+      if (["get_sales_per_sqm", "get_member_purchases", "get_sales", "analyze_members", "compare_member_purchases_vs_sales", "analyze_campaign_sales_performance", "search_promotions", "get_member_soles", "get_soles_usage", "search_soles_usage_destinations", "search_soles_usage_movement_types", "get_vehicle_registrations", "get_member_vehicles"].includes(name)) {
         presentationCall.result = protectedResultForModel;
       }
 
@@ -1789,6 +1798,7 @@ export const chatService = async ({ message, sessionId }) => {
         sessionId,
         sourceMessages: messages,
         chartRequested,
+        sqmFollowup: { message, history: protectedHistory },
       });
 
       conversationActions = mergeActions(
@@ -1810,7 +1820,8 @@ export const chatService = async ({ message, sessionId }) => {
 
       // A complete breakdown is authoritative even when the model requested
       // it after changing dates or filters. Do not ask the model to rewrite it.
-      followupAnswer = buildSalesYearComparisonResponse(conversationInternalContext.presentationCalls)
+      followupAnswer = buildSalesPerSqmResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) })
+        ?? buildSalesYearComparisonResponse(conversationInternalContext.presentationCalls)
         ?? buildSalesSampleResponse(conversationInternalContext.presentationCalls, { exportAvailable: Boolean(conversationActions.salesExport?.available) })
         ?? buildSalesSeriesResponse(conversationInternalContext.presentationCalls, { message })
         ?? buildVehicleResponse(conversationInternalContext.presentationCalls)
@@ -1872,6 +1883,7 @@ export const chatService = async ({ message, sessionId }) => {
       : conversationActions.chart?.available
       ? "Aquí tienes el gráfico solicitado."
       : monthlyIncidenceText ??
+      buildSalesPerSqmResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) }) ??
       buildSalesYearComparisonResponse(conversationInternalContext.presentationCalls) ??
       buildSalesSampleResponse(conversationInternalContext.presentationCalls, { exportAvailable: Boolean(conversationActions.salesExport?.available) }) ??
       buildSalesSeriesResponse(conversationInternalContext.presentationCalls, { message }) ??
