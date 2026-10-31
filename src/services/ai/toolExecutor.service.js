@@ -1,0 +1,193 @@
+import { isAccessDenied, accessDeniedError } from "./toolErrors.service.js";
+import { generateChart } from "../charts/chart.service.js";
+import { getVehicleRegistrations } from "../vehicles/vehicleRegistrations.service.js";
+import { getSolesUsage } from "../soles/solesUsage.service.js";
+import { searchSolesUsageDestinations } from "../soles/solesUsageDestination.resolver.js";
+import { searchSolesUsageMovementTypes } from "../soles/solesUsageMovementType.resolver.js";
+import { searchSolesTypes } from "../soles/searchSolesTypes.service.js";
+import { getMemberSoles } from "../soles/memberSoles.service.js";
+import { getCampaignSalesPerformance } from "../sales/campaignSalesPerformance.service.js";
+import { compareMemberPurchasesVsSales } from "../members/memberPurchasesVsSales.service.js";
+import { resolveCustomer } from "../customers/customer.resolver.js";
+import { resolveCategory } from "../categories/category.resolver.js";
+import { getSales } from "../sales/sales.service.js";
+import { getSalesPerSqm } from "../sales/salesPerSqm.service.js";
+import { searchInvoiceConcepts } from "../invoices/searchInvoiceConcepts.service.js";
+import { searchInvoiceCustomers } from "../invoices/searchInvoiceCustomers.service.js";
+import { getInvoices } from "../invoices/invoices.service.js";
+import { getContractConditions } from "../contracts/contractConditions.service.js";
+import { getContractCostPerSqm } from "../contracts/contractCostPerSqm.service.js";
+import { analyzeContractCostIncidence } from "../contracts/contractCostIncidence.service.js";
+import { resolveMember } from "../members/member.resolver.js";
+import { getMember, getMemberPurchases } from "../members/member.service.js";
+import { resolvePromotion } from "../promotions/promotion.resolver.js";
+import { getMemberPromoPurchases } from "../members/memberPromoPurchase.service.js";
+import { getMemberVehicles } from "../members/memberVehicle.service.js";
+import { analyzeMembers } from "../members/memberAnalysis.service.js";
+import { withOracleProxySession } from "../sessions/oracleSession.service.js";
+
+const withAuthorizedOracle = async (sessionId, callback) => {
+  return withOracleProxySession(
+    sessionId,
+    async ({ connection, username }) => {
+      try {
+        return await callback({ connection, username });
+      } catch (error) {
+        if (isAccessDenied(error)) throw accessDeniedError(error);
+
+        throw error;
+      }
+    },
+  );
+};
+
+const toolHandlers = {
+  generate_chart: async (args, context) => generateChart(args, { sources: context.chartSources, restoreText: context.restoreChartText }),
+  get_vehicle_registrations: async (args, context) => withAuthorizedOracle(context.sessionId, ({ connection }) => getVehicleRegistrations(args, connection)),
+  get_soles_usage: async (args, context) => withAuthorizedOracle(context.sessionId, ({ connection }) => getSolesUsage(args, connection)),
+  search_soles_usage_destinations: async (args, context) => withAuthorizedOracle(context.sessionId, ({ connection }) => searchSolesUsageDestinations(args, connection)),
+  search_soles_usage_movement_types: async (args, context) => withAuthorizedOracle(context.sessionId, ({ connection }) => searchSolesUsageMovementTypes(args, connection)),
+
+  search_soles_types: async (args, context) => withAuthorizedOracle(context.sessionId,
+    ({ connection }) => searchSolesTypes(args, connection)),
+  get_member_soles: async (args, context) => withAuthorizedOracle(context.sessionId,
+    ({ connection }) => getMemberSoles(args, connection)),
+  analyze_campaign_sales_performance: async (args, context) => withAuthorizedOracle(
+    context.sessionId,
+    ({ connection }) => getCampaignSalesPerformance(args, connection),
+  ),
+  compare_member_purchases_vs_sales: async (args, context) => withAuthorizedOracle(
+    context.sessionId,
+    ({ connection }) => compareMemberPurchasesVsSales(args, connection),
+  ),
+  search_customers: async (args, context) => {
+    return withAuthorizedOracle(
+      context.sessionId,
+      ({ connection }) => resolveCustomer(args.search, connection),
+    );
+  },
+
+  search_categories: async (args, context) => {
+    return withAuthorizedOracle(
+      context.sessionId,
+      ({ connection }) => resolveCategory(args.search, connection),
+    );
+  },
+
+  get_sales: async (args, context) => {
+    return withAuthorizedOracle(
+      context.sessionId,
+      ({ connection, username }) =>
+        getSales(args, connection, username),
+    );
+  },
+
+  get_sales_per_sqm: async (args, context) => {
+    return withAuthorizedOracle(
+      context.sessionId,
+      ({ connection }) => getSalesPerSqm(args, connection),
+    );
+  },
+
+  search_invoice_concepts: async (args, context) => {
+    return withAuthorizedOracle(
+      context.sessionId,
+      ({ connection }) => searchInvoiceConcepts(args, connection),
+    );
+  },
+
+  search_invoice_customers: async (args, context) => {
+    return withAuthorizedOracle(
+      context.sessionId,
+      ({ connection }) => searchInvoiceCustomers(args, connection),
+    );
+  },
+
+  get_invoices: async (args, context) => {
+    return withAuthorizedOracle(
+      context.sessionId,
+      ({ connection }) => getInvoices(args, connection),
+    );
+  },
+
+  get_contract_conditions: async (args, context) => {
+    return withAuthorizedOracle(
+      context.sessionId,
+      ({ connection }) => getContractConditions(args, connection),
+    );
+  },
+
+  get_contract_cost_per_sqm: async (args, context) => {
+    return withAuthorizedOracle(
+      context.sessionId,
+      ({ connection }) => getContractCostPerSqm(args, connection),
+    );
+  },
+
+  analyze_contract_cost_incidence: async (args, context) => {
+    return withAuthorizedOracle(
+      context.sessionId,
+      ({ connection }) => analyzeContractCostIncidence(args, connection),
+    );
+  },
+
+  search_members: async (args, context) => {
+    return withAuthorizedOracle(
+      context.sessionId,
+      ({ connection }) => resolveMember(args.search, connection),
+    );
+  },
+
+  get_member: async (args, context) => {
+    return withAuthorizedOracle(
+      context.sessionId,
+      ({ connection }) => getMember(args, connection),
+    );
+  },
+
+  get_member_purchases: async (args, context) => {
+    return withAuthorizedOracle(
+      context.sessionId,
+      ({ connection }) => getMemberPurchases(args, connection),
+    );
+  },
+
+  search_promotions: async (args, context) => {
+    return withAuthorizedOracle(
+      context.sessionId,
+      ({ connection }) => resolvePromotion(args.search, connection, { page: args.page, rows: args.rows }),
+    );
+  },
+
+  get_member_promo_purchases: async (args, context) => {
+    return withAuthorizedOracle(
+      context.sessionId,
+      ({ connection }) => getMemberPromoPurchases(args, connection),
+    );
+  },
+
+  get_member_vehicles: async (args, context) => {
+    return withAuthorizedOracle(
+      context.sessionId,
+      ({ connection }) => getMemberVehicles(args, connection),
+    );
+  },
+
+  analyze_members: async (args, context) => {
+    return withAuthorizedOracle(
+      context.sessionId,
+      ({ connection, username }) =>
+        analyzeMembers(args, connection, username),
+    );
+  },
+};
+
+export const executeTool = async ({ name, arguments: args, context }) => {
+  const handler = toolHandlers[name];
+
+  if (!handler) {
+    throw new Error(`Tool no implementada: ${name}`);
+  }
+
+  return handler(args, context);
+};
