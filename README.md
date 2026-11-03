@@ -2,9 +2,15 @@
 
 Servicio independiente para el chatbot del ERP delSol.
 
-## Primera etapa
+## Estado del backend
 
-Esta versión inicial valida la independencia de infraestructura:
+El backend está migrado y desplegado en Docker DEV sobre `6b1303e` (PR #35).
+El [inventario y matriz de evidencia](docs/backend-functional-matrix.md) compara
+las 25 herramientas originales del ERP con las 26 actuales, detalla commits
+validados y separa variantes sin verificar de muestras DEV faltantes. Es la
+referencia de alcance; los ejemplos siguientes no constituyen evidencia de prueba.
+
+El flujo de identidad conserva la independencia de infraestructura:
 
 1. recibe un `sessionId` existente;
 2. consulta `delsol_oracle_sessions_dev`;
@@ -15,14 +21,19 @@ Esta versión inicial valida la independencia de infraestructura:
 
 El servicio no crea ni cierra sesiones ERP. PostgreSQL es la fuente compartida de metadata de sesión.
 
-## Endpoints iniciales
+## Endpoints
 
 - `GET /chatbot/api/health`
 - `GET /chatbot/api/health/oracle/:sessionId` solo en development.
+- `POST /chatbot/api/bot/chat`
+- `POST /chatbot/api/bot/chat/reset`
 
-## Siguiente etapa
+## Alcance restante
 
-Migrar el módulo de IA del ERP por capas: catálogo, repositories, services, tools, Bedrock y PII.
+No faltan herramientas del registro original por migrar. Quedan verificaciones
+dirigidas de variantes y trazabilidad indicadas en la matriz. La integración
+frontend/ERP queda fuera de este cierre del backend. No se modifican datos ni
+expiraciones para obtener muestras.
 
 
 ## Conversaciones del chatbot
@@ -89,9 +100,9 @@ de enero de 2023?». Después: «Ahora desglosa ese porcentaje por rubro» y «A
 por local». Se muestran los valores calculados sin pedir al modelo que reescriba
 la tabla. Los resultados deben validarse contra Oracle DEV.
 
-Inventario de herramientas aún pendientes frente al registro de `api-delsol-erp/main`
-revisado el 28/10/2026: sin herramientas pendientes de registrar. La presencia de herramientas
-migradas no equivale a haber validado todos sus casos en DEV.
+Inventario comparado nuevamente con `api-delsol-erp/main` el 03/11/2026:
+25 herramientas originales presentes y `get_sales_per_sqm` adicional. La presencia
+de herramientas migradas no equivale a haber validado todos sus casos en DEV.
 
 
 ## Ventas antes, durante y después de una campaña
@@ -184,7 +195,8 @@ Prueba en Insomnia tras reset, reemplazando el documento por uno existente en DE
 5. «Consulta sus soles vencidos al 31/05/2023 de todo el histórico».
 
 Contrastar saldos, tipos y vencimientos con Oracle bajo el mismo usuario. Este
-bloque no incluye todavía movimientos ni destinos de uso de soles.
+bloque de saldo no reconstruye movimientos; estos y sus destinos se consultan
+mediante `get_soles_usage` y sus buscadores, descritos abajo.
 
 
 ### Consultas habituales de saldo de soles
@@ -245,8 +257,10 @@ Prueba DEV en Insomnia tras reset, con un documento existente:
 
 Validar también un destino o movimiento existente: primero resolver su nombre y
 luego filtrar la consulta con los valores retornados. Contrastar cantidades,
-fechas y paginación con Oracle usando el mismo usuario. No se han ejecutado
-consultas reales durante la implementación; el contraste DEV queda pendiente.
+fechas y paginación con Oracle usando el mismo usuario. Ya existe evidencia HTTP
+de seis pasos aprobados, incluidos usos y varias páginas, en el reporte local
+de soles. Ese reporte no incorpora SHA: queda pendiente su trazabilidad y el
+contraste SQL independiente de las variantes indicadas en la matriz.
 
 
 ## Registros de vehículos y segmentación de socios
@@ -292,7 +306,9 @@ Pruebas DEV sugeridas con datos disponibles:
 
 Las pruebas automatizadas cubren calendario, filtros, conteos, datos demográficos
 faltantes, paginación, protección de datos, cancelación y cierre del proxy ante éxito
-y error. La validación contra Oracle DEV y las respuestas de Bedrock queda pendiente.
+y error. La regresión HTTP sobre `b315ff9` ya aprobó total y desglose por género.
+Faltan el contraste SQL independiente y las variantes de chapa, edad y filtros
+detalladas en la matriz; no se considera todo el bloque sin validar.
 
 
 ## Gráficos de resultados
@@ -339,7 +355,9 @@ Pruebas DEV sugeridas:
 
 En cada caso exitoso se espera `actions.chart.available=true`, una `url` con prefijo
 `data:image/svg+xml;base64,` y una respuesta breve, sin enlaces técnicos ni Markdown
-de imagen. La validación con Bedrock/Oracle DEV y el frontend está pendiente.
+de imagen. La regresión HTTP sobre `b315ff9` ya aprobó barras y líneas de ventas.
+Quedan variantes horizontal/circular/multiserie según la matriz; la revisión
+frontend está fuera de este alcance.
 
 
 ## Interpretación de series temporales de ventas
@@ -371,7 +389,11 @@ La conexión proxy mantiene su cierre habitual incluso ante error.
 
 Este ajuste conserva el contrato HTTP del chat y no modifica autenticación,
 permisos Oracle ni la política de expiración/inactividad de sesiones del ERP.
-Validar en DEV repitiendo una consulta con un usuario sin permiso sobre la vista.
+La denegación real sin datos con usuarios Oracle distintos ya fue validada en
+`b315ff9`, ventas por m², incidencia y compras promocionales. Los fallos de cierre
+registran únicamente correlación aleatoria y códigos seguros; tienen cobertura
+controlada y simulaciones posteriores al cierre real. No repetir controles
+aprobados salvo cambios de código o nuevos fallos.
 
 
 ## Comparación mensual entre años

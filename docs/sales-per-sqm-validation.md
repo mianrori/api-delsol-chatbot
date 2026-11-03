@@ -1,5 +1,13 @@
 # Ventas por m²: validación DEV
 
+Estado al 03/11/2026: PR #33 fusionada; código revisado `e317a8f`, despliegue
+`68847db` comprobado con una consulta real (15/15 controles). Está incluido en
+la base actual `6b1303e`. Se conservan las muestras DEV pendientes de superficie
+cero y cambiante; la implementación y sus límites ya tienen cobertura controlada.
+La [matriz backend](backend-functional-matrix.md) reúne evidencia y alcance.
+Las referencias a procesos candidatos/restauración de módulos abajo describen
+la validación previa al merge, no el estado del servicio desplegado actual.
+
 Base: `13e69ef`, después del merge de la PR #32. Alcance exclusivo: ventas por m².
 No se modifican incidencia contractual, compras por promoción ni expiraciones.
 

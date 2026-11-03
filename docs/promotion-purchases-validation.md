@@ -1,5 +1,16 @@
 # Compras por promoción y campaña: validación DEV
 
+Estado al 03/11/2026: PR #35 fusionada y desplegada en `6b1303e`. Validación
+final de la candidata: 138/138 sobre `89a4e59`; `3344728` solo documentó resultados.
+La consulta real desplegada aprobó 13/13 controles: conciliación independiente
+de importes/cantidades por moneda, socio/período y cierre, sin errores en logs.
+Salud HTTP 200, PM2 sin reinicios y 141 archivos desplegados coincidentes.
+Se conserva `MIXED_CURRENCY_REAL_MEMBER_FIXTURE_NOT_FOUND`; los grupos ambiguos
+y mixtos ya tienen cobertura controlada. La
+[matriz backend](backend-functional-matrix.md) distingue ambas cosas.
+Las etapas y pendientes de repetición siguientes se conservan como historial;
+su estado final es el indicado aquí, no una PR aún en borrador.
+
 Base: `8e80887` (PR #34 desplegada). Rama: `test/promotion-purchases-dev`.
 Alcance: búsqueda/selección de promoción y campaña, compras del socio asociadas,
 filtros, monedas, desgloses y paginación. No se modifican datos de DEV ni expiraciones.
@@ -154,14 +165,14 @@ pueden cambiar un recorrido posterior; el control detecta diferencias al concili
   de actividad, códigos malformados, ausencia de datos privados en el registro,
   monedas ambiguas, grupos separados y presentación del motivo.
 - Los 111 controles anteriores corresponden a `5d8161e`, no a esta corrección.
-  La repetición afectada DEV queda pendiente de entradas ocultas vigentes.
+  La repetición afectada DEV se completó después sobre `89a4e59` (138/138).
   `scripts/check-promotion-hardening-dev.mjs` añade SELECT de filas sintéticas
   mediante CTE en Oracle para grupos/monedas y paginación, sin crear datos.
   Simula dos errores de cierre únicamente después de cerrar conexiones reales,
   para comprobar registro seguro y conservación del resultado/error principal.
   Esta simulación no equivale a observar un fallo real del driver en DEV.
-- Se conserva la muestra real DEV pendiente con varias monedas. La PR permanece
-  en borrador hasta revisar la corrección y completar la evidencia nueva.
+- Se conserva la muestra real DEV pendiente con varias monedas. En aquella etapa
+  la PR permaneció en borrador; la revisión, repetición y merge ya se completaron.
 
 Ejecución DEV de `37226cc`: 56/56 comprobaciones ejecutadas aprobaron, incluido
 el recorrido real de siete páginas, su multiconjunto completo, resumen/desgloses,
@@ -175,8 +186,8 @@ El adaptador ahora usa opciones `{}` por defecto y conserva binds, opciones
 explícitas y el resultado/error original del driver. Una nueva prueba enfocada
 aprueba en Node 22 aislado (1/1); no se cambió código de producción desde
 `37226cc`, cuyas 23/23 pruebas enfocadas siguen siendo la evidencia de ese código.
-El preflight de la candidata corregida aprueba. Se requiere repetir los controles
-DEV con entradas ocultas para completar la evidencia.
+El preflight de la candidata corregida aprobó. La repetición posterior con entradas
+ocultas completó la evidencia, como se detalla en el resultado final.
 
 ### Resultado final de las correcciones
 
@@ -203,5 +214,6 @@ DEV con entradas ocultas para completar la evidencia.
   prueba 1/1 del adaptador, ambas en Node 22 aislado. No se repitió la suite completa.
 - **Pendiente:** muestra real de un socio con varias monedas. Las CTE son
   cobertura controlada y no sustituyen esa muestra. Sin datos DEV alterados,
-  expiraciones modificadas, despliegue ni merge. La PR sigue en borrador para
-  revisar las correcciones. Los helpers y reportes de `logs/` permanecen ignorados.
+  expiraciones modificadas durante las pruebas. Posteriormente la corrección se
+  revisó, fusionó y desplegó según el estado actual al inicio. Los helpers y
+  reportes de `logs/` permanecen ignorados.
