@@ -108,7 +108,26 @@ la base durante la medición inicial y conserva únicamente códigos de diagnós
   con el protector/restaurador real verifica este recorrido.
 - Los IDs nulos de promoción/campaña en desgloses amplios se conservan nulos,
   sin convertirlos en cero o en el texto `null`.
-- El nuevo contraste final DEV y sus limitaciones se consignarán al revisar el reporte.
+- **111/111 controles finales aprobados sobre `5d8161e`** contra Oracle DEV y
+  mediante HTTP. El recorrido de siete páginas se concilió como multiconjunto
+  completo con las filas independientes, y sus importes/cantidades con el resumen
+  y los desgloses. Se comprobaron filtros por día, local, rubro y origen, catálogo
+  paginado, selección explícita y distinción entre selección inexistente y ausencia
+  de compras. El conteo externo falso ya no altera la paginación.
+- Los seguimientos HTTP de página, resumen, período y mes y la elección explícita
+  conservaron el documento, los valores de promoción/campaña y los demás filtros.
+  La comparación numérica limitada a IDs de campaña resolvió la discrepancia de
+  representación PII sin relajar la igualdad del documento ni los permisos.
+- Se verificaron usuarios Oracle realmente distintos, denegación sin datos y
+  cierre de conexiones de control y denegación. `ORA-00942` fue el rechazo
+  esperado. Los ocho archivos candidatos comparados coinciden con la copia
+  ejecutada; los logs compactos del servicio no muestran errores de cierre,
+  controlador o carga de módulos.
+- **Pendiente real DEV:** no hay muestra de este socio con varias monedas. La
+  separación y los casos desconocidos/contradictorios pasan con datos controlados;
+  no se fabricaron registros. El cambio de socio se contrastó con un documento de
+  control comprobado sin compras; no se afirma cobertura positiva de un segundo
+  socio real con compras.
 
 No se fabrican compras o socios para obtener muestras. Los controles validan las
 vistas permitidas, no sus tablas ERP subyacentes. La búsqueda aproximada se cubre
