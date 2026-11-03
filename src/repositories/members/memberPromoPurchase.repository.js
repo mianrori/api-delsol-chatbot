@@ -1,651 +1,94 @@
 import { executeOracleQuery } from "../../database/oracle-query.database.js";
+import config from "../../../config.js";
 
-/*
-|--------------------------------------------------------------------------
-| Origen bancario
-|--------------------------------------------------------------------------
-|
-| Ajustar estos valores solamente si VW_BOT_FACTURAS_PROMO utiliza
-| códigos distintos a S/N.
-|--------------------------------------------------------------------------
-*/
-
-const BANK_ORIGIN_VALUES = {
-  bank: "S",
-  nonBank: "N",
+export const promoDimensions = {
+  month: ["TO_CHAR(FECHA_COMPRA, 'YYYY-MM')", "MONTH", (r) => ({ month: r.MONTH })],
+  year: ["TO_CHAR(FECHA_COMPRA, 'YYYY')", "YEAR", (r) => ({ year: r.YEAR })],
+  promotion: ["COD_PROMOCION, PROMOCION", null, (r) => ({ promotionId: r.COD_PROMOCION == null ? null : String(r.COD_PROMOCION), promotionName: r.PROMOCION })],
+  campaign: ["COD_CAMPANIA, CAMPANIA", null, (r) => ({ campaignId: r.COD_CAMPANIA == null ? null : Number(r.COD_CAMPANIA), campaignName: r.CAMPANIA })],
+  customer: ["COD_CLIENTE, LOCAL", null, (r) => ({ customerId: r.COD_CLIENTE == null ? null : String(r.COD_CLIENTE), customerName: r.LOCAL })],
+  category: ["COD_RUBRO, RUBRO", null, (r) => ({ categoryId: r.COD_RUBRO == null ? null : String(r.COD_RUBRO), categoryName: r.RUBRO })],
+  bankOrigin: ["NVL(ORIGEN_BANCARIO, 'N')", "BANK_ORIGIN", (r) => originFields(r.BANK_ORIGIN)],
 };
-
-/*
-|--------------------------------------------------------------------------
-| Métricas
-|--------------------------------------------------------------------------
-*/
-
-const METRIC_CONFIG = {
-  totalAmount: {
-    select: `
-      NVL(
-        SUM(MONTO),
-        0
-      ) AS TOTAL_AMOUNT
-    `,
-
-    map: (row) => ({
-      totalAmount: Number(row.TOTAL_AMOUNT ?? 0),
-    }),
-  },
-
-  purchaseCount: {
-    select: `
-      COUNT(*) AS PURCHASE_COUNT
-    `,
-
-    map: (row) => ({
-      purchaseCount: Number(row.PURCHASE_COUNT ?? 0),
-    }),
-  },
+export const promoPageLimit = () => Math.min(100, Number.isSafeInteger(Number(config.limitFilter)) && Number(config.limitFilter) > 0 ? Number(config.limitFilter) : 100);
+const originFields = (v) => v === "S" ? { bankOrigin: true, origin: "Banco Atlas" }
+  : v === "N" || v == null ? { bankOrigin: false, origin: "No bancario" } : { bankOrigin: null, origin: "Origen no identificado" };
+const identifyCurrency = (v) => {
+  const s = String(v ?? "").trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ");
+  if (["PYG", "GS", "GS.", "₲", "GUARANI", "GUARANIES", "GUARANI PARAGUAYO", "GUARANIES PARAGUAYOS"].includes(s)) return "PYG";
+  if (["USD", "US$", "U$S", "DOLAR", "DOLARES", "DOLAR AMERICANO", "DOLARES AMERICANOS", "DOLAR ESTADOUNIDENSE", "DOLARES ESTADOUNIDENSES", "US DOLLAR", "US DOLLARS", "UNITED STATES DOLLAR", "UNITED STATES DOLLARS"].includes(s)) return "USD";
+  return null;
 };
-
-/*
-|--------------------------------------------------------------------------
-| Agrupaciones
-|--------------------------------------------------------------------------
-*/
-
-const GROUP_BY_CONFIG = {
-  month: {
-    select: `
-      TO_CHAR(
-        FECHA_COMPRA,
-        'YYYY-MM'
-      ) AS MONTH
-    `,
-
-    groupBy: `
-      TO_CHAR(
-        FECHA_COMPRA,
-        'YYYY-MM'
-      )
-    `,
-
-    orderBy: `
-      TO_CHAR(
-        FECHA_COMPRA,
-        'YYYY-MM'
-      )
-    `,
-
-    map: (row) => ({
-      month: row.MONTH,
-    }),
-  },
-
-  year: {
-    select: `
-      TO_CHAR(
-        FECHA_COMPRA,
-        'YYYY'
-      ) AS YEAR
-    `,
-
-    groupBy: `
-      TO_CHAR(
-        FECHA_COMPRA,
-        'YYYY'
-      )
-    `,
-
-    orderBy: `
-      TO_CHAR(
-        FECHA_COMPRA,
-        'YYYY'
-      )
-    `,
-
-    map: (row) => ({
-      year: row.YEAR,
-    }),
-  },
-
-  promotion: {
-    select: `
-      COD_PROMOCION AS PROMOTION_ID,
-      PROMOCION AS PROMOTION_NAME
-    `,
-
-    groupBy: `
-      COD_PROMOCION,
-      PROMOCION
-    `,
-
-    orderBy: `
-      PROMOCION
-    `,
-
-    map: (row) => ({
-      promotionId: row.PROMOTION_ID != null ? String(row.PROMOTION_ID) : null,
-
-      promotionName: row.PROMOTION_NAME,
-    }),
-  },
-
-  campaign: {
-    select: `
-      COD_CAMPANIA AS CAMPAIGN_ID,
-      CAMPANIA AS CAMPAIGN_NAME
-    `,
-
-    groupBy: `
-      COD_CAMPANIA,
-      CAMPANIA
-    `,
-
-    orderBy: `
-      CAMPANIA
-    `,
-
-    map: (row) => ({
-      campaignId: row.CAMPAIGN_ID != null ? Number(row.CAMPAIGN_ID) : null,
-
-      campaignName: row.CAMPAIGN_NAME,
-    }),
-  },
-
-  customer: {
-    select: `
-      COD_CLIENTE AS CUSTOMER_ID,
-      LOCAL AS CUSTOMER_NAME
-    `,
-
-    groupBy: `
-      COD_CLIENTE,
-      LOCAL
-    `,
-
-    orderBy: `
-      LOCAL
-    `,
-
-    map: (row) => ({
-      customerId: row.CUSTOMER_ID != null ? String(row.CUSTOMER_ID) : null,
-
-      customerName: row.CUSTOMER_NAME,
-    }),
-  },
-
-  category: {
-    select: `
-      COD_RUBRO AS CATEGORY_ID,
-      RUBRO AS CATEGORY_NAME
-    `,
-
-    groupBy: `
-      COD_RUBRO,
-      RUBRO
-    `,
-
-    orderBy: `
-      RUBRO
-    `,
-
-    map: (row) => ({
-      categoryId: row.CATEGORY_ID != null ? String(row.CATEGORY_ID) : null,
-
-      categoryName: row.CATEGORY_NAME,
-    }),
-  },
-
-  bankOrigin: {
-    select: `
-      ORIGEN_BANCARIO AS BANK_ORIGIN
-    `,
-
-    groupBy: `
-      ORIGEN_BANCARIO
-    `,
-
-    orderBy: `
-      ORIGEN_BANCARIO
-    `,
-
-    map: (row) => ({
-      bankOrigin: row.BANK_ORIGIN === BANK_ORIGIN_VALUES.bank,
-
-      origin:
-        row.BANK_ORIGIN === BANK_ORIGIN_VALUES.bank
-          ? "Banco Atlas"
-          : "No bancario",
-    }),
-  },
+const currencyFields = (r) => {
+  const a = identifyCurrency(r.CURRENCY_SYMBOL), b = identifyCurrency(r.CURRENCY_DESCRIPTION);
+  const unknown = (value, known) => Boolean(String(value ?? "").trim()) && String(value).trim() !== "$" && !known;
+  const code = unknown(r.CURRENCY_SYMBOL, a) || unknown(r.CURRENCY_DESCRIPTION, b) || a && b && a !== b ? null : a ?? b;
+  return { code, description: r.CURRENCY_DESCRIPTION ?? null, symbol: r.CURRENCY_SYMBOL ?? null };
 };
-
-const createInFilter = ({
-  column,
-  values,
-  bindPrefix,
-  binds,
-  mapper = (value) => String(value),
-}) => {
-  if (!Array.isArray(values) || values.length === 0) {
-    return null;
-  }
-
-  const placeholders = values.map((value, index) => {
-    const bindName = `${bindPrefix}${index}`;
-
-    binds[bindName] = mapper(value);
-
-    return `:${bindName}`;
-  });
-
-  return `
-    ${column} IN (
-      ${placeholders.join(", ")}
-    )
-  `;
+const addIn = (filters, binds, column, values, prefix) => {
+  if (!values.length) return;
+  const names = values.map((v, i) => { binds[prefix + i] = v; return ":" + prefix + i; });
+  filters.push(`${column} IN (${names.join(", ")})`);
 };
-
-export const getMemberPromoPurchasesRepository = async ({
-  connection,
-
-  documentNumber,
-
-  promotionIds = [],
-
-  campaignIds = [],
-
-  customerIds = [],
-
-  categoryIds = [],
-
-  dateFrom,
-
-  dateTo,
-
-  origin,
-
-  mode = "summary",
-
-  groupBy = [],
-
-  metrics = ["totalAmount", "purchaseCount"],
-
-  page = 1,
-
-  rows = 20,
-
-  knownTotalRows,
-}) => {
-  if (!documentNumber) {
-    throw new Error("documentNumber es obligatorio.");
-  }
-
-  if ((dateFrom && !dateTo) || (!dateFrom && dateTo)) {
-    throw new Error("dateFrom y dateTo deben especificarse juntos.");
-  }
-
-  if (!["summary", "detail"].includes(mode)) {
-    throw new Error(`Modo no soportado: ${mode}`);
-  }
-
-  const invalidGroups = groupBy.filter((item) => !GROUP_BY_CONFIG[item]);
-
-  if (invalidGroups.length > 0) {
-    throw new Error(`Agrupaciones no soportadas: ${invalidGroups.join(", ")}`);
-  }
-
-  const invalidMetrics = metrics.filter((item) => !METRIC_CONFIG[item]);
-
-  if (invalidMetrics.length > 0) {
-    throw new Error(`Métricas no soportadas: ${invalidMetrics.join(", ")}`);
-  }
-
-  if (mode === "summary" && metrics.length === 0) {
-    throw new Error("Debe especificarse al menos una métrica.");
-  }
-
-  if (origin && !BANK_ORIGIN_VALUES[origin]) {
-    throw new Error(`Origen no soportado: ${origin}`);
-  }
-
-  const binds = {
-    documentNumber: String(documentNumber),
-  };
-
-  const filters = [
-    `
-        COD_SOCIO =
-        :documentNumber
-      `,
-  ];
-
+export const getMemberPromoPurchasesRepository = async ({ connection, documentNumber, promotionIds = [], campaignIds = [], customerIds = [], categoryIds = [],
+  dateFrom, dateTo, origin, mode = "summary", groupBy = [], metrics = ["totalAmount", "purchaseCount"], page = 1, rows = 20 }) => {
+  if (!connection || !documentNumber) throw Error("Conexión y documento obligatorios.");
+  if (!groupBy.every((g) => Object.hasOwn(promoDimensions, g)) || !metrics.every((m) => ["totalAmount", "purchaseCount"].includes(m))) throw Error("Agrupación o métrica inválida.");
+  const binds = { documentNumber: String(documentNumber) }, filters = ["COD_SOCIO = :documentNumber"];
   if (dateFrom && dateTo) {
-    binds.dateFrom = dateFrom;
-
-    binds.dateTo = dateTo;
-
-    filters.push(`
-        FECHA_COMPRA >=
-        TO_DATE(
-          :dateFrom,
-          'DD/MM/YYYY'
-        )
-      `);
-
-    filters.push(`
-        FECHA_COMPRA <
-        TO_DATE(
-          :dateTo,
-          'DD/MM/YYYY'
-        ) + 1
-      `);
+    binds.dateFrom = dateFrom; binds.dateTo = dateTo;
+    filters.push("FECHA_COMPRA >= TO_DATE(:dateFrom, 'DD/MM/YYYY')", "FECHA_COMPRA < TO_DATE(:dateTo, 'DD/MM/YYYY') + 1");
   }
-
-  const promotionFilter = createInFilter({
-    column: "COD_PROMOCION",
-
-    values: promotionIds,
-
-    bindPrefix: "promotionId",
-
-    binds,
-  });
-
-  if (promotionFilter) {
-    filters.push(promotionFilter);
-  }
-
-  const campaignFilter = createInFilter({
-    column: "COD_CAMPANIA",
-
-    values: campaignIds,
-
-    bindPrefix: "campaignId",
-
-    binds,
-
-    mapper: (value) => Number(value),
-  });
-
-  if (campaignFilter) {
-    filters.push(campaignFilter);
-  }
-
-  const customerFilter = createInFilter({
-    column: "COD_CLIENTE",
-
-    values: customerIds,
-
-    bindPrefix: "customerId",
-
-    binds,
-  });
-
-  if (customerFilter) {
-    filters.push(customerFilter);
-  }
-
-  const categoryFilter = createInFilter({
-    column: "COD_RUBRO",
-
-    values: categoryIds,
-
-    bindPrefix: "categoryId",
-
-    binds,
-  });
-
-  if (categoryFilter) {
-    filters.push(categoryFilter);
-  }
-
-  if (origin) {
-    binds.bankOrigin = BANK_ORIGIN_VALUES[origin];
-
-    filters.push(`
-        NVL(
-          ORIGEN_BANCARIO,
-          '${BANK_ORIGIN_VALUES.nonBank}'
-        ) = :bankOrigin
-      `);
-  }
-
+  for (const [column, values, prefix] of [["COD_PROMOCION", promotionIds, "promotionId"], ["COD_CAMPANIA", campaignIds, "campaignId"], ["COD_CLIENTE", customerIds, "customerId"], ["COD_RUBRO", categoryIds, "categoryId"]]) addIn(filters, binds, column, values, prefix);
+  if (origin) { binds.bankOrigin = origin === "bank" ? "S" : "N"; filters.push("NVL(ORIGEN_BANCARIO, 'N') = :bankOrigin"); }
+  const where = filters.join(" AND ");
   if (mode === "detail") {
-    const safePage = Math.max(Number(page) || 1, 1);
-    const safeRows = Math.min(Math.max(Number(rows) || 20, 1), 100);
-    const offset = (safePage - 1) * safeRows;
-
-    let totalRows;
-
-    if (
-      knownTotalRows !== undefined &&
-      knownTotalRows !== null &&
-      Number.isFinite(Number(knownTotalRows)) &&
-      Number(knownTotalRows) >= 0
-    ) {
-      totalRows = Number(knownTotalRows);
-      console.log(
-        `[CHATBOT-DEV] MEMBER PROMO PURCHASES COUNT: reused totalRows=${totalRows}`,
-      );
-    } else {
-      const countSql = `
-        SELECT COUNT(*) AS TOTAL_ROWS
-        FROM VW_BOT_FACTURAS_PROMO
-        WHERE ${filters.join("\nAND ")}
-      `;
-
-      const countStartedAt = Date.now();
-      const countResult = await executeOracleQuery(
-        connection,
-        countSql,
-        binds,
-      );
-
-      console.log(
-        `[CHATBOT-DEV] MEMBER PROMO PURCHASES COUNT: ${Date.now() - countStartedAt} ms`,
-      );
-
-      totalRows = Number(countResult?.[0]?.TOTAL_ROWS ?? 0);
-    }
-
-    const totalPages =
-      totalRows === 0 ? 0 : Math.ceil(totalRows / safeRows);
-
-    const detailBinds = {
-      ...binds,
-      pageOffset: offset,
-      pageSize: safeRows,
-    };
-
-    const sql = `
-      SELECT
-        TO_CHAR(FECHA, 'DD/MM/YYYY') AS REGISTER_DATE,
-        TO_CHAR(FECHA_COMPRA, 'DD/MM/YYYY') AS PURCHASE_DATE,
-        COD_PROMOCION AS PROMOTION_ID,
-        PROMOCION AS PROMOTION_NAME,
-        COD_CAMPANIA AS CAMPAIGN_ID,
-        CAMPANIA AS CAMPAIGN_NAME,
-        COD_CLIENTE AS CUSTOMER_ID,
-        LOCAL AS CUSTOMER_NAME,
-        COD_RUBRO AS CATEGORY_ID,
-        RUBRO AS CATEGORY_NAME,
-        MONEDA AS CURRENCY_DESCRIPTION,
-        SIMBOLO_MONEDA AS CURRENCY_SYMBOL,
-        TO_CHAR(NRO_FACTURA) AS INVOICE_NUMBER,
-        MONTO AS AMOUNT,
-        ORIGEN_BANCARIO AS BANK_ORIGIN
-      FROM VW_BOT_FACTURAS_PROMO
-      WHERE ${filters.join("\nAND ")}
-      ORDER BY FECHA_COMPRA DESC, NRO_FACTURA DESC
-      OFFSET :pageOffset ROWS
-      FETCH NEXT :pageSize ROWS ONLY
-    `;
-
-    const detailStartedAt = Date.now();
-    const result = await executeOracleQuery(
-      connection,
-      sql,
-      detailBinds,
-    );
-
-    console.log(
-      `[CHATBOT-DEV] MEMBER PROMO PURCHASES DETAIL: ${Date.now() - detailStartedAt} ms`,
-    );
-
-    const detailRows = Array.isArray(result) ? result : [];
-
-    return {
-      documentNumber: String(documentNumber),
-      mode: "detail",
-      page: safePage,
-      rows: safeRows,
-      startRow: detailRows.length > 0 ? offset + 1 : null,
-      endRow:
-        detailRows.length > 0
-          ? offset + detailRows.length
-          : null,
-      returnedRows: detailRows.length,
-      totalRows,
-      totalPages,
-      hasMore: safePage < totalPages,
-      nextPage: safePage < totalPages ? safePage + 1 : null,
-      data: detailRows.map((row) => ({
-        registerDate: row.REGISTER_DATE,
-        purchaseDate: row.PURCHASE_DATE,
-        promotion: {
-          id:
-            row.PROMOTION_ID != null
-              ? String(row.PROMOTION_ID)
-              : null,
-          name: row.PROMOTION_NAME,
-        },
-        campaign: {
-          id:
-            row.CAMPAIGN_ID != null
-              ? Number(row.CAMPAIGN_ID)
-              : null,
-          name: row.CAMPAIGN_NAME,
-        },
-        customer: {
-          id:
-            row.CUSTOMER_ID != null
-              ? String(row.CUSTOMER_ID)
-              : null,
-          name: row.CUSTOMER_NAME,
-        },
-        category: {
-          id:
-            row.CATEGORY_ID != null
-              ? String(row.CATEGORY_ID)
-              : null,
-          name: row.CATEGORY_NAME,
-        },
-        currency: {
-          description: row.CURRENCY_DESCRIPTION,
-          symbol: row.CURRENCY_SYMBOL,
-          symbolPosition: "prefix",
-        },
-        invoiceNumber: row.INVOICE_NUMBER,
-        amount: Number(row.AMOUNT ?? 0),
-        bankOrigin: row.BANK_ORIGIN === BANK_ORIGIN_VALUES.bank,
-        origin:
-          row.BANK_ORIGIN === BANK_ORIGIN_VALUES.bank
-            ? "Banco Atlas"
-            : "No bancario",
-      })),
-    };
+    if (!Number.isSafeInteger(page) || page < 1 || !Number.isSafeInteger(rows) || rows < 1) throw Error("Paginación inválida.");
+    rows = Math.min(rows, promoPageLimit());
+    const offset = (page - 1) * rows;
+    if (!Number.isSafeInteger(offset + rows)) throw Error("Paginación fuera de rango.");
+    // Counts always use the same current Oracle session and filters. Client/model
+    // knownTotalRows is deliberately not accepted as pagination authority.
+    const count = await executeOracleQuery(connection, `SELECT COUNT(*) AS TOTAL_ROWS FROM VW_BOT_FACTURAS_PROMO WHERE ${where}`, binds);
+    const totalRows = Number(count[0]?.TOTAL_ROWS ?? 0), totalPages = Math.ceil(totalRows / rows);
+    const data = await executeOracleQuery(connection, `
+      SELECT * FROM (
+        SELECT TO_CHAR(FECHA, 'DD/MM/YYYY') AS REGISTER_DATE, TO_CHAR(FECHA_COMPRA, 'DD/MM/YYYY') AS PURCHASE_DATE,
+          COD_PROMOCION, PROMOCION, COD_CAMPANIA, CAMPANIA, COD_CLIENTE, LOCAL, COD_RUBRO, RUBRO,
+          MONEDA AS CURRENCY_DESCRIPTION, SIMBOLO_MONEDA AS CURRENCY_SYMBOL,
+          TO_CHAR(NRO_FACTURA) AS INVOICE_NUMBER, MONTO AS AMOUNT, ORIGEN_BANCARIO,
+          ROW_NUMBER() OVER (ORDER BY FECHA_COMPRA DESC, FECHA DESC, NRO_FACTURA DESC,
+            COD_PROMOCION, COD_CAMPANIA, COD_CLIENTE, COD_RUBRO, SIMBOLO_MONEDA, MONEDA,
+            MONTO, ORIGEN_BANCARIO, LOCAL, RUBRO, PROMOCION, CAMPANIA) AS RESULT_ROW_NUMBER
+        FROM VW_BOT_FACTURAS_PROMO WHERE ${where}
+      ) WHERE RESULT_ROW_NUMBER BETWEEN :startRow AND :endRow ORDER BY RESULT_ROW_NUMBER
+    `, { ...binds, startRow: offset + 1, endRow: offset + rows });
+    return { documentNumber: String(documentNumber), mode, page, rows, totalRows, totalPages,
+      startRow: data.length ? offset + 1 : null, endRow: data.length ? offset + data.length : null, returnedRows: data.length,
+      hasMore: page < totalPages, nextPage: page < totalPages ? page + 1 : null,
+      data: data.map((r) => {
+        const currency = currencyFields(r);
+        const reason = [...(!currency.code ? ["Moneda ambigua, desconocida o contradictoria; sin divisa asignada ni conversión."] : []), ...(r.AMOUNT == null ? ["Importe ausente; no se sustituye por cero."] : [])].join(" ");
+        return { registerDate: r.REGISTER_DATE, purchaseDate: r.PURCHASE_DATE,
+        promotion: { id: r.COD_PROMOCION == null ? null : String(r.COD_PROMOCION), name: r.PROMOCION },
+        campaign: { id: r.COD_CAMPANIA == null ? null : Number(r.COD_CAMPANIA), name: r.CAMPANIA },
+        customer: { id: r.COD_CLIENTE == null ? null : String(r.COD_CLIENTE), name: r.LOCAL },
+        category: { id: r.COD_RUBRO == null ? null : String(r.COD_RUBRO), name: r.RUBRO },
+        currency, invoiceNumber: r.INVOICE_NUMBER, amount: r.AMOUNT == null ? null : Number(r.AMOUNT),
+        ...(reason ? { reason } : {}), ...originFields(r.ORIGEN_BANCARIO) };
+      }) };
   }
-
-  const selectFields = [];
-
-  for (const dimension of groupBy) {
-    selectFields.push(GROUP_BY_CONFIG[dimension].select);
-  }
-
-  selectFields.push(`
-      MONEDA AS CURRENCY_DESCRIPTION
-    `);
-
-  selectFields.push(`
-      SIMBOLO_MONEDA AS CURRENCY_SYMBOL
-    `);
-
-  for (const metric of metrics) {
-    selectFields.push(METRIC_CONFIG[metric].select);
-  }
-
-  const groupByFields = groupBy.map(
-    (dimension) => GROUP_BY_CONFIG[dimension].groupBy,
-  );
-
-  groupByFields.push("MONEDA", "SIMBOLO_MONEDA");
-
-  const orderByFields = groupBy.map(
-    (dimension) => GROUP_BY_CONFIG[dimension].orderBy,
-  );
-
-  const sql = `
-      SELECT
-        ${selectFields.join(",\n")}
-
-      FROM
-        VW_BOT_FACTURAS_PROMO
-
-      WHERE
-        ${filters.join("\nAND ")}
-
-      GROUP BY
-        ${groupByFields.join(",\n")}
-
-      ${
-        orderByFields.length > 0
-          ? `
-            ORDER BY
-              ${orderByFields.join(",\n")}
-          `
-          : ""
-      }
-    `;
-
-  console.log("getMemberPromoPurchasesRepository SUMMARY SQL:", sql);
-
-  console.log("getMemberPromoPurchasesRepository SUMMARY binds:", binds);
-
-  const result = await executeOracleQuery(connection, sql, binds);
-
-  const resultRows = Array.isArray(result) ? result : [];
-
-  const data = resultRows.map((row) => {
-    let item = {};
-
-    for (const dimension of groupBy) {
-      item = {
-        ...item,
-
-        ...GROUP_BY_CONFIG[dimension].map(row),
-      };
-    }
-
-    item.currency = {
-      description: row.CURRENCY_DESCRIPTION,
-
-      symbol: row.CURRENCY_SYMBOL,
-    };
-
-    for (const metric of metrics) {
-      item = {
-        ...item,
-
-        ...METRIC_CONFIG[metric].map(row),
-      };
-    }
-
-    return item;
-  });
-
-  return {
-    documentNumber: String(documentNumber),
-
-    data,
-  };
+  const fields = groupBy.map((g) => promoDimensions[g][0] + (promoDimensions[g][1] ? " AS " + promoDimensions[g][1] : ""));
+  const groups = [...groupBy.map((g) => promoDimensions[g][0]), "MONEDA", "SIMBOLO_MONEDA"];
+  const data = await executeOracleQuery(connection, `SELECT ${[...fields, "MONEDA AS CURRENCY_DESCRIPTION", "SIMBOLO_MONEDA AS CURRENCY_SYMBOL",
+    "COUNT(*) AS SOURCE_ROWS", ...(metrics.includes("purchaseCount") ? ["COUNT(*) AS PURCHASE_COUNT"] : []),
+    ...(metrics.includes("totalAmount") ? ["CASE WHEN COUNT(MONTO) = COUNT(*) THEN SUM(MONTO) ELSE NULL END AS TOTAL_AMOUNT"] : [])].join(", ")}
+    FROM VW_BOT_FACTURAS_PROMO WHERE ${where} GROUP BY ${groups.join(", ")} ORDER BY ${groups.join(", ")}`, binds);
+  return { documentNumber: String(documentNumber), mode, data: data.map((r) => {
+    const currency = currencyFields(r);
+    return { ...Object.assign({}, ...groupBy.map((g) => promoDimensions[g][2](r))), currency,
+      ...(metrics.includes("purchaseCount") ? { purchaseCount: Number(r.PURCHASE_COUNT) } : {}),
+      ...(metrics.includes("totalAmount") ? { totalAmount: currency.code && r.TOTAL_AMOUNT != null ? Number(r.TOTAL_AMOUNT) : null } : {}),
+      ...(metrics.includes("totalAmount") && (!currency.code || r.TOTAL_AMOUNT == null) ? { reason: !currency.code ? "Moneda ambigua, desconocida o contradictoria; importe agregado sin calcular ni conversión." : "Hay importes ausentes; no se sustituyen por cero." } : {}) };
+  }) };
 };

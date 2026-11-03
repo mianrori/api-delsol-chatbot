@@ -1,4 +1,5 @@
 import { buildMemberPurchasesResponse, resolveMemberPurchasesPage } from "./memberPurchasesPresentation.service.js";
+import { buildMemberPromoResponse, resolveMemberPromoPage, resolveMemberPromoSelection, preserveMemberPromoFollowup } from "./memberPromoPurchasesPresentation.service.js";
 import { preserveSalesPerSqmFollowup } from "./salesPerSqmFollowup.service.js";
 import { preserveContractIncidenceFollowup } from "./contractIncidenceFollowup.service.js";
 import { buildContractIncidenceResponse } from "./contractIncidencePresentation.service.js";
@@ -238,7 +239,9 @@ Para compras promocionales de socios:
 - startRow/endRow son el rango global exacto; nunca inventes rangos;
 - si hasMore=true, puedes ofrecer ver la siguiente página; si hasMore=false o nextPage=null, no afirmes que hay más resultados;
 - ante "ver más", "siguiente página", "continuar" o equivalente, conserva exactamente documentNumber, promotionIds, campaignIds, customerIds, categoryIds, dateFrom/dateTo, origin y rows, y usa page=nextPage;
-- en continuaciones con filtros y rows idénticos, reutiliza totalRows anterior como knownTotalRows; si cambia cualquier filtro o rows, no reutilices knownTotalRows;
+- el conteo de compras promocionales se recalcula en Oracle con los filtros vigentes; no envíes knownTotalRows ni inventes totales;
+- los seguimientos conservan socio, promoción, campaña, período, local, rubro, origen y tamaño de página salvo el cambio pedido; no sustituyas el socio ni el par promoción/campaña;
+- distingue AMBIGUOUS (selección pendiente), SELECTION_NOT_FOUND (selección fuera del catálogo autorizado) y NO_PURCHASES (selección válida sin compras); no presentes una selección ambigua como ausencia de compras;
 - muestra todas las filas presentes en data y no las reemplaces por abreviaciones.
 
 Para marcas o nombres propios comerciales:
@@ -1384,6 +1387,10 @@ const executeToolRequests = async ({ content, sessionId, sourceMessages = [], ch
       input = preserveContractIncidenceFollowup({ ...sqmFollowup, input }) ?? input;
       block.toolUse.input = input;
     }
+    if (name === "get_member_promo_purchases" && sqmFollowup) {
+      input = preserveMemberPromoFollowup({ ...sqmFollowup, input, restoreValue: (value) => restorePiiDeep(sessionId, value) }) ?? input;
+      block.toolUse.input = input;
+    }
     const presentationCall = { name, input };
     internalContext.presentationCalls.push(presentationCall);
 
@@ -1407,7 +1414,12 @@ const executeToolRequests = async ({ content, sessionId, sourceMessages = [], ch
       if (name === "generate_chart" && !chartRequested) throw new Error("El usuario debe solicitar el gráfico antes de generarlo.");
       const restoredInput = name === "generate_chart" ? input : restorePiiDeep(sessionId, input);
 
-      const result = await executeTool({
+      const pendingPromotion = name === "get_member_promo_purchases"
+        ? internalContext.presentationCalls.filter((c) => c.name === "search_promotions").at(-1)?.result : null;
+      const result = pendingPromotion?.status === "AMBIGUOUS"
+        ? { documentNumber: restoredInput.documentNumber, mode: restoredInput.mode ?? "summary", status: "AMBIGUOUS",
+          reason: "La búsqueda tiene varias coincidencias; elige una opción antes de consultar compras.", options: restorePiiDeep(sessionId, pendingPromotion.options), totalOptions: pendingPromotion.totalRows, data: [] }
+        : await executeTool({
         name,
         arguments: restoredInput,
         context: {
@@ -1481,6 +1493,7 @@ const executeToolRequests = async ({ content, sessionId, sourceMessages = [], ch
       }
 
       if (name === "analyze_contract_cost_incidence") presentationCall.result = protectedResultForModel;
+      if (name === "get_member_promo_purchases") presentationCall.result = protectedResultForModel;
       if (
         name === "analyze_contract_cost_incidence" &&
         protectedResultForModel?.groupBy === "month" &&
@@ -1616,6 +1629,8 @@ export const chatService = async ({ message, sessionId }) => {
   const promotionPage = resolvePromotionSearchPage({ message, history: protectedHistory });
   const purchasePage = resolveMemberPurchasesPage({ message: messages.at(-1).content[0].text, history: protectedHistory,
     restoreValue: (value) => restorePiiDeep(sessionId, value) });
+  const promoFollowup = resolveMemberPromoPage({ message, history: protectedHistory, restoreValue: (value) => restorePiiDeep(sessionId, value) })
+    ?? resolveMemberPromoSelection({ message, history: protectedHistory, restoreValue: (value) => restorePiiDeep(sessionId, value) });
   const solesPage = resolveVehiclePage({ message, history: protectedHistory })
     ?? resolveVehicleGenderBreakdown({ message, history: protectedHistory })
     ?? resolveSolesUsagePage({ message, history: protectedHistory })
@@ -1647,6 +1662,18 @@ export const chatService = async ({ message, sessionId }) => {
     // The fresh tool result, rather than the previous narrative/sample, is the
     // source for the answer. The standard executor rechecks Oracle permissions.
     followupAnswer = buildSalesSampleResponse(executed.internalContext.presentationCalls, { exportAvailable: Boolean(conversationActions.salesExport?.available) });
+  } else if (promoFollowup) {
+    if (promoFollowup.answer) followupAnswer = promoFollowup.answer;
+    else {
+      const content = [{ toolUse: { toolUseId: `promo_purchase_followup_${randomUUID()}`, name: "get_member_promo_purchases", input: promoFollowup.input } }];
+      messages.push({ role: "assistant", content });
+      const executed = await executeToolRequests({ content, sessionId });
+      messages.push({ role: "user", content: executed.toolResults });
+      conversationActions = executed.actions; conversationInternalContext = executed.internalContext; toolIterations = 1;
+      followupAnswer = executed.internalContext.accessDenied ? ACCESS_DENIED_MESSAGE
+        : buildMemberPromoResponse(executed.internalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) })
+          ?? "No fue posible consultar las compras promocionales. Vuelve a intentarlo.";
+    }
   } else if (purchasePage) {
     if (purchasePage.answer) followupAnswer = purchasePage.answer;
     else {
@@ -1830,7 +1857,8 @@ export const chatService = async ({ message, sessionId }) => {
 
       // A complete breakdown is authoritative even when the model requested
       // it after changing dates or filters. Do not ask the model to rewrite it.
-      followupAnswer = buildContractIncidenceResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) })
+      followupAnswer = buildMemberPromoResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) })
+        ?? buildContractIncidenceResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) })
         ?? buildSalesPerSqmResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) })
         ?? buildSalesYearComparisonResponse(conversationInternalContext.presentationCalls)
         ?? buildSalesSampleResponse(conversationInternalContext.presentationCalls, { exportAvailable: Boolean(conversationActions.salesExport?.available) })
@@ -1893,7 +1921,7 @@ export const chatService = async ({ message, sessionId }) => {
       ? ACCESS_DENIED_MESSAGE
       : conversationActions.chart?.available
       ? "Aquí tienes el gráfico solicitado."
-      : buildContractIncidenceResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) }) ?? monthlyIncidenceText ??
+      : buildMemberPromoResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) }) ?? buildContractIncidenceResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) }) ?? monthlyIncidenceText ??
       buildSalesPerSqmResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) }) ??
       buildSalesYearComparisonResponse(conversationInternalContext.presentationCalls) ??
       buildSalesSampleResponse(conversationInternalContext.presentationCalls, { exportAvailable: Boolean(conversationActions.salesExport?.available) }) ??

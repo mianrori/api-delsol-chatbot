@@ -121,12 +121,6 @@ export const getMemberPromoPurchasesTool = {
               "Cantidad de registros por página cuando mode es detail. Por defecto 20.",
           },
 
-          knownTotalRows: {
-            type: "integer",
-            minimum: 0,
-            description:
-              "Total ya conocido de una página anterior con exactamente los mismos filtros.",
-          },
         },
 
         required: ["documentNumber"],

@@ -23,7 +23,7 @@ const synthetic = (exports) => new vm.SyntheticModule(Object.keys(exports), func
 const load = async (path, stubs) => {
   const main = new vm.SourceTextModule(await readFile(new URL(path, import.meta.url), "utf8"), { context });
   await main.link(async (spec) => {
-    if (["./contractIncidenceFollowup.service.js", "./contractIncidencePresentation.service.js", "./salesHistory.service.js", "./salesSamplePresentation.service.js", "./salesPerSqmFollowup.service.js", "./salesPerSqmPresentation.service.js"].includes(spec)) {
+    if (["./memberPromoPurchasesPresentation.service.js", "./contractIncidenceFollowup.service.js", "./contractIncidencePresentation.service.js", "./salesHistory.service.js", "./salesSamplePresentation.service.js", "./salesPerSqmFollowup.service.js", "./salesPerSqmPresentation.service.js"].includes(spec)) {
       return new vm.SourceTextModule(await readFile(new URL("../../src/services/ai/" + spec.slice(2), import.meta.url), "utf8"), { context });
     }
     if (["./salesExportFollowup.service.js", "./salesYearComparison.service.js", "./toolErrors.service.js", "./salesSeriesPresentation.service.js", "./vehiclePresentation.service.js", "./solesUsagePresentation.service.js", "./memberSolesPresentation.service.js", "./promotionSearchPresentation.service.js", "./campaignSalesPerformancePresentation.service.js", "./memberPurchasesVsSalesPresentation.service.js", "./memberPurchasesPresentation.service.js", "./conversationClarification.service.js", "./memberAnalysisFollowup.service.js", "./memberRankingPresentation.service.js", "./memberSummaryPresentation.service.js"].includes(spec)) {
@@ -58,6 +58,13 @@ const chat = await load("../../src/services/ai/chat.service.js", {
   "@aws-sdk/client-bedrock-runtime": {
     BedrockRuntimeClient: class { async send(_command, options) {
       modelCalls++;
+      if (mode === "promo-pages" || mode === "promo-ambiguity") {
+        assert.equal(comparisonStep++, 0, "Promo continuations must not request model recomputation");
+        const content = mode === "promo-ambiguity" ? [{ toolUse: { name: "search_promotions", toolUseId: "promo-search", input: { search: "Synthetic" } } }] : [];
+        content.push({ toolUse: { name: "get_member_promo_purchases", toolUseId: "promo-first", input: { documentNumber: "SYNTHETIC-PROMO-DOCUMENT", promotionIds: ["P"], campaignIds: [1], mode: "detail", page: 1, rows: 1 } } });
+        return { stopReason: "tool_use", output: { message: { role: "assistant", content } } };
+      }
+      if (mode === "promo-denied" || mode === "promo-selected") assert.fail("Direct promo followups must not invoke the model");
       if (mode === "sqm-followup") {
         const step = comparisonStep++;
         assert.ok(step < 3, "SQM presentation must not ask the model to rewrite returned metrics");
@@ -216,6 +223,16 @@ const chat = await load("../../src/services/ai/chat.service.js", {
   },
   "../../tools/index.js": { tools: [] },
   "./toolExecutor.service.js": { executeTool: async (call) => {
+    if (mode.startsWith("promo-")) {
+      toolCalls++;
+      if (call.name === "search_promotions") return { status: "AMBIGUOUS", totalRows: 2, page: 1, rows: 2, totalPages: 1, hasMore: false, options: [1,2].map(i=>({optionId:String(i),promotionId:"P",campaignId:i,promotionName:"Synthetic promotion",campaignName:"Synthetic campaign"})) };
+      if (mode === "promo-ambiguity") assert.fail("Ambiguous search must block a model-selected purchase query");
+      assert.equal(call.name,"get_member_promo_purchases");assert.equal(call.arguments.documentNumber,"SYNTHETIC-PROMO-DOCUMENT");assert.deepEqual(JSON.parse(JSON.stringify(call.arguments.promotionIds)),["P"]);
+      if (mode === "promo-denied") throw Object.assign(Error("denied"),{code:"ACCESS_DENIED",errorNum:942});
+      assert.equal(call.arguments.campaignIds[0],mode === "promo-selected"?2:1);
+      const page=call.arguments.page??1;
+      return {documentNumber:call.arguments.documentNumber,status:"OK",mode:"detail",page,rows:1,totalRows:3,totalPages:3,hasMore:page<3,nextPage:page<3?page+1:null,data:[{purchaseDate:"01/01/2023",promotion:{name:"Synthetic promotion"},campaign:{name:"Synthetic campaign"},customer:{name:"Synthetic local"},category:{name:"Synthetic category"},currency:{code:"PYG"},amount:10}]};
+    }
     toolCalls++;
     if (mode === "sqm-followup") {
       const input = call.arguments;
@@ -724,6 +741,8 @@ dispatcherStubs["../invoices/invoices.service.js"] = await import("../../src/ser
 dispatcherStubs["../contracts/contractConditions.service.js"] = await import("../../src/services/contracts/contractConditions.service.js");
 dispatcherStubs["../contracts/contractCostPerSqm.service.js"] = await import("../../src/services/contracts/contractCostPerSqm.service.js");
 dispatcherStubs["../contracts/contractCostIncidence.service.js"] = await import("../../src/services/contracts/contractCostIncidence.service.js");
+dispatcherStubs["../members/memberPromoPurchase.service.js"] = await import("../../src/services/members/memberPromoPurchase.service.js");
+dispatcherStubs["../promotions/promotion.resolver.js"] = await import("../../src/services/promotions/promotion.resolver.js");
 dispatcherStubs["../sales/salesPerSqm.service.js"] = await import("../../src/services/sales/salesPerSqm.service.js");
 dispatcherStubs["../charts/chart.service.js"] = { generateChart };
 dispatcherStubs["../vehicles/vehicleRegistrations.service.js"] = { getVehicleRegistrations };
@@ -870,6 +889,7 @@ let closes = 0;
 let touches = 0;
 const acquiring = new AbortController();
 const sessions = await load("../../src/services/sessions/oracleSession.service.js", {
+  "node:crypto": { randomUUID: () => "11111111-1111-4111-8111-111111111111" },
   "../requestContext.service.js": requestContext,
   "../../database/oracle.database.js": { connectWithProxy: async () => {
     acquiring.abort();
@@ -913,6 +933,8 @@ for (const [name, arguments_] of [
   ["get_contract_conditions", { customerId: "SYNTHETIC-CUSTOMER", localNumber: "SYNTHETIC-LOCAL" }],
   ["get_contract_cost_per_sqm", { customerId: "SYNTHETIC-CUSTOMER", conceptCode: "6" }],
   ["analyze_contract_cost_incidence", { customerId: "SYNTHETIC-CUSTOMER", dateFrom: "01/01/2023", dateTo: "31/01/2023" }],
+  ["get_member_promo_purchases", { documentNumber: "SYNTHETIC-DOCUMENT", dateFrom: "01/01/2023", dateTo: "31/01/2023" }],
+  ["search_promotions", { search: "SYNTHETIC", rows: 1 }],
 ]) {
   const request = { name, arguments: { ...arguments_, username: "UNTRUSTED-FRONTEND" }, context: { sessionId: "authorized-session" } };
   const before = proxyClosed, queryStart = proxyQueries.length;
@@ -979,4 +1001,20 @@ const mixedCurrencyPresentation = chat.buildMonthlyIncidenceResponse({ groupBy: 
 assert.match(mixedCurrencyPresentation, /USD 100/);
 assert.match(mixedCurrencyPresentation, /\| 01\/2023 \| USD 100 \| — \| — \| ₲ 1\.000 \| — \|/);
 assert.match(mixedCurrencyPresentation, /no corresponde sumar importes entre monedas/);
+mode="promo-pages";comparisonStep=0;storedHistory=[];
+const promoModelStart=modelCalls,promoToolStart=toolCalls;
+let promoFirstHistory;
+for(let page=1;page<=3;page++){
+ const r=await chat.chatService({sessionId:"test",message:page===1?"Compras promocionales del socio seleccionado":"Siguiente página"});
+ assert.ok(r.answer.includes(`Página ${page} de 3; 3 compras en total.`));
+ if(page===1)promoFirstHistory=structuredClone(storedHistory);
+}
+assert.equal(modelCalls-promoModelStart,1);assert.equal(toolCalls-promoToolStart,3);
+const promoEnd=await chat.chatService({sessionId:"test",message:"Siguiente página"});assert.match(promoEnd.answer,/No hay más páginas de compras promocionales/);assert.equal(toolCalls-promoToolStart,3);
+mode="promo-denied";storedHistory=promoFirstHistory;
+assert.equal((await chat.chatService({sessionId:"test",message:"Siguiente página"})).answer,"El usuario no tiene permisos para consultar esta información.");
+mode="promo-ambiguity";comparisonStep=0;storedHistory=[];
+const promoAmbiguous=await chat.chatService({sessionId:"test",message:"Compras promocionales del socio; busca Synthetic"});assert.match(promoAmbiguous.answer,/elige una opción/);assert.ok(!promoAmbiguous.answer.includes("No hay compras"));
+mode="promo-selected";
+const promoSelected=await chat.chatService({sessionId:"test",message:"Opción 2"});assert.match(promoSelected.answer,/Página 1 de 3/);
 console.log("Lifecycle integration passed");
