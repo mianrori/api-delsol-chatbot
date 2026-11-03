@@ -5,7 +5,7 @@ const mapPromotion = (item) => ({
 
   promotionName: item.NOMBRE_PROMOCION,
 
-  campaignId: Number(item.COD_CAMPANIA),
+  campaignId: item.COD_CAMPANIA == null ? null : Number(item.COD_CAMPANIA),
 
   campaignName: item.NOMBRE_CAMPANIA,
 
