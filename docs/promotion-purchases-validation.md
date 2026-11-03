@@ -177,3 +177,31 @@ aprueba en Node 22 aislado (1/1); no se cambió código de producción desde
 `37226cc`, cuyas 23/23 pruebas enfocadas siguen siendo la evidencia de ese código.
 El preflight de la candidata corregida aprueba. Se requiere repetir los controles
 DEV con entradas ocultas para completar la evidencia.
+
+### Resultado final de las correcciones
+
+- **138/138 controles aprobados sobre `89a4e59`** el 03/11/2026 contra Oracle
+  DEV y HTTP. Helper terminado con código 0. Los hashes de los 140 archivos
+  candidatos (fuentes, configuración de código, manifiesto y runners) coinciden
+  con el commit ejecutado; no se compararon ni publicaron entradas privadas.
+- Se repitió el recorrido real de siete páginas y su conciliación completa con
+  la consulta independiente, resumen/desgloses, cantidades, importes por moneda,
+  filtros y catálogo paginado. Los 38 controles HTTP aprobaron preservación de
+  identidad/filtros, metadatos, presentación y selección explícita.
+- Los once grupos monetarios sintéticos SELECT/CTE se mantuvieron separados en
+  Oracle. Los casos ambiguos no recibieron divisa, agregado ni conversión; los
+  códigos/descripciones reconocidos mantuvieron sus importes. Se concilió el
+  detalle completo en seis páginas con tamaño solicitado de dos y límite vigente.
+- Las dos simulaciones posteriores al cierre real aprobaron el registro exclusivo
+  de correlación/códigos seguros y conservaron el resultado o error principal.
+  Las pruebas controladas cubren además fallos de actualización de actividad y
+  códigos no seguros. No se afirma haber observado un fallo real de cierre DEV.
+- Usuarios Oracle distintos comprobados privadamente; denegación real sin datos
+  y cierre de control/denegación aprobados. El único código de diagnóstico fue
+  `ORA-00942`, esperado por la denegación; no reapareció `NJS-005`.
+- Se mantienen las 23/23 pruebas enfocadas del código de producción y la nueva
+  prueba 1/1 del adaptador, ambas en Node 22 aislado. No se repitió la suite completa.
+- **Pendiente:** muestra real de un socio con varias monedas. Las CTE son
+  cobertura controlada y no sustituyen esa muestra. Sin datos DEV alterados,
+  expiraciones modificadas, despliegue ni merge. La PR sigue en borrador para
+  revisar las correcciones. Los helpers y reportes de `logs/` permanecen ignorados.
