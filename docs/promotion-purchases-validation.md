@@ -92,12 +92,23 @@ la base durante la medición inicial y conserva únicamente códigos de diagnós
 
 - Base Oracle DEV: 57 controles, con un fallo reproducido por `knownTotalRows=0`.
   El socio proporcionado tiene varias páginas y el catálogo ofrece varias opciones.
-- 277/277 pruebas aprobadas en Node 22, contenedor aislado sin red, volúmenes ni
-  credenciales; 20/20 pruebas enfocadas. Incluyen monedas mixtas, importes nulos,
+- 277/277 pruebas aprobadas sobre `78b1adc` en Node 22, contenedor aislado sin red,
+  volúmenes ni credenciales. Las 21/21 pruebas enfocadas de la revisión posterior
+  también pasan en Node 22. Incluyen monedas mixtas, importes nulos,
   suma cero, paginación, identidad, selección y preservación de filtros. El ciclo
   HTTP controlado comprueba que el modelo no elija compras tras búsqueda ambigua,
   elección explícita, continuaciones sin modelo y denegación sin datos.
-- El contraste final DEV y sus limitaciones se consignarán al revisar el reporte.
+- El primer contraste final ejecutó 110 controles y encontró una diferencia de
+  representación en la selección explícita: la restauración PII devuelve el ID
+  de campaña como texto numérico y el control esperaba un número. Documento,
+  valores de IDs, filtros efectivos, importes y cantidades coincidieron. El
+  control corregido acepta solo enteros seguros no negativos equivalentes para
+  `campaignIds`; documento, promoción y demás filtros conservan comparación
+  estricta. No se cambia la restauración PII ni la identidad Oracle. Una prueba
+  con el protector/restaurador real verifica este recorrido.
+- Los IDs nulos de promoción/campaña en desgloses amplios se conservan nulos,
+  sin convertirlos en cero o en el texto `null`.
+- El nuevo contraste final DEV y sus limitaciones se consignarán al revisar el reporte.
 
 No se fabrican compras o socios para obtener muestras. Los controles validan las
 vistas permitidas, no sus tablas ERP subyacentes. La búsqueda aproximada se cubre

@@ -5,6 +5,7 @@ import {promoPageLimit} from '../src/repositories/members/memberPromoPurchase.re
 import {buildMemberPromoResponse,preserveMemberPromoFollowup,resolveMemberPromoPage,resolveMemberPromoSelection} from '../src/services/ai/memberPromoPurchasesPresentation.service.js';
 import {getMemberPromoPurchasesTool} from '../src/tools/members/getMemberPromoPurchases.tool.js';
 import {runWithRequestSignal} from '../src/services/requestContext.service.js';
+import {protectPiiDeep,restorePiiDeep} from '../src/services/ai/pii.service.js';
 const args={documentNumber:"SYNTHETIC'DOCUMENT",promotionIds:['P'],campaignIds:[1],dateFrom:'01/01/2023',dateTo:'31/05/2023',mode:'summary',groupBy:[]};
 const selection=(id=1)=>({COD_PROMOCION:'P',COD_CAMPANIA:id,NOMBRE_PROMOCION:'Synthetic promotion',NOMBRE_CAMPANIA:'Synthetic campaign'});
 const aggregate=(extra={})=>({TOTAL_AMOUNT:100,PURCHASE_COUNT:2,SOURCE_ROWS:2,CURRENCY_DESCRIPTION:'GUARANIES',CURRENCY_SYMBOL:'PYG',...extra});
@@ -72,6 +73,14 @@ test('explicit ambiguity selection uses the exact stored pair and preserves the 
  const r={documentNumber:args.documentNumber,status:'AMBIGUOUS',options:[{optionId:'2',promotionId:'P2',campaignId:20}]};
  assert.deepEqual(resolveMemberPromoSelection({message:'Opción 2',history:history(args,r)}),{input:{...args,promotionIds:['P2'],campaignIds:[20],page:1}});
  assert.equal(resolveMemberPromoSelection({message:'Opción 1',history:history(args,r)}),null);
+});
+test('real PII restoration preserves the selected campaign value and keeps document equality strict',async()=>{
+ const session='SYNTHETIC-PROMO-PII',r={documentNumber:args.documentNumber,status:'AMBIGUOUS',options:[{optionId:'1',promotionId:'P',campaignId:17}]};
+ const protectedHistory=history(protectPiiDeep(session,args),protectPiiDeep(session,r,null,['get_member_promo_purchases']));
+ const follow=resolveMemberPromoSelection({message:'Opción 1',history:protectedHistory,restoreValue:v=>restorePiiDeep(session,v)});
+ const restored=restorePiiDeep(session,follow.input);assert.equal(restored.documentNumber,args.documentNumber);assert.equal(restored.promotionIds[0],'P');assert.equal(restored.campaignIds[0],'17');
+ const c=db({selection:[selection(17)]});await getMemberPromoPurchases(restored,c);assert.equal(c.queries.at(-1).binds.campaignId0,17);assert.equal(c.queries.at(-1).binds.documentNumber,args.documentNumber);
+ const nullIds=await getMemberPromoPurchases({documentNumber:args.documentNumber,groupBy:['promotion','campaign']},db({summary:[aggregate({COD_PROMOCION:null,COD_CAMPANIA:null})]}));assert.equal(nullIds.data[0].promotionId,null);assert.equal(nullIds.data[0].campaignId,null);
 });
 test('promo rendering restores only the matched member, distinguishes ambiguity and escapes commercial labels',()=>{
  const input={...args,groupBy:['campaign']};const result={status:'OK',documentNumber:args.documentNumber,mode:'summary',data:[{campaignName:'SYNTHETIC|CAMPAIGN\nX',currency:{code:'PYG'},purchaseCount:2,totalAmount:100}]};

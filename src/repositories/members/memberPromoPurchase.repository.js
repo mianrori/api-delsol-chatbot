@@ -4,7 +4,7 @@ import config from "../../../config.js";
 export const promoDimensions = {
   month: ["TO_CHAR(FECHA_COMPRA, 'YYYY-MM')", "MONTH", (r) => ({ month: r.MONTH })],
   year: ["TO_CHAR(FECHA_COMPRA, 'YYYY')", "YEAR", (r) => ({ year: r.YEAR })],
-  promotion: ["COD_PROMOCION, PROMOCION", null, (r) => ({ promotionId: String(r.COD_PROMOCION), promotionName: r.PROMOCION })],
+  promotion: ["COD_PROMOCION, PROMOCION", null, (r) => ({ promotionId: r.COD_PROMOCION == null ? null : String(r.COD_PROMOCION), promotionName: r.PROMOCION })],
   campaign: ["COD_CAMPANIA, CAMPANIA", null, (r) => ({ campaignId: r.COD_CAMPANIA == null ? null : Number(r.COD_CAMPANIA), campaignName: r.CAMPANIA })],
   customer: ["COD_CLIENTE, LOCAL", null, (r) => ({ customerId: r.COD_CLIENTE == null ? null : String(r.COD_CLIENTE), customerName: r.LOCAL })],
   category: ["COD_RUBRO, RUBRO", null, (r) => ({ categoryId: r.COD_RUBRO == null ? null : String(r.COD_RUBRO), categoryName: r.RUBRO })],
