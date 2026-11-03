@@ -1,12 +1,16 @@
 import {getMemberPromoPurchases} from '../src/services/members/memberPromoPurchase.service.js';
-import {withOracleProxySession} from '../src/services/sessions/oracleSession.service.js';
+
+export const oracleSelectFixtureConnection=(connection,source)=>({
+ execute:(sql,binds,options={})=>connection.execute(`WITH hardening_fixture AS (${source}) ${sql.replaceAll('VW_BOT_FACTURAS_PROMO','hardening_fixture')}`,binds,options),
+});
 
 // Synthetic rows are evaluated by Oracle SELECT only; no DEV records are changed.
 export async function checkPromotionHardening({connection,sessionId,check}) {
+ const {withOracleProxySession}=await import('../src/services/sessions/oracleSession.service.js');
  const cases=[['PYG','GUARANIES','PYG'],['USD','DOLARES','USD'],['$','DOLARES','USD'],['$','PESOS ARGENTINOS',null],['$','PESOS MEXICANOS',null],['$',null,null],['$','DOLARES AUSTRALIANOS',null],['PYG','DOLARES',null],['USD','PESOS ARGENTINOS',null],[null,'DÓLARES ESTADOUNIDENSES','USD'],['US$',null,'USD']];
  const literal=v=>v==null?'CAST(NULL AS VARCHAR2(100))':`'${v.replaceAll("'","''")}'`;
  const source=cases.map(([symbol,description],i)=>`SELECT 'SYNTHETIC' COD_SOCIO, DATE '2023-01-15' FECHA, DATE '2023-01-15' FECHA_COMPRA, 'P' COD_PROMOCION, 'PROMO' PROMOCION, 1 COD_CAMPANIA, 'CAMPAIGN' CAMPANIA, 'L' COD_CLIENTE, 'LOCAL' LOCAL, 'R' COD_RUBRO, 'CATEGORY' RUBRO, ${literal(description)} MONEDA, ${literal(symbol)} SIMBOLO_MONEDA, ${i+1} NRO_FACTURA, ${(i+1)*10} MONTO, 'N' ORIGEN_BANCARIO FROM DUAL`).join(' UNION ALL ');
- const control={execute:(sql,binds,options)=>connection.execute(`WITH hardening_fixture AS (${source}) ${sql.replaceAll('VW_BOT_FACTURAS_PROMO','hardening_fixture')}`,binds,options)};
+ const control=oracleSelectFixtureConnection(connection,source);
  const args={documentNumber:'SYNTHETIC',dateFrom:'01/01/2023',dateTo:'31/01/2023',mode:'summary'};
  const summary=await getMemberPromoPurchases(args,control);
  check(summary.data.length===cases.length,'HARDENING_ORACLE_RAW_CURRENCY_GROUPS_SEPARATE');

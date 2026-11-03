@@ -162,3 +162,18 @@ pueden cambiar un recorrido posterior; el control detecta diferencias al concili
   Esta simulación no equivale a observar un fallo real del driver en DEV.
 - Se conserva la muestra real DEV pendiente con varias monedas. La PR permanece
   en borrador hasta revisar la corrección y completar la evidencia nueva.
+
+Ejecución DEV de `37226cc`: 56/56 comprobaciones ejecutadas aprobaron, incluido
+el recorrido real de siete páginas, su multiconjunto completo, resumen/desgloses,
+filtros y conteo independiente del catálogo. La ejecución se interrumpió con
+`NJS-005` al comenzar la CTE sintética: el adaptador del control entregaba
+explícitamente `undefined` como tercer argumento de `connection.execute`.
+No se atribuyen aprobaciones a las monedas sintéticas, cierres simulados,
+seguimientos HTTP o denegación de esta ejecución, porque no llegaron a ejecutarse.
+
+El adaptador ahora usa opciones `{}` por defecto y conserva binds, opciones
+explícitas y el resultado/error original del driver. Una nueva prueba enfocada
+aprueba en Node 22 aislado (1/1); no se cambió código de producción desde
+`37226cc`, cuyas 23/23 pruebas enfocadas siguen siendo la evidencia de ese código.
+El preflight de la candidata corregida aprueba. Se requiere repetir los controles
+DEV con entradas ocultas para completar la evidencia.
