@@ -4,6 +4,7 @@ import {
 } from "../../repositories/members/memberAnalysis.repository.js";
 import { getMemberSummaryRepository } from "../../repositories/members/memberSummary.repository.js";
 import { getMemberGroupedSummaryRepository } from "../../repositories/members/memberGroupedSummary.repository.js";
+import { validateMemberAnalysisInput } from "./memberAnalysisValidation.service.js";
 
 const GENDER_LABELS = {
   M: "Masculino",
@@ -383,6 +384,11 @@ const buildAnalysisDescription = ({
 };
 
 export const analyzeMembers = async (args, connection, username) => {
+  if (!args || typeof args !== "object" || Array.isArray(args)) throw Error("Filtros de segmentación inválidos.");
+  // Identity and connections come only from the authorized dispatcher context.
+  const { connection: _untrustedConnection, username: _untrustedUsername, ...input } = args;
+  args = input;
+  validateMemberAnalysisInput(args);
   /*
    * -------------------------------------------------------------
    * Defaults de negocio
@@ -598,7 +604,7 @@ export const analyzeMembers = async (args, connection, username) => {
    * -------------------------------------------------------------
    */
 
-  const returnedCount = members.length;
+  const returnedCount = new Set(members.map((member) => member.documentNumber)).size;
 
   const hasMore =
     repositoryHasMore != null
@@ -611,9 +617,9 @@ export const analyzeMembers = async (args, connection, username) => {
    * En summary, members contiene todo el universo filtrado.
    * En members, estos conteos corresponden únicamente a la lista retornada.
    */
-  const commerciallyActiveCount = members.filter(
+  const commerciallyActiveCount = new Set(members.filter(
     (member) => member.commerciallyActive,
-  ).length;
+  ).map((member) => member.documentNumber)).size;
 
   const commerciallyInactiveCount = returnedCount - commerciallyActiveCount;
 

@@ -49,6 +49,15 @@ subsanar una diferencia: debe documentarse y resolverse en el alcance autorizado
 - Preflight del helper aprobado; no acredita ejecución de consultas Oracle.
 - Medición baseline Oracle pendiente de sesión oculta vigente. Ningún caso
   nuevo de segmentación está marcado como aprobado en DEV todavía.
+- Tres fallos reproducidos con datos controlados: los argumentos podían sustituir
+  la conexión de la ruta general; `returnedCount` y actividad contaban filas por
+  moneda como socios; filtros inválidos podían aceptarse sin rechazo. La candidata
+  descarta conexión/usuario de argumentos, valida antes de consultar y usa conjuntos
+  de identidades para esos conteos. No se presenta como validada en Oracle todavía.
+- Las 17 pruebas enfocadas ejecutadas en Node 22 aprobaron sobre esta primera
+  corrección (nuevos controles y rutas afectadas, sin suite completa). El archivo
+  nuevo actualizado, incluido un caso adicional de demografía nula/contactos,
+  aprobó después 4/4 en Node 22; no se suman ambas ejecuciones como casos únicos.
 - Se reutilizan las suites controladas existentes de resumen, agrupación,
   seguimiento y ranking. No se repitieron las suites completas aprobadas.
 - Se conservan las muestras DEV históricas faltantes de superficie cero/cambiante,
