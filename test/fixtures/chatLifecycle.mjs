@@ -889,6 +889,7 @@ let closes = 0;
 let touches = 0;
 const acquiring = new AbortController();
 const sessions = await load("../../src/services/sessions/oracleSession.service.js", {
+  "node:crypto": { randomUUID: () => "11111111-1111-4111-8111-111111111111" },
   "../requestContext.service.js": requestContext,
   "../../database/oracle.database.js": { connectWithProxy: async () => {
     acquiring.abort();

@@ -136,3 +136,29 @@ todos los criterios lingüísticos. El HTTP parte de un contexto previo preparad
 y no prueba toda la desambiguación inicial de personas y nombres. No se mantiene
 una conexión/snapshot Oracle entre páginas: cambios concurrentes en las vistas
 pueden cambiar un recorrido posterior; el control detecta diferencias al conciliar.
+
+## Corrección de la revisión de privacidad y monedas
+
+- Los fallos de cierre registran exclusivamente `correlationId` aleatorio,
+  `ORACLE_PROXY_CLOSE_FAILED` y un código de driver validado por formato o un
+  código genérico. No se registra la sesión, el error crudo ni su mensaje/stack.
+  El resultado o error original de la operación se conserva, también si falla
+  la actualización de actividad antes del callback. No cambia la expiración.
+- `$` no identifica USD. Se exige un código o descripción reconocidos y sin
+  contradicciones. Descripciones no reconocidas (incluidos pesos y dólares
+  australianos) dejan la divisa sin identificar y el agregado sin calcular con
+  motivo. El detalle conserva el importe original, sin asignar divisa ni convertir.
+  Los grupos siguen separados por descripción y símbolo originales.
+- **23/23 pruebas enfocadas aprobadas en Node 22**, aisladas sin red ni
+  credenciales. Incluyen fallo de cierre tras éxito/error, fallo de actualización
+  de actividad, códigos malformados, ausencia de datos privados en el registro,
+  monedas ambiguas, grupos separados y presentación del motivo.
+- Los 111 controles anteriores corresponden a `5d8161e`, no a esta corrección.
+  La repetición afectada DEV queda pendiente de entradas ocultas vigentes.
+  `scripts/check-promotion-hardening-dev.mjs` añade SELECT de filas sintéticas
+  mediante CTE en Oracle para grupos/monedas y paginación, sin crear datos.
+  Simula dos errores de cierre únicamente después de cerrar conexiones reales,
+  para comprobar registro seguro y conservación del resultado/error principal.
+  Esta simulación no equivale a observar un fallo real del driver en DEV.
+- Se conserva la muestra real DEV pendiente con varias monedas. La PR permanece
+  en borrador hasta revisar la corrección y completar la evidencia nueva.

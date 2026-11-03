@@ -14,12 +14,15 @@ export const promoPageLimit = () => Math.min(100, Number.isSafeInteger(Number(co
 const originFields = (v) => v === "S" ? { bankOrigin: true, origin: "Banco Atlas" }
   : v === "N" || v == null ? { bankOrigin: false, origin: "No bancario" } : { bankOrigin: null, origin: "Origen no identificado" };
 const identifyCurrency = (v) => {
-  const s = String(v ?? "").trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  return ["PYG", "GS", "GS.", "₲"].includes(s) || s.includes("GUARANI") ? "PYG" : ["USD", "$", "US$"].includes(s) || s.includes("DOLAR") ? "USD" : null;
+  const s = String(v ?? "").trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ");
+  if (["PYG", "GS", "GS.", "₲", "GUARANI", "GUARANIES", "GUARANI PARAGUAYO", "GUARANIES PARAGUAYOS"].includes(s)) return "PYG";
+  if (["USD", "US$", "U$S", "DOLAR", "DOLARES", "DOLAR AMERICANO", "DOLARES AMERICANOS", "DOLAR ESTADOUNIDENSE", "DOLARES ESTADOUNIDENSES", "US DOLLAR", "US DOLLARS", "UNITED STATES DOLLAR", "UNITED STATES DOLLARS"].includes(s)) return "USD";
+  return null;
 };
 const currencyFields = (r) => {
   const a = identifyCurrency(r.CURRENCY_SYMBOL), b = identifyCurrency(r.CURRENCY_DESCRIPTION);
-  const code = String(r.CURRENCY_SYMBOL ?? "").trim() && !a ? null : a && b && a !== b ? null : a ?? b;
+  const unknown = (value, known) => Boolean(String(value ?? "").trim()) && String(value).trim() !== "$" && !known;
+  const code = unknown(r.CURRENCY_SYMBOL, a) || unknown(r.CURRENCY_DESCRIPTION, b) || a && b && a !== b ? null : a ?? b;
   return { code, description: r.CURRENCY_DESCRIPTION ?? null, symbol: r.CURRENCY_SYMBOL ?? null };
 };
 const addIn = (filters, binds, column, values, prefix) => {
@@ -63,13 +66,17 @@ export const getMemberPromoPurchasesRepository = async ({ connection, documentNu
     return { documentNumber: String(documentNumber), mode, page, rows, totalRows, totalPages,
       startRow: data.length ? offset + 1 : null, endRow: data.length ? offset + data.length : null, returnedRows: data.length,
       hasMore: page < totalPages, nextPage: page < totalPages ? page + 1 : null,
-      data: data.map((r) => ({ registerDate: r.REGISTER_DATE, purchaseDate: r.PURCHASE_DATE,
+      data: data.map((r) => {
+        const currency = currencyFields(r);
+        const reason = [...(!currency.code ? ["Moneda ambigua, desconocida o contradictoria; sin divisa asignada ni conversión."] : []), ...(r.AMOUNT == null ? ["Importe ausente; no se sustituye por cero."] : [])].join(" ");
+        return { registerDate: r.REGISTER_DATE, purchaseDate: r.PURCHASE_DATE,
         promotion: { id: r.COD_PROMOCION == null ? null : String(r.COD_PROMOCION), name: r.PROMOCION },
         campaign: { id: r.COD_CAMPANIA == null ? null : Number(r.COD_CAMPANIA), name: r.CAMPANIA },
         customer: { id: r.COD_CLIENTE == null ? null : String(r.COD_CLIENTE), name: r.LOCAL },
         category: { id: r.COD_RUBRO == null ? null : String(r.COD_RUBRO), name: r.RUBRO },
-        currency: currencyFields(r), invoiceNumber: r.INVOICE_NUMBER, amount: r.AMOUNT == null ? null : Number(r.AMOUNT),
-        ...(r.AMOUNT == null ? {reason:"Importe ausente; no se sustituye por cero."} : {}), ...originFields(r.ORIGEN_BANCARIO) })) };
+        currency, invoiceNumber: r.INVOICE_NUMBER, amount: r.AMOUNT == null ? null : Number(r.AMOUNT),
+        ...(reason ? { reason } : {}), ...originFields(r.ORIGEN_BANCARIO) };
+      }) };
   }
   const fields = groupBy.map((g) => promoDimensions[g][0] + (promoDimensions[g][1] ? " AS " + promoDimensions[g][1] : ""));
   const groups = [...groupBy.map((g) => promoDimensions[g][0]), "MONEDA", "SIMBOLO_MONEDA"];
@@ -82,6 +89,6 @@ export const getMemberPromoPurchasesRepository = async ({ connection, documentNu
     return { ...Object.assign({}, ...groupBy.map((g) => promoDimensions[g][2](r))), currency,
       ...(metrics.includes("purchaseCount") ? { purchaseCount: Number(r.PURCHASE_COUNT) } : {}),
       ...(metrics.includes("totalAmount") ? { totalAmount: currency.code && r.TOTAL_AMOUNT != null ? Number(r.TOTAL_AMOUNT) : null } : {}),
-      ...(metrics.includes("totalAmount") && (!currency.code || r.TOTAL_AMOUNT == null) ? { reason: !currency.code ? "Moneda desconocida o contradictoria; importe agregado sin calcular." : "Hay importes ausentes; no se sustituyen por cero." } : {}) };
+      ...(metrics.includes("totalAmount") && (!currency.code || r.TOTAL_AMOUNT == null) ? { reason: !currency.code ? "Moneda ambigua, desconocida o contradictoria; importe agregado sin calcular ni conversión." : "Hay importes ausentes; no se sustituyen por cero." } : {}) };
   }) };
 };

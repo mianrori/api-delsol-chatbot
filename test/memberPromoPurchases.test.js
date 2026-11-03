@@ -48,6 +48,27 @@ test('detail retains null amounts and never labels an unknown bank code nonbank'
  assert.equal(r.data[0].amount,null);assert.ok(r.data[0].reason);assert.equal(r.data[0].bankOrigin,null);assert.equal(r.data[0].origin,'Origen no identificado');
  const c=db({summary:[aggregate({BANK_ORIGIN:'N'})]});await getMemberPromoPurchases({...args,groupBy:['bankOrigin']},c);assert.match(c.queries.at(-1).sql,/NVL\(ORIGEN_BANCARIO, 'N'\) AS BANK_ORIGIN/);
 });
+test('ambiguous dollar signs and unsupported descriptions stay unidentified and retain separate groups',async()=>{
+ const values=[
+  {CURRENCY_SYMBOL:'PYG',CURRENCY_DESCRIPTION:'GUARANIES',TOTAL_AMOUNT:100,expected:'PYG'},
+  {CURRENCY_SYMBOL:'USD',CURRENCY_DESCRIPTION:'DOLARES',TOTAL_AMOUNT:20,expected:'USD'},
+  {CURRENCY_SYMBOL:'$',CURRENCY_DESCRIPTION:'DOLARES',TOTAL_AMOUNT:30,expected:'USD'},
+  {CURRENCY_SYMBOL:'$',CURRENCY_DESCRIPTION:'PESOS ARGENTINOS',TOTAL_AMOUNT:40,expected:null},
+  {CURRENCY_SYMBOL:'$',CURRENCY_DESCRIPTION:'PESOS MEXICANOS',TOTAL_AMOUNT:50,expected:null},
+  {CURRENCY_SYMBOL:'$',CURRENCY_DESCRIPTION:null,TOTAL_AMOUNT:60,expected:null},
+  {CURRENCY_SYMBOL:'$',CURRENCY_DESCRIPTION:'DOLARES AUSTRALIANOS',TOTAL_AMOUNT:70,expected:null},
+  {CURRENCY_SYMBOL:'PYG',CURRENCY_DESCRIPTION:'DOLARES',TOTAL_AMOUNT:80,expected:null},
+  {CURRENCY_SYMBOL:'USD',CURRENCY_DESCRIPTION:'PESOS ARGENTINOS',TOTAL_AMOUNT:90,expected:null},
+  {CURRENCY_SYMBOL:null,CURRENCY_DESCRIPTION:'DÓLARES ESTADOUNIDENSES',TOTAL_AMOUNT:110,expected:'USD'},
+  {CURRENCY_SYMBOL:'US$',CURRENCY_DESCRIPTION:null,TOTAL_AMOUNT:120,expected:'USD'},
+ ];
+ const c=db({summary:values.map(v=>aggregate(v))}),r=await getMemberPromoPurchases(args,c);
+ assert.equal(r.data.length,values.length);assert.match(c.queries.at(-1).sql,/GROUP BY MONEDA, SIMBOLO_MONEDA/);
+ for(let i=0;i<values.length;i++){assert.equal(r.data[i].currency.code,values[i].expected);assert.equal(r.data[i].totalAmount,values[i].expected?values[i].TOTAL_AMOUNT:null);assert.equal(r.data[i].purchaseCount,2);assert.ok(!Object.hasOwn(r.data[i],'usd'));if(!values[i].expected)assert.match(r.data[i].reason,/ambigua/);}
+ assert.notEqual(r.data[3].currency.description,r.data[4].currency.description);assert.ok(!Object.hasOwn(r,'totalAmount'));
+ const text=buildMemberPromoResponse([{name:'get_member_promo_purchases',input:args,result:r}]);assert.match(text,/Moneda no identificada \| Sin calcular/);assert.doesNotMatch(text,/USD \| (40|50|60|70|80|90) \|/);
+ const detailResult=await getMemberPromoPurchases({...args,mode:'detail'},db({detail:[detail({CURRENCY_SYMBOL:'$',CURRENCY_DESCRIPTION:null})]}));assert.equal(detailResult.data[0].currency.code,null);assert.equal(detailResult.data[0].amount,100);assert.match(detailResult.data[0].reason,/sin divisa asignada ni conversión/);
+});
 test('invalid promo dates, IDs, page numbers and groups fail before any Oracle query',async()=>{
  for(const fields of [{documentNumber:''},{documentNumber:{}},{dateFrom:'31/02/2023'},{dateTo:'01/01/2022'},{dateFrom:undefined},{promotionIds:'P'},{campaignIds:['bad']},{campaignIds:[Infinity]},{customerIds:[{}]},{categoryIds:[' ']},{page:0},{page:1.5},{rows:NaN},{rows:0},{origin:'unknown'},{groupBy:['month','month']},{groupBy:['__proto__']},{metrics:[]}]){
   const c=db();await assert.rejects(getMemberPromoPurchases({...args,...fields},c));assert.equal(c.queries.length,0);

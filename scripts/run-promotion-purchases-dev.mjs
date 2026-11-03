@@ -9,7 +9,14 @@ const report={suite:'promotion-purchases-dev',startedAt:new Date().toISOString()
 const check=(ok,code)=>report.checks.push({code,passed:Boolean(ok)});
 const near=(a,b)=>a===b||(Number.isFinite(a)&&Number.isFinite(b)&&Math.abs(a-b)<=Math.max(.000001,Math.abs(b)*1e-9));
 const norm=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim().replace(/\s+/g,' ');
-const currency=s=>{const raw=String(s??'').trim(),v=norm(raw);return ['PYG','GS'].includes(v)||v.includes('GUARANI')||raw==='₲'?'PYG':['USD','US'].includes(v)||v.includes('DOLAR')||raw==='$'?'USD':null;};
+const currency=(symbol,description)=>{
+ const recognized=new Map([
+  ...['PYG','GS','GS.','₲','GUARANI','GUARANIES','GUARANI PARAGUAYO','GUARANIES PARAGUAYOS'].map(s=>[s,'PYG']),
+  ...['USD','US$','U$S','DOLAR','DOLARES','DOLAR AMERICANO','DOLARES AMERICANOS','DOLAR ESTADOUNIDENSE','DOLARES ESTADOUNIDENSES','US DOLLAR','US DOLLARS','UNITED STATES DOLLAR','UNITED STATES DOLLARS'].map(s=>[s,'USD'])]);
+ const raw=[symbol,description].map(s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim().replace(/\s+/g,' '));
+ const codes=raw.map(s=>recognized.get(s));
+ return raw.some((s,i)=>s&&s!=='$'&&!codes[i])||codes[0]&&codes[1]&&codes[0]!==codes[1]?null:codes[0]??codes[1]??null;
+};
 const day=s=>s.slice(0,10).split('-').reverse().join('/');
 const key=r=>JSON.stringify([r.PROMOTION_ID,String(r.CAMPAIGN_ID),r.CUSTOMER_ID,r.CATEGORY_ID,r.CURRENCY_DESCRIPTION,r.CURRENCY_SYMBOL,r.INVOICE_NUMBER,r.PURCHASE_AT?.slice(0,10),r.REGISTER_AT?.slice(0,10),r.AMOUNT,r.BANK_ORIGIN]);
 try{
@@ -35,7 +42,7 @@ try{
   const args={documentNumber,promotionIds:[String(first.PROMOTION_ID)],campaignIds:[Number(first.CAMPAIGN_ID)],dateFrom:day(dates[0]),dateTo:day(dates.at(-1)),mode:'summary',groupBy:[]};
   report.coverage.memberFixture=true;report.coverage.multiplePages=rows.length>2;
   const expected=(source,groupBy=[])=>{
-   const map=new Map();for(const r of source){const dims=groupBy.map(g=>({month:r.PURCHASE_AT.slice(0,7),year:r.PURCHASE_AT.slice(0,4),promotion:String(r.PROMOTION_ID),campaign:Number(r.CAMPAIGN_ID),customer:String(r.CUSTOMER_ID),category:String(r.CATEGORY_ID),bankOrigin:r.BANK_ORIGIN==='S'?true:r.BANK_ORIGIN==null||r.BANK_ORIGIN==='N'?false:null}[g]));const k=JSON.stringify([...dims,r.CURRENCY_DESCRIPTION,r.CURRENCY_SYMBOL]);if(!map.has(k))map.set(k,{count:0,amount:0});const v=map.get(k),a=currency(r.CURRENCY_SYMBOL),b=currency(r.CURRENCY_DESCRIPTION);v.count++;if(r.AMOUNT==null||!a||b&&a!==b)v.amount=null;else if(v.amount!==null)v.amount+=Number(r.AMOUNT);}return map;
+   const map=new Map();for(const r of source){const dims=groupBy.map(g=>({month:r.PURCHASE_AT.slice(0,7),year:r.PURCHASE_AT.slice(0,4),promotion:String(r.PROMOTION_ID),campaign:Number(r.CAMPAIGN_ID),customer:String(r.CUSTOMER_ID),category:String(r.CATEGORY_ID),bankOrigin:r.BANK_ORIGIN==='S'?true:r.BANK_ORIGIN==null||r.BANK_ORIGIN==='N'?false:null}[g]));const k=JSON.stringify([...dims,r.CURRENCY_DESCRIPTION,r.CURRENCY_SYMBOL]);if(!map.has(k))map.set(k,{count:0,amount:0});const v=map.get(k),code=currency(r.CURRENCY_SYMBOL,r.CURRENCY_DESCRIPTION);v.count++;if(r.AMOUNT==null||!code)v.amount=null;else if(v.amount!==null)v.amount+=Number(r.AMOUNT);}return map;
   };
   const compare=(result,input,source,label)=>{
    const control=expected(source,input.groupBy??[]);
@@ -72,6 +79,7 @@ try{
   const search=await resolvePromotion(query,connection,{page:1,rows:1});
   check(search.totalRows===matches.length,'SEARCH_INDEPENDENT_COUNT');check(search.status===(matches.length===1?'RESOLVED':matches.length?'AMBIGUOUS':'NOT_FOUND'),'SEARCH_AMBIGUITY_DISTINCT_FROM_EMPTY');
   report.coverage.searchMultipleOptions=matches.length>1;
+  if(process.env.BOT_TEST_PROMO_HARDENING==='true'){const {checkPromotionHardening}=await import('./check-promotion-hardening-dev.mjs');await checkPromotionHardening({connection,sessionId,check});report.coverage.syntheticOracleCurrencyControls=true;report.coverage.simulatedCloseFailureAfterRealClose=true;}
   if(process.env.BOT_TEST_PROMO_HTTP==='true'){
    const totalSearchPages=Math.ceil(matches.length/2),seen=[];
    if(totalSearchPages<=200){for(let page=1;page<=totalSearchPages;page++){
@@ -84,7 +92,7 @@ try{
    const noPurchases=await getMemberPromoPurchases({...args,customerIds:['-999999999']},connection);check(noPurchases.status==='NO_PURCHASES','VALID_SELECTION_EMPTY_PURCHASES_DISTINCT');
    let emptyMember;for(const candidate of ['-999999999','-999999998','-999999997']){if(candidate===documentNumber)continue;const count=(await connection.execute('SELECT COUNT(*) AS TOTAL_ROWS FROM VW_BOT_FACTURAS_PROMO WHERE COD_SOCIO=:documentNumber',{documentNumber:candidate})).rows?.[0]?.TOTAL_ROWS;if(Number(count)===0){emptyMember=candidate;break;}}
    if(emptyMember){const other=await getMemberPromoPurchases({...args,documentNumber:emptyMember},connection);check(other.status==='NO_PURCHASES'&&other.documentNumber===emptyMember&&!other.data.length,'DIFFERENT_MEMBER_FILTER_NO_DATA_LEAK');report.coverage.otherMemberEmptyControl=true;}else report.pending.push('OTHER_MEMBER_EMPTY_CONTROL_NOT_AVAILABLE');
-   report.coverage.multipleCurrencies=new Set(rows.map(r=>currency(r.CURRENCY_SYMBOL)).filter(Boolean)).size>1;
+   report.coverage.multipleCurrencies=new Set(rows.map(r=>currency(r.CURRENCY_SYMBOL,r.CURRENCY_DESCRIPTION)).filter(Boolean)).size>1;
    if(!report.coverage.multipleCurrencies)report.pending.push('MIXED_CURRENCY_REAL_MEMBER_FIXTURE_NOT_FOUND');
    const {router}=await import('../src/routes/index.js');const {getConversation,setConversation,clearConversation}=await import('../src/state/conversation.store.js');const {protectPiiDeep,restorePiiDeep}=await import('../src/services/ai/pii.service.js');const {default:express}=await import('express');
    const app=express();app.use(express.json());app.use('/chatbot/api',router);const server=await new Promise(resolve=>{const s=app.listen(0,'127.0.0.1',()=>resolve(s));});
