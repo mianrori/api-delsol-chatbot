@@ -199,3 +199,54 @@ para sus casos; permanecen las históricas y los límites de la matriz. Se reuti
 los 100 checks previos sin repetirlos, sin sumarlos como casos únicos ni atribuirlos
 al código corregido. No se repitieron controles/login al revisar esta evidencia.
 PR #37 sigue en borrador hasta revisar las correcciones; sin merge/despliegue.
+
+## Composición de local y rubro — `929d88e`
+
+La revisión encontró que mezclar `previousInput` por cada resolutor reintroducía
+IDs propuestos por el modelo sobre IDs ya validados. Ahora se recupera el contexto
+una sola vez, prefiriendo los últimos argumentos ejecutados correctamente, y se
+acumulan todas las identidades por separado para aplicarlas al final. Local y
+rubro conservan su identidad independientemente del orden de las
+búsquedas. Una selección confirmada solo cambia mediante otra selección válida
+o un nuevo lookup resuelto; no por argumentos contradictorios del consumidor.
+Las resoluciones previas se conservan en los seguimientos del contexto disponible.
+
+El resultado se clona en profundidad: ni la función ni una modificación posterior
+del resultado pueden alterar los argumentos guardados en el historial. Una nueva
+búsqueda explícita cambia su dominio, conservando el otro; un cambio de período
+puede actualizar fechas sin volver a elegir local/rubro, conservándolas también
+en el siguiente «continúa».
+
+**42/42 pruebas afectadas aprobadas en Node 22**, sin sesiones ni Oracle reales:
+ambos órdenes local→rubro/rubro→local, propuestas contradictorias, selección
+confirmada más nueva resolución del otro dominio, cambios de local/rubro/período,
+historial congelado y copia de filtros anidados. La integración HTTP candidata
+comprueba los argumentos finales y el prefijo previo del historial después de
+cada petición. El modelo simulado entrega argumentos ya protegidos por PII,
+conforme al contrato real; no se confunde esa normalización con una mutación del
+guard. Se conservan también las regresiones de selección/«continúa» afectadas.
+
+La paginación y el repositorio de promociones no cambian. Los 78 controles de
+`2bfa637`, incluidos empates/paginación/denegación/cierre, se reutilizan con su
+SHA y hash, sin atribuir la composición nueva a esa ejecución. No se repiten los
+100 controles previos ni catálogos completos, ventas, compras o usos.
+
+`scripts/run-search-composition-dev.mjs` prepara únicamente el contraste afectado:
+lee perfiles reales de locales activos/rubros por SQL independiente, coteja sus
+IDs con los lookups y ejecuta las conversaciones HTTP en ambos órdenes, cambios
+explícitos, selección previa y denegación. Ruta/controller/chat, autenticación y
+búsquedas Oracle son reales; modelo y consumidor de ventas son controlados para
+inspeccionar argumentos, sin volver a consultar ventas. Se comprueba historial
+previo, usuarios Oracle distintos y cierre. Lecturas acotadas a 10.000 filas y
+60 s por llamada; las muestras inexistentes no se declaran aprobadas.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\logs\run-search-composition-dev.ps1
+```
+
+Preflight aprobado con el comando HTTP sintético completo. Dos cuentas DEV en
+cuatro entradas ocultas, login protegido existente para obtener sesiones nuevas,
+credenciales/sesiones solo en memoria/stdin y logout de las creadas; helpers y
+reportes ignorados. Reporte esperado: `logs/search-composition-final.json`.
+**Oracle/HTTP de esta composición todavía pendientes.** PR #37 en borrador hasta
+completar y revisar esa evidencia; muestras y limitaciones previas conservadas.
