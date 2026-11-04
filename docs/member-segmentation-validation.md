@@ -231,3 +231,37 @@ relación con la sesión). El helper rechaza reportes de otra ejecución y deja 
 estado local explícito si Node no llegó a arrancar. Esta modificación afecta
 solo al ejecutor/reportes y documentación; el código productivo de `6d3af88`
 y su evidencia enfocada de 46/46 se conservan. Oracle/HTTP siguen pendientes.
+
+### Corrección final del contrato `orderBy` — `345827f`
+
+El esquema de `analyze_members` declara `orderBy` como string opcional con cuatro
+valores enumerados; no admite null. Ahora null se rechaza en la validación del
+servicio antes de ejecutar cualquier SQL, tanto en members como en summary.
+Omitir el argumento conserva el predeterminado `totalAmount`. No cambian el
+repositorio, la selección de rutas SQL, los filtros ni la protección monetaria.
+
+**17/17 pruebas enfocadas aprobadas en Node 22 aislado**, correspondientes a
+`memberAnalysisOrderBy`, `memberSegmentation` y `memberSegmentationAccess`.
+Los cinco tests nuevos también aprobaron **5/5 dentro de Docker DEV**, sobre una
+copia candidata aislada en `/tmp/orderby-candidate`, sin modificar `/app`:
+
+- Contrato opcional no nullable; omisión y orden explícito predeterminado generan
+  SQL/binds idénticos, conservando período, sexo, local, rubro, importe y límite.
+- Null y valores inválidos se rechazan sin llamadas a Oracle en ambos modos.
+- Los cuatro órdenes válidos conservan filtros y seleccionan columnas permitidas.
+- Omisión y `totalAmount` explícito rechazan el universo monetario mixto; null
+  no puede alcanzar SQL ni eludir esa protección.
+
+Los conteos anteriores se solapan y no se suman como casos únicos. El SQL de las
+rutas válidas es idéntico al ya contrastado con Oracle DEV en `7c34c14`; se
+reutilizan esos 50 controles Oracle/HTTP y la denegación de `82e72ba` con sus SHA
+originales, sin atribuirlos como ejecuciones nuevas del commit corregido. Los
+cinco controles nuevos en Docker DEV son controlados, no consultas nuevas de
+datos reales Oracle. El cambio solo afecta al rechazo previo de null, por lo
+que no se repiten consultas aprobadas ni el flujo de login independiente.
+
+Reportes locales ignorados: `logs/orderby-focused.txt`,
+`logs/orderby-dev-focused.txt` y `logs/orderby-final-evidence.json`. Solo contienen
+resultados controlados/hashes; no sesiones, credenciales ni datos de socios DEV.
+El hallazgo P2 de null queda corregido. Se conservan las muestras reales pendientes,
+incluida la multimoneda de segmentación, y la PR permanece sin fusionar.
