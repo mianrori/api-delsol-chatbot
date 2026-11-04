@@ -119,3 +119,54 @@ en borrador para revisión final; sin merge ni despliegue del candidato.
 Se conservan sin fabricar muestras: superficie cero/cambiante, ventas registradas
 que sumen cero, socios/promociones/segmentación con varias monedas y demás límites
 históricos de la matriz. Sin merge ni cambios de datos, permisos o expiraciones.
+
+## Correcciones de revisión — `2094624`
+
+Los tres P2 de la revisión de `7ced8d9` se corrigen en código, con validación
+controlada aprobada y contraste DEV afectado aún pendiente:
+
+- El guard reconstruye búsquedas pendientes a través de los turnos e iteraciones
+  conservados en el contexto. «Continúa», preguntas sin selección y opciones
+  inexistentes no liberan la identidad. Solo una opción numérica mostrada o una
+  nueva búsqueda RESOLVED sin truncamiento libera la consulta. El ID se toma del
+  resultado real y se conservan los filtros del intento original; los intentos
+  posteriores bloqueados no pueden reemplazarlos.
+- `get_soles_usage` es consumidor de `search_categories`: bloqueo y selección de
+  `categoryIds` conservan socio, período, movimientos y pareja de destino.
+- El fallback de promociones usa como clave la opción visible completa (IDs,
+  nombres y fechas), deduplica filas indistinguibles y añade esa clave como último
+  desempate. Se mantiene la prioridad existente de similitud/fecha/IDs. Las
+  opciones visibles distintas empatadas quedan ordenadas sin depender de Oracle;
+  la rama textual no cambia. No garantiza un snapshot entre peticiones si otro
+  proceso modifica el catálogo concurrentemente.
+
+**44/44 pruebas enfocadas Node 22 aprobadas** sobre `2094624`, incluidas conversaciones
+por HTTP de loopback con ruta/controlador/chat reales y modelo/buscadores/consumidores
+controlados, no Oracle real. Cubren dos «continúa», elección explícita y sus filtros,
+nueva búsqueda unívoca y denegación sin datos/acciones. La paginación recorre filas
+empatadas invertidas, duplicados idénticos y una página posterior al final. El
+control independiente de promociones también tiene su regresión de empates.
+
+`scripts/run-search-corrections-dev.mjs` prepara solo controles afectados:
+CTE sintéticas sobre DUAL ejecutadas por Oracle, un recorrido aproximado real
+contrastado con una consulta independiente de todas las columnas de opción,
+denegación y cierre; HTTP candidata con sesiones y búsquedas de rubros Oracle
+reales, modelo controlado y consumidores de negocio como espías de argumentos
+(sin releer compras/usos). El servidor HTTP es temporal, en loopback, y no
+modifica `/app` ni el servicio desplegado. La prueba declara expresamente esa
+separación; no se atribuyen al consumidor resultados de negocio no consultados.
+
+Se verifica por hash el reporte anterior y se reutilizan sus 100 controles de
+`7ced8d9` para implementaciones sin cambios, con su SHA original; no se atribuye
+el orden aproximado anterior a `2094624`. No se repiten suites completas ni los
+otros catálogos. El login protegido solo obtiene sesiones nuevas para esta etapa;
+credenciales y sesiones permanecen en memoria/stdin y los logout son propios.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\logs\run-search-corrections-dev.ps1
+```
+
+El preflight ya probó entorno, guard de logs y el comando HTTP sintético completo
+en Docker DEV sin credenciales. **Oracle/HTTP afectados reales pendientes de
+ejecución y revisión**; reporte privado esperado `logs/search-corrections-final.json`.
+PR #37 sigue en borrador. Las muestras/limitaciones anteriores no se eliminan.
