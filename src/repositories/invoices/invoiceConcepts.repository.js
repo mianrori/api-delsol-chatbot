@@ -26,15 +26,15 @@ export const searchInvoiceConceptsRepository = async ({
         DESCRIPCION
       FROM VW_BOT_CONCEPTOS
       WHERE
-        UPPER(DESCRIPCION) LIKE '%' || :query || '%'
+        INSTR(UPPER(DESCRIPCION), :query) > 0
         OR UPPER(COD_CONCEPTO) = :query
       ORDER BY
         CASE
           WHEN UPPER(DESCRIPCION) = :query THEN 1
-          WHEN UPPER(DESCRIPCION) LIKE :query || '%' THEN 2
+          WHEN INSTR(UPPER(DESCRIPCION), :query) = 1 THEN 2
           ELSE 3
         END,
-        DESCRIPCION
+        DESCRIPCION, COD_CONCEPTO
     )
     WHERE ROWNUM <= :limit
   `;

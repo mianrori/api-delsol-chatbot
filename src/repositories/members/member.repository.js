@@ -146,7 +146,8 @@ const getCandidateMembers = async ({
     WHERE (
       ${tokenFilters.join(`\n      ${operator} `)}
     )
-    AND ROWNUM <= :candidateLimit
+    ORDER BY COD_SOCIO, NOMBRE_COMPLETO
+    FETCH FIRST :candidateLimit ROWS ONLY
   `;
 
   const result = await executeOracleQuery(connection, sql, binds);
@@ -176,7 +177,7 @@ const rankCandidates = ({ candidates, search, matchPriority }) =>
         return b.SIMILARITY - a.SIMILARITY;
       }
 
-      return b.MIN_TOKEN_SIMILARITY - a.MIN_TOKEN_SIMILARITY;
+      return b.MIN_TOKEN_SIMILARITY - a.MIN_TOKEN_SIMILARITY || String(a.COD_SOCIO).localeCompare(String(b.COD_SOCIO));
     });
 
 export const searchMembersRepository = async (connection, search) => {
@@ -199,6 +200,7 @@ export const searchMembersRepository = async (connection, search) => {
         REGEXP_REPLACE(:search, '[^0-9]', '')
         AND REGEXP_REPLACE(:search, '[^0-9]', '') IS NOT NULL
       )
+    ORDER BY COD_SOCIO, NOMBRE_COMPLETO
   `;
 
   const exactResult = await executeOracleQuery(connection, exactSql, { search });
@@ -209,6 +211,7 @@ export const searchMembersRepository = async (connection, search) => {
       .slice(0, Number(config.limitFilter || 5))
       .map((member) => ({
         ...member,
+        TOTAL_MATCHES: exactMatches.length,
         MATCH_PRIORITY: 1,
         SIMILARITY: 100,
         MIN_TOKEN_SIMILARITY: 100,
@@ -263,6 +266,7 @@ export const searchMembersRepository = async (connection, search) => {
       binds,
       operator: "OR",
     });
+    candidates=fallbackCandidates;
 
     ranked = rankCandidates({
       candidates: fallbackCandidates,
@@ -271,7 +275,8 @@ export const searchMembersRepository = async (connection, search) => {
     });
   }
 
-  return ranked.slice(0, Number(config.limitFilter ?? 10));
+  const truncated=candidates.length>=binds.candidateLimit;
+  return Object.assign(ranked.slice(0, Number(config.limitFilter ?? 10)).map(member=>({...member,TOTAL_MATCHES:ranked.length,CANDIDATES_TRUNCATED:truncated})),{candidateTruncated:truncated});
 };
 
 export const getMemberRepository = async (connection, documentNumber) => {

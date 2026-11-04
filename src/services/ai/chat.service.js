@@ -1,4 +1,5 @@
 import { buildMemberPurchasesResponse, resolveMemberPurchasesPage } from "./memberPurchasesPresentation.service.js";
+import {preserveSearchSelection} from './searchSelection.service.js';
 import { buildMemberPromoResponse, resolveMemberPromoPage, resolveMemberPromoSelection, preserveMemberPromoFollowup } from "./memberPromoPurchasesPresentation.service.js";
 import { preserveSalesPerSqmFollowup } from "./salesPerSqmFollowup.service.js";
 import { preserveContractIncidenceFollowup } from "./contractIncidenceFollowup.service.js";
@@ -1409,6 +1410,8 @@ const executeToolRequests = async ({ content, sessionId, sourceMessages = [], ch
     }
 
     try {
+      input=preserveSearchSelection({name,input,history:sourceMessages,currentCalls:internalContext.presentationCalls});
+      block.toolUse.input=input;presentationCall.input=input;
       validateProtectedToolInput({ name, input });
 
       if (name === "generate_chart" && !chartRequested) throw new Error("El usuario debe solicitar el gráfico antes de generarlo.");
@@ -1485,6 +1488,7 @@ const executeToolRequests = async ({ content, sessionId, sourceMessages = [], ch
         null,
         [name],
       );
+      if(name.startsWith('search_'))presentationCall.result=protectedResultForModel;
       if (isChartSourceTool(name) && protectedResultForModel && typeof protectedResultForModel === "object" && !Array.isArray(protectedResultForModel)) {
         protectedResultForModel.chartSourceId = toolUseId;
       }

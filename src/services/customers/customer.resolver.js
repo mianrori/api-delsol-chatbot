@@ -8,7 +8,7 @@ const mapCustomer = (customer) => ({
 });
 
 const isExactMatch = (customer) =>
-  Number(customer?.SIMILARITY) === 100;
+  customer?.EXACT_MATCH!=null ? Number(customer.EXACT_MATCH)===1 : Number(customer?.SIMILARITY) === 100;
 
 const hasActiveContract = (customer) =>
   customer?.CONTRATO_ACTIVO === "S";
@@ -50,17 +50,24 @@ export const resolveCustomer = async (search, connection) => {
    * locales NIKE activos), debe mantenerse la ambigüedad.
    */
   const exactMatches = activeCustomers.filter(isExactMatch);
+  const totalMatches=Number(customers[0].TOTAL_MATCHES??activeCustomers.length);
+  const exactCount=Number(customers[0].EXACT_MATCH_COUNT??exactMatches.length);
+  const candidates=exactCount>0?exactMatches:activeCustomers;
+  const count=exactCount||totalMatches;
+  const metadata={totalMatches:count,returnedMatches:candidates.length,hasMore:count>candidates.length};
 
-  if (exactMatches.length === 1) {
+  if (exactCount === 1 && exactMatches.length === 1) {
     return {
       status: "RESOLVED",
+      ...metadata,
       customer: mapCustomer(exactMatches[0]),
     };
   }
 
-  if (exactMatches.length > 1) {
+  if (exactCount > 1) {
     return {
       status: "AMBIGUOUS",
+      ...metadata,
       query: search,
       options: exactMatches.map((customer, index) => ({
         optionId: String(index + 1),
@@ -74,15 +81,17 @@ export const resolveCustomer = async (search, connection) => {
    * - una sola coincidencia activa puede resolverse;
    * - varias coincidencias activas requieren selección del usuario.
    */
-  if (activeCustomers.length === 1) {
+  if (totalMatches === 1 && activeCustomers.length === 1) {
     return {
       status: "RESOLVED",
+      ...metadata,
       customer: mapCustomer(activeCustomers[0]),
     };
   }
 
   return {
     status: "AMBIGUOUS",
+    ...metadata,
     query: search,
     options: activeCustomers.map((customer, index) => ({
       optionId: String(index + 1),

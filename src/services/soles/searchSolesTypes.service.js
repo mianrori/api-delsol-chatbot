@@ -227,15 +227,16 @@ export const searchSolesTypes = async ({ query }, connection) => {
    * etc.
    */
   if (alias) {
-    const exactAliasMatch = directResults.find(
+    const exactAliasMatches = directResults.filter(
       (item) => normalizeText(item.description) === normalizeText(alias),
     );
 
-    if (exactAliasMatch) {
+    if (exactAliasMatches.length > 1) return buildAmbiguousResponse({query,items:exactAliasMatches});
+    if (exactAliasMatches.length === 1) {
       return buildResolvedResponse({
         query,
 
-        item: exactAliasMatch,
+        item: exactAliasMatches[0],
       });
     }
   }
@@ -246,15 +247,16 @@ export const searchSolesTypes = async ({ query }, connection) => {
    * resolvemos esa opción aunque el LIKE
    * también haya retornado otros tipos.
    */
-  const exactMatch = directResults.find(
+  const exactMatches = directResults.filter(
     (item) => normalizeText(item.description) === normalizedQuery,
   );
 
-  if (exactMatch) {
+  if (exactMatches.length > 1) return buildAmbiguousResponse({query,items:exactMatches});
+  if (exactMatches.length === 1) {
     return buildResolvedResponse({
       query,
 
-      item: exactMatch,
+      item: exactMatches[0],
     });
   }
 

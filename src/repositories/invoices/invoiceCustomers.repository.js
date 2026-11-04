@@ -58,6 +58,14 @@ const mapRow = (row) => ({
   strongMatch: Number(row.MATCH_PRIORITY ?? 99) <= 7,
 });
 
+// Limit identities, not invoice/plate rows belonging to the same customer.
+const uniqueCustomerSql=sql=>`SELECT * FROM (
+  SELECT source_rows.*, ROW_NUMBER() OVER (
+    PARTITION BY COD_CLIENTE ORDER BY MATCH_PRIORITY, SIMILARITY DESC NULLS LAST,
+      NOM_CLIENTE, RAZON_SOCIAL, RUC
+  ) AS CUSTOMER_ROW FROM (${sql}) source_rows
+) WHERE CUSTOMER_ROW = 1 ORDER BY MATCH_PRIORITY, SIMILARITY DESC NULLS LAST, NOM_CLIENTE, COD_CLIENTE`;
+
 export const searchInvoiceCustomersRepository = async ({
   connection,
   query,
@@ -143,7 +151,7 @@ export const searchInvoiceCustomersRepository = async ({
   `;
 
   const strongResult = await connection.execute(
-    strongSql,
+    uniqueCustomerSql(strongSql),
     strongBinds,
     {
       outFormat: 4002,
@@ -232,7 +240,7 @@ export const searchInvoiceCustomersRepository = async ({
   `;
 
   const fuzzyResult = await connection.execute(
-    fuzzySql,
+    uniqueCustomerSql(fuzzySql),
     fuzzyBinds,
     {
       outFormat: 4002,

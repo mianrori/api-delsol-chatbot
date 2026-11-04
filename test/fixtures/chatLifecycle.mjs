@@ -23,6 +23,7 @@ const synthetic = (exports) => new vm.SyntheticModule(Object.keys(exports), func
 const load = async (path, stubs) => {
   const main = new vm.SourceTextModule(await readFile(new URL(path, import.meta.url), "utf8"), { context });
   await main.link(async (spec) => {
+    if(spec==='./searchSelection.service.js')return new vm.SourceTextModule(await readFile(new URL('../../src/services/ai/searchSelection.service.js',import.meta.url),'utf8'),{context});
     if (["./memberPromoPurchasesPresentation.service.js", "./contractIncidenceFollowup.service.js", "./contractIncidencePresentation.service.js", "./salesHistory.service.js", "./salesSamplePresentation.service.js", "./salesPerSqmFollowup.service.js", "./salesPerSqmPresentation.service.js"].includes(spec)) {
       return new vm.SourceTextModule(await readFile(new URL("../../src/services/ai/" + spec.slice(2), import.meta.url), "utf8"), { context });
     }
@@ -58,6 +59,11 @@ const chat = await load("../../src/services/ai/chat.service.js", {
   "@aws-sdk/client-bedrock-runtime": {
     BedrockRuntimeClient: class { async send(_command, options) {
       modelCalls++;
+      if(mode==='search-guard'||mode==='search-selected'){
+        if(comparisonStep++>0)return {stopReason:'end_turn',output:{message:{role:'assistant',content:[{text:'Selecciona una opción válida.'}]}}};
+        const input={dateFrom:'01/01/2023',dateTo:'31/01/2023',customerIds:['SYNTHETIC-C'],categoryIds:['SYNTHETIC-A'],groupBy:['month'],metrics:['totalAmount']};
+        return {stopReason:'tool_use',output:{message:{role:'assistant',content:mode==='search-guard'?[{toolUse:{name:'search_categories',toolUseId:'search-category',input:{search:'Synthetic'}}},{toolUse:{name:'get_sales',toolUseId:'search-sales',input}}]:[{toolUse:{name:'get_sales',toolUseId:'selected-sales',input:{categoryIds:['SYNTHETIC-A']}}}]}}};
+      }
       if (mode === "promo-pages" || mode === "promo-ambiguity") {
         assert.equal(comparisonStep++, 0, "Promo continuations must not request model recomputation");
         const content = mode === "promo-ambiguity" ? [{ toolUse: { name: "search_promotions", toolUseId: "promo-search", input: { search: "Synthetic" } } }] : [];
@@ -223,6 +229,12 @@ const chat = await load("../../src/services/ai/chat.service.js", {
   },
   "../../tools/index.js": { tools: [] },
   "./toolExecutor.service.js": { executeTool: async (call) => {
+    if(mode==='search-guard'||mode==='search-selected'){
+      toolCalls++;
+      if(mode==='search-guard'){assert.equal(call.name,'search_categories','An ambiguous search must prevent the business query');return {status:'AMBIGUOUS',options:[{optionId:'1',codRubro:'SYNTHETIC-A'},{optionId:'2',codRubro:'SYNTHETIC-B'}]};}
+      assert.equal(call.name,'get_sales');assert.deepEqual(JSON.parse(JSON.stringify(call.arguments)),{dateFrom:'01/01/2023',dateTo:'31/01/2023',customerIds:['SYNTHETIC-C'],categoryIds:['SYNTHETIC-B'],groupBy:['month'],metrics:['totalAmount']});
+      return {data:[{month:'2023-01',totalAmount:10,currency:{symbol:'₲'}}]};
+    }
     if (mode.startsWith("promo-")) {
       toolCalls++;
       if (call.name === "search_promotions") return { status: "AMBIGUOUS", totalRows: 2, page: 1, rows: 2, totalPages: 1, hasMore: false, options: [1,2].map(i=>({optionId:String(i),promotionId:"P",campaignId:i,promotionName:"Synthetic promotion",campaignName:"Synthetic campaign"})) };
@@ -1017,4 +1029,11 @@ mode="promo-ambiguity";comparisonStep=0;storedHistory=[];
 const promoAmbiguous=await chat.chatService({sessionId:"test",message:"Compras promocionales del socio; busca Synthetic"});assert.match(promoAmbiguous.answer,/elige una opción/);assert.ok(!promoAmbiguous.answer.includes("No hay compras"));
 mode="promo-selected";
 const promoSelected=await chat.chatService({sessionId:"test",message:"Opción 2"});assert.match(promoSelected.answer,/Página 1 de 3/);
+mode='search-guard';comparisonStep=0;storedHistory=[];
+const searchTools=toolCalls;
+await chat.chatService({sessionId:'test',message:'Busca un rubro Synthetic para ventas de enero conservando el local'});
+assert.equal(toolCalls-searchTools,1,'Only the ambiguous search may execute');
+mode='search-selected';comparisonStep=0;
+await chat.chatService({sessionId:'test',message:'opción 2'});
+assert.equal(toolCalls-searchTools,2,'Only the explicitly selected query may execute');
 console.log("Lifecycle integration passed");

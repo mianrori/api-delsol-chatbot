@@ -10,6 +10,7 @@ const mapMember = (member) => ({
 
 export const resolveMember = async (search, connection) => {
   const members = await searchMembersRepository(connection, search);
+  if(members?.candidateTruncated&&!members.length)return {status:'AMBIGUOUS',query:search,options:[],totalMatches:null,returnedMatches:0,hasMore:true,reason:'SEARCH_CANDIDATE_LIMIT_REACHED'};
 
   if (!members || members.length === 0) {
     return {
@@ -20,15 +21,18 @@ export const resolveMember = async (search, connection) => {
   }
 
   const first = members[0];
+  const totalMatches=Number(first.TOTAL_MATCHES??members.length);
+  const truncated=totalMatches>members.length||members.some(m=>m.CANDIDATES_TRUNCATED===true);
+  const metadata={totalMatches:first.CANDIDATES_TRUNCATED?null:totalMatches,returnedMatches:members.length,hasMore:truncated};
 
-  if (first.MATCH_PRIORITY === 1) {
+  if (Number(first.MATCH_PRIORITY) === 1 && totalMatches === 1 && !truncated) {
     return {
       status: "RESOLVED",
       member: mapMember(first),
     };
   }
 
-  if (first.MATCH_PRIORITY === 2) {
+  if (Number(first.MATCH_PRIORITY) === 2 && !truncated) {
     if (members.length === 1) {
       return {
         status: "RESOLVED",
@@ -48,7 +52,7 @@ export const resolveMember = async (search, connection) => {
     }
   }
 
-  if (members.length === 1) {
+  if (members.length === 1 && !truncated && Number(first.MATCH_PRIORITY)!==1) {
     return {
       status: "RESOLVED",
       member: mapMember(first),
@@ -57,9 +61,9 @@ export const resolveMember = async (search, connection) => {
 
   const second = members[1];
   const scoreDifference =
-    Number(first.SIMILARITY) - Number(second.SIMILARITY);
+    Number(first.SIMILARITY) - Number(second?.SIMILARITY);
 
-  if (Number(first.SIMILARITY) >= 90 && scoreDifference >= 10) {
+  if (!truncated && Number(first.MATCH_PRIORITY)!==1 && Number(first.SIMILARITY) >= 90 && scoreDifference >= 10) {
     return {
       status: "RESOLVED",
       member: mapMember(first),
@@ -68,6 +72,7 @@ export const resolveMember = async (search, connection) => {
 
   return {
     status: "AMBIGUOUS",
+    ...metadata,
     query: search,
     options: members.map((member, index) => ({
       optionId: String(index + 1),
