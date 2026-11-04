@@ -45,7 +45,7 @@ con pruebas históricas; no se suman como casos únicos ni como validación Orac
   Se probó la integración completa búsqueda → bloqueo → opción 2 → consulta con
   modelo y datos controlados. No acredita interpretación libre exhaustiva.
 
-## Contraste DEV preparado (pendiente de ejecución)
+## Contraste DEV ejecutado
 
 `scripts/run-search-resolvers-dev.mjs` recibe solo sesiones por stdin, resuelve
 identidad con el servicio existente y compara los usuarios Oracle reales. Ejecuta
@@ -84,8 +84,37 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\logs\run-search-resolvers-
 
 Preflight aprobado antes de solicitar credenciales. Reportes locales ignorados:
 `logs/search-focused.txt` (controladas) y `logs/search-resolvers-final.json` (DEV).
-**La validación real Oracle y denegación del candidato aún no está ejecutada.**
-PR en borrador hasta revisar ese reporte, conciliaciones y pendientes.
+**100/100 controles reales Oracle aprobados sobre `7ced8d9`**, 04/11/2026
+17:21:45.408–17:21:56.696 UTC (**11,288 segundos**); helper finalizado en COMPLETE,
+success=true, código 0. El código de `c8525a6` y el de `7ced8d9` son idénticos;
+este último solo incorporó documentación. Coincidieron los 162 archivos de la
+copia candidata preparados para esa ejecución.
+
+- Nueve buscadores contrastados: exacta/parcial/ausencia de locales y rubros con
+  identidades, estado y conteo; documento y pertenencia de identidades nominales
+  parciales de socios; conceptos y clientes facturados con límite por identidad
+  y aislamiento de período; tipos/alias de soles, destinos y movimientos con sus
+  metadatos reales de límite. No se atribuye una lectura íntegra de cada catálogo.
+- Fallback aproximado de promociones: **ocho páginas**, total, hasMore/nextPage
+  y multiconjunto completo conciliados con el catálogo independiente. Solo este
+  fallback era nuevo; no se repitió la paginación textual ya aprobada.
+- Usuarios Oracle reales distintos y **nueve rechazos 942/1031 sin datos**, uno
+  por buscador. Todos los proxies cerraron; ambos logout de sesiones propias
+  aprobaron, registrados aparte de los 100 checks del worker.
+- Logs del intervalo: cuatro eventos compactos ERP, ninguno error ni con campos
+  extra/etiquetas sensibles; sin logger de cuerpos detectado. Sin error fatal o
+  de cierre detectado en logs del chatbot. No se publican sus líneas crudas.
+- El reporte no dejó muestras pendientes para sus casos ejecutados. Esto no
+  elimina las muestras históricas ni acredita otros positivos fuzzy, empates
+  exactos reales, completitud nominal fuera de la cohorte acotada o un destino
+  SOCIO/LOCAL real con el mismo código. Esas variantes tienen cobertura controlada
+  o permanecen delimitadas en la matriz; no se declaran casos reales aprobados.
+
+La selección y conservación de filtros se acreditan con la integración de chat
+controlada descrita arriba; los 100 checks DEV usan el dispatcher real/Oracle,
+no constituyen nueve conversaciones HTTP nuevas ni interpretación libre.
+No se repitieron controles ni login al revisar los reportes. PR #37 permanece
+en borrador para revisión final; sin merge ni despliegue del candidato.
 
 Se conservan sin fabricar muestras: superficie cero/cambiante, ventas registradas
 que sumen cero, socios/promociones/segmentación con varias monedas y demás límites
