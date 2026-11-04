@@ -60,3 +60,12 @@ test('session removal markers survive trimmed history and clear with conversatio
   clearConversation(session);assert.equal(getRemovedSearchFilters(session).size,0);
  }finally{clearConversation(session);}
 });
+
+test('executed identities remain authoritative after their resolver leaves bounded history',()=>{
+ const history=[user('continúa'),{role:'assistant',content:[use('get_sales','retained',base)]},{role:'user',content:[response('retained',{data:[]})]},user('Cambia el período a febrero')];
+ const before=JSON.stringify(history);
+ assert.deepEqual(preserveSearchSelection({name:'get_sales',history,input:{dateFrom:'01/02/2023',customerIds:['MODEL-C'],categoryIds:['MODEL-R']}}),{...base,dateFrom:'01/02/2023'});
+ assert.equal(JSON.stringify(history),before);
+ const changed=[...history,user('Cambia el local'),{role:'assistant',content:[use('search_customers','new-lookup',{search:'Synthetic new'}),use('get_sales','new-query',{customerIds:['MODEL-C'],categoryIds:['MODEL-R']})]}];
+ assert.deepEqual(preserveSearchSelection({name:'get_sales',history:changed,input:{customerIds:['MODEL-C'],categoryIds:['MODEL-R']},currentCalls:[{name:'search_customers',result:{status:'RESOLVED',customer:{codCliente:'NEW-C'}}}]}),{...base,customerIds:['NEW-C']});
+});

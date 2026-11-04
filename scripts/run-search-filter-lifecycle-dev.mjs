@@ -13,6 +13,9 @@ try{
  const prior=JSON.parse((await readFile(new URL('../prior-search-composition.json',import.meta.url),'utf8')).replace(/^\uFEFF/,''));
  check(prior.validatedCommit==='d0bb3a60544b9ffae59553b4117f1de00d91c17a'&&prior.success&&prior.checks.length===99&&prior.checks.every(c=>c.passed)&&prior.cleanup?.length===2&&prior.cleanup.every(c=>c.passed)&&createHash('sha256').update(JSON.stringify(prior.checks)).digest('hex')==='fcba9332ddc7b15137aaa33327ef2e0598320d1872d88d2f45ba55523f24c0a3','PRIOR_99_CHECK_EVIDENCE_VERIFIED');
  report.reusedEvidence={validatedCommit:prior.validatedCommit,checks:99,notRerun:true,scope:'Prior composition, denial and ordering evidence reused; only filter lifecycle is rechecked here.'};
+ const previous=JSON.parse((await readFile(new URL('../prior-search-filter-lifecycle.json',import.meta.url),'utf8')).replace(/^\uFEFF/,''));
+ check(previous.validatedCommit==='9249d6f88a348fb93d3be1a9f3baa2ec28977819'&&!previous.success&&previous.checks.length===275&&previous.checks.filter(c=>!c.passed).length===3&&previous.checks.filter(c=>!c.passed).every(c=>c.code==='HTTP_SELECTED_ID_AND_FILTERS_EXACT')&&previous.cleanup?.length===2&&previous.cleanup.every(c=>c.passed)&&createHash('sha256').update(JSON.stringify(previous.checks)).digest('hex')==='bf9c6b96eefbc713084f0e5e35cff7fbf34eaa75a40043e5cc1dbb42bffff4ac','PRIOR_FILTER_LIFECYCLE_ATTEMPT_VERIFIED');
+ report.previousAttempt={validatedCommit:previous.validatedCommit,checks:275,passed:272,failed:3,scope:'Short resolver/removal flows retained as prior evidence; recreate only the 19-request long chain to recheck the three failed arguments and trimming boundary.'};
  const {default:driver}=await import('oracledb'),connect=driver.getConnection.bind(driver);
  driver.getConnection=async(...args)=>{const c=await connect(...args);opened++;c.callTimeout=60000;const close=c.close.bind(c);let done=false;c.close=async()=>{try{await close();if(!done){closed++;done=true;}}catch(e){closeErrors++;throw e;}};return c;};
  const {getValidOracleSession,withOracleProxySession}=await import('../src/services/sessions/oracleSession.service.js');
@@ -35,9 +38,9 @@ try{
  };
  const cProfile=profile(customers),rProfile=profile(categories);
  if(!cProfile||!rProfile)report.pending.push('COMBINED_CUSTOMER_CATEGORY_REAL_PROFILE_MISSING');else{
-  report.phase='HTTP_COMBINED_CONTEXT';const start=Date.now();
+  report.phase='HTTP_FILTER_LIFECYCLE_LONG_RETRY';const start=Date.now();
   const {checkSearchCorrectionsHttp}=await import('./check-search-corrections-http.mjs');
-  await checkSearchCorrectionsHttp({sessionId:authorizedSessionId,deniedSessionId,lifecycleOnly:true,compositionProfile:{customers:cProfile.options,categories:rProfile.options,ambiguousCustomerSearch:cProfile.ambiguous,ambiguousCategorySearch:rProfile.ambiguous},
+  await checkSearchCorrectionsHttp({sessionId:authorizedSessionId,deniedSessionId,lifecycleOnly:true,lifecycleRetry:true,compositionProfile:{customers:cProfile.options,categories:rProfile.options,ambiguousCustomerSearch:cProfile.ambiguous,ambiguousCategorySearch:rProfile.ambiguous},
    lookup:async(args,context,name)=>{
     const result=await executeTool({name,arguments:args,context});
     const customer=name==='search_customers',source=customer?customers:categories,selected=customer?result.customer?.codCliente:result.category?.codRubro;

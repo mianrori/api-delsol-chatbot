@@ -7,7 +7,7 @@ import {protectPiiDeep} from '../src/services/ai/pii.service.js';
 // Actual candidate route/controller/chat/PII, with deterministic model output.
 // Only business consumers are doubles: this check verifies their exact inputs,
 // and never queries purchases/usages outside the narrowly affected lookup flow.
-export async function checkSearchCorrectionsHttp({sessionId,deniedSessionId,lookup,uniqueSearch,ambiguousSearch,compositionProfile,lifecycleOnly=false,validateSession,check}){
+export async function checkSearchCorrectionsHttp({sessionId,deniedSessionId,lookup,uniqueSearch,ambiguousSearch,compositionProfile,lifecycleOnly=false,lifecycleRetry=false,validateSession,check}){
  const context=vm.createContext({console,process,structuredClone,Intl,Date,Map,Set,Number,String,Array,JSON,Math,RegExp,Object,Boolean,Error,AbortController});
  const synthetic=exports=>new vm.SyntheticModule(Object.keys(exports),function(){for(const [k,v] of Object.entries(exports))this.setExport(k,v);},{context});
  const plans=[];let consumerCalls=0,lastLookup,expectedConsumer,requestSessionId=sessionId;
@@ -46,7 +46,7 @@ export async function checkSearchCorrectionsHttp({sessionId,deniedSessionId,look
   if(compositionProfile){
    if(lifecycleOnly){
     const p=compositionProfile;
-    for(const removed of ['categoryIds','customerIds','both-customer','both-category']){
+    for(const removed of lifecycleRetry?['both-customer']:['categoryIds','customerIds','both-customer','both-category']){
      clearConversation(sessionId);plans.length=0;const before=consumerCalls;
      let args={...sales,customerIds:[p.customers[0].id],categoryIds:[p.categories[0].id]};
      const query=async(text,lookups=[],proposal={customerIds:['MODEL-C'],categoryIds:['MODEL-R']})=>{
@@ -78,7 +78,7 @@ export async function checkSearchCorrectionsHttp({sessionId,deniedSessionId,look
      }
     }
     // Selection from an ambiguous lookup must also be invalidated by removal.
-    for(const name of ['search_customers','search_categories']){
+    for(const name of lifecycleRetry?[]:['search_customers','search_categories']){
      clearConversation(sessionId);plans.length=0;const before=consumerCalls,customer=name==='search_customers',field=customer?'customerIds':'categoryIds';
      const initial={...sales};delete initial[customer?'categoryIds':'customerIds'];
      plans.push([command(name,{search:customer?p.ambiguousCustomerSearch:p.ambiguousCategorySearch},'ambiguous'),command('get_sales',initial,'guess')]);

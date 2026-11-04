@@ -66,10 +66,20 @@ export function preserveSearchSelection({name,input,history=[],currentCalls=[],r
  const origins=new Set(resolutions.map(r=>r.state.originTurn));
  const origin=queries.filter(c=>c.name===name&&origins.has(c.turn)).sort((a,b)=>a.turn-b.turn)[0];
  const successful=queries.filter(c=>c.name===name&&c.turn<turn&&c.resultStatus==='success').at(-1);
- const original=(successful&&successful.turn>=(origin?.turn??-1)?successful:origin)?.input??{};
+ const original={...(successful?.input??{}),...((successful&&successful.turn>=(origin?.turn??-1)?successful:origin)?.input??{})};
  const selectingNow=Boolean(selection(currentText))&&resolutions.some(r=>r.state.selectedTurn===turn);
  const result=selectingNow?{...input,...original}:{...original,...input};
  const identifiers={};
+ // A confirmed lookup may have left the bounded history, while its executed
+ // arguments remain. Those IDs still outrank an unsolicited model proposal.
+ // Explicit domain changes keep their existing resolution/selection path.
+ const actions=getSearchFilterActions(currentText);
+ for(const search of ['search_customers','search_categories']){
+  if(states.has(search)||!specs[search].consumers.includes(name)||actions.some(a=>a.search===search&&a.action==='add'))continue;
+  for(const key of search==='search_customers'?['customerId','customerIds']:['categoryIds']){
+   if(successful&&Object.hasOwn(successful.input??{},key))identifiers[key]=successful.input[key];
+  }
+ }
  for(const {search,spec,state,selected} of resolutions){
   for(const [key,value] of Object.entries(spec.fields(selected,name))){
    // customerId and customerIds are alternate contracts, not extra tool fields.
