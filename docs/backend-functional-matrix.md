@@ -28,6 +28,22 @@ ambos órdenes, propuestas contradictorias, cambios explícitos e historial inmu
 auth/lookups Oracle reales, modelo y ventas controlados. 167 archivos idénticos.
 78 controles `2bfa637` reutilizados sin repetir paginación ni consultas de negocio.
 
+Retirada explícita corregida en `158b120`: **51/51 pruebas afectadas aprobadas**
+en Node 22, más la aserción HTTP posterior de recorte de historial aprobada.
+Quitar local/rubro invalida su resolución; cambiar período o continuar no lo
+restaura. Volver a añadir requiere petición explícita y resolución nueva;
+propuestas del modelo, opciones antiguas y menciones negativas no bastan.
+Las selecciones del otro dominio y los demás filtros se conservan sin mutar
+historial, incluso después de recortarlo. **Oracle/HTTP DEV de esta corrección
+pendiente de ejecutar**, no atribuible a los 99 controles anteriores.
+Preflight completo sin credenciales aprobado y 169 archivos candidatos idénticos.
+Ejecutor privado: `logs/run-search-filter-lifecycle-dev.ps1`. Reutiliza por hash
+los 99 checks anteriores y su denegación; solo recorre el ciclo afectado.
+Este pendiente de validación se distingue de las muestras DEV faltantes de
+superficie cero/cambiante, ventas registradas de suma cero y socios multimoneda,
+que conservan su cobertura controlada y sus limitaciones originales.
+PR #37 permanece en borrador; sin merge ni cambios de datos/permisos/expiraciones.
+
 ## Comparación con el chat original
 
 Se compararon los registros `src/tools/index.js` y los nombres de sus herramientas:

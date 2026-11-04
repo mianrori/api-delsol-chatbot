@@ -279,3 +279,43 @@ a esta ejecución. Reportes privados `logs/search-composition-final.json` y
 del perfil ejecutado; las muestras y limitaciones históricas permanecen abiertas.
 No se repitieron controles/login al revisar los reportes. PR #37 en borrador para
 revisión final, sin merge/despliegue ni cambios de datos, permisos o expiraciones.
+
+## Retirada e incorporación explícita de filtros
+
+Corrección `158b120`: omitir un argumento no equivale a retirar un filtro.
+Las instrucciones explícitas de retirada invalidan únicamente la resolución
+del dominio indicado y mantienen dos marcas técnicas por conversación, sin
+valores de filtros, identidades ni conexiones. Se eliminan con el reset y
+sobreviven al recorte del historial. Un cambio de período o una propuesta del
+modelo no puede reactivar esas resoluciones. Una nueva petición explícita debe
+resolver otra vez la identidad; una opción antigua o una mención negativa no basta.
+
+**51/51 pruebas afectadas Node 22 aprobadas**; la aserción HTTP añadida después
+para confirmar que el turno de retirada salió del historial también aprobó.
+Guard, conversación y ruta/controller/chat cubren quitar rubro → cambiar período,
+quitar local → cambiar período, retirar ambos → añadir solo uno, propuestas
+contradictorias, ambigüedad → selección → retirada → nueva resolución, cambios
+explícitos, doce seguimientos tras retirar ambos, aislamiento entre sesiones,
+reset, argumentos finales, filtros restantes y ausencia de mutación del historial.
+Modelo y repositorios/consumidores son controlados en estas pruebas.
+
+**Pendiente: control Oracle/HTTP DEV del código `158b120`.** No se da por aprobado
+por reutilizar evidencia anterior. El nuevo ejecutor contrasta las identidades de
+local/rubro con catálogos independientes, usa auth y lookups reales y espías de
+ventas para verificar argumentos; no consulta ventas/compras. Reutiliza los 99
+checks `d0bb3a6` verificados por SHA-256, incluida su denegación, sin repetirlos.
+Comprueba identidades Oracle distintas y cierre de proxies; lecturas limitadas a
+10.000 filas y 60 s por llamada. Preflight completo sin credenciales aprobado,
+incluida la secuencia HTTP sintética; 169 archivos del candidato iguales por hash.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\logs\run-search-filter-lifecycle-dev.ps1
+```
+
+Introduce las dos cuentas DEV únicamente en sus cuatro entradas ocultas. El
+login protegido existente obtiene sesiones nuevas en memoria/stdin y cierra las
+creadas al terminar. Contraseñas y sesiones no se imprimen ni se guardan en
+argumentos, archivos o reportes. Helper y reporte sanitizado esperado
+`logs/search-filter-lifecycle-final.json` están ignorados por Git.
+PR #37 continúa en borrador hasta revisar la corrección y su evidencia real.
+Las muestras históricas faltantes permanecen documentadas; no se fabricaron datos.
