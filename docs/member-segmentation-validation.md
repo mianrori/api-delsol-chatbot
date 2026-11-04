@@ -4,6 +4,53 @@ Base: `6b1303e`. Rama: `test/member-segmentation-dev`. Alcance: variantes
 pendientes de `analyze_members` en la [matriz](backend-functional-matrix.md).
 No incluye integración, cambios de datos o de expiraciones, ni merge/despliegue.
 
+## Resultado vigente al 04/11/2026
+
+**50/50 controles finales aprobados sobre `7c34c14`**, con código de salida 0 y
+correlación idéntica entre helper y reporte. Duración de la ejecución: **28,806 s**.
+Los 144 archivos candidatos (fuentes/configuración/manifiesto y cinco ejecutores)
+coinciden byte a byte con la copia ejecutada en `/tmp/segmentation-candidate`.
+No se incluyeron `.env`, sesiones o resultados personales en la comparación ni
+en los archivos versionados.
+
+| Evidencia | Commit | Resultado y atribución |
+| --- | --- | --- |
+| Baseline independiente del universo/MV, filtros, ranking y demografía | `6b1303e` | 108 comprobaciones aprobadas; ejecución global incompleta en aquella etapa. Se reutilizan, no se atribuyen al head. |
+| Filtros combinados/importe/recurrencia, vacío, tres rankings y denegación real con cierre | `82e72ba` | 40 comprobaciones aprobadas; posterior ALL agotó tiempo. Se reutilizan, incluida identidad distinta/rechazo sin datos. |
+| ALL/ANY corregidos, CTE y seguimientos HTTP | `7c34c14` | 50/50 finales: 10 comprobaciones ALL/ANY, 12 CTE, 26 HTTP, sesión autorizada y cierre de control. |
+| Pruebas automatizadas enfocadas | Productivo de `6d3af88`, idéntico en `7c34c14` | 46/46 Node 22 aislado. `7c34c14` solo añadió correlación al reporte/documentación; no se repitieron suites completas. |
+
+Los números corresponden a ejecuciones distintas, con coberturas solapadas;
+**no se suman como un total de casos únicos**. La muestra y los filtros de cada
+etapa solo se manejan en memoria.
+
+- ALL se concilió en 6,806 s: aplicación 6,496 s y control independiente 0,306 s.
+  ANY se concilió en 6,298 s. La CTE completa tardó 0,245 s. Son medidas del perfil
+  real acotado ensayado; el timeout anterior no tenía detalle por rol y no se
+  presenta como una comparación de planes idénticos ni una prueba de carga general.
+- Las 12 comprobaciones Oracle CTE validan socios únicos entre monedas, importes,
+  género faltante, segmentos, recurrencia y ALL entre monedas, desgloses sin mezclar,
+  límite por socio distinto, rechazo del ranking monetario entre grupos distintos,
+  inactividad y filtros inválidos antes de Oracle. No se insertaron datos.
+- Los 26 controles HTTP de rubro/local ejecutaron consultas nuevas y conservaron
+  filtros, períodos, ranking, límite e identidades. Ranking, métricas y desgloses
+  se conciliaron con el control diario independiente; los distintos globales
+  no se obtuvieron sumando los de grupos.
+- La conexión de control cerró correctamente; la denegación/cierre reales de
+  `82e72ba` se reutilizaron explícitamente. No se repitieron esos controles ni se
+  declararon como una ejecución negativa nueva. El reporte final no registra
+  códigos de error inesperados. Docker DEV desplegado `/app` permanece intacto.
+
+**Pendiente de muestra, no de implementación:**
+`SEGMENTATION_MIXED_CURRENCY_DEV_FIXTURE_NOT_FOUND`. No apareció un perfil real
+con varias monedas; los casos controlados multimoneda sí aprobaron en Oracle.
+Se conservan además las limitaciones históricas de superficie cero/cambiante,
+ventas registradas con suma cero y compras promocionales de un socio con varias
+monedas. La PR #36 continúa en borrador para revisión de la corrección, sin merge.
+
+Las secciones siguientes documentan preparación e incidencias anteriores;
+sus menciones de ejecución pendiente quedan resueltas por este resultado final.
+
 ## Contraste preparado
 
 `scripts/run-member-segmentation-dev.mjs` contrasta los caminos materializados

@@ -1,14 +1,17 @@
 # Alcance y evidencia del backend del chatbot
 
 Corte: **03/11/2026**, código `6b1303e` (PR #35 fusionada y desplegada en DEV).
-Esta revisión solo lee código y evidencia existente; no ejecuta suites ni consultas
-de negocio, no modifica datos o expiraciones y no incluye integración frontend/ERP.
+La comparación inicial del registro fue documental. La actualización posterior
+de segmentación incorpora las ejecuciones descritas abajo, sin modificar datos,
+expiraciones o integración frontend/ERP.
 
-Actualización de segmentación, 04/11/2026: PR #36 en borrador. Baseline Oracle
-`6b1303e`, 108/108 comprobaciones ejecutadas aprobadas; ejecución incompleta.
-`82e72ba` aprobó 40 controles adicionales, incluida denegación real, pero ALL
-agotó el timeout de 60 segundos antes de CTE/HTTP. Consulta y control acotado
-optimizados con 46/46 pruebas enfocadas Node 22; Oracle/HTTP pendientes.
+Actualización de segmentación, 04/11/2026: PR #36 en borrador para revisión.
+**50/50 controles finales Oracle/HTTP sobre `7c34c14`**, en 28,806 s y con 144
+archivos candidatos idénticos; 46/46 pruebas enfocadas Node 22 del código productivo.
+Se reutilizan los 108 controles baseline `6b1303e` y los 40 parciales de `82e72ba`,
+incluida denegación real/cierre. No se suman ni se atribuyen al head como recién
+ejecutados. Queda pendiente la muestra real de segmentación con varias monedas,
+ya cubierta con CTE controladas; las demás muestras históricas también se conservan.
 
 ## Comparación con el chat original
 
@@ -66,6 +69,7 @@ ni importes del socio. Las letras siguientes identifican evidencia ya ejecutada:
 | I | `contract-incidence-ties-final-summary.json`: 309/309 sobre `dcd9530`, incluidos 96 controles Oracle de empates; despliegue `8e80887`, 17/17. | Un caso DEV faltante; CTE de empates son controladas. Véase [detalle](contract-incidence-validation.md). |
 | R | `promotion-purchases-final-summary.json`: 138/138 sobre `89a4e59`, 38 controles HTTP, 140 archivos candidatos idénticos; `3344728` solo documentación. Despliegue `6b1303e`, 13/13. | Once grupos monetarios y fallos de cierre son controlados; falta muestra real con varias monedas. Véase [detalle](promotion-purchases-validation.md). |
 | X | `deployed-pr32-xlsx.json`: exportación real XLSX, 21/21 sobre `13e69ef`. | Evidencia específica de la exportación desplegada tras PR #32, no una nueva ejecución sobre `6b1303e`. |
+| G | `member-segmentation-final-summary.json`: 50/50 sobre `7c34c14`, 26 comprobaciones HTTP, 12 CTE Oracle, 144 archivos idénticos; 46/46 enfocadas Node 22. Reutiliza baseline 108 de `6b1303e` y parcial 40 de `82e72ba` con denegación real. | No sumar ejecuciones como casos únicos. HTTP con contexto preparado; muestra real de varias monedas pendiente. [Detalle](member-segmentation-validation.md). |
 
 Las validaciones históricas conservan su SHA: no se declaran recién ejecutadas
 en la base actual. Las suites controladas de aquellas etapas incluyen 251 pruebas
@@ -91,7 +95,7 @@ dentro de `test/`. **Sin acreditar** indica falta de evidencia, no fallo probado
 | `search_promotions` — promoción/campaña | `promotions/promotion.resolver.js` | `promotionSearch`, `memberPromoPurchases`, `chatLifecycle` | R: conteo/catálogo paginado independiente, ambigüedad y opción explícita; H búsqueda previa | `89a4e59`; desplegado `6b1303e` | Fallback aproximado controlado, sin muestra real independiente de todas sus coincidencias; redacción inicial no exhaustiva. |
 | `get_member_promo_purchases` — compras promocionales | `members/memberPromoPurchase.service.js` | `memberPromoPurchases`, `promotionHardeningHarness`, `chatLifecycle` | R: siete páginas reales, multiconjunto y resumen, filtros/selección/seguimientos; denegación/cierre | `89a4e59`; desplegado `6b1303e` | **Muestra DEV:** socio con varias monedas; grupos ambiguos ya controlados en Oracle CTE. Segundo socio positivo no acreditado. |
 | `get_member_vehicles` — vehículos del socio/chapa | `members/memberVehicle.service.js` | `vehicleRegistrations`, PII y ciclo | H comprueba registros agregados, no la búsqueda real de dueño por chapa | Sin validación DEV dedicada acreditada | Chapa única/múltiples socios, documento, débito/activo y ausencia: contraste real dirigido. |
-| `analyze_members` — segmentación/ranking | `members/memberAnalysis.service.js` | Suites existentes y `memberSegmentation`/`memberSegmentationControl`/`memberSegmentationDailyControl`/`memberSegmentationAccess`; 46/46 enfocadas | [Evidencia](member-segmentation-validation.md): baseline 108 aprobados; etapa parcial 40 aprobados con denegación real; ALL terminó por timeout antes de CTE/HTTP | `6b1303e` baseline; `82e72ba` parcial; no atribuirlos a la nueva consulta | Pendientes: medir/conciliar ALL/ANY de la consulta optimizada, CTE y contexto HTTP. Los seis casos y la denegación se reutilizan. Muestra real de varias monedas no encontrada en perfiles ensayados. |
+| `analyze_members` — segmentación/ranking | `members/memberAnalysis.service.js` | Suites existentes y `memberSegmentation`/`memberSegmentationControl`/`memberSegmentationDailyControl`/`memberSegmentationAccess`; 46/46 enfocadas | G: 50/50 finales con ALL/ANY, 12 CTE, 26 HTTP y cierre; baseline y 40 controles/denegación reutilizados | `7c34c14` final; `6b1303e` baseline; `82e72ba` parcial | Muestra real con varias monedas pendiente; CTE multimoneda aprobadas. Lenguaje inicial y carga general no exhaustivos; variante ensayada completada, PR en revisión. |
 | `compare_member_purchases_vs_sales` — canjes/ventas | `members/memberPurchasesVsSales.service.js` | `memberPurchasesVsSales`, `chatLifecycle` | H: meses/total/cambio de período; coherencia HTTP | `b315ff9` | SQL independiente de ambos universos con mismos filtros; otras monedas/denominador cero ya controlados, no muestra real acreditada de cada variante. |
 | `generate_chart` — gráficos | `charts/chart.service.js` | `charts`, `chatLifecycle` | H: barras/líneas de ventas, SVG y fuente | `b315ff9` | HTTP de barras horizontales/circular, varias series/fuentes y datos de otras herramientas no acreditado; no exige Oracle al graficar. Revisión frontend excluida. |
 | `analyze_campaign_sales_performance` — antes/durante/después | `sales/campaignSalesPerformance.service.js` | `campaignSalesPerformance`, `chatLifecycle` | H: selección y comparación temporal | `b315ff9` | Control SQL independiente de tres períodos con filtros; variantes reales de ausencia/base cero/monedas diferentes no acreditadas. |
@@ -141,10 +145,10 @@ pendiente de evidencia; no declararlas aprobadas como casos reales.
 1. Completar trazabilidad de S/P usando artefactos/manifiestos ya existentes.
    Si no permiten anclar SHA, conservar «sin acreditar»; no inventar un commit
    por fecha ni repetir suites completas para subsanar un dato documental.
-2. Validar `analyze_members` en un bloque dedicado: control SQL independiente
-   del resumen materializado y fuente, ranking, segmentos/filtros, períodos,
-   monedas, seguimientos y permiso/cierre. Reutilizar pruebas controladas; añadir
-   únicamente casos que falten o fallos reproducidos.
+2. `analyze_members`: bloque dedicado completado para los perfiles/variantes
+   declarados en G, con contraste independiente, segmentos, ranking, filtros,
+   períodos, monedas controladas, seguimientos y permiso/cierre. Revisar la PR
+   y conservar la muestra multimoneda real como limitación; no repetir lo aprobado.
 3. Cubrir resolutores/ficha y variantes de soles/vehículos sin evidencia directa:
    pruebas enfocadas de buscadores donde no existen y consultas DEV mínimas de
    exacta/ambigua/vacía, selección, aislamiento del socio y únicos. Reutilizar S/H
