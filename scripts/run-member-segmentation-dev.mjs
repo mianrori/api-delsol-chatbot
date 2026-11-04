@@ -2,6 +2,7 @@ import 'dotenv/config';
 import {writeFile,readFile} from 'node:fs/promises';
 import config from '../config.js';
 import {segmentationControl} from './member-segmentation-control.mjs';
+import {resolveSegmentationDeniedSession} from './member-segmentation-access.mjs';
 import {withOracleProxySession,getValidOracleSession} from '../src/services/sessions/oracleSession.service.js';
 import {analyzeMembers} from '../src/services/members/memberAnalysis.service.js';
 
@@ -28,11 +29,12 @@ try{
   if(prior.validatedCommit!=='6b1303e8d7c8e76a5bad95571a84edfc16b90ddc'||prior.candidateMismatches!==0||prior.checks!==108||prior.passed!==108)throw Error('BASELINE_EVIDENCE_MISMATCH');
   report.reusedBaseline={validatedCommit:prior.validatedCommit,checks:prior.checks,passed:prior.passed,coverage:prior.coverage,notRerun:true,complete:false,terminalError:prior.terminalError};
  }
- if(process.env.BOT_TEST_DENIED_SESSION_ID?.trim()){
-  report.phase='AUTHORIZED_SESSION_CHECK';const authorized=await getValidOracleSession(sessionId);
-  report.phase='DENIED_SESSION_CHECK';const deniedSession=await getValidOracleSession(process.env.BOT_TEST_DENIED_SESSION_ID);check(authorized.username!==deniedSession.username,'DISTINCT_ORACLE_USERS');
-  if(authorized.username!==deniedSession.username){let denied=false,closed=false;try{await withOracleProxySession(process.env.BOT_TEST_DENIED_SESSION_ID,async({connection,username})=>{const close=connection.close.bind(connection);connection.close=async()=>{await close();closed=true;};await analyzeMembers({resultMode:'members',purchasePeriods:periods,limit:1},connection,username);});}catch(e){denied=[942,1031].includes(Number(e.errorNum));}check(denied,'REAL_DENIAL_WITHOUT_DATA');check(closed,'DENIED_CONNECTION_CLOSED');}
- }else report.pending.push('REAL_DENIED_USER_NOT_CONFIGURED');
+ report.phase='AUTHORIZED_SESSION_CHECK';const authorized=await getValidOracleSession(sessionId);check(true,'AUTHORIZED_SESSION_VALID');
+ report.phase='DENIED_SESSION_CHECK';const optionalDenial=await resolveSegmentationDeniedSession({authorized,deniedSessionId:process.env.BOT_TEST_DENIED_SESSION_ID,getSession:getValidOracleSession});
+ if(optionalDenial.status==='ready'){
+  check(true,'DISTINCT_ORACLE_USERS');
+  let denied=false,closed=false;try{await withOracleProxySession(process.env.BOT_TEST_DENIED_SESSION_ID,async({connection,username})=>{const close=connection.close.bind(connection);connection.close=async()=>{await close();closed=true;};await analyzeMembers({resultMode:'members',purchasePeriods:periods,limit:1},connection,username);});}catch(e){denied=[942,1031].includes(Number(e.errorNum));}check(denied,'REAL_DENIAL_WITHOUT_DATA');check(closed,'DENIED_CONNECTION_CLOSED');
+ }else report.pending.push(optionalDenial.code);
  let closed=false;
  await withOracleProxySession(sessionId,async({connection,username})=>{
   connection.callTimeout=60000;

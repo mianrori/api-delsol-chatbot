@@ -113,3 +113,22 @@ Para completar solo lo pendiente se preparó `-Stage remaining`:
 Preflight de esta etapa aprobado. **Oracle/HTTP sobre la candidata corregida
 siguen pendientes de ejecución** con entradas ocultas vigentes. La PR #36
 permanece en borrador y las muestras históricas faltantes se conservan.
+
+### Entrada opcional de denegación: ejecución de `d1061bb`
+
+La etapa acotada se detuvo en 46 ms con `ORACLE_SESSION_NOT_FOUND` durante
+`DENIED_SESSION_CHECK`, después de validar la sesión autorizada. Ejecutó cero
+controles de negocio/CTE/HTTP. No es un fallo ni una aprobación de las consultas
+de segmentación; el reporte sanitizado conserva este resultado y su commit.
+
+Se corrigió el ejecutor para que una sesión opcional ausente, inexistente,
+inactiva, vencida o del mismo usuario deje la denegación explícitamente pendiente
+y permita continuar con la sesión autorizada. Solo usuarios resueltos distintos
+habilitan la prueba real; su rechazo Oracle y cierre deben comprobarse antes de
+declararla aprobada. Los errores inesperados de infraestructura siguen propagándose.
+La autorización de los controles principales sigue siendo obligatoria.
+
+Esta corrección cambia únicamente el ejecutor y sus pruebas/documentación, sin
+cambios de código productivo desde `d1061bb`. Cuatro pruebas nuevas del manejo
+opcional aprobaron en Node 22 aislado; se conservan las 37/37 enfocadas anteriores.
+Las condiciones pendientes de muestra real no se convierten en aprobaciones.
