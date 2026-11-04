@@ -248,5 +248,34 @@ Preflight aprobado con el comando HTTP sintético completo. Dos cuentas DEV en
 cuatro entradas ocultas, login protegido existente para obtener sesiones nuevas,
 credenciales/sesiones solo en memoria/stdin y logout de las creadas; helpers y
 reportes ignorados. Reporte esperado: `logs/search-composition-final.json`.
-**Oracle/HTTP de esta composición todavía pendientes.** PR #37 en borrador hasta
-completar y revisar esa evidencia; muestras y limitaciones previas conservadas.
+**99/99 controles afectados aprobados sobre `d0bb3a6`**, 04/11/2026
+18:27:47.119–18:27:49.933 UTC (**2,814 segundos**), helper COMPLETE/success=true,
+salida 0. `d0bb3a6` solo documenta el código `929d88e`; los 167 archivos candidatos
+preparados coincidieron por hash, sin diferencias.
+
+- Ambos órdenes local→rubro y rubro→local, propuestas contradictorias, cambios
+  explícitos de local/rubro/período y «continúa» posterior: **16 comprobaciones
+  de argumentos finales** y conservación de las selecciones confirmadas.
+- **79 checks HTTP / 19 peticiones** a la candidata de loopback, incluidos
+  **19 checks del prefijo de historial sin cambios**. Estos conteos se solapan;
+  no representan casos únicos acumulables. La autenticación y los lookups son
+  reales Oracle DEV: 10 comprobaciones exactas de identidad contrastadas con los
+  catálogos independientes y pertenencia de opciones ambiguas comprobada.
+- Modelo con entradas PII protegidas y consumidor de ventas controlados para
+  inspeccionar argumentos; no se consultaron ventas/compras ni se acredita toda
+  interpretación libre. La inmutabilidad profunda del guard también conserva
+  las pruebas de historial congelado y mutación posterior de su resultado.
+- Identidades PG/proxy coincidentes, usuarios Oracle distintos, denegación HTTP
+  sin datos/acciones y todos los proxies cerrados. **Dos logout propios aprobados
+  aparte** de los 99 checks.
+- Logs del intervalo: cuatro eventos ERP compactos, cero error/campos extra,
+  sin etiquetas sensibles ni logger de cuerpos; sin error fatal/de cierre
+  detectado en chatbot. No se publican líneas crudas ni resultados de vistas.
+
+Se verificó por hash la evidencia de 78 checks `2bfa637` y se reutilizó sin repetir
+paginación, CTE de promociones ni otros catálogos; sus resultados no se atribuyen
+a esta ejecución. Reportes privados `logs/search-composition-final.json` y
+`logs/search-composition-final-summary.json`, ignorados. No hubo pendientes propios
+del perfil ejecutado; las muestras y limitaciones históricas permanecen abiertas.
+No se repitieron controles/login al revisar los reportes. PR #37 en borrador para
+revisión final, sin merge/despliegue ni cambios de datos, permisos o expiraciones.
