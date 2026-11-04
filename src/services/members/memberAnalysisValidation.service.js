@@ -6,6 +6,8 @@ const date=value=>{
 export const validateMemberAnalysisInput=args=>{
  const fail=()=>{throw Error('Filtros de segmentación inválidos.');};
  if(Object.keys(args).some(k=>!allowed.has(k)))fail();
+ // The tool schema permits an omitted orderBy, but requires a string when present.
+ if(args.orderBy===null)fail();
  for(const [key,values] of Object.entries({gender:['male','female'],activityStatus:['active','inactive'],purchasePeriodMatch:['all','any'],resultMode:['summary','members'],orderBy:['totalAmount','purchaseCount','recurrenceMonths','fullName'],orderDirection:['asc','desc']}))if(args[key]!=null&&!values.includes(args[key]))fail();
  for(const key of ['birthMonth','ageMin','ageMax','activityMonths','recurrenceMin','recurrenceMax','limit'])if(args[key]!=null&&(!Number.isSafeInteger(args[key])||args[key]<(key==='birthMonth'||key==='activityMonths'||key==='limit'?1:0)))fail();
  if(args.birthMonth>12||args.activityMonths>120||args.limit>500)fail();
