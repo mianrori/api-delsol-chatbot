@@ -1,5 +1,6 @@
 import { buildMemberPurchasesResponse, resolveMemberPurchasesPage } from "./memberPurchasesPresentation.service.js";
-import {preserveSearchSelection} from './searchSelection.service.js';
+import {preserveSearchSelection,reenabledSearchFilters} from './searchSelection.service.js';
+import {getSearchFilterActions} from './searchFilterIntent.service.js';
 import { buildMemberPromoResponse, resolveMemberPromoPage, resolveMemberPromoSelection, preserveMemberPromoFollowup } from "./memberPromoPurchasesPresentation.service.js";
 import { preserveSalesPerSqmFollowup } from "./salesPerSqmFollowup.service.js";
 import { preserveContractIncidenceFollowup } from "./contractIncidenceFollowup.service.js";
@@ -33,6 +34,9 @@ import { executeTool } from "./toolExecutor.service.js";
 import {
   getConversation,
   setConversation,
+  getRemovedSearchFilters,
+  setSearchFilterRemoved,
+  clearRemovedSearchFilters,
 } from "../../state/conversation.store.js";
 import {
   compactMemberPurchasePaginationHistory,
@@ -1410,7 +1414,9 @@ const executeToolRequests = async ({ content, sessionId, sourceMessages = [], ch
     }
 
     try {
-      input=preserveSearchSelection({name,input,history:sourceMessages,currentCalls:internalContext.presentationCalls});
+      const removedFilters=getRemovedSearchFilters(sessionId);
+      input=preserveSearchSelection({name,input,history:sourceMessages,currentCalls:internalContext.presentationCalls,removedFilters});
+      for(const search of reenabledSearchFilters(name,input,removedFilters))setSearchFilterRemoved(sessionId,search,false);
       block.toolUse.input=input;presentationCall.input=input;
       validateProtectedToolInput({ name, input });
 
@@ -1586,6 +1592,8 @@ export const chatService = async ({ message, sessionId }) => {
   }
 
   const history = getConversation(sessionId) ?? [];
+  if(!history.length)clearRemovedSearchFilters(sessionId);
+  for(const {search,action} of getSearchFilterActions(message))if(action==='remove')setSearchFilterRemoved(sessionId,search,true);
 
   const protectedHistory = protectPiiDeep(
     sessionId,

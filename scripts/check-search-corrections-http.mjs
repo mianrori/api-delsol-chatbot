@@ -7,7 +7,7 @@ import {protectPiiDeep} from '../src/services/ai/pii.service.js';
 // Actual candidate route/controller/chat/PII, with deterministic model output.
 // Only business consumers are doubles: this check verifies their exact inputs,
 // and never queries purchases/usages outside the narrowly affected lookup flow.
-export async function checkSearchCorrectionsHttp({sessionId,deniedSessionId,lookup,uniqueSearch,ambiguousSearch,compositionProfile,validateSession,check}){
+export async function checkSearchCorrectionsHttp({sessionId,deniedSessionId,lookup,uniqueSearch,ambiguousSearch,compositionProfile,lifecycleOnly=false,validateSession,check}){
  const context=vm.createContext({console,process,structuredClone,Intl,Date,Map,Set,Number,String,Array,JSON,Math,RegExp,Object,Boolean,Error,AbortController});
  const synthetic=exports=>new vm.SyntheticModule(Object.keys(exports),function(){for(const [k,v] of Object.entries(exports))this.setExport(k,v);},{context});
  const plans=[];let consumerCalls=0,lastLookup,expectedConsumer,requestSessionId=sessionId;
@@ -39,11 +39,65 @@ export async function checkSearchCorrectionsHttp({sessionId,deniedSessionId,look
  const routes=await load('../src/routes/index.js',{'../controllers/chat.controller.js':controller});
  const app=express();app.use(express.json());app.use('/chatbot/api',routes.router);
  const server=await new Promise(resolve=>{const s=app.listen(0,'127.0.0.1',()=>resolve(s));});
- const post=async(message,session=sessionId)=>{requestSessionId=session;const snapshot=compositionProfile?structuredClone(getConversation(session)):null;const response=await fetch(`http://127.0.0.1:${server.address().port}/chatbot/api/bot/chat`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({sessionId:session,message}),signal:AbortSignal.timeout(90000)});const body=await response.json();check(response.status===200&&body.success===true,'HTTP_CANDIDATE_CHAT_SUCCESS');if(snapshot)check(JSON.stringify(canonical(getConversation(session).slice(0,snapshot.length)))===JSON.stringify(canonical(snapshot)),'HTTP_PRIOR_HISTORY_UNCHANGED');return body;};
+ const post=async(message,session=sessionId)=>{requestSessionId=session;const priorHistory=getConversation(session);const snapshot=compositionProfile?structuredClone(priorHistory):null;const response=await fetch(`http://127.0.0.1:${server.address().port}/chatbot/api/bot/chat`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({sessionId:session,message}),signal:AbortSignal.timeout(90000)});const body=await response.json();check(response.status===200&&body.success===true,'HTTP_CANDIDATE_CHAT_SUCCESS');if(snapshot)check(JSON.stringify(canonical(lifecycleOnly?priorHistory:getConversation(session).slice(0,snapshot.length)))===JSON.stringify(canonical(snapshot)),'HTTP_PRIOR_HISTORY_UNCHANGED');return body;};
  const sales={dateFrom:'01/01/2023',dateTo:'31/01/2023',customerIds:['SYNTHETIC-C'],categoryIds:['SYNTHETIC-ARBITRARY'],groupBy:['month'],metrics:['totalAmount']};
  const usage={documentNumber:'SYNTHETIC-M',dateFrom:'01/01/2023',dateTo:'31/05/2023',movementTypes:['SYNTHETIC-MOVEMENT'],destinations:[{destinationType:'LOCAL',destinationCode:'SYNTHETIC-D'}],categoryIds:['SYNTHETIC-ARBITRARY'],mode:'summary'};
  try{
   if(compositionProfile){
+   if(lifecycleOnly){
+    const p=compositionProfile;
+    for(const removed of ['categoryIds','customerIds','both-customer','both-category']){
+     clearConversation(sessionId);plans.length=0;const before=consumerCalls;
+     let args={...sales,customerIds:[p.customers[0].id],categoryIds:[p.categories[0].id]};
+     const query=async(text,lookups=[],proposal={customerIds:['MODEL-C'],categoryIds:['MODEL-R']})=>{
+      const callsBefore=consumerCalls;
+      expectedConsumer={name:'get_sales',input:structuredClone(args)};
+      if(text!=='quita el filtro de rubro')plans.push([...lookups,command('get_sales',proposal,'lifecycle-query')]);
+      await post(text);plans.length=0;
+      check(consumerCalls===callsBefore+1,'HTTP_LIFECYCLE_EXECUTED_'+removed+'_'+String(consumerCalls-before));
+     };
+     await query('Busca local y rubro para ventas de enero',[
+      command('search_customers',{search:p.customers[0].search},'initial-c'),
+      command('search_categories',{search:p.categories[0].search},'initial-r')],sales);
+     args.customerIds=[p.customers[1].id];
+     await query('Cambia el local y conserva el rubro',[command('search_customers',{search:p.customers[1].search},'change-c')]);
+     if(removed.startsWith('both')){delete args.customerIds;delete args.categoryIds;}
+     else delete args[removed];
+     await query(removed==='categoryIds'?'quita el filtro de rubro':removed==='customerIds'?'quita el filtro de local':'retira ambos filtros');
+     args={...args,dateFrom:'01/02/2023',dateTo:'28/02/2023'};
+     await query('Cambia el período a febrero de 2023',[],{dateFrom:args.dateFrom,dateTo:args.dateTo,customerIds:['MODEL-C'],categoryIds:['MODEL-R']});
+     await query('continúa');
+     const customer=removed==='customerIds'||removed==='both-customer',name=customer?'search_customers':'search_categories';
+     args[customer?'customerIds':'categoryIds']=[customer?p.customers[0].id:p.categories[1].id];
+     await query(customer?'Vuelve a añadir el local':'Vuelve a añadir el rubro',[command(name,{search:customer?p.customers[0].search:p.categories[1].search},'readd')]);
+     await query('continúa');
+     check(consumerCalls===before+7,'HTTP_REMOVE_PERIOD_READD_EXACT_'+removed);
+     if(removed==='both-customer'){
+      for(let i=0;i<12;i++)await query('continúa');
+      check(!getConversation(sessionId).some(m=>m.content?.some(b=>b.text==='retira ambos filtros')),'HTTP_REMOVAL_SURVIVES_HISTORY_TRIMMING');
+     }
+    }
+    // Selection from an ambiguous lookup must also be invalidated by removal.
+    for(const name of ['search_customers','search_categories']){
+     clearConversation(sessionId);plans.length=0;const before=consumerCalls,customer=name==='search_customers',field=customer?'customerIds':'categoryIds';
+     const initial={...sales};delete initial[customer?'categoryIds':'customerIds'];
+     plans.push([command(name,{search:customer?p.ambiguousCustomerSearch:p.ambiguousCategorySearch},'ambiguous'),command('get_sales',initial,'guess')]);
+     await post('Busca opciones para ventas');plans.length=0;
+     check(lastLookup.status==='AMBIGUOUS'&&consumerCalls===before,'HTTP_LIFECYCLE_AMBIGUITY_BLOCKS');
+     const selected=customer?lastLookup.options[1].codCliente:lastLookup.options[1].codRubro;
+     expectedConsumer={name:'get_sales',input:{...initial,[field]:[selected]}};
+     plans.push([command('get_sales',initial,'selected')]);await post('opción 2');plans.length=0;
+     delete expectedConsumer.input[field];
+     if(customer)plans.push([command('get_sales',initial,'remove-selected')]);await post(customer?'quita el filtro de local':'quita el filtro de rubro');plans.length=0;
+     plans.push([command('get_sales',initial,'continue-selected')]);await post('continúa');plans.length=0;
+     check(consumerCalls===before+3,'HTTP_SELECTED_FILTER_STAYS_REMOVED_'+name);
+     expectedConsumer.input[field]=[customer?p.customers[1].id:p.categories[1].id];
+     plans.push([command(name,{search:customer?p.customers[1].search:p.categories[1].search},'fresh-after-selection'),command('get_sales',initial,'fresh-selected-query')]);
+     await post(customer?'Vuelve a añadir el local':'Vuelve a añadir el rubro');plans.length=0;
+     check(consumerCalls===before+4,'HTTP_FRESH_RESOLUTION_REPLACES_REMOVED_SELECTION_'+name);
+    }
+    return;
+   }
    const profiles={search_customers:compositionProfile.customers,search_categories:compositionProfile.categories};
    const field={search_customers:'customerIds',search_categories:'categoryIds'};
    const selectedId=(name,result)=>name==='search_customers'?result.options[1].codCliente:result.options[1].codRubro;

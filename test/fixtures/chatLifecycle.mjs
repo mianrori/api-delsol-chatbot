@@ -23,6 +23,7 @@ const synthetic = (exports) => new vm.SyntheticModule(Object.keys(exports), func
 const load = async (path, stubs) => {
   const main = new vm.SourceTextModule(await readFile(new URL(path, import.meta.url), "utf8"), { context });
   await main.link(async (spec) => {
+    if(spec==='./searchFilterIntent.service.js')return new vm.SourceTextModule(await readFile(new URL('../../src/services/ai/searchFilterIntent.service.js',import.meta.url),'utf8'),{context});
     if(spec==='./searchSelection.service.js')return new vm.SourceTextModule(await readFile(new URL('../../src/services/ai/searchSelection.service.js',import.meta.url),'utf8'),{context});
     if (["./memberPromoPurchasesPresentation.service.js", "./contractIncidenceFollowup.service.js", "./contractIncidencePresentation.service.js", "./salesHistory.service.js", "./salesSamplePresentation.service.js", "./salesPerSqmFollowup.service.js", "./salesPerSqmPresentation.service.js"].includes(spec)) {
       return new vm.SourceTextModule(await readFile(new URL("../../src/services/ai/" + spec.slice(2), import.meta.url), "utf8"), { context });
@@ -410,7 +411,7 @@ const chat = await load("../../src/services/ai/chat.service.js", {
     }
     assert.fail("A cancelled model must not invoke tools");
   } },
-  "../../state/conversation.store.js": { getConversation: () => storedHistory, setConversation: (_id, history) => { writes++; storedHistory = history; } },
+  "../../state/conversation.store.js": { ...conversationStore, getConversation: () => storedHistory, setConversation: (_id, history) => { writes++; storedHistory = history; } },
   "./conversation.service.js": { compactMemberPurchasePaginationHistory: (x) => x, trimConversation: (x) => x },
   "../../prompts/system.prompt.js": { getSystemPrompt: () => "" },
   "../../utils/debug.logger.js": Object.fromEntries(["logBedrockRequest", "logBedrockResponse", "logToolCall", "logToolResult"].map((key) => [key, () => {}])),
