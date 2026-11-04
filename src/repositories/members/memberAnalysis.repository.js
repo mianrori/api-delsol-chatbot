@@ -427,28 +427,6 @@ export const getMemberAnalysisRepository = async ({
     purchaseFilters.push(categoryFilter);
   }
 
-  const purchaseHaving = [];
-
-  if (purchasePeriods.length > 1 && purchasePeriodMatch === "all") {
-    purchasePeriods.forEach((period, index) => {
-      const fromBind = `period${index}DateFrom`;
-      const toBind = `period${index}DateTo`;
-
-      purchaseHaving.push(`
-        SUM(
-          CASE
-            WHEN
-              FECHA_COMPRA >= TO_DATE(:${fromBind}, 'DD/MM/YYYY')
-              AND
-              FECHA_COMPRA < TO_DATE(:${toBind}, 'DD/MM/YYYY') + 1
-            THEN 1
-            ELSE 0
-          END
-        ) > 0
-      `);
-    });
-  }
-
   const memberFilters = [];
 
   if (birthMonth != null) {
@@ -551,14 +529,6 @@ export const getMemberAnalysisRepository = async ({
 
   const direction =
     String(orderDirection).toLowerCase() === "asc" ? "ASC" : "DESC";
-
-  const limitClause =
-    limit != null
-      ? `
-        WHERE
-          ROWNUM <= :limit
-      `
-      : "";
 
   const canUseRankingFastPath =
     limit != null &&
@@ -698,30 +668,19 @@ export const getMemberAnalysisRepository = async ({
   }
 
   const sql = `
-    WITH MEMBER_SCOPE AS (
-      SELECT COD_SOCIO AS DOCUMENT_NUMBER,
-        COUNT(DISTINCT TO_CHAR(FECHA_COMPRA, 'YYYYMM')) AS RECURRENCE_MONTHS
-      FROM VW_BOT_COMPRAS_SOCIO
-      WHERE ${purchaseFilters.join("\nAND ")}
-      GROUP BY COD_SOCIO
-      ${purchaseHaving.length > 0 ? `HAVING ${purchaseHaving.join("\nAND ")}` : ""}
+    WITH SCOPED_PURCHASES AS (
+      SELECT C.COD_SOCIO, C.FECHA_COMPRA, C.MONEDA, C.SIMBOLO_MONEDA, C.IMPORTE,
+        COUNT(DISTINCT TO_CHAR(FECHA_COMPRA, 'YYYYMM')) OVER (PARTITION BY COD_SOCIO) AS MEMBER_RECURRENCE_MONTHS
+        ${purchasePeriods.length > 1 && purchasePeriodMatch === 'all' ? purchasePeriods.map((_, index) => `, MAX(CASE WHEN FECHA_COMPRA >= TO_DATE(:period${index}DateFrom, 'DD/MM/YYYY') AND FECHA_COMPRA < TO_DATE(:period${index}DateTo, 'DD/MM/YYYY') + 1 THEN 1 ELSE 0 END) OVER (PARTITION BY COD_SOCIO) AS PRESENT_PERIOD_${index}`).join('') : ''}
+      FROM VW_BOT_COMPRAS_SOCIO C
+      WHERE ${purchaseFilters.join('\nAND ')}
     ), PURCHASES AS (
-      SELECT
-        COD_SOCIO AS DOCUMENT_NUMBER,
-        MONEDA AS CURRENCY_DESCRIPTION,
-        SIMBOLO_MONEDA AS CURRENCY_SYMBOL,
-        SUM(IMPORTE) AS TOTAL_AMOUNT,
-        COUNT(*) AS PURCHASE_COUNT,
-        MAX(R.RECURRENCE_MONTHS) AS RECURRENCE_MONTHS
-      FROM
-        VW_BOT_COMPRAS_SOCIO C
-      INNER JOIN MEMBER_SCOPE R ON R.DOCUMENT_NUMBER = C.COD_SOCIO
-      WHERE
-        ${purchaseFilters.join("\nAND ")}
-      GROUP BY
-        COD_SOCIO,
-        MONEDA,
-        SIMBOLO_MONEDA
+      SELECT COD_SOCIO AS DOCUMENT_NUMBER, MONEDA AS CURRENCY_DESCRIPTION,
+        SIMBOLO_MONEDA AS CURRENCY_SYMBOL, SUM(IMPORTE) AS TOTAL_AMOUNT,
+        COUNT(*) AS PURCHASE_COUNT, MAX(MEMBER_RECURRENCE_MONTHS) AS RECURRENCE_MONTHS
+      FROM SCOPED_PURCHASES
+      ${purchasePeriods.length > 1 && purchasePeriodMatch === 'all' ? 'WHERE ' + purchasePeriods.map((_, index) => `PRESENT_PERIOD_${index} = 1`).join(' AND ') : ''}
+      GROUP BY COD_SOCIO, MONEDA, SIMBOLO_MONEDA
     ),
 
     MEMBER_DATA AS (

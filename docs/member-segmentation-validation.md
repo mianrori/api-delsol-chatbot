@@ -132,3 +132,41 @@ Esta corrección cambia únicamente el ejecutor y sus pruebas/documentación, si
 cambios de código productivo desde `d1061bb`. Cuatro pruebas nuevas del manejo
 opcional aprobaron en Node 22 aislado; se conservan las 37/37 enfocadas anteriores.
 Las condiciones pendientes de muestra real no se convierten en aprobaciones.
+
+### Ejecución parcial de `82e72ba` y continuación del caso lento
+
+La etapa acotada aprobó **40 comprobaciones**: sesión autorizada, usuarios Oracle
+distintos, denegación real sin datos/cierre y los seis casos reales de filtros
+combinados, importe/recurrencia, ausencia y ranking por tres métricas. Después
+`BOUNDED_TWO_PERIODS_ALL` alcanzó 60 segundos y terminó con `NJS-123` (timeout
+de llamada según el driver instalado), sin resultado conciliado de ese caso.
+Los seis casos previos duraron aproximadamente 22 segundos cada uno, salvo el
+filtro vacío (0,5 segundos). CTE y HTTP no llegaron a ejecutarse. No se atribuye
+un resultado aprobado al caso que agotó el tiempo.
+
+La consulta productiva general ahora calcula presencia por período y recurrencia
+mediante analíticas por socio sobre una única referencia a la fuente. Conserva
+la pertenencia antes de agrupar por moneda. Se elimina el autojoin de dos
+agregaciones sobre compras; falta medir el efecto real en DEV. Oracle 19c permite
+`COUNT(DISTINCT ...) OVER (PARTITION BY ...)` sin ORDER BY ni ventana, según su
+[referencia de COUNT](https://docs.oracle.com/en/database/oracle/oracle-database/19/sqlrf/COUNT.html).
+
+El control independiente acotado lee agregados diarios por socio/moneda/local/rubro
+con una sola referencia a la vista. ALL/ANY, recurrencia, orden, filtros métricos
+y distintos se calculan aparte en JavaScript; el orden nominal viene de Oracle.
+No reutiliza la consulta productiva, no depende de la MV ni hace EXISTS
+correlacionados repetidos. Los filtros métricos conservan también la moneda
+seleccionada al formar el desglose; no se reintroducen filas monetarias excluidas.
+
+**46/46 pruebas enfocadas aprobadas en Node 22 aislado** con estas correcciones,
+incluidas las cuatro del control diario y los casos de períodos entre monedas,
+solapamientos y demografía contradictoria. No acredita todavía el tiempo ni la
+ejecución Oracle de la nueva consulta.
+
+`-Stage remaining -Retry` reutiliza explícitamente los 40 controles de `82e72ba`,
+incluida la denegación real. Pide solo la sesión autorizada y no repite los seis
+casos aprobados. Ejecuta ALL/ANY pendientes, CTE y seguimientos HTTP. Mantiene
+60 segundos por llamada, añade tiempos por fase/rol y hashes de SQL (sin binds),
+y comprueba cierre de la conexión de control también si falla la operación.
+Los reportes anteriores se conservaron en `logs/`; no se modifica ninguna sesión
+para completar las pruebas. **Reintento Oracle/HTTP pendiente; PR aún en borrador.**

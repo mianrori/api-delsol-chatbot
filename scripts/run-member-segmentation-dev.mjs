@@ -1,5 +1,7 @@
 import 'dotenv/config';
 import {writeFile,readFile} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
+import {dailySegmentationQuery,aggregateDailySegmentation,dailySegmentationBreakdown} from './member-segmentation-daily-control.mjs';
 import config from '../config.js';
 import {segmentationControl} from './member-segmentation-control.mjs';
 import {resolveSegmentationDeniedSession} from './member-segmentation-access.mjs';
@@ -8,13 +10,14 @@ import {analyzeMembers} from '../src/services/members/memberAnalysis.service.js'
 
 // All source values stay in memory. Reports contain only checks/coverage/codes.
 const output=console.log.bind(console),logCodes=new Set();console.log=()=>{};
-console.error=(...values)=>{for(const value of values)for(const m of String(value?.driverCode??value?.message??'').matchAll(/(?:ORA|NJS|DPI)-\d+/g))logCodes.add(m[0]);};
-const report={suite:'member-segmentation-dev',scope:process.env.BOT_TEST_SEGMENT_REMAINING==='true'?'remaining':'full',timings:[],startedAt:new Date().toISOString(),checks:[],coverage:{},pending:[]};
+console.error=(...values)=>{for(const value of values)for(const m of String(value?.driverCode??value?.message??(typeof value==='string'?value:'')).matchAll(/(?:ORA|NJS|DPI)-\d+/g))logCodes.add(m[0]);};
+const report={suite:'member-segmentation-dev',scope:process.env.BOT_TEST_SEGMENT_REMAINING==='true'?'remaining':'full',timings:[],queryTimings:[],startedAt:new Date().toISOString(),checks:[],coverage:{},pending:[]};
 const check=(ok,code)=>report.checks.push({code,passed:Boolean(ok)});
 const near=(a,b)=>a===b||Number.isFinite(a)&&Number.isFinite(b)&&Math.abs(a-b)<=Math.max(.000001,Math.abs(b)*1e-9);
 const canonical=v=>JSON.stringify(v&&typeof v==='object'?Array.isArray(v)?v.map(x=>JSON.parse(canonical(x))):Object.fromEntries(Object.keys(v).sort().map(k=>[k,JSON.parse(canonical(v[k]))])):v);
 const moneyKey=c=>JSON.stringify([c?.description??null,String(c?.symbol??'').replace(/^(?:PYG|GUARANIES|GUARANÍES)$/i,'₲')]);
 const currency=r=>({description:r.CURRENCY_DESCRIPTION??null,symbol:r.CURRENCY_SYMBOL??null});
+let controlOpened=false,controlClosed=false;
 const periods=[{dateFrom:'01/01/2023',dateTo:'31/01/2023'},{dateFrom:'01/02/2023',dateTo:'28/02/2023'}];
 
 // Independent control: membership is selected with EXISTS/NOT EXISTS, then
@@ -30,19 +33,27 @@ try{
   report.reusedBaseline={validatedCommit:prior.validatedCommit,checks:prior.checks,passed:prior.passed,coverage:prior.coverage,notRerun:true,complete:false,terminalError:prior.terminalError};
  }
  report.phase='AUTHORIZED_SESSION_CHECK';const authorized=await getValidOracleSession(sessionId);check(true,'AUTHORIZED_SESSION_VALID');
+ if(process.env.BOT_TEST_SEGMENT_RETRY==='true'){
+  const prior=JSON.parse(await readFile(process.env.BOT_TEST_SEGMENT_PRIOR,'utf8'));
+  if(prior.validatedCommit!=='82e72bab58b26bde16bc27089c68ed709e3f292f'||prior.approvedChecks!==40||!prior.denialValidated||!prior.failedCodes?.includes('BOUNDED_TWO_PERIODS_ALL_EXECUTION_NJS_123'))throw Error('PRIOR_REMAINING_EVIDENCE_MISMATCH');
+  report.reusedRemaining={validatedCommit:prior.validatedCommit,approvedChecks:prior.approvedChecks,denialValidated:true,notRerun:true,complete:false,failedCodes:prior.failedCodes};
+ }
  report.phase='DENIED_SESSION_CHECK';const optionalDenial=await resolveSegmentationDeniedSession({authorized,deniedSessionId:process.env.BOT_TEST_DENIED_SESSION_ID,getSession:getValidOracleSession});
- if(optionalDenial.status==='ready'){
+ if(report.reusedRemaining?.denialValidated){report.coverage.denialEvidenceReused=true;}
+ else if(optionalDenial.status==='ready'){
   check(true,'DISTINCT_ORACLE_USERS');
   let denied=false,closed=false;try{await withOracleProxySession(process.env.BOT_TEST_DENIED_SESSION_ID,async({connection,username})=>{const close=connection.close.bind(connection);connection.close=async()=>{await close();closed=true;};await analyzeMembers({resultMode:'members',purchasePeriods:periods,limit:1},connection,username);});}catch(e){denied=[942,1031].includes(Number(e.errorNum));}check(denied,'REAL_DENIAL_WITHOUT_DATA');check(closed,'DENIED_CONNECTION_CLOSED');
  }else report.pending.push(optionalDenial.code);
  let closed=false;
  await withOracleProxySession(sessionId,async({connection,username})=>{
-  connection.callTimeout=60000;
-  const close=connection.close.bind(connection);connection.close=async()=>{await close();closed=true;};
+  controlOpened=true;connection.callTimeout=60000;
+  const execute=connection.execute.bind(connection);connection.execute=async(...args)=>{const started=Date.now(),sql=String(args[0]),kind=sql.includes('fixture_')?'controlled':sql.includes('SCOPED_PURCHASES AS')?'application':sql.includes('NAME_ORDER')||sql.startsWith('WITH scoped AS')?'independent':'other';let code;try{return await execute(...args);}catch(e){code=/^(?:ORA|NJS|DPI)-\d+$/.test(e.code??'')?e.code:'QUERY_FAILED';throw e;}finally{report.queryTimings.push({phase:report.phase,kind,milliseconds:Date.now()-started,sqlHash:createHash('sha256').update(sql).digest('hex'),...(code?{code}:{})});}};
+  const close=connection.close.bind(connection);connection.close=async()=>{await close();closed=true;controlClosed=true;};
+  const dailyCache=new Map();
   const controlCache=new Map();
-  const independent=async(input)=>{const {metrics,breakdownBy,limit,...filters}=input;const key=JSON.stringify({...filters,orderBy:filters.orderBy??'totalAmount',orderDirection:filters.orderDirection??'desc'});if(controlCache.has(key))return controlCache.get(key);const q=segmentationControl(input);const result=(await connection.execute(q.sql,q.binds,{maxRows:100001})).rows??[];if(result.length>100000)throw Error('INDEPENDENT_CONTROL_LIMIT_EXCEEDED');const control={rows:result,...q};controlCache.set(key,control);return control;};
+  const independent=async(input)=>{if(input.purchasePeriods?.length){const q=dailySegmentationQuery(input),key=JSON.stringify([q.sql,q.binds]);let daily=dailyCache.get(key);if(!daily){daily=(await connection.execute(q.sql,q.binds,{maxRows:100001})).rows??[];if(daily.length>100000)throw Error('INDEPENDENT_CONTROL_LIMIT_EXCEEDED');dailyCache.set(key,daily);}return {rows:aggregateDailySegmentation(input,daily),daily};}const {metrics,breakdownBy,limit,...filters}=input;const key=JSON.stringify({...filters,orderBy:filters.orderBy??'totalAmount',orderDirection:filters.orderDirection??'desc'});if(controlCache.has(key))return controlCache.get(key);const q=segmentationControl(input);const result=(await connection.execute(q.sql,q.binds,{maxRows:100001})).rows??[];if(result.length>100000)throw Error('INDEPENDENT_CONTROL_LIMIT_EXCEEDED');const control={rows:result,...q};controlCache.set(key,control);return control;};
   const compare=async(input,result,label)=>{
-   const control=await independent(input),all=control.rows,expected=input.resultMode==='members'?all.slice(0,input.limit??20):all;
+   const control=await independent(input),all=control.rows;const chosenIds=input.resultMode==='members'?new Set([...new Set(all.map(r=>String(r.DOCUMENT_NUMBER)))].slice(0,input.limit??20)):null;const expected=chosenIds?all.filter(r=>chosenIds.has(String(r.DOCUMENT_NUMBER))):all;
    const allIds=new Set(all.map(r=>String(r.DOCUMENT_NUMBER))),ids=new Set(expected.map(r=>String(r.DOCUMENT_NUMBER)));
    check(result.summary.totalMatches==null?input.resultMode==='members'&&result.summary.hasMore&&allIds.size>ids.size:result.summary.totalMatches===allIds.size,label+'_DISTINCT_UNIVERSE');
    check(result.summary.returnedCount===ids.size,label+'_DISTINCT_RETURNED');
@@ -62,7 +73,7 @@ try{
     const binds={...control.binds},chosen=input.resultMode==='members'?[...ids]:null;
     const chosenFilter=chosen?`AND C.COD_SOCIO IN (${chosen.map((id,i)=>{binds['chosen'+i]=id;return ':chosen'+i;}).join(',')||'NULL'})`:'';
     const sql=`${control.cte} SELECT ${spec[0]} DIMENSION_KEY,C.MONEDA CURRENCY_DESCRIPTION,C.SIMBOLO_MONEDA CURRENCY_SYMBOL,COUNT(DISTINCT C.COD_SOCIO) MEMBER_COUNT,SUM(C.IMPORTE) TOTAL_AMOUNT,COUNT(*) PURCHASE_COUNT FROM scoped C WHERE EXISTS(SELECT 1 FROM selected S WHERE S.DOCUMENT_NUMBER=C.COD_SOCIO) ${chosenFilter} GROUP BY ${spec[0]},C.MONEDA,C.SIMBOLO_MONEDA`;
-    const source=(await connection.execute(sql,binds,{maxRows:100001})).rows??[];if(source.length>100000)throw Error('BREAKDOWN_CONTROL_LIMIT_EXCEEDED');
+    const source=control.daily?dailySegmentationBreakdown(control.daily,expected,dim):(await connection.execute(sql,binds,{maxRows:100001})).rows??[];if(source.length>100000)throw Error('BREAKDOWN_CONTROL_LIMIT_EXCEEDED');
     const values=result.breakdown?.[dim]??[],expectedKeys=new Map(source.map(r=>[JSON.stringify([r.DIMENSION_KEY==null?null:String(r.DIMENSION_KEY),moneyKey(currency(r))]),r]));
     check(values.length===source.length&&values.every(r=>{const k=JSON.stringify([r[spec[2]]==null?null:String(r[spec[2]]),moneyKey(r.currency)]),v=expectedKeys.get(k);return v&&r.memberCount===Number(v.MEMBER_COUNT)&&r.purchaseCount===Number(v.PURCHASE_COUNT)&&near(r.totalAmount,Number(v.TOTAL_AMOUNT));}),label+'_BREAKDOWN_'+dim.toUpperCase());
     check(result.summary.totalMatches==null||result.summary.totalMatches===allIds.size,label+'_GROUP_COUNTS_NOT_SUMMED');
@@ -80,11 +91,12 @@ try{
   const fixture=(await connection.execute(`SELECT C.COD_CLIENTE,C.COD_RUBRO,S.GENERO,EXTRACT(MONTH FROM S.FECHA_NACIMIENTO) BIRTH_MONTH,TRUNC(MONTHS_BETWEEN(TRUNC(SYSDATE),S.FECHA_NACIMIENTO)/12) AGE FROM VW_BOT_COMPRAS_SOCIO C JOIN VW_BOT_SOCIOS S ON S.COD_SOCIO=C.COD_SOCIO WHERE C.FECHA_COMPRA>=DATE '2023-01-01' AND C.FECHA_COMPRA<DATE '2023-02-01' AND C.COD_CLIENTE IS NOT NULL AND C.COD_RUBRO IS NOT NULL AND S.GENERO IN ('M','F') AND S.FECHA_NACIMIENTO IS NOT NULL AND S.FECHA_NACIMIENTO<=SYSDATE FETCH FIRST 1 ROWS ONLY`)).rows?.[0];
   if(!fixture)throw Error('COMBINED_FILTER_FIXTURE_REQUIRED');
   const combined={...summary,customerIds:[String(fixture.COD_CLIENTE)],categoryIds:[String(fixture.COD_RUBRO)],gender:fixture.GENERO==='M'?'male':'female',birthMonth:Number(fixture.BIRTH_MONTH),ageMin:Number(fixture.AGE),ageMax:Number(fixture.AGE)};
-  await run(combined,'COMBINED_DEMOGRAPHIC_AND_PURCHASE_FILTERS');
+  if(process.env.BOT_TEST_SEGMENT_RETRY!=='true'){await run(combined,'COMBINED_DEMOGRAPHIC_AND_PURCHASE_FILTERS');
   await run({...combined,amountMin:0,amountMax:100000000000000,recurrenceMin:1,recurrenceMax:5},'COMBINED_AMOUNT_AND_RECURRENCE_FILTERS');
   await run({...combined,customerIds:['-999999999']},'EMPTY_COMBINED_FILTER');
+  }
   const rank={...combined,resultMode:'members',limit:5,orderBy:'totalAmount',orderDirection:'desc',metrics:['totalAmount','purchaseCount','recurrenceMonths']};
-  for(const metric of ['totalAmount','purchaseCount','recurrenceMonths'])await run({...rank,orderBy:metric},'FILTERED_RANK_'+metric.toUpperCase());
+  if(process.env.BOT_TEST_SEGMENT_RETRY!=='true')for(const metric of ['totalAmount','purchaseCount','recurrenceMonths'])await run({...rank,orderBy:metric},'FILTERED_RANK_'+metric.toUpperCase());
   if(!remaining){for(const direction of ['asc','desc'])await run({resultMode:'members',purchasePeriods:[periods[0]],metrics:rank.metrics,limit:5,orderBy:'totalAmount',orderDirection:direction},'MV_RANK_'+direction.toUpperCase());
   for(const match of ['all','any'])await run({...summary,purchasePeriods:periods,purchasePeriodMatch:match},'TWO_PERIODS_'+match.toUpperCase());
   await run({...rank,referenceDate:'31/05/2023',purchasePeriods:[],activityMonths:1,activityStatus:'inactive'},'INACTIVE_WITH_MISSING_PURCHASES');
@@ -94,7 +106,7 @@ try{
    const {router}=await import('../src/routes/index.js'),{getConversation,setConversation,clearConversation}=await import('../src/state/conversation.store.js'),{protectPiiDeep,restorePiiDeep}=await import('../src/services/ai/pii.service.js'),{default:express}=await import('express');
    const app=express();app.use(express.json());app.use('/chatbot/api',router);const server=await new Promise(resolve=>{const s=app.listen(0,'127.0.0.1',()=>resolve(s));});
    try{
-    const seed=await analyzeMembers(rank,connection,username);setConversation(sessionId,[{role:'user',content:[{text:'Ranking de socios con los filtros seleccionados'}]},{role:'assistant',content:[{toolUse:{name:'analyze_members',toolUseId:'segmentation-seed',input:protectPiiDeep(sessionId,rank)}}]},{role:'user',content:[{toolResult:{toolUseId:'segmentation-seed',status:'success',content:[{json:protectPiiDeep(sessionId,seed,null,['analyze_members'])}]}}]},{role:'assistant',content:[{text:'Ranking consultado.'}]}]);
+    report.phase='HTTP_SEED';const seed=await analyzeMembers(rank,connection,username);setConversation(sessionId,[{role:'user',content:[{text:'Ranking de socios con los filtros seleccionados'}]},{role:'assistant',content:[{toolUse:{name:'analyze_members',toolUseId:'segmentation-seed',input:protectPiiDeep(sessionId,rank)}}]},{role:'user',content:[{toolResult:{toolUseId:'segmentation-seed',status:'success',content:[{json:protectPiiDeep(sessionId,seed,null,['analyze_members'])}]}}]},{role:'assistant',content:[{text:'Ranking consultado.'}]}]);
     for(const [message,dimension] of [['Ahora por rubro','category'],['Ahora por local','customer']]){
      report.phase='HTTP_'+dimension.toUpperCase();const response=await fetch(`http://127.0.0.1:${server.address().port}/chatbot/api/bot/chat`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({sessionId,message}),signal:AbortSignal.timeout(90000)}),body=await response.json();check(response.status===200&&body.success===true,'HTTP_'+dimension.toUpperCase()+'_SUCCESS');
      const history=getConversation(sessionId);let start=-1;for(let i=history.length-1;i>=0;i--)if(history[i].role==='user'&&history[i].content?.some(b=>typeof b.text==='string')){start=i;break;}
@@ -108,4 +120,5 @@ try{
  for(const [field,code] of [['missingBirthDate','MISSING_BIRTH_DATE_DEV_FIXTURE_NOT_FOUND'],['missingGender','MISSING_GENDER_DEV_FIXTURE_NOT_FOUND']])if(!report.coverage[field]&&!report.reusedBaseline?.coverage[field])report.pending.push(code);
  report.success=report.checks.every(c=>c.passed);
 }catch(e){report.success=false;report.error=/^[A-Z_]+$/.test(e.code??'')?e.code:/^[A-Z_]+$/.test(e.message??'')?e.message:'SEGMENTATION_DEV_CHECK_FAILED';}
+if(controlOpened&&!report.checks.some(c=>c.code==='CONTROL_CONNECTION_CLOSED'))check(controlClosed,'CONTROL_CONNECTION_CLOSED');
 report.logCodes=[...logCodes];report.finishedAt=new Date().toISOString();await writeFile(process.env.BOT_TEST_REPORT||'/tmp/member-segmentation-dev.json',JSON.stringify(report,null,2),{mode:0o600});output(JSON.stringify(report));process.exit(report.success?0:1);

@@ -51,7 +51,8 @@ test('monetary ranking rejects a mixed-currency universe instead of comparing na
 
 test('purchase breakdowns and attached member rows retain their currency without multiplying members or amounts',async()=>{
  const members=[row('A'),row('A',{CURRENCY_DESCRIPTION:'DOLARES',CURRENCY_SYMBOL:'USD',TOTAL_AMOUNT:2}),row('B')];
- const connection={execute:async sql=>({rows:sql.includes('WITH MEMBER_SCOPE')?members:[
+ let selected=members;
+ const connection={execute:async sql=>({rows:sql.includes('RANKED_MEMBERS AS')?selected:[
   {DOCUMENT_NUMBER:'A',CATEGORY_ID:'R',CATEGORY_NAME:'Synthetic',CURRENCY_DESCRIPTION:'GUARANIES',CURRENCY_SYMBOL:'PYG',TOTAL_AMOUNT:10,PURCHASE_COUNT:1},
   {DOCUMENT_NUMBER:'A',CATEGORY_ID:'R',CATEGORY_NAME:'Synthetic',CURRENCY_DESCRIPTION:'DOLARES',CURRENCY_SYMBOL:'USD',TOTAL_AMOUNT:2,PURCHASE_COUNT:1},
   {DOCUMENT_NUMBER:'B',CATEGORY_ID:'R',CATEGORY_NAME:'Synthetic',CURRENCY_DESCRIPTION:'GUARANIES',CURRENCY_SYMBOL:'PYG',TOTAL_AMOUNT:10,PURCHASE_COUNT:1},
@@ -63,4 +64,15 @@ test('purchase breakdowns and attached member rows retain their currency without
  assert.equal(r.breakdown.category.find(g=>g.currency.symbol==='USD').totalAmount,2);
  assert.ok(r.members.every(m=>m.breakdown.category.length===1&&m.breakdown.category[0].currency.symbol===m.currency.symbol));
  const text=buildMemberAnalysisFollowupResponse({input,result:r});assert.match(text,/2 socios del ranking/);assert.doesNotMatch(text,/3 socios del ranking/);
+ selected=members.filter(m=>m.CURRENCY_SYMBOL==='PYG');
+ const filtered=await analyzeMembers({...input,amountMin:3},connection,'AUTHORIZED');
+ assert.equal(filtered.breakdown.category.length,1);assert.equal(filtered.breakdown.category[0].currency.symbol,'PYG');
+});
+
+test('general ALL-period query uses one source reference and member-wide analytic presence before currency grouping',async()=>{
+ let observed;
+ await analyzeMembers({...args,purchasePeriods:[period,{dateFrom:'01/02/2023',dateTo:'28/02/2023'}],purchasePeriodMatch:'all'},{execute:async sql=>{observed=sql;return {rows:[]};}},'AUTHORIZED');
+ assert.equal(observed.match(/FROM VW_BOT_COMPRAS_SOCIO/g).length,1);
+ assert.match(observed,/OVER \(PARTITION BY COD_SOCIO\) AS MEMBER_RECURRENCE_MONTHS/);
+ assert.match(observed,/WHERE PRESENT_PERIOD_0 = 1 AND PRESENT_PERIOD_1 = 1/);
 });

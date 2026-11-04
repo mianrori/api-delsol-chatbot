@@ -547,7 +547,7 @@ export const analyzeMembers = async (args, connection, username) => {
     ];
 
     for (const dimension of purchaseDimensions) {
-      const breakdownRows = await getMemberPurchaseBreakdownRepository({
+      const sourceBreakdownRows = await getMemberPurchaseBreakdownRepository({
         connection,
 
         documentNumbers,
@@ -564,6 +564,8 @@ export const analyzeMembers = async (args, connection, username) => {
 
         categoryIds: args.categoryIds ?? [],
       });
+      const selectedCurrencies = new Set(members.map((member) => JSON.stringify([member.documentNumber, member.currency])));
+      const breakdownRows = sourceBreakdownRows.filter((row) => selectedCurrencies.has(JSON.stringify([row.documentNumber, row.currency])));
 
       /*
        * En modo members mantenemos el detalle por socio.
