@@ -40,7 +40,7 @@ La retirada del rubro siguió vigente; no se declara aprobado el bloque completo
 Preflight completo sin credenciales aprobado y 169 archivos candidatos idénticos.
 Ejecutor privado: `logs/run-search-filter-lifecycle-dev.ps1`. Reutiliza por hash
 los 99 checks anteriores y su denegación; solo recorre el ciclo afectado.
-Este pendiente de validación se distingue de las muestras DEV faltantes de
+El hallazgo de implementación se distingue de las muestras DEV faltantes de
 superficie cero/cambiante, ventas registradas de suma cero y socios multimoneda,
 que conservan su cobertura controlada y sus limitaciones originales.
 PR #37 permanece en borrador; sin merge ni cambios de datos/permisos/expiraciones.
@@ -51,12 +51,21 @@ no solicitadas del modelo si la resolución salió del historial. Una resolució
 nueva del otro dominio conserva esos IDs y el resto de contexto. Las fixtures
 HTTP acumulan las aserciones capturadas por el chat para impedir falsos positivos;
 reproducen los tres fallos antes de la corrección y pasan después.
-**Pendiente de Oracle/HTTP: repetir solo la cadena larga de 19 peticiones**, con
-el mismo helper actualizado. El ejecutor verifica por hash el intento de 275
+**110/110 controles Oracle/HTTP aprobados sobre `13e8ea8`**, 04/11/2026
+20:35:12.821–20:35:14.507 UTC (1,686 s), salida 0; solo la cadena larga de
+19 peticiones. `13e8ea8` solo documenta el código de `aaf3b5f`; 169 archivos
+candidatos idénticos. Los 19 argumentos finales y los 19 historiales previos
+aprobaron, incluidos los tres seguimientos antes fallidos y el límite de recorte.
+Cuatro comprobaciones exactas de IDs contra Oracle independiente; auth/lookups
+reales, modelo y consumidor de ventas controlados, sin consultar ventas/compras.
+El ejecutor verifica por hash el intento de 275
 checks y conserva sus 272 aprobados con su SHA, sin atribuirlos al código nuevo;
 también reutiliza los 99 controles anteriores y su denegación. Proxies cerrados,
 dos logout propios y cuatro eventos ERP compactos sin campos extra/error en el
-intento fallido. Las muestras reales faltantes permanecen abiertas.
+intento fallido y en el retry aprobado. Los dos logout propios no forman parte
+de los 110 checks. No sumar conteos solapados; no se repitieron otros perfiles.
+Sin pendientes propios del retry ejecutado; las muestras reales faltantes siguen
+abiertas. PR #37 en borrador para revisión final de la corrección, sin merge.
 
 ## Comparación con el chat original
 

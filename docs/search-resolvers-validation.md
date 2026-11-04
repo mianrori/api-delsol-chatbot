@@ -345,12 +345,33 @@ Las tres fixtures HTTP ahora acumulan fallos aunque el chat capture la excepció
 de la aserción del consumidor. Se reprodujeron así los mismos tres fallos con datos
 sintéticos antes de corregirlos; la secuencia completa y el modo acotado pasan.
 
-**Pendiente: Oracle/HTTP DEV de `aaf3b5f`.** El mismo helper actualizado recreará
-solo la cadena larga de **19 peticiones**, necesaria para volver a los tres fallos
-y cruzar el límite de recorte. No repite los otros perfiles de la medición fallida,
-ni promociones, ventas/compras o las suites completas. Verifica por hash el intento
-de 275 checks y la evidencia anterior de 99, conservando sus SHA y conteos originales.
-No suma checks solapados ni convierte el intento fallido en aprobado.
-Se requieren cuentas DEV en las cuatro entradas ocultas del comando anterior
-solo para obtener sesiones nuevas; las dos sesiones propias anteriores ya se cerraron.
-PR #37 sigue en borrador hasta revisar la corrección y el retry real.
+**110/110 controles Oracle/HTTP DEV aprobados sobre `13e8ea8`**, 04/11/2026
+20:35:12.821–20:35:14.507 UTC (**1,686 s**, tramo HTTP 903 ms), helper COMPLETE,
+success=true/salida 0. `13e8ea8` solo modifica los dos documentos respecto a
+`aaf3b5f`; fuentes, pruebas, ejecutores y dependencias iguales al código corregido.
+**169 archivos candidatos idénticos por hash** y ningún pendiente propio del perfil.
+
+Se recreó solo la cadena larga de **19 peticiones**, necesaria para llegar a los
+tres argumentos antes fallidos y cruzar el límite de recorte. **19 comprobaciones
+de argumentos finales y 19 de historial previo aprobadas**, más el control de que
+el turno de retirada ya salió del historial y el filtro continúa retirado.
+Cuatro comprobaciones exactas de IDs contra catálogos independientes de Oracle:
+tres de locales y una de rubros. Ruta/controller/chat, auth y lookups reales;
+modelo y consumidor de ventas controlados para inspeccionar argumentos. No se
+consultaron ventas/compras ni se acredita interpretación libre exhaustiva.
+Los conteos de HTTP/argumentos/historial se solapan; no se suman como casos únicos.
+
+Los checks verificaron por hash el intento de 275 y la evidencia anterior de 99,
+conservando sus SHA originales. No se repitieron los otros perfiles aprobados,
+promociones, paginación ni suites completas; el intento fallido permanece fallido.
+Usuarios Oracle distintos e identidades PG/proxy coincidentes, todos los proxies
+cerrados y **dos logout propios aprobados aparte** de los 110 controles.
+Logs del nuevo intervalo: cuatro eventos ERP compactos, cero error/campos extra/
+líneas no compactas; sin error fatal/de cierre detectado en chatbot. No se
+imprimieron líneas crudas, identidades ni secretos. Reportes privados
+`logs/search-filter-lifecycle-final.json` y `logs/search-filter-lifecycle-retry-summary.json`,
+helpers y `.env` fuera de Git. No se repitieron controles ni login al revisar
+estos artefactos. PR #37 sigue en borrador para revisión final, sin merge, despliegue
+ni cambios de datos, permisos o expiraciones. Se conservan las muestras reales
+faltantes de superficie cero/cambiante, ventas registradas de suma cero y socios
+con varias monedas, con su cobertura controlada y limitaciones originales.
