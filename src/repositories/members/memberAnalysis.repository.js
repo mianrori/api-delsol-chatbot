@@ -662,7 +662,7 @@ export const getMemberAnalysisRepository = async ({
           S.GENERO
         ORDER BY
           ${rankingOrderColumn} ${direction},
-          S.NOMBRE_COMPLETO ASC
+          S.NOMBRE_COMPLETO ASC, M.COD_SOCIO ASC
       )
       WHERE
         ROWNUM <= :fetchLimit
@@ -698,35 +698,30 @@ export const getMemberAnalysisRepository = async ({
   }
 
   const sql = `
-    WITH PURCHASES AS (
+    WITH MEMBER_SCOPE AS (
+      SELECT COD_SOCIO AS DOCUMENT_NUMBER,
+        COUNT(DISTINCT TO_CHAR(FECHA_COMPRA, 'YYYYMM')) AS RECURRENCE_MONTHS
+      FROM VW_BOT_COMPRAS_SOCIO
+      WHERE ${purchaseFilters.join("\nAND ")}
+      GROUP BY COD_SOCIO
+      ${purchaseHaving.length > 0 ? `HAVING ${purchaseHaving.join("\nAND ")}` : ""}
+    ), PURCHASES AS (
       SELECT
         COD_SOCIO AS DOCUMENT_NUMBER,
         MONEDA AS CURRENCY_DESCRIPTION,
         SIMBOLO_MONEDA AS CURRENCY_SYMBOL,
         SUM(IMPORTE) AS TOTAL_AMOUNT,
         COUNT(*) AS PURCHASE_COUNT,
-        COUNT(
-          DISTINCT TO_CHAR(
-            FECHA_COMPRA,
-            'YYYYMM'
-          )
-        ) AS RECURRENCE_MONTHS
+        MAX(R.RECURRENCE_MONTHS) AS RECURRENCE_MONTHS
       FROM
-        VW_BOT_COMPRAS_SOCIO
+        VW_BOT_COMPRAS_SOCIO C
+      INNER JOIN MEMBER_SCOPE R ON R.DOCUMENT_NUMBER = C.COD_SOCIO
       WHERE
         ${purchaseFilters.join("\nAND ")}
       GROUP BY
         COD_SOCIO,
         MONEDA,
         SIMBOLO_MONEDA
-      ${
-        purchaseHaving.length > 0
-          ? `
-            HAVING
-              ${purchaseHaving.join("\nAND ")}
-          `
-          : ""
-      }
     ),
 
     MEMBER_DATA AS (
@@ -815,6 +810,21 @@ export const getMemberAnalysisRepository = async ({
         ) AS TOTAL_MATCHES
       FROM
         FILTERED_MEMBERS
+    ), RANK_VALUES AS (
+      SELECT F.*,
+        SUM(PURCHASE_COUNT) OVER (PARTITION BY DOCUMENT_NUMBER) AS RANK_PURCHASE_COUNT,
+        MAX(RECURRENCE_MONTHS) OVER (PARTITION BY DOCUMENT_NUMBER) AS RANK_RECURRENCE_MONTHS
+      FROM FILTERED_MEMBERS F
+    ), RANKED_MEMBERS AS (
+      SELECT F.*, DENSE_RANK() OVER (ORDER BY
+        ${orderBy === "purchaseCount" ? "RANK_PURCHASE_COUNT" : orderBy === "recurrenceMonths" ? "RANK_RECURRENCE_MONTHS" : orderColumn}
+        ${direction}, FULL_NAME ASC, DOCUMENT_NUMBER ASC) AS MEMBER_RANK
+      FROM RANK_VALUES F
+    ), CURRENCY_COUNT AS (
+      SELECT COUNT(*) AS RANK_CURRENCY_COUNT FROM (
+        SELECT DISTINCT CURRENCY_DESCRIPTION, CURRENCY_SYMBOL FROM FILTERED_MEMBERS
+        WHERE CURRENCY_DESCRIPTION IS NOT NULL OR CURRENCY_SYMBOL IS NOT NULL
+      )
     )
 
     SELECT *
@@ -835,17 +845,16 @@ export const getMemberAnalysisRepository = async ({
         F.PURCHASE_COUNT,
         F.RECURRENCE_MONTHS,
         F.COMMERCIALLY_ACTIVE,
-        T.TOTAL_MATCHES
+        T.TOTAL_MATCHES, F.MEMBER_RANK, CC.RANK_CURRENCY_COUNT
       FROM
-        FILTERED_MEMBERS F
+        RANKED_MEMBERS F
       CROSS JOIN
         TOTAL_COUNT T
+      CROSS JOIN CURRENCY_COUNT CC
       ORDER BY
-        ${orderColumn}
-        ${direction},
-        F.FULL_NAME ASC
+        F.MEMBER_RANK, F.CURRENCY_DESCRIPTION, F.CURRENCY_SYMBOL
     )
-    ${limitClause}
+    ${limit != null ? "WHERE MEMBER_RANK <= :limit" : ""}
   `;
 
 
@@ -853,9 +862,13 @@ export const getMemberAnalysisRepository = async ({
 
   const rows = Array.isArray(result) ? result : [];
 
+  if (limit != null && orderBy === "totalAmount" && Number(rows[0]?.RANK_CURRENCY_COUNT ?? 0) > 1) {
+    throw Object.assign(new Error("Ranking monetario no calculable: hay varios grupos monetarios en el universo filtrado; no se convierten ni comparan sus importes."), { code: "MEMBER_RANKING_MULTIPLE_CURRENCIES" });
+  }
+
   const totalMatches = rows.length > 0 ? Number(rows[0].TOTAL_MATCHES ?? 0) : 0;
 
-  const cleanRows = rows.map(({ TOTAL_MATCHES, ...row }) => row);
+  const cleanRows = rows.map(({ TOTAL_MATCHES, MEMBER_RANK, RANK_CURRENCY_COUNT, ...row }) => row);
 
   return {
     rows: cleanRows,
@@ -921,6 +934,7 @@ export const getMemberPurchaseBreakdownRepository = async ({
     SELECT
       C.COD_SOCIO AS DOCUMENT_NUMBER,
       ${config.select},
+      C.MONEDA AS CURRENCY_DESCRIPTION, C.SIMBOLO_MONEDA AS CURRENCY_SYMBOL,
       NVL(SUM(C.IMPORTE), 0) AS TOTAL_AMOUNT,
       COUNT(*) AS PURCHASE_COUNT
 
@@ -931,7 +945,7 @@ export const getMemberPurchaseBreakdownRepository = async ({
 
     GROUP BY
       C.COD_SOCIO,
-      ${config.groupBy}
+      ${config.groupBy}, C.MONEDA, C.SIMBOLO_MONEDA
 
     ORDER BY
       C.COD_SOCIO,
@@ -945,6 +959,7 @@ export const getMemberPurchaseBreakdownRepository = async ({
   return rows.map((row) => ({
     documentNumber: String(row.DOCUMENT_NUMBER),
     ...config.map(row),
+    currency: { description: row.CURRENCY_DESCRIPTION ?? null, symbol: row.CURRENCY_SYMBOL ?? null },
     totalAmount: Number(row.TOTAL_AMOUNT ?? 0),
     purchaseCount: Number(row.PURCHASE_COUNT ?? 0),
   }));

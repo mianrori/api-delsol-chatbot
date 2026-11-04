@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {analyzeMembers} from '../src/services/members/memberAnalysis.service.js';
+import {buildMemberAnalysisFollowupResponse} from '../src/services/ai/memberAnalysisFollowup.service.js';
 
 const period={dateFrom:'01/01/2023',dateTo:'31/01/2023'};
 const args={resultMode:'summary',purchasePeriods:[period],metrics:['totalAmount','purchaseCount','recurrenceMonths']};
@@ -33,4 +34,33 @@ test('combined invalid filters fail before any Oracle operation rather than broa
  for(const change of [{gender:'unknown'},{birthMonth:13},{ageMin:50,ageMax:20},{amountMin:100,amountMax:10},{purchasePeriodMatch:'unknown'},{purchasePeriods:[{dateFrom:'31/02/2023',dateTo:'01/03/2023'}]},{metrics:['unknown']},{breakdownBy:['unknown']},{customerIds:'X'},{limit:0,resultMode:'members'}]){
   let calls=0;await assert.rejects(analyzeMembers({...args,...change},{execute:async()=>{calls++;return {rows:[]};}},'AUTHORIZED'));assert.equal(calls,0);
  }
+});
+
+test('gender and amount segments preserve currencies and distinct members; recurrence segments do not add currency rows',async()=>{
+ const rows=[row('A'),row('A',{CURRENCY_DESCRIPTION:'DOLARES',CURRENCY_SYMBOL:'USD',TOTAL_AMOUNT:2}),row('B',{GENDER:'F'})];
+ const r=await analyzeMembers({...args,breakdownBy:['gender','amountSegment','recurrenceSegment'],amountSegments:[{label:'Synthetic range',min:0,max:100}],recurrenceSegments:[{label:'Synthetic recurrence',min:1,max:2}]},{execute:async()=>({rows})},'AUTHORIZED');
+ assert.equal(r.breakdown.gender.length,3);
+ assert.ok(r.breakdown.gender.every(g=>g.currency&&g.memberCount===1));
+ const segment=r.breakdown.amountSegments[0];assert.equal(segment.memberCount,2);assert.equal(segment.totalAmount,null);assert.ok(segment.reason);assert.equal(segment.totalsByCurrency.length,2);
+ assert.equal(r.breakdown.recurrenceSegments[0].memberCount,2);
+});
+
+test('monetary ranking rejects a mixed-currency universe instead of comparing native amounts',async()=>{
+ await assert.rejects(analyzeMembers({...args,resultMode:'members',amountMin:0,orderBy:'totalAmount',limit:1},{execute:async()=>({rows:[row('A',{RANK_CURRENCY_COUNT:2})]})},'AUTHORIZED'),{code:'MEMBER_RANKING_MULTIPLE_CURRENCIES'});
+});
+
+test('purchase breakdowns and attached member rows retain their currency without multiplying members or amounts',async()=>{
+ const members=[row('A'),row('A',{CURRENCY_DESCRIPTION:'DOLARES',CURRENCY_SYMBOL:'USD',TOTAL_AMOUNT:2}),row('B')];
+ const connection={execute:async sql=>({rows:sql.includes('WITH MEMBER_SCOPE')?members:[
+  {DOCUMENT_NUMBER:'A',CATEGORY_ID:'R',CATEGORY_NAME:'Synthetic',CURRENCY_DESCRIPTION:'GUARANIES',CURRENCY_SYMBOL:'PYG',TOTAL_AMOUNT:10,PURCHASE_COUNT:1},
+  {DOCUMENT_NUMBER:'A',CATEGORY_ID:'R',CATEGORY_NAME:'Synthetic',CURRENCY_DESCRIPTION:'DOLARES',CURRENCY_SYMBOL:'USD',TOTAL_AMOUNT:2,PURCHASE_COUNT:1},
+  {DOCUMENT_NUMBER:'B',CATEGORY_ID:'R',CATEGORY_NAME:'Synthetic',CURRENCY_DESCRIPTION:'GUARANIES',CURRENCY_SYMBOL:'PYG',TOTAL_AMOUNT:10,PURCHASE_COUNT:1},
+ ]})};
+ const input={...args,resultMode:'members',amountMin:0,orderBy:'purchaseCount',limit:2,breakdownBy:['category']};
+ const r=await analyzeMembers(input,connection,'AUTHORIZED');
+ assert.equal(r.summary.returnedCount,2);assert.equal(r.breakdown.category.length,2);
+ assert.equal(r.breakdown.category.find(g=>g.currency.symbol==='PYG').totalAmount,20);
+ assert.equal(r.breakdown.category.find(g=>g.currency.symbol==='USD').totalAmount,2);
+ assert.ok(r.members.every(m=>m.breakdown.category.length===1&&m.breakdown.category[0].currency.symbol===m.currency.symbol));
+ const text=buildMemberAnalysisFollowupResponse({input,result:r});assert.match(text,/2 socios del ranking/);assert.doesNotMatch(text,/3 socios del ranking/);
 });

@@ -29,7 +29,7 @@ rechazo sin datos y cierre; si no se proporciona, queda pendiente.
 
 ## Reproducción privada
 
-El helper local ignorado `logs/run-member-segmentation-dev.ps1 -Stage baseline|final`
+El helper local ignorado `logs/run-member-segmentation-dev.ps1 -Stage baseline|final|remaining`
 pide sesiones con `Read-Host -AsSecureString`, las pasa por variables del proceso
 y restaura sus valores al terminar. No requiere documentos personales. La etapa
 baseline extrae el código de `6b1303e`; final copia la candidata local. Se ejecutan
@@ -47,8 +47,14 @@ subsanar una diferencia: debe documentarse y resolverse en el alcance autorizado
   sin red ni credenciales. Comprueban combinación de binds, membresía ALL/ANY
   entre monedas, ausencia de SQL materializado y conservación de demografía nula.
 - Preflight del helper aprobado; no acredita ejecución de consultas Oracle.
-- Medición baseline Oracle pendiente de sesión oculta vigente. Ningún caso
-  nuevo de segmentación está marcado como aprobado en DEV todavía.
+- **Baseline sobre `6b1303e`: 108/108 controles ejecutados aprobados**, incluidos
+  conteos, importes, rankings, filtros combinados, ALL/ANY, nulos demográficos y
+  cierre de la conexión de control. El ejecutor era `16fbacc`. La ejecución duró
+  4215 segundos y terminó con `ORACLE_SESSION_NOT_ACTIVE` al validar las sesiones
+  antes de la denegación. No permite identificar cuál de las dos estaba inactiva.
+  Denegación y HTTP no se marcan aprobados. Los 138 archivos baseline coinciden
+  con el commit tras normalizar exclusivamente CRLF/LF; el reporte completo sigue
+  siendo incompleto, no se convierte su resultado global en aprobado.
 - Tres fallos reproducidos con datos controlados: los argumentos podían sustituir
   la conexión de la ruta general; `returnedCount` y actividad contaban filas por
   moneda como socios; filtros inválidos podían aceptarse sin rechazo. La candidata
@@ -63,3 +69,47 @@ subsanar una diferencia: debe documentarse y resolverse en el alcance autorizado
 - Se conservan las muestras DEV históricas faltantes de superficie cero/cambiante,
   ventas registradas con suma cero y socio con varias monedas. Su ausencia no
   autoriza crear datos ni equivale a un fallo de implementación.
+
+## Correcciones y etapa acotada posterior al baseline
+
+La candidata conserva moneda en los desgloses de compras y género, evita mezclar
+el importe de segmentos entre monedas y cuenta sus socios mediante conjuntos.
+La pertenencia ALL y la recurrencia se calculan por socio antes de agrupar por
+moneda. El ranking general aplica el límite a socios distintos, conserva sus
+filas monetarias y usa documento como desempate estable. Un ranking por importe
+con varios grupos monetarios devuelve un error explícito de no calculable;
+no impone un orden entre esos importes ni los convierte. La presentación de
+seguimientos usa la moneda de cada fila y el número de socios únicos.
+
+El camino materializado conserva su contrato preexistente de fuente PYG sin
+columna moneda; el baseline lo contrastó con la vista de origen en los perfiles
+ensayados. No se refresca ni redefine la materializada, ni se afirma cobertura
+real de varias monedas para ese camino. La candidata modifica en él únicamente
+el desempate por documento. Los casos de varias monedas del camino general se
+comprueban con datos controlados; la muestra real sigue siendo una limitación.
+
+**37/37 pruebas enfocadas aprobadas en Node 22 aislado** tras estas correcciones:
+segmentación, control independiente, resumen/agrupación, ranking, seguimientos y
+ciclo de chat afectados. No se ejecutó la suite completa.
+
+Para completar solo lo pendiente se preparó `-Stage remaining`:
+
+- Reutiliza explícitamente el resumen sanitizado de los 108 controles baseline,
+  atribuidos a `6b1303e`; no los presenta como ejecutados sobre la corrección.
+- Comprueba ambas sesiones y la denegación al principio. No modifica su estado
+  ni expiración; si falta otro usuario real, conserva la prueba como pendiente.
+- Omite las lecturas amplias y el ranking materializado ya comprobados. Usa un
+  perfil real acotado por local/rubro/demografía para las rutas generales afectadas
+  y los dos seguimientos HTTP. Reutiliza controles independientes idénticos en
+  memoria dentro de la misma ejecución, sin reutilizar respuestas narrativas.
+- Registra tiempos por caso y resultados parciales sanitizados; fija un timeout
+  de 60 segundos por llamada Oracle de control y aborta ante errores técnicos.
+  Este timeout no cambia la política de sesiones.
+- `scripts/check-member-segmentation-cases.mjs` prepara CTE Oracle de solo lectura
+  para moneda/grupos, socios únicos, ALL/recurrencia entre monedas, límites de
+  ranking, demografía faltante, inactividad y rechazo temprano de filtros. Son
+  cobertura controlada, no datos fabricados en las vistas de DEV.
+
+Preflight de esta etapa aprobado. **Oracle/HTTP sobre la candidata corregida
+siguen pendientes de ejecución** con entradas ocultas vigentes. La PR #36
+permanece en borrador y las muestras históricas faltantes se conservan.

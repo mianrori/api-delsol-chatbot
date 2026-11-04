@@ -205,10 +205,10 @@ export const buildMemberAnalysisFollowupResponse = ({ input, result }) => {
       lines.push(`| ${cell(member.fullName)} | Sin compras registradas para este desglose | — | — |`);
     }
     for (const row of rows) {
-      const currency = member.currency?.symbol || member.currency?.description || "";
+      const currency = row.currency?.symbol || row.currency?.description || member.currency?.symbol || member.currency?.description || "";
       lines.push(`| ${cell(member.fullName)} | ${cell(row[nameField])} | ${number(row.purchaseCount)} | ${cell(currency)} ${number(row.totalAmount)} |`);
     }
   }
-  lines.push("", `El desglose corresponde a los ${result.members.length} socios del ranking, con los mismos filtros y período.`);
+  lines.push("", `El desglose corresponde a los ${new Set(result.members.map((member) => member.documentNumber ?? member.fullName)).size} socios del ranking, con los mismos filtros y período.`);
   return lines.join("\n");
 };
