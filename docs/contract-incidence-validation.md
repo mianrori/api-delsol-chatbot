@@ -1,5 +1,11 @@
 # Incidencia contractual: validación DEV
 
+Estado al 03/11/2026: PR #34 fusionada; `dcd9530` validado con 309/309 controles;
+despliegue `8e80887` comprobado con una consulta real (17/17). Incluido en la
+base actual `6b1303e`. Se conserva la muestra real pendiente de ventas registradas
+que sumen cero, ya cubierta con datos controlados. Véase la
+[matriz backend](backend-functional-matrix.md).
+
 Base: `68847db` (PR #33 desplegada). Rama: `test/contract-incidence-dev`.
 Alcance: costo contractual facturado sin IVA, ventas auditadas e incidencia.
 No se modifican ventas por m², compras por promoción, datos ERP ni expiraciones.
@@ -121,8 +127,9 @@ También pasaron la denegación con otro usuario Oracle real y los controles de
 cierre. `ORA-00942` fue la denegación esperada; los logs compactos del servicio
 no muestran errores de cierre, controlador ni carga de módulos.
 
-Se conserva el pendiente de muestra real `ZERO_SALES` descrito abajo. La PR
-permanece en borrador hasta revisar esta corrección, sin merge ni despliegue.
+Se conserva el pendiente de muestra real `ZERO_SALES` descrito abajo. La revisión
+posterior aprobó la corrección y se fusionó/desplegó, como indica el estado actual
+al inicio. No queda pendiente de implementación ni de revisión de esa corrección.
 
 ### Evidencia anterior a esta corrección
 
@@ -161,7 +168,8 @@ de `src`, capturar stdout/stderr sin imprimirlos y registrar etapa/versión en u
 diagnóstico sanitizado. El lanzador local `logs/run-contract-incidence-final.ps1`
 fuerza la etapa final; `-Preflight` solo comprueba la preparación, sin sesiones.
 Estos helpers y todos los reportes continúan ignorados por Git. El servicio
-desplegado no se reconstruyó ni reinició para esta validación.
+desplegado no se reconstruyó ni reinició durante aquella validación candidata;
+posteriormente sí se reconstruyó y comprobó al fusionar la PR #34.
 
 Los controles validan las vistas autorizadas, no auditan las tablas ERP subyacentes.
 No se fabrican muestras reales para obtener cobertura. El modo HTTP no prueba todas

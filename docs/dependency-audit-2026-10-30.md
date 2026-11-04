@@ -3,6 +3,12 @@
 Base: `feature/chat-sales-pilot` en `e85630b`. Rama de propuesta:
 `fix/npm-audit-production-dependencies`. No se despliega ni se modifica la rama base.
 
+Estado posterior: PR #32 fusionada y desplegada en `13e69ef`. El audit de
+producción desplegado y la exportación real XLSX (21/21 controles) se verificaron
+después del merge. El resultado de audit es histórico; no se volvió a consultar
+el catálogo de avisos durante la revisión documental del 03/11/2026.
+Véase la [matriz de evidencia backend](backend-functional-matrix.md).
+
 ## Hallazgos iniciales y uso en producción
 
 `npm audit --json` informó cuatro paquetes afectados: una severidad alta y tres
@@ -59,10 +65,11 @@ de dependencia de uso efectivo de la función vulnerable.
 - Windows tiene Node 24, fuera del rango `>=22 <23` del proyecto. La ejecución
   local de la prueba quedó bloqueada y se detuvo; no se presenta como aprobada.
   El resultado de compatibilidad corresponde al entorno soportado Node 22.
-- No se reconstruyó ni recreó Docker DEV. Su ID de contenedor, imagen y fecha de
-  arranque permanecen iguales. Los reportes completos y el Dockerfile temporal de
+- Durante esta validación previa al merge no se reconstruyó ni recreó Docker DEV.
+  Posteriormente sí se reconstruyó al desplegar la PR #32. Los reportes y el Dockerfile temporal de
   validación permanecen en `logs/`, ignorado por Git y por el contexto Docker.
 
 El resultado de audit corresponde al catálogo de avisos consultado en esta fecha;
-no equivale a una garantía de ausencia de futuras vulnerabilidades. La PR no
-incluye una validación contra las bases DEV ni un despliegue de la API.
+no equivale a una garantía de ausencia de futuras vulnerabilidades. La validación
+previa al merge no incluyó bases DEV ni despliegue; la comprobación desplegada
+posterior se distingue arriba.

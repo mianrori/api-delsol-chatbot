@@ -4,6 +4,7 @@ import {
 } from "../../repositories/members/memberAnalysis.repository.js";
 import { getMemberSummaryRepository } from "../../repositories/members/memberSummary.repository.js";
 import { getMemberGroupedSummaryRepository } from "../../repositories/members/memberGroupedSummary.repository.js";
+import { validateMemberAnalysisInput } from "./memberAnalysisValidation.service.js";
 
 const GENDER_LABELS = {
   M: "Masculino",
@@ -142,12 +143,11 @@ const createAmountSegments = ({ members, segments }) => {
 
       max: Number(segment.max),
 
-      memberCount: matched.length,
-
-      totalAmount: matched.reduce(
-        (sum, member) => sum + member._totalAmount,
-        0,
-      ),
+      memberCount: new Set(matched.map((member) => member.documentNumber)).size,
+      totalsByCurrency: createTotalsByCurrency({ members: matched }),
+      ...(new Set(matched.map((member) => JSON.stringify(member.currency))).size <= 1
+        ? { totalAmount: matched.reduce((sum, member) => sum + member._totalAmount, 0) }
+        : { totalAmount: null, reason: "El segmento contiene varias monedas; los importes se presentan separados por moneda." }),
     };
   });
 };
@@ -171,7 +171,7 @@ const createRecurrenceSegments = ({ members, segments }) => {
 
       max: Number(segment.max),
 
-      memberCount: matched.length,
+      memberCount: new Set(matched.map((member) => member.documentNumber)).size,
     };
   });
 };
@@ -180,30 +180,33 @@ const createGenderBreakdown = ({ members }) => {
   const map = new Map();
 
   for (const member of members) {
-    const key = member.gender ?? "No informado";
+    const gender = member.gender ?? "No informado";
+    const key = JSON.stringify([gender, member.currency]);
 
     if (!map.has(key)) {
       map.set(key, {
-        gender: key,
+        gender,
+        currency: member.currency,
 
         memberCount: 0,
 
         totalAmount: 0,
 
         purchaseCount: 0,
+        _members: new Set(),
       });
     }
 
     const item = map.get(key);
 
-    item.memberCount++;
+    item._members.add(member.documentNumber);
 
     item.totalAmount += member._totalAmount;
 
     item.purchaseCount += member._purchaseCount;
   }
 
-  return Array.from(map.values());
+  return Array.from(map.values()).map(({ _members, ...item }) => ({ ...item, memberCount: _members.size }));
 };
 
 const createTotalsByCurrency = ({ members }) => {
@@ -272,7 +275,8 @@ const attachPurchaseBreakdown = ({ members, rows, dimension }) => {
       member.breakdown = {};
     }
 
-    member.breakdown[dimension] = byDocument.get(member.documentNumber) ?? [];
+    member.breakdown[dimension] = (byDocument.get(member.documentNumber) ?? []).filter((row) =>
+      JSON.stringify(row.currency ?? null) === JSON.stringify(member.currency ?? null));
   }
 };
 
@@ -313,9 +317,11 @@ const aggregatePurchaseBreakdown = ({ rows, dimension }) => {
       continue;
     }
 
+    key = JSON.stringify([key, row.currency ?? null]);
     if (!map.has(key)) {
       map.set(key, {
         ...base,
+        currency: row.currency ?? null,
         memberCount: 0,
         totalAmount: 0,
         purchaseCount: 0,
@@ -383,6 +389,11 @@ const buildAnalysisDescription = ({
 };
 
 export const analyzeMembers = async (args, connection, username) => {
+  if (!args || typeof args !== "object" || Array.isArray(args)) throw Error("Filtros de segmentación inválidos.");
+  // Identity and connections come only from the authorized dispatcher context.
+  const { connection: _untrustedConnection, username: _untrustedUsername, ...input } = args;
+  args = input;
+  validateMemberAnalysisInput(args);
   /*
    * -------------------------------------------------------------
    * Defaults de negocio
@@ -536,7 +547,7 @@ export const analyzeMembers = async (args, connection, username) => {
     ];
 
     for (const dimension of purchaseDimensions) {
-      const breakdownRows = await getMemberPurchaseBreakdownRepository({
+      const sourceBreakdownRows = await getMemberPurchaseBreakdownRepository({
         connection,
 
         documentNumbers,
@@ -553,6 +564,8 @@ export const analyzeMembers = async (args, connection, username) => {
 
         categoryIds: args.categoryIds ?? [],
       });
+      const selectedCurrencies = new Set(members.map((member) => JSON.stringify([member.documentNumber, member.currency])));
+      const breakdownRows = sourceBreakdownRows.filter((row) => selectedCurrencies.has(JSON.stringify([row.documentNumber, row.currency])));
 
       /*
        * En modo members mantenemos el detalle por socio.
@@ -598,7 +611,7 @@ export const analyzeMembers = async (args, connection, username) => {
    * -------------------------------------------------------------
    */
 
-  const returnedCount = members.length;
+  const returnedCount = new Set(members.map((member) => member.documentNumber)).size;
 
   const hasMore =
     repositoryHasMore != null
@@ -611,9 +624,9 @@ export const analyzeMembers = async (args, connection, username) => {
    * En summary, members contiene todo el universo filtrado.
    * En members, estos conteos corresponden únicamente a la lista retornada.
    */
-  const commerciallyActiveCount = members.filter(
+  const commerciallyActiveCount = new Set(members.filter(
     (member) => member.commerciallyActive,
-  ).length;
+  ).map((member) => member.documentNumber)).size;
 
   const commerciallyInactiveCount = returnedCount - commerciallyActiveCount;
 

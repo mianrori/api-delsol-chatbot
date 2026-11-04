@@ -1,5 +1,10 @@
 # Pruebas automáticas del endpoint DEV
 
+Estado y commits ya validados: [matriz de alcance backend](../docs/backend-functional-matrix.md).
+Este documento explica reproducción y perfiles; no implica que haya que repetir
+las suites aprobadas. Los reportes sin SHA se distinguen de los controles con
+commit acreditado, y las muestras DEV faltantes de las carencias de implementación.
+
 ## Introducir sesión y documentos sin guardarlos
 
 Desde PowerShell, en la carpeta del proyecto:
@@ -389,8 +394,10 @@ El reporte contiene solo fechas del perfil, códigos de comprobación, tiempos y
 `coverage.memberPurchasesMultiplePages`, sin documento, locales, rubros, importes
 ni filas. Son controles de coherencia de respuestas HTTP; no prueban por sí
 solos la correspondencia documento/persona ni sustituyen un control independiente
-contra Oracle. No modifica sesiones ni reloj. Pendiente validar el
-formato solicitado contra DEV; los tests locales usan respuestas simuladas.
+contra Oracle. No modifica sesiones ni reloj. El formato y recorrido HTTP ya
+aprobaron en la validación final de paginación (muestra de 170 registros), con
+conciliación completa y fin real. La traza no incluye SHA propio; conservar esa
+salvedad y el pendiente de contraste SQL independiente descritos en la matriz.
 
 La suite personal admite negrita y espacios Unicode en encabezados y separadores
 de miles (por ejemplo, `1 234`), además de `1.234`. Solo admite grupos de

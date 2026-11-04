@@ -14,7 +14,10 @@ export const analyzeMembersTool = {
       "cada período con los mismos filtros, métricas y breakdownBy. No reutilices " +
       "los valores de un período para representar otro. Para socios activos no es " +
       "necesario indicar purchasePeriods: si no se especifica un período, el " +
-      "backend utiliza activityMonths, con 12 meses por defecto.",
+      "backend utiliza activityMonths, con 12 meses por defecto. Los conteos globales " +
+      "son socios distintos: no sumes los conteos distintos de grupos. Conserva " +
+      "los importes separados por moneda. Si un ranking monetario informa varios " +
+      "grupos monetarios, presenta su motivo sin inventar un orden ni convertir importes.",
 
     inputSchema: {
       json: {
