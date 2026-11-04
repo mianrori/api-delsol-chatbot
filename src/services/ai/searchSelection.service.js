@@ -17,7 +17,7 @@ const optionFrom=result=>result.customer??result.category??result.member??result
 // Reconstruct resolution state across turns and tool iterations. A failed query
 // or a non-selection message must not erase an unresolved lookup.
 export function preserveSearchSelection({name,input,history=[],currentCalls=[]}){
- const states=new Map(),calls=new Map(),queries=[];let turn=-1;
+ const states=new Map(),calls=new Map(),queries=[];let turn=-1,currentText='';
  const update=(call,result)=>{
   if(!specs[call.name]||!result)return;
   const prior=states.get(call.name),originTurn=prior?.kind==='pending'?prior.originTurn:call.turn;
@@ -27,6 +27,7 @@ export function preserveSearchSelection({name,input,history=[],currentCalls=[]})
  for(const message of history){
   const text=userText(message);
   if(text!=null){
+   currentText=text;
    turn++;const choice=selection(text),pending=[...states].filter(([,s])=>s.kind==='pending');
    const selectable=pending.length?pending:[...states].filter(([,s])=>s.kind==='selected');
    if(choice&&selectable.length===1){const [search,state]=selectable[0];const selected=state.result.options?.find(o=>String(o.optionId??o.option)===String(Number(choice)));
@@ -36,29 +37,37 @@ export function preserveSearchSelection({name,input,history=[],currentCalls=[]})
   }
   for(const block of message.content??[]){
    if(block.toolUse){const call={...block.toolUse,turn};calls.set(call.toolUseId,call);if(!specs[call.name])queries.push(call);}
-   if(block.toolResult?.status==='success'){const call=calls.get(block.toolResult.toolUseId);if(call)update(call,block.toolResult.content?.find(b=>b.json)?.json);}
+   if(block.toolResult){const call=calls.get(block.toolResult.toolUseId);if(call){call.resultStatus=block.toolResult.status;if(call.resultStatus==='success')update(call,block.toolResult.content?.find(b=>b.json)?.json);}}
   }
  }
  for(const call of currentCalls)if(specs[call.name])update({...call,turn},call.result);
- let result={...input};
+ const resolutions=[];
  for(const [search,spec] of Object.entries(specs)){
   if(!spec.consumers.includes(name))continue;
   const state=states.get(search);if(!state)continue;
   if(state.kind==='pending')fail();
-  // Older resolved lookups must not bind an unrelated new request. Explicitly
-  // selected identities remain authoritative for continuations until re-searched.
-  if(state.kind==='resolved'&&state.selectedTurn<turn)continue;
   const {selected}=state;
   if(required[search].some(key=>selected[key]==null))fail();
-  const previousInput=queries.filter(c=>c.name===name&&c.turn===state.originTurn).at(-1)?.input??{};
-  result=state.selectedTurn===turn?{...result,...previousInput}:{...previousInput,...result};
+  resolutions.push({search,spec,state,selected});
+ }
+ // Recover context once, independently of resolver order. A later resolver must
+ // never merge the original model proposal over identifiers already validated.
+ const origins=new Set(resolutions.map(r=>r.state.originTurn));
+ const origin=queries.filter(c=>c.name===name&&origins.has(c.turn)).sort((a,b)=>a.turn-b.turn)[0];
+ const successful=queries.filter(c=>c.name===name&&c.turn<turn&&c.resultStatus==='success').at(-1);
+ const original=(successful&&successful.turn>=(origin?.turn??-1)?successful:origin)?.input??{};
+ const selectingNow=Boolean(selection(currentText))&&resolutions.some(r=>r.state.selectedTurn===turn);
+ const result=selectingNow?{...input,...original}:{...original,...input};
+ const identifiers={};
+ for(const {search,spec,state,selected} of resolutions){
   for(const [key,value] of Object.entries(spec.fields(selected,name))){
    // customerId and customerIds are alternate contracts, not extra tool fields.
    if(key==='customerId'&&['get_sales','get_sales_per_sqm','analyze_members','get_member_purchases','get_member_promo_purchases','compare_member_purchases_vs_sales','analyze_campaign_sales_performance'].includes(name))continue;
    if(key==='customerIds'&&['get_contract_conditions','get_contract_cost_per_sqm','analyze_contract_cost_incidence'].includes(name))continue;
-   if(value==null||Array.isArray(value)&&value.some(v=>v==null))fail();result[key]=value;
+   if(value==null||Array.isArray(value)&&value.some(v=>v==null))fail();identifiers[key]=value;
   }
   if(search==='search_invoice_customers')for(const key of ['dateFrom','dateTo'])if(state.call.input?.[key]!=null)result[key]=state.call.input[key];
  }
- return result;
+ // Detach nested filters too, so a consumer cannot mutate the stored history.
+ return structuredClone({...result,...identifiers});
 }
