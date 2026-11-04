@@ -5,6 +5,7 @@ import {tools} from '../src/tools/index.js';
 const rows=[
  ['search_customers','get_sales',[{codCliente:'A'},{codCliente:'B'}],{customerIds:['B']}],
  ['search_categories','get_sales',[{codRubro:'A'},{codRubro:'B'}],{categoryIds:['B']}],
+ ['search_categories','get_soles_usage',[{codRubro:'A'},{codRubro:'B'}],{categoryIds:['B']}],
  ['search_members','get_member_purchases',[{documentNumber:'A'},{documentNumber:'B'}],{documentNumber:'B'}],
  ['search_invoice_customers','get_invoices',[{customerId:'A'},{customerId:'B'}],{customerIds:['B']}],
  ['search_invoice_concepts','get_invoices',[{conceptId:'A'},{conceptId:'B'}],{conceptIds:['B']}],
