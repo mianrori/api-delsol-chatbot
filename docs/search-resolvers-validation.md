@@ -299,8 +299,7 @@ explícitos, doce seguimientos tras retirar ambos, aislamiento entre sesiones,
 reset, argumentos finales, filtros restantes y ausencia de mutación del historial.
 Modelo y repositorios/consumidores son controlados en estas pruebas.
 
-**Pendiente: control Oracle/HTTP DEV del código `158b120`.** No se da por aprobado
-por reutilizar evidencia anterior. El nuevo ejecutor contrasta las identidades de
+El ejecutor Oracle/HTTP DEV contrasta las identidades de
 local/rubro con catálogos independientes, usa auth y lookups reales y espías de
 ventas para verificar argumentos; no consulta ventas/compras. Reutiliza los 99
 checks `d0bb3a6` verificados por SHA-256, incluida su denegación, sin repetirlos.
@@ -319,3 +318,39 @@ argumentos, archivos o reportes. Helper y reporte sanitizado esperado
 `logs/search-filter-lifecycle-final.json` están ignorados por Git.
 PR #37 continúa en borrador hasta revisar la corrección y su evidencia real.
 Las muestras históricas faltantes permanecen documentadas; no se fabricaron datos.
+
+### Resultado DEV y corrección del contexto recortado
+
+Intento `9249d6f` (código `158b120`), 04/11/2026 19:09:55.228–19:09:59.265 UTC:
+**272/275 checks aprobados; tres fallos de argumentos**, success=false/salida 1.
+Los tres aparecen en los últimos seguimientos de la cadena de retirar ambos y
+añadir solo local: al salir su nueva búsqueda del historial acotado, el guard ya
+no tenía una resolución que prevaleciera sobre el ID contradictorio del modelo.
+El rubro retirado no se reintrodujo. La cadena corta, los cambios de período,
+ambigüedad/selección, reincorporación y los controles de identidad/cierre aprobaron;
+estos resultados mantienen la atribución del intento y no acreditan el commit nuevo.
+
+Todos los proxies cerrados y dos logout propios aprobados. Logs del intervalo:
+cuatro eventos ERP compactos, cero eventos error/campos extra/líneas no compactas,
+sin error fatal/de cierre detectado en chatbot. Solo se guardó resumen sanitizado;
+no se imprimieron líneas crudas. El reporte fallido se conserva localmente como
+`logs/search-filter-lifecycle-9249d6f-failed.json`, fuera de Git.
+
+**Corregido en `aaf3b5f`; 53/53 pruebas afectadas Node 22 aprobadas.** Tras recortar
+una resolución, las identidades de la última consulta ejecutada correctamente se
+conservan ante propuestas no solicitadas. Una búsqueda nueva del otro dominio no
+reemplaza esos IDs ni pierde período, métricas, desglose u otros filtros. Continúan
+funcionando las retiradas y los cambios explícitos, con clon profundo del historial.
+Las tres fixtures HTTP ahora acumulan fallos aunque el chat capture la excepción
+de la aserción del consumidor. Se reprodujeron así los mismos tres fallos con datos
+sintéticos antes de corregirlos; la secuencia completa y el modo acotado pasan.
+
+**Pendiente: Oracle/HTTP DEV de `aaf3b5f`.** El mismo helper actualizado recreará
+solo la cadena larga de **19 peticiones**, necesaria para volver a los tres fallos
+y cruzar el límite de recorte. No repite los otros perfiles de la medición fallida,
+ni promociones, ventas/compras o las suites completas. Verifica por hash el intento
+de 275 checks y la evidencia anterior de 99, conservando sus SHA y conteos originales.
+No suma checks solapados ni convierte el intento fallido en aprobado.
+Se requieren cuentas DEV en las cuatro entradas ocultas del comando anterior
+solo para obtener sesiones nuevas; las dos sesiones propias anteriores ya se cerraron.
+PR #37 sigue en borrador hasta revisar la corrección y el retry real.

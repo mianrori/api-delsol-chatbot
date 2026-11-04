@@ -34,8 +34,9 @@ Quitar local/rubro invalida su resolución; cambiar período o continuar no lo
 restaura. Volver a añadir requiere petición explícita y resolución nueva;
 propuestas del modelo, opciones antiguas y menciones negativas no bastan.
 Las selecciones del otro dominio y los demás filtros se conservan sin mutar
-historial, incluso después de recortarlo. **Oracle/HTTP DEV de esta corrección
-pendiente de ejecutar**, no atribuible a los 99 controles anteriores.
+historial. **Oracle/HTTP DEV ejecutado sobre `9249d6f`: 272/275 aprobados, tres
+fallos de argumentos tras recortar la búsqueda del local recién añadido**.
+La retirada del rubro siguió vigente; no se declara aprobado el bloque completo.
 Preflight completo sin credenciales aprobado y 169 archivos candidatos idénticos.
 Ejecutor privado: `logs/run-search-filter-lifecycle-dev.ps1`. Reutiliza por hash
 los 99 checks anteriores y su denegación; solo recorre el ciclo afectado.
@@ -43,6 +44,19 @@ Este pendiente de validación se distingue de las muestras DEV faltantes de
 superficie cero/cambiante, ventas registradas de suma cero y socios multimoneda,
 que conservan su cobertura controlada y sus limitaciones originales.
 PR #37 permanece en borrador; sin merge ni cambios de datos/permisos/expiraciones.
+
+Hallazgo del recorte corregido en **`aaf3b5f`**, **53/53 pruebas afectadas aprobadas**:
+los IDs de la última consulta ejecutada correctamente prevalecen ante propuestas
+no solicitadas del modelo si la resolución salió del historial. Una resolución
+nueva del otro dominio conserva esos IDs y el resto de contexto. Las fixtures
+HTTP acumulan las aserciones capturadas por el chat para impedir falsos positivos;
+reproducen los tres fallos antes de la corrección y pasan después.
+**Pendiente de Oracle/HTTP: repetir solo la cadena larga de 19 peticiones**, con
+el mismo helper actualizado. El ejecutor verifica por hash el intento de 275
+checks y conserva sus 272 aprobados con su SHA, sin atribuirlos al código nuevo;
+también reutiliza los 99 controles anteriores y su denegación. Proxies cerrados,
+dos logout propios y cuatro eventos ERP compactos sin campos extra/error en el
+intento fallido. Las muestras reales faltantes permanecen abiertas.
 
 ## Comparación con el chat original
 
