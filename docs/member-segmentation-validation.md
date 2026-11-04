@@ -170,3 +170,17 @@ casos aprobados. Ejecuta ALL/ANY pendientes, CTE y seguimientos HTTP. Mantiene
 y comprueba cierre de la conexión de control también si falla la operación.
 Los reportes anteriores se conservaron en `logs/`; no se modifica ninguna sesión
 para completar las pruebas. **Reintento Oracle/HTTP pendiente; PR aún en borrador.**
+
+El intento de `6d3af88` falló en el helper antes de arrancar Node: PowerShell
+considera `$retry` y el parámetro switch `$Retry` la misma variable. El reporte
+de negocio local seguía siendo el de `82e72ba`; no se atribuyen sus 40 controles
+a una ejecución nueva. Se reprodujo la colisión y se corrigió el nombre local.
+El preflight ahora construye y ejecuta el comando Docker completo en modo
+`node --check` antes de pedir entradas ocultas; terminó con código 0 usando
+`-Stage remaining -Retry`. No consulta Oracle.
+
+Cada ejecución recibe además una correlación aleatoria de prueba (`runId`, sin
+relación con la sesión). El helper rechaza reportes de otra ejecución y deja un
+estado local explícito si Node no llegó a arrancar. Esta modificación afecta
+solo al ejecutor/reportes y documentación; el código productivo de `6d3af88`
+y su evidencia enfocada de 46/46 se conservan. Oracle/HTTP siguen pendientes.

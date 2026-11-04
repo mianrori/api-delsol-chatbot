@@ -11,7 +11,7 @@ import {analyzeMembers} from '../src/services/members/memberAnalysis.service.js'
 // All source values stay in memory. Reports contain only checks/coverage/codes.
 const output=console.log.bind(console),logCodes=new Set();console.log=()=>{};
 console.error=(...values)=>{for(const value of values)for(const m of String(value?.driverCode??value?.message??(typeof value==='string'?value:'')).matchAll(/(?:ORA|NJS|DPI)-\d+/g))logCodes.add(m[0]);};
-const report={suite:'member-segmentation-dev',scope:process.env.BOT_TEST_SEGMENT_REMAINING==='true'?'remaining':'full',timings:[],queryTimings:[],startedAt:new Date().toISOString(),checks:[],coverage:{},pending:[]};
+const report={suite:'member-segmentation-dev',runId:process.env.BOT_TEST_RUN_ID??null,scope:process.env.BOT_TEST_SEGMENT_REMAINING==='true'?'remaining':'full',timings:[],queryTimings:[],startedAt:new Date().toISOString(),checks:[],coverage:{},pending:[]};
 const check=(ok,code)=>report.checks.push({code,passed:Boolean(ok)});
 const near=(a,b)=>a===b||Number.isFinite(a)&&Number.isFinite(b)&&Math.abs(a-b)<=Math.max(.000001,Math.abs(b)*1e-9);
 const canonical=v=>JSON.stringify(v&&typeof v==='object'?Array.isArray(v)?v.map(x=>JSON.parse(canonical(x))):Object.fromEntries(Object.keys(v).sort().map(k=>[k,JSON.parse(canonical(v[k]))])):v);
