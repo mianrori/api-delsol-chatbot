@@ -123,7 +123,7 @@ históricos de la matriz. Sin merge ni cambios de datos, permisos o expiraciones
 ## Correcciones de revisión — `2094624`
 
 Los tres P2 de la revisión de `7ced8d9` se corrigen en código, con validación
-controlada aprobada y contraste DEV afectado aún pendiente:
+controlada y contraste DEV afectado aprobados:
 
 - El guard reconstruye búsquedas pendientes a través de los turnos e iteraciones
   conservados en el contexto. «Continúa», preguntas sin selección y opciones
@@ -166,7 +166,36 @@ credenciales y sesiones permanecen en memoria/stdin y los logout son propios.
 powershell -NoProfile -ExecutionPolicy Bypass -File .\logs\run-search-corrections-dev.ps1
 ```
 
-El preflight ya probó entorno, guard de logs y el comando HTTP sintético completo
-en Docker DEV sin credenciales. **Oracle/HTTP afectados reales pendientes de
-ejecución y revisión**; reporte privado esperado `logs/search-corrections-final.json`.
-PR #37 sigue en borrador. Las muestras/limitaciones anteriores no se eliminan.
+El preflight probó entorno, guard de logs y el comando HTTP sintético completo
+en Docker DEV sin credenciales. **78/78 controles afectados aprobados sobre
+`2bfa637`**, 04/11/2026 17:54:00.184–17:54:02.723 UTC (**2,539 segundos**),
+helper COMPLETE/success=true/salida 0. `2bfa637` solo documenta el código validado
+`2094624`; los 166 archivos candidatos preparados coincidían por hash.
+
+- **10 checks de empates Oracle controlados:** CTE sobre DUAL, filas empatadas
+  invertidas, duplicados indistinguibles y página posterior al final; secuencia
+  estable, sin repeticiones u omisiones. No son cambios ni muestras fabricadas
+  en datos DEV.
+- **Ocho páginas reales** aproximadas más la **novena petición vacía**: total,
+  hasMore/nextPage, ambigüedad conservada y secuencia ordenada completa por todas
+  las columnas cotejadas contra el control independiente. Opciones únicas y
+  rechazo Oracle sin datos comprobados.
+- **31 checks HTTP / 11 peticiones** a la candidata de loopback: bloqueo de
+  elección arbitraria y dos «continúa» por flujo, opción explícita/filtros exactos
+  para ventas y usos de soles, nueva búsqueda unívoca/ID real, denegación sin
+  datos ni acciones. Ruta/controlador/chat y validación de sesiones son reales;
+  lookups de rubros usan Oracle DEV. El modelo y los consumidores de negocio
+  son controlados: no se releyeron compras/usos ni se acredita interpretación
+  libre o la respuesta de un consumidor de negocio real.
+- Identidades reales PG/proxy coincidentes y usuarios Oracle distintos; todos
+  los proxies cerrados; **dos logout propios aprobados aparte** de los 78 checks.
+- Logs del intervalo: cuatro eventos ERP compactos, cero error/campos extra,
+  sin etiquetas sensibles ni logger de cuerpos detectados. Sin error fatal o
+  de cierre detectado en chatbot. Sin publicar líneas crudas.
+
+Reporte privado `logs/search-corrections-final.json` y resumen
+`logs/search-corrections-final-summary.json`, ignorados. No dejó muestras pendientes
+para sus casos; permanecen las históricas y los límites de la matriz. Se reutilizaron
+los 100 checks previos sin repetirlos, sin sumarlos como casos únicos ni atribuirlos
+al código corregido. No se repitieron controles/login al revisar esta evidencia.
+PR #37 sigue en borrador hasta revisar las correcciones; sin merge/despliegue.
