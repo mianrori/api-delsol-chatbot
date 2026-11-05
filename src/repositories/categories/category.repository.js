@@ -1,47 +1,21 @@
-import config from "../../../config.js";
-import { executeOracleQuery } from "../../database/oracle-query.database.js";
+import config from '../../../config.js';
+import {executeOracleQuery} from '../../database/oracle-query.database.js';
+import {oracleSearchText,normalizeSearchText} from '../searchText.sql.js';
 
-export const searchCategoriesRepository = async (connection, search) => {
-  const sql = `
-    SELECT *
-    FROM (
-      SELECT
-        COD_RUBRO,
-        DESCRIPCION,
-        UTL_MATCH.JARO_WINKLER_SIMILARITY(
-          UPPER(
-            REGEXP_REPLACE(
-              TRANSLATE(
-                DESCRIPCION,
-                'ÁÉÍÓÚÜÑáéíóúüñ',
-                'AEIOUUNAEIOUUN'
-              ),
-              '[^A-Za-z0-9]',
-              ''
-            )
-          ),
-          UPPER(
-            REGEXP_REPLACE(
-              TRANSLATE(
-                :search,
-                'ÁÉÍÓÚÜÑáéíóúüñ',
-                'AEIOUUNAEIOUUN'
-              ),
-              '[^A-Za-z0-9]',
-              ''
-            )
-          )
-        ) AS SIMILARITY
-      FROM VW_BOT_RUBROS_LOCALES
-      ORDER BY SIMILARITY DESC
-    )
-    WHERE SIMILARITY >= :minSimilarity
-      AND ROWNUM <= :limit
-  `;
+export const searchCategoriesRepository=async(connection,search)=>{
+ const normalizedSearch=normalizeSearchText(search);if(!normalizedSearch)return [];
+ const name=oracleSearchText('C.DESCRIPCION');
+ return executeOracleQuery(connection,`SELECT * FROM (
+  SELECT matches.*, COUNT(*) OVER() AS TOTAL_MATCHES,
+    SUM(EXACT_MATCH) OVER() AS EXACT_MATCH_COUNT
+  FROM (
+    SELECT C.COD_RUBRO,C.DESCRIPCION,
+      CASE WHEN ${name}=:normalizedSearch THEN 1 ELSE 0 END AS EXACT_MATCH,
+      CASE WHEN INSTR(${name},:normalizedSearch)>0 THEN 1 ELSE 0 END AS TEXT_MATCH,
+      UTL_MATCH.JARO_WINKLER_SIMILARITY(${name},:normalizedSearch) AS SIMILARITY
+    FROM VW_BOT_RUBROS_LOCALES C
 
-  return executeOracleQuery(connection, sql, {
-    search,
-    minSimilarity: Number(config.minSimilarity || 70),
-    limit: Number(config.limitFilter || 5),
-  });
+  ) matches WHERE TEXT_MATCH=1 OR SIMILARITY>=:minSimilarity
+  ORDER BY EXACT_MATCH DESC, TEXT_MATCH DESC, SIMILARITY DESC, COD_RUBRO
+ ) WHERE ROWNUM<=:limit`,{normalizedSearch,minSimilarity:Number(config.minSimilarity||70),limit:Number(config.limitFilter||5)});
 };

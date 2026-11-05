@@ -187,19 +187,25 @@ export const searchPromotionsRepository = async (connection, search, paging = {}
     return `(INSTR(${normalizedColumn("NOMBRE_PROMOCION")}, :token${index}) > 0 OR INSTR(${normalizedColumn("NOMBRE_CAMPANIA")}, :token${index}) > 0)`;
   });
   const candidates = await executeOracleQuery(connection, `
-    SELECT COD_PROMOCION, COD_CAMPANIA, NOMBRE_PROMOCION, NOMBRE_CAMPANIA,
+    SELECT DISTINCT COD_PROMOCION, COD_CAMPANIA, NOMBRE_PROMOCION, NOMBRE_CAMPANIA,
            TO_CHAR(FECHA_DESDE, 'DD/MM/YYYY') AS FECHA_DESDE,
            TO_CHAR(FECHA_HASTA, 'DD/MM/YYYY') AS FECHA_HASTA
       FROM VW_BOT_PROMOCIONES
      WHERE ${fuzzyFilters.join(" OR ")}
-     ORDER BY VW_BOT_PROMOCIONES.FECHA_DESDE DESC NULLS LAST, COD_PROMOCION, COD_CAMPANIA
+     ORDER BY FECHA_DESDE DESC NULLS LAST, COD_PROMOCION, COD_CAMPANIA,
+              NOMBRE_PROMOCION, NOMBRE_CAMPANIA, FECHA_HASTA DESC NULLS LAST
   `, fuzzyBinds);
   const dateKey = (value) => String(value ?? "").split("/").reverse().join("");
-  const ranked = candidates.map((item) => {
+  // The complete visible option is its key: collapse indistinguishable source
+  // duplicates, then use this key to break every remaining ranking tie.
+  const optionKey=item=>JSON.stringify([String(item.COD_PROMOCION),item.COD_CAMPANIA==null?null:Number(item.COD_CAMPANIA),item.NOMBRE_PROMOCION??null,item.NOMBRE_CAMPANIA??null,item.FECHA_DESDE??null,item.FECHA_HASTA??null]);
+  const uniqueCandidates=[...new Map(candidates.map(item=>[optionKey(item),item])).values()];
+  const compareKey=(a,b)=>optionKey(a)<optionKey(b)?-1:optionKey(a)>optionKey(b)?1:0;
+  const ranked = uniqueCandidates.map((item) => {
     const score = calculateTextSimilarity(item.NOMBRE_PROMOCION, item.NOMBRE_CAMPANIA, search);
     return { ...item, MATCH_PRIORITY: 3, SIMILARITY: score.similarity, MIN_TOKEN_SIMILARITY: score.minTokenSimilarity };
   }).filter((item) => item.SIMILARITY >= Number(config.minSimilarity ?? 65) && item.MIN_TOKEN_SIMILARITY >= 60)
     .sort((a, b) => b.SIMILARITY - a.SIMILARITY || dateKey(b.FECHA_DESDE).localeCompare(dateKey(a.FECHA_DESDE)) ||
-      String(a.COD_PROMOCION).localeCompare(String(b.COD_PROMOCION)) || String(a.COD_CAMPANIA).localeCompare(String(b.COD_CAMPANIA)));
+      String(a.COD_PROMOCION).localeCompare(String(b.COD_PROMOCION)) || String(a.COD_CAMPANIA).localeCompare(String(b.COD_CAMPANIA)) || compareKey(a,b));
   return pageResult(ranked.slice(pagination.offset, pagination.offset + pagination.rows), ranked.length, pagination, "approximate");
 };

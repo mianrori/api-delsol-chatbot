@@ -1,17 +1,138 @@
 # Alcance y evidencia del backend del chatbot
 
-Corte: **03/11/2026**, código `6b1303e` (PR #35 fusionada y desplegada en DEV).
-La comparación inicial del registro fue documental. La actualización posterior
-de segmentación incorpora las ejecuciones descritas abajo, sin modificar datos,
-expiraciones o integración frontend/ERP.
+Corte actualizado: **04/11/2026**, base desplegada `00a1acb` (PR #36 fusionada).
+Segmentación: 50/50 Oracle/HTTP en `7c34c14`; corrección orderBy en `345827f`
+(17/17 enfocadas, 5/5 controladas Docker DEV); despliegue `00a1acb`, 10/10
+conciliaciones de una consulta real y cierre, salud correcta y 159 archivos idénticos.
+Se reutilizan baseline/denegación con sus SHA originales, sin sumar conteos solapados.
 
-Actualización de segmentación, 04/11/2026: PR #36 en borrador para revisión.
-**50/50 controles finales Oracle/HTTP sobre `7c34c14`**, en 28,806 s y con 144
-archivos candidatos idénticos; 46/46 pruebas enfocadas Node 22 del código productivo.
-Se reutilizan los 108 controles baseline `6b1303e` y los 40 parciales de `82e72ba`,
-incluida denegación real/cierre. No se suman ni se atribuyen al head como recién
-ejecutados. Queda pendiente la muestra real de segmentación con varias monedas,
-ya cubierta con CTE controladas; las demás muestras históricas también se conservan.
+Buscadores: candidato `c8525a6`, rama separada; **68/68 enfocadas controladas**.
+**100/100 controles Oracle aprobados sobre `7ced8d9`**, nueve buscadores, ocho páginas
+aproximadas de promociones, rechazo sin datos y cierre; dos logout propios aprobados.
+162 archivos candidatos idénticos; 11,288 s. Selección/contexto: integración controlada,
+no nueve conversaciones HTTP nuevas. PR #37 en borrador para revisión.
+Ver [detalle](search-resolvers-validation.md). No se declaran muestras pendientes aprobadas.
+
+Revisión posterior: tres P2 corregidos en `2094624`; **44/44 enfocadas aprobadas**.
+Persistencia de selección pendiente, rubro en usos de soles y desempate completo del
+fallback: **78/78 controles afectados sobre `2bfa637` aprobados**, 2,539 s. Incluye
+10 checks CTE Oracle, ocho páginas reales y una petición final vacía; 31 checks HTTP
+en 11 peticiones a candidata con auth/lookups Oracle reales, modelo/consumidores
+controlados. Cierre y dos logout aprobados; PR #37 continúa en borrador.
+Los 100 controles previos siguen atribuidos a `7ced8d9`; no acreditan esta corrección.
+
+Composición local/rubro corregida en `929d88e`: **42/42 pruebas afectadas aprobadas**,
+ambos órdenes, propuestas contradictorias, cambios explícitos e historial inmutable.
+**99/99 controles Oracle/HTTP de composición aprobados sobre `d0bb3a6`**, 2,814 s:
+79 checks HTTP/19 peticiones, 16 comprobaciones de argumentos y 19 de historial;
+auth/lookups Oracle reales, modelo y ventas controlados. 167 archivos idénticos.
+78 controles `2bfa637` reutilizados sin repetir paginación ni consultas de negocio.
+
+Retirada explícita corregida en `158b120`: **51/51 pruebas afectadas aprobadas**
+en Node 22, más la aserción HTTP posterior de recorte de historial aprobada.
+Quitar local/rubro invalida su resolución; cambiar período o continuar no lo
+restaura. Volver a añadir requiere petición explícita y resolución nueva;
+propuestas del modelo, opciones antiguas y menciones negativas no bastan.
+Las selecciones del otro dominio y los demás filtros se conservan sin mutar
+historial. **Oracle/HTTP DEV ejecutado sobre `9249d6f`: 272/275 aprobados, tres
+fallos de argumentos tras recortar la búsqueda del local recién añadido**.
+La retirada del rubro siguió vigente; no se declara aprobado el bloque completo.
+Preflight completo sin credenciales aprobado y 169 archivos candidatos idénticos.
+Ejecutor privado: `logs/run-search-filter-lifecycle-dev.ps1`. Reutiliza por hash
+los 99 checks anteriores y su denegación; solo recorre el ciclo afectado.
+El hallazgo de implementación se distingue de las muestras DEV faltantes de
+superficie cero/cambiante, ventas registradas de suma cero y socios multimoneda,
+que conservan su cobertura controlada y sus limitaciones originales.
+PR #37 permanece en borrador; sin merge ni cambios de datos/permisos/expiraciones.
+
+Hallazgo del recorte corregido en **`aaf3b5f`**, **53/53 pruebas afectadas aprobadas**:
+los IDs de la última consulta ejecutada correctamente prevalecen ante propuestas
+no solicitadas del modelo si la resolución salió del historial. Una resolución
+nueva del otro dominio conserva esos IDs y el resto de contexto. Las fixtures
+HTTP acumulan las aserciones capturadas por el chat para impedir falsos positivos;
+reproducen los tres fallos antes de la corrección y pasan después.
+**110/110 controles Oracle/HTTP aprobados sobre `13e8ea8`**, 04/11/2026
+20:35:12.821–20:35:14.507 UTC (1,686 s), salida 0; solo la cadena larga de
+19 peticiones. `13e8ea8` solo documenta el código de `aaf3b5f`; 169 archivos
+candidatos idénticos. Los 19 argumentos finales y los 19 historiales previos
+aprobaron, incluidos los tres seguimientos antes fallidos y el límite de recorte.
+Cuatro comprobaciones exactas de IDs contra Oracle independiente; auth/lookups
+reales, modelo y consumidor de ventas controlados, sin consultar ventas/compras.
+El ejecutor verifica por hash el intento de 275
+checks y conserva sus 272 aprobados con su SHA, sin atribuirlos al código nuevo;
+también reutiliza los 99 controles anteriores y su denegación. Proxies cerrados,
+dos logout propios y cuatro eventos ERP compactos sin campos extra/error en el
+intento fallido y en el retry aprobado. Los dos logout propios no forman parte
+de los 110 checks. No sumar conteos solapados; no se repitieron otros perfiles.
+Sin pendientes propios del retry ejecutado; las muestras reales faltantes siguen
+abiertas. PR #37 en borrador para revisión final de la corrección, sin merge.
+
+Actualización 05/11/2026 — **estado de resolución por sesión, código `003f740`**:
+el hallazgo de selección pendiente tras recorte está corregido y validado en DEV.
+Local y rubro conservan estados independientes pendiente/seleccionado/retirado,
+opciones e inputs protegidos; reset limpia estos estados junto con el historial
+y PII. Sin evidencia de resolución no se admiten IDs del modelo, aunque aparezcan
+en argumentos anteriores. **60/60 pruebas afectadas Node 22 aprobadas**: recorte
+real, selección posterior, cambios explícitos, retiradas/reincorporación, ambos
+órdenes, temas, aislamiento y reset HTTP; búsquedas negadas y opciones de otro
+catálogo no cambian una identidad confirmada. Preflight completo sin credenciales
+aprobado. **502/502 controles Oracle/HTTP DEV de `003f740` aprobados**, 05/11/2026
+13:27:49.669–13:27:53.540 UTC (3,871 s), helper COMPLETE/success=true/salida 0.
+170 archivos candidatos idénticos; 120 peticiones de chat y dos resets, 60 checks
+de argumentos y 120 de historial (conteos solapados). Seis checks de coincidencia
+exacta y cuatro de pertenencia de opciones contra catálogos independientes,
+denegación/aislamiento para ambos buscadores y proxies cerrados. Dos logout
+propios aprobados aparte. Auth y lookups Oracle reales; modelo/consumidor de ventas
+controlados, sin consultar ventas/compras. Los 110 checks `13e8ea8` se verificaron
+por hash y mantienen su SHA; no se atribuyen al código nuevo ni se suman.
+Cuatro eventos ERP compactos, sin errores/campos extra; sin error fatal/de cierre
+detectado en stdout/stderr de chatbot. Sin pendientes propios del perfil ejecutado.
+PR #37 en borrador para revisión final, sin merge. Muestras históricas de superficie
+cero/cambiante, ventas registradas de suma cero y socios con varias monedas
+conservadas sin cambios; no se fabricaron datos.
+
+Transiciones posteriores — **código `0668b1b`, 66/66 pruebas afectadas aprobadas**
+y **452/452 controles Oracle/HTTP DEV aprobados**, 05/11/2026
+14:29:22.561–14:29:26.058 UTC (3,497 s), helper COMPLETE/success=true/salida 0.
+Las opciones ajenas/incorrectas y las búsquedas rechazadas conservan el estado
+completo anterior (dominios, opciones, contexto y foco), también después de
+recortar el historial. Una selección válida cambia solo su catálogo. Se separan
+las instrucciones efímeras del turno del estado duradero por sesión; pedir una
+búsqueda no invalida por adelantado una selección o retirada. Solo un resultado
+válido puede aplicar esa transición. Reset limpia ambos almacenes.
+Preflight completo sin credenciales aprobado; helper nuevo
+`logs/run-search-state-transitions-dev.ps1`. Los 502 checks `003f740` se conservan
+por hash y SHA: no validan estas variantes nuevas. El control acotado usa Oracle
+real para lookups/denegaciones de local-rubro; catálogo ajeno y fallos del ejecutor
+son controlados y se identifican como tales. Sin repetir suites completas ni
+consultas de negocio. 171 archivos candidatos idénticos; 104 peticiones HTTP,
+64 checks de argumentos y 104 de historial (conteos solapados), 24 comparaciones
+del estado completo ante errores/rechazos y cuatro de selección válida limitada
+a su catálogo. Ocho checks de IDs exactos y cuatro de pertenencia de opciones
+contra catálogos independientes; cuatro denegaciones Oracle reales conservan
+el estado retirado. Proxies cerrados y dos logout propios aprobados aparte de los
+452 checks. Cuatro eventos ERP compactos, sin error/campos inválidos; sin error
+fatal/de cierre detectado en stdout/stderr de chatbot. Sin pendientes propios
+del perfil; muestras reales faltantes conservadas. PR en borrador para revisión.
+
+Reelección enfocada — **código `047c361`, 75/75 pruebas afectadas aprobadas**.
+Con local y rubro confirmados, una opción mostrada del catálogo enfocado puede
+elegirse de nuevo sin alterar el otro. Se valida catálogo/ordinal/ID; dos catálogos
+aún pendientes siguen requiriendo aclaración. Pruebas de ambos buscadores antes/
+después del recorte, reelección repetida `1 → 2 → 1`, listas con los mismos números
+de opción, argumentos finales y estado completo ante opciones inválidas/ajenas.
+**370/370 controles Oracle/HTTP DEV aprobados sobre `047c361`**, 05/11/2026
+15:06:49.108–15:06:51.287 UTC (2,179 s), helper COMPLETE/success=true/salida 0.
+172 archivos candidatos idénticos; 88 peticiones HTTP, 44 checks de argumentos
+y 88 de historial (conteos solapados). Doce comparaciones del estado confirman
+que una reelección válida cambia solo su catálogo; opciones inválidas/ajenas e
+aislamiento conservan el estado completo. Ocho checks de pertenencia de opciones
+a catálogos Oracle independientes; auth/lookups reales, catálogo ajeno/modelo/
+ventas controlados. Proxies cerrados, dos logout propios aprobados aparte y
+cuatro eventos ERP compactos sin error/campos inválidos; sin error fatal/de cierre
+detectado en stdout/stderr de chatbot. Los 452 checks `0668b1b` se verificaron por
+hash, conservan su SHA y no se suman. Sin pendientes propios del perfil; PR #37
+en borrador para revisión final. Muestras históricas faltantes conservadas.
 
 ## Comparación con el chat original
 
@@ -71,6 +192,10 @@ ni importes del socio. Las letras siguientes identifican evidencia ya ejecutada:
 | X | `deployed-pr32-xlsx.json`: exportación real XLSX, 21/21 sobre `13e69ef`. | Evidencia específica de la exportación desplegada tras PR #32, no una nueva ejecución sobre `6b1303e`. |
 | G | `member-segmentation-final-summary.json`: 50/50 sobre `7c34c14`, 26 comprobaciones HTTP, 12 CTE Oracle, 144 archivos idénticos; 46/46 enfocadas Node 22. Reutiliza baseline 108 de `6b1303e` y parcial 40 de `82e72ba` con denegación real. | No sumar ejecuciones como casos únicos. HTTP con contexto preparado; muestra real de varias monedas pendiente. [Detalle](member-segmentation-validation.md). |
 
+| L | `search-resolvers-final.json`: 100/100 Oracle sobre `7ced8d9`, nueve buscadores y ocho páginas de fallback, usuarios distintos, nueve denegaciones/cierre; dos logout aparte. 162 archivos idénticos; 68/68 enfocadas `c8525a6`. | Selección/contexto con modelo controlado; Oracle por dispatcher real, sin nueve diálogos HTTP nuevos. Variantes fuera de los perfiles ensayados conservadas. [Detalle](search-resolvers-validation.md). |
+| C | `search-corrections-final.json`: 78/78 sobre `2bfa637` (código `2094624`), 2,539 s; 10 checks CTE, ocho páginas reales + final vacío, 31 checks HTTP/11 peticiones, denegación/cierre; dos logout aparte. 166 archivos candidatos idénticos; 44/44 enfocadas. | HTTP candidata: ruta/controller/chat, auth y lookups reales; modelo y consumidores de negocio controlados. No nueve catálogos/suites nuevos; L se reutiliza. [Detalle](search-resolvers-validation.md). |
+| M | `search-composition-final.json`: 99/99 sobre `d0bb3a6` (código `929d88e`), 2,814 s; 79 checks HTTP/19 peticiones, 16 de argumentos y 19 de historial (solapados), IDs Oracle independientes/denegación/cierre; dos logout aparte. 167 archivos idénticos; 42/42 enfocadas. | Ruta/controller/chat, autenticación y lookups reales; modelo/consumidor de ventas controlados, sin consultar ventas/compras. C se reutiliza sin rerun. [Detalle](search-resolvers-validation.md). |
+
 Las validaciones históricas conservan su SHA: no se declaran recién ejecutadas
 en la base actual. Las suites controladas de aquellas etapas incluyen 251 pruebas
 en Q, 263 antes de la corrección I, 29 enfocadas de empates, y 23 enfocadas de R
@@ -85,31 +210,31 @@ dentro de `test/`. **Sin acreditar** indica falta de evidencia, no fallo probado
 
 | Herramienta / funcionalidad | Implementación | Pruebas automatizadas existentes | Oracle / HTTP existente | Commit validado | Pendientes y variantes no verificadas |
 | --- | --- | --- | --- | --- | --- |
-| `search_customers` — locales | `customers/customer.resolver.js` | Ciclo/PII compartidos; sin suite dedicada del resolutor | H usa locales/filtros; Q usa lookup para seguimientos; no control independiente del catálogo completo | `b315ff9`, `e317a8f` indirectos | Exacta/parcial/ambigua/sin coincidencias y locales históricos: validación dirigida del resolutor. |
-| `search_categories` — rubros | `categories/category.resolver.js` | Ciclo/PII compartidos; sin suite dedicada | H y Q ejercitan filtros de rubro; no contraste dedicado del catálogo | `b315ff9`, `e317a8f` indirectos | Ambigüedad, ausencia y selección inicial, sin extrapolar el filtro probado. |
+| `search_customers` — locales | `customers/customer.resolver.js` | Nuevas: searchResolvers/searchSelection y chatLifecycle; 68/68 enfocadas del bloque (conteos solapados)  Composición `929d88e`: 42/42 afectadas, ambos órdenes e historial, con dependencias controladas. | L: exacta/parcial/ausencia; identidades/conteos activos, denegación/cierre. H/Q previos reutilizados. | `7ced8d9` Oracle; `c8525a6` controladas  `929d88e` código; `d0bb3a6` composición aprobada | Históricos inactivos siguen excluidos por política. Empates exactos controlados; no muestra real de todos los empates ni lenguaje inicial exhaustivo. |
+| `search_categories` — rubros | `categories/category.resolver.js` | Nuevas: searchResolvers/searchSelection y chatLifecycle; 68/68 enfocadas del bloque (conteos solapados)  Correcciones `2094624`: 44/44 enfocadas/HTTP controladas del bloque (solapadas).  Composición `929d88e`: 42/42 afectadas, ambos órdenes e historial, con dependencias controladas. | L: exacta/parcial/ausencia; identidades/conteos, denegación/cierre. H/Q previos reutilizados. | `7ced8d9` Oracle; `c8525a6` controladas  `2094624` código; `2bfa637` contraste afectado aprobado  `929d88e` código; `d0bb3a6` composición aprobada | Empates exactos y opciones truncadas controlados; interpretación libre y todos los empates reales no acreditados. |
 | `get_sales` — ventas | `sales/sales.service.js` | `salesHistory`, `salesSeriesPresentation`, `salesYearComparison`, `salesExportFollowup`, `chatLifecycle` | H; lectura independiente de ventas dentro de Q/I para esos perfiles | `b315ff9`; Q/I para perfiles específicos | No todas las combinaciones de dimensiones/días/monedas; no repetir ventas generales ya aprobadas. |
 | `get_sales_per_sqm` — ventas por m² (adicional) | `sales/salesPerSqm.service.js` | `salesPerSqm`, `chatLifecycle` | Q: historia contractual, superficies inválidas/ambiguas, filtros, FX y cierre | `e317a8f`; desplegado `68847db` | **Muestras DEV:** superficie cero y cambiante. Límites y cálculo ya controlados; lenguaje inicial no exhaustivo. |
-| `search_members` — localizar socio | `members/member.resolver.js` | PII/ciclo; búsqueda simulada en `chatLifecycle`, sin suite dedicada del resolutor real | S/P/R usan documentos directos; no acreditan búsqueda nominal independiente | Sin SHA de validación dedicada | Nombre/documento, múltiples coincidencias y no encontrado con consulta independiente y privacidad. |
+| `search_members` — localizar socio | `members/member.resolver.js` | Nuevas: searchResolvers/searchSelection y chatLifecycle; 68/68 enfocadas del bloque (conteos solapados)  Correcciones `2094624`: 44/44 enfocadas/HTTP controladas del bloque (solapadas). | L: documento, pertenencia de identidades de nombre parcial y ausencia; rechazo/cierre. Selección: controlada. | `7ced8d9` Oracle; `c8525a6` controladas  `2094624` código; `2bfa637` contraste afectado aprobado | No completitud nominal ni ranking fuera de la cohorte acotada. Identificador compartido/empates: controlados; no atribuir una muestra real no registrada. |
 | `get_member` — ficha de socio | `members/member.service.js` | Cobertura PII transversal; sin suite dedicada identificada del servicio | Sin evidencia específica de ficha real contrastada | Sin acreditar | Perfil encontrado/ausente, campos nulos y mínima exposición autorizada. |
 | `get_member_purchases` — compras individuales | `members/member.service.js` → repositorio `members/memberPurchase.repository.js` | `memberPurchasesPagination`, `memberPurchasesPresentation`, `apiMemberPurchases`, `chatLifecycle` | P: detalle completo/resumen, filtros y fin real; no lectura SQL independiente acreditada | Fase `b315ff9`; traza sin SHA propio | Contraste SQL independiente del socio/período; segunda muestra positiva y variantes monetarias no acreditadas. |
-| `search_promotions` — promoción/campaña | `promotions/promotion.resolver.js` | `promotionSearch`, `memberPromoPurchases`, `chatLifecycle` | R: conteo/catálogo paginado independiente, ambigüedad y opción explícita; H búsqueda previa | `89a4e59`; desplegado `6b1303e` | Fallback aproximado controlado, sin muestra real independiente de todas sus coincidencias; redacción inicial no exhaustiva. |
+| `search_promotions` — promoción/campaña | `promotions/promotion.resolver.js` | Nuevas: searchResolvers/searchSelection y chatLifecycle; 68/68 enfocadas del bloque (conteos solapados)  Correcciones `2094624`: 44/44 enfocadas/HTTP controladas del bloque (solapadas). | R textual/paginación reutilizados; L: fallback aproximado independiente, ocho páginas completas, total/hasMore/nextPage, denegación/cierre. | `7ced8d9` fallback; `89a4e59` R; `6b1303e` despliegue R  `2094624` código; `2bfa637` contraste afectado aprobado | Fallback real ensayado aprobado; no exhaustivo de todos los errores de escritura. Muestra multimoneda de compras continúa pendiente en su propia fila. |
 | `get_member_promo_purchases` — compras promocionales | `members/memberPromoPurchase.service.js` | `memberPromoPurchases`, `promotionHardeningHarness`, `chatLifecycle` | R: siete páginas reales, multiconjunto y resumen, filtros/selección/seguimientos; denegación/cierre | `89a4e59`; desplegado `6b1303e` | **Muestra DEV:** socio con varias monedas; grupos ambiguos ya controlados en Oracle CTE. Segundo socio positivo no acreditado. |
 | `get_member_vehicles` — vehículos del socio/chapa | `members/memberVehicle.service.js` | `vehicleRegistrations`, PII y ciclo | H comprueba registros agregados, no la búsqueda real de dueño por chapa | Sin validación DEV dedicada acreditada | Chapa única/múltiples socios, documento, débito/activo y ausencia: contraste real dirigido. |
-| `analyze_members` — segmentación/ranking | `members/memberAnalysis.service.js` | Suites existentes de segmentación; 46/46 previas. Corrección del contrato orderBy: 17/17 enfocadas (5 nuevas; conteos solapados) | G: 50/50 finales Oracle/HTTP y cierre reutilizados; baseline y 40 controles/denegación previos. Null rechazado antes de SQL: 5/5 nuevos tests controlados en Docker DEV, sin nuevas lecturas Oracle | `345827f` validación orderBy; `7c34c14` Oracle/HTTP; `6b1303e` baseline; `82e72ba` parcial | Muestra real con varias monedas pendiente; CTE multimoneda aprobadas. Lenguaje inicial y carga general no exhaustivos. P2 orderBy:null corregido conforme al esquema no nullable; PR sin fusionar. |
+| `analyze_members` — segmentación/ranking | `members/memberAnalysis.service.js` | Suites existentes de segmentación; 46/46 previas. Corrección del contrato orderBy: 17/17 enfocadas (5 nuevas; conteos solapados) | G: 50/50 finales Oracle/HTTP y cierre reutilizados; baseline y 40 controles/denegación previos. Null rechazado antes de SQL: 5/5 nuevos tests controlados en Docker DEV, sin nuevas lecturas Oracle | `345827f` validación orderBy; `7c34c14` Oracle/HTTP; `6b1303e` baseline; `82e72ba` parcial | Muestra real con varias monedas pendiente; CTE multimoneda aprobadas. Lenguaje inicial y carga general no exhaustivos. P2 orderBy:null corregido conforme al esquema no nullable; PR #36 fusionada y desplegada `00a1acb` (10/10 controles puntuales). |
 | `compare_member_purchases_vs_sales` — canjes/ventas | `members/memberPurchasesVsSales.service.js` | `memberPurchasesVsSales`, `chatLifecycle` | H: meses/total/cambio de período; coherencia HTTP | `b315ff9` | SQL independiente de ambos universos con mismos filtros; otras monedas/denominador cero ya controlados, no muestra real acreditada de cada variante. |
 | `generate_chart` — gráficos | `charts/chart.service.js` | `charts`, `chatLifecycle` | H: barras/líneas de ventas, SVG y fuente | `b315ff9` | HTTP de barras horizontales/circular, varias series/fuentes y datos de otras herramientas no acreditado; no exige Oracle al graficar. Revisión frontend excluida. |
 | `analyze_campaign_sales_performance` — antes/durante/después | `sales/campaignSalesPerformance.service.js` | `campaignSalesPerformance`, `chatLifecycle` | H: selección y comparación temporal | `b315ff9` | Control SQL independiente de tres períodos con filtros; variantes reales de ausencia/base cero/monedas diferentes no acreditadas. |
-| `search_invoice_concepts` — conceptos facturados | `invoices/searchInvoiceConcepts.service.js` | Sin suite dedicada identificada del buscador | B prueba facturas/conceptos contractuales, no este buscador HTTP | Sin acreditar | Catálogo autorizado exacto/parcial/ambiguo/vacío y selección en chat. |
-| `search_invoice_customers` — clientes facturados | `invoices/searchInvoiceCustomers.service.js` | Sin suite dedicada identificada | B usa un cliente obtenido por control; no valida este buscador | Sin acreditar | Nombre, período histórico y ausencia/ambigüedad; continuidad hacia facturas. |
+| `search_invoice_concepts` — conceptos facturados | `invoices/searchInvoiceConcepts.service.js` | Nuevas: searchResolvers/searchSelection y chatLifecycle; 68/68 enfocadas del bloque (conteos solapados) | L: exacta/parcial/ausencia y límite; denegación/cierre. Selección/contexto: controlados. | `7ced8d9` Oracle; `c8525a6` controladas | Sin paginación en contrato: opciones limitadas y refinamiento. Conversación inicial libre no exhaustiva. |
+| `search_invoice_customers` — clientes facturados | `invoices/searchInvoiceCustomers.service.js` | Nuevas: searchResolvers/searchSelection y chatLifecycle; 68/68 enfocadas del bloque (conteos solapados) | L: exacta/parcial/ausencia, clientes distintos, período aislado y denegación/cierre; selección con período controlada. | `7ced8d9` Oracle; `c8525a6` controladas | Fallback fuzzy positivo y otras coincidencias de RUC/matrícula no acreditados individualmente. Opciones limitadas; no prometer catálogo completo. |
 | `get_invoices` — facturación | `invoices/invoices.service.js` | `invoices`, `chatLifecycle` | B: monedas, meses, conteos y dos páginas; D: denegación | `b315ff9` | HTTP positivo dedicado y control SQL independiente; variantes número/período/chapa/anuladas y todas las páginas no acreditadas en DEV. |
 | `get_contract_conditions` — condiciones | `contracts/contractConditions.service.js` | `contracts`, `chatLifecycle` | B: selección exacta, cliente ajeno, conceptos/vigencia; D rechazo | `b315ff9` | HTTP positivo dedicado; variantes de conceptos/último facturado y todos los casos de ausencia/ambigüedad en este endpoint, no inferir de I. |
 | `get_contract_cost_per_sqm` — costo por m² | `contracts/contractCostPerSqm.service.js` | `contracts`, `chatLifecycle` | B: cálculo real sin IVA y misma moneda | `b315ff9` | HTTP positivo y contraste independiente; USD/tasa inválida y área/facturación inválidas tienen controladas, no muestra real específica acreditada. |
 | `analyze_contract_cost_incidence` — incidencia | `contracts/contractCostIncidence.service.js` | `contractIncidence`, `contracts`, `chatLifecycle` | I: resumen/mes, SQL independiente, límites de vigencia, empates invertidos, FX y seguimientos | `dcd9530`; desplegado `8e80887` | **Muestra DEV:** ventas registradas cuya suma sea cero; no confundir con ausencia real ya verificada. |
-| `search_soles_types` — tipos de soles | `soles/searchSolesTypes.service.js` | `memberSoles`, `chatLifecycle` | S: saldo por tipos; no acredita buscador real con todas sus variantes | S sin SHA; buscador dedicado sin acreditar | Catálogo exacto/ambiguo/ausente y alias reales; no volver a probar el saldo como sustituto. |
+| `search_soles_types` — tipos de soles | `soles/searchSolesTypes.service.js` | Nuevas: searchResolvers/searchSelection y chatLifecycle; 68/68 enfocadas del bloque (conteos solapados) | L: exacta/parcial/ausencia y alias normales obtenido de Oracle; rechazo/cierre. | `7ced8d9` Oracle; `c8525a6` controladas | Descripciones/alias duplicados controlados; no muestra real acreditada de cada empate o positivo fuzzy. S no se repite. |
 | `get_member_soles` — saldo/vencimiento | `soles/memberSoles.service.js` | `memberSoles`, `chatLifecycle` | S: saldo por tipo, vencimiento y vuelta desde usos | S sin SHA | Recuperar trazabilidad; SQL independiente; vencidos/generación y referencia temporal, según variantes no cubiertas por S. |
-| `get_soles_usage` — usos | `soles/solesUsage.service.js` | `solesUsage`, `chatLifecycle` | S: resumen/tipos, detalle y varias páginas, cantidades faltantes detectadas | S sin SHA | SQL independiente y filtros de movimiento/destino/transacción/importes/ranking no acreditados individualmente. Soles son cantidades, no monedas. |
-| `search_soles_usage_destinations` — destinos | `soles/solesUsageDestination.resolver.js` | `solesUsage` | Sin contraste dedicado Oracle/HTTP acreditado | Sin acreditar | Pareja tipo/código, mismo código de SOCIO/LOCAL, límite y ambigüedad real. |
-| `search_soles_usage_movement_types` — movimientos | `soles/solesUsageMovementType.resolver.js` | `solesUsage` | Sin contraste dedicado Oracle/HTTP acreditado | Sin acreditar | Catálogo real, signos y selección; ausencia/límite sin declarar coincidencia única falsa. |
+| `get_soles_usage` — usos | `soles/solesUsage.service.js` | `solesUsage`, `chatLifecycle`  Guard de rubros: nuevas conversaciones HTTP controladas `2094624`. | S: resumen/tipos, detalle y varias páginas, cantidades faltantes detectadas | S sin SHA | SQL independiente y filtros de movimiento/destino/transacción/importes/ranking no acreditados individualmente. Soles son cantidades, no monedas.  Oracle/HTTP candidato del guard aprobado en `2bfa637`; consumidor de usos controlado, no reconsultado. |
+| `search_soles_usage_destinations` — destinos | `soles/solesUsageDestination.resolver.js` | Nuevas: searchResolvers/searchSelection y chatLifecycle; 68/68 enfocadas del bloque (conteos solapados) | L: exacta/parcial/ausencia, pareja tipo/código y conteo/hasMore con límite; rechazo/cierre. | `7ced8d9` Oracle; `c8525a6` controladas | Pareja SOCIO/LOCAL con igual código: controlada; muestra real conjunta no acreditada. No hay contrato page. |
+| `search_soles_usage_movement_types` — movimientos | `soles/solesUsageMovementType.resolver.js` | Nuevas: searchResolvers/searchSelection y chatLifecycle; 68/68 enfocadas del bloque (conteos solapados) | L: exacta/parcial/ausencia y listado limitado; conteo real/hasMore, denegación/cierre. Selección: controlada. | `7ced8d9` Oracle; `c8525a6` controladas | No se revalida el signo/importe de los usos como parte del catálogo. Interpretación libre no exhaustiva. |
 | `get_vehicle_registrations` — altas de vehículos | `vehicles/vehicleRegistrations.service.js` | `vehicleRegistrations`, `chatLifecycle` | H: total y género con seguimiento | `b315ff9` | SQL independiente de únicos/ACTIVO; edad actual/al registro, límites relativos y demás filtros/detalle no acreditados en DEV. |
 
 ## Capacidades del backend fuera del registro de herramientas

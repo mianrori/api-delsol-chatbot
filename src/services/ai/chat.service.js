@@ -1,4 +1,5 @@
 import { buildMemberPurchasesResponse, resolveMemberPurchasesPage } from "./memberPurchasesPresentation.service.js";
+import {preserveSearchSelection,beginSearchSelectionTurn,recordSearchToolResult,captureSearchQueryContext} from './searchSelection.service.js';
 import { buildMemberPromoResponse, resolveMemberPromoPage, resolveMemberPromoSelection, preserveMemberPromoFollowup } from "./memberPromoPurchasesPresentation.service.js";
 import { preserveSalesPerSqmFollowup } from "./salesPerSqmFollowup.service.js";
 import { preserveContractIncidenceFollowup } from "./contractIncidenceFollowup.service.js";
@@ -32,6 +33,8 @@ import { executeTool } from "./toolExecutor.service.js";
 import {
   getConversation,
   setConversation,
+  getSearchResolutions,
+  getSearchSelectionTurn,
 } from "../../state/conversation.store.js";
 import {
   compactMemberPurchasePaginationHistory,
@@ -1409,6 +1412,9 @@ const executeToolRequests = async ({ content, sessionId, sourceMessages = [], ch
     }
 
     try {
+      captureSearchQueryContext(sessionId,name,protectPiiDeep(sessionId,input));
+      input=preserveSearchSelection({name,input,history:sourceMessages,currentCalls:internalContext.presentationCalls,resolutionState:getSearchResolutions(sessionId),selectionTurn:getSearchSelectionTurn(sessionId)});
+      block.toolUse.input=input;presentationCall.input=input;
       validateProtectedToolInput({ name, input });
 
       if (name === "generate_chart" && !chartRequested) throw new Error("El usuario debe solicitar el gráfico antes de generarlo.");
@@ -1485,6 +1491,8 @@ const executeToolRequests = async ({ content, sessionId, sourceMessages = [], ch
         null,
         [name],
       );
+      recordSearchToolResult(sessionId,name,input,protectedResultForModel);
+      if(name.startsWith('search_'))presentationCall.result=protectedResultForModel;
       if (isChartSourceTool(name) && protectedResultForModel && typeof protectedResultForModel === "object" && !Array.isArray(protectedResultForModel)) {
         protectedResultForModel.chartSourceId = toolUseId;
       }
@@ -1600,6 +1608,7 @@ export const chatService = async ({ message, sessionId }) => {
     },
   ];
 
+  beginSearchSelectionTurn(sessionId,messages.at(-1).content[0].text);
   const systemPrompt = getSystemPrompt({
     currentDate: getCurrentDateParaguay(),
   }) + "\n" + chartsPrompt;

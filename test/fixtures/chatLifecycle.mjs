@@ -8,6 +8,13 @@ import { readFile } from "node:fs/promises";
 import { EventEmitter } from "node:events";
 import assert from "node:assert/strict";
 import * as conversationStore from "../../src/state/conversation.store.js";
+import {recordSearchToolResult} from '../../src/services/ai/searchSelection.service.js';
+const seedFixtureFilters=(input,name='get_sales')=>{
+ conversationStore.clearConversation('test');
+ if(input.customerIds?.length)recordSearchToolResult('test','search_customers',{}, {status:'RESOLVED',customer:{codCliente:input.customerIds[0]}});
+ if(input.categoryIds?.length)recordSearchToolResult('test','search_categories',{}, {status:'RESOLVED',category:{codRubro:input.categoryIds[0]}});
+ recordSearchToolResult('test',name,input,{data:[]});
+};
 import { getPiiSession } from "../../src/state/pii.store.js";
 import * as requestContext from "../../src/services/requestContext.service.js";
 import { resolvePromotion } from "../../src/services/promotions/promotion.resolver.js";
@@ -23,6 +30,8 @@ const synthetic = (exports) => new vm.SyntheticModule(Object.keys(exports), func
 const load = async (path, stubs) => {
   const main = new vm.SourceTextModule(await readFile(new URL(path, import.meta.url), "utf8"), { context });
   await main.link(async (spec) => {
+    if(spec==='./searchFilterIntent.service.js')return new vm.SourceTextModule(await readFile(new URL('../../src/services/ai/searchFilterIntent.service.js',import.meta.url),'utf8'),{context});
+    if(spec==='./searchSelection.service.js')return new vm.SourceTextModule(await readFile(new URL('../../src/services/ai/searchSelection.service.js',import.meta.url),'utf8'),{context});
     if (["./memberPromoPurchasesPresentation.service.js", "./contractIncidenceFollowup.service.js", "./contractIncidencePresentation.service.js", "./salesHistory.service.js", "./salesSamplePresentation.service.js", "./salesPerSqmFollowup.service.js", "./salesPerSqmPresentation.service.js"].includes(spec)) {
       return new vm.SourceTextModule(await readFile(new URL("../../src/services/ai/" + spec.slice(2), import.meta.url), "utf8"), { context });
     }
@@ -44,7 +53,7 @@ let modelSignal;
 let mode = "cancel-model";
 let comparisonStep = 0;
 let aggregateQueries = 0;
-let storedHistory = [];
+let storedHistory = []; conversationStore.clearConversation("test");
 const plannedCalls = [];
 let cancelBetweenPeriods;
 let uuidCounter = 0;
@@ -58,6 +67,11 @@ const chat = await load("../../src/services/ai/chat.service.js", {
   "@aws-sdk/client-bedrock-runtime": {
     BedrockRuntimeClient: class { async send(_command, options) {
       modelCalls++;
+      if(mode==='search-guard'||mode==='search-selected'){
+        if(comparisonStep++>0)return {stopReason:'end_turn',output:{message:{role:'assistant',content:[{text:'Selecciona una opción válida.'}]}}};
+        const input={dateFrom:'01/01/2023',dateTo:'31/01/2023',customerIds:['SYNTHETIC-C'],categoryIds:['SYNTHETIC-A'],groupBy:['month'],metrics:['totalAmount']};
+        return {stopReason:'tool_use',output:{message:{role:'assistant',content:mode==='search-guard'?[{toolUse:{name:'search_categories',toolUseId:'search-category',input:{search:'Synthetic'}}},{toolUse:{name:'get_sales',toolUseId:'search-sales',input}}]:[{toolUse:{name:'get_sales',toolUseId:'selected-sales',input:{categoryIds:['SYNTHETIC-A']}}}]}}};
+      }
       if (mode === "promo-pages" || mode === "promo-ambiguity") {
         assert.equal(comparisonStep++, 0, "Promo continuations must not request model recomputation");
         const content = mode === "promo-ambiguity" ? [{ toolUse: { name: "search_promotions", toolUseId: "promo-search", input: { search: "Synthetic" } } }] : [];
@@ -68,7 +82,7 @@ const chat = await load("../../src/services/ai/chat.service.js", {
       if (mode === "sqm-followup") {
         const step = comparisonStep++;
         assert.ok(step < 3, "SQM presentation must not ask the model to rewrite returned metrics");
-        return { stopReason: "tool_use", output: { message: { role: "assistant", content: [{ toolUse: {
+        return { stopReason: "tool_use", output: { message: { role: "assistant", content: [...(step?[{toolUse:{name:step===1?'search_customers':'search_categories',toolUseId:'sqm-resolve-'+step,input:{search:step===1?'Otro local':'Otro rubro'}}}]:[]),{ toolUse: {
           name: "get_sales_per_sqm", toolUseId: `sqm-follow-${step}`, input: [
             { dateFrom: "01/02/2023", dateTo: "28/02/2023" }, { customerIds: ["RESOLVED-OTHER"] }, { categoryIds: ["RESOLVED-CATEGORY"] },
           ][step],
@@ -223,6 +237,12 @@ const chat = await load("../../src/services/ai/chat.service.js", {
   },
   "../../tools/index.js": { tools: [] },
   "./toolExecutor.service.js": { executeTool: async (call) => {
+    if(mode==='search-guard'||mode==='search-selected'){
+      toolCalls++;
+      if(mode==='search-guard'){assert.equal(call.name,'search_categories','An ambiguous search must prevent the business query');return {status:'AMBIGUOUS',options:[{optionId:'1',codRubro:'SYNTHETIC-A'},{optionId:'2',codRubro:'SYNTHETIC-B'}]};}
+      assert.equal(call.name,'get_sales');assert.deepEqual(JSON.parse(JSON.stringify(call.arguments)),{dateFrom:'01/01/2023',dateTo:'31/01/2023',customerIds:['SYNTHETIC-C'],categoryIds:['SYNTHETIC-B'],groupBy:['month'],metrics:['totalAmount']});
+      return {data:[{month:'2023-01',totalAmount:10,currency:{symbol:'₲'}}]};
+    }
     if (mode.startsWith("promo-")) {
       toolCalls++;
       if (call.name === "search_promotions") return { status: "AMBIGUOUS", totalRows: 2, page: 1, rows: 2, totalPages: 1, hasMore: false, options: [1,2].map(i=>({optionId:String(i),promotionId:"P",campaignId:i,promotionName:"Synthetic promotion",campaignName:"Synthetic campaign"})) };
@@ -235,6 +255,8 @@ const chat = await load("../../src/services/ai/chat.service.js", {
     }
     toolCalls++;
     if (mode === "sqm-followup") {
+      if(call.name==='search_customers')return {status:'RESOLVED',customer:{codCliente:'RESOLVED-OTHER'}};
+      if(call.name==='search_categories')return {status:'RESOLVED',category:{codRubro:'RESOLVED-CATEGORY'}};
       const input = call.arguments;
       assert.equal(call.name, "get_sales_per_sqm");
       assert.equal(input.dayType, "weekend");
@@ -398,7 +420,7 @@ const chat = await load("../../src/services/ai/chat.service.js", {
     }
     assert.fail("A cancelled model must not invoke tools");
   } },
-  "../../state/conversation.store.js": { getConversation: () => storedHistory, setConversation: (_id, history) => { writes++; storedHistory = history; } },
+  "../../state/conversation.store.js": { ...conversationStore, getConversation: () => storedHistory, setConversation: (_id, history) => { writes++; storedHistory = history; } },
   "./conversation.service.js": { compactMemberPurchasePaginationHistory: (x) => x, trimConversation: (x) => x },
   "../../prompts/system.prompt.js": { getSystemPrompt: () => "" },
   "../../utils/debug.logger.js": Object.fromEntries(["logBedrockRequest", "logBedrockResponse", "logToolCall", "logToolResult"].map((key) => [key, () => {}])),
@@ -428,7 +450,7 @@ assert.match(clarification.answer, /ventas, compras de socios/);
 assert.match(clarification.answer, /período/);
 assert.equal(storedHistory.length, 2);
 assert.equal(storedHistory.at(-1).content[0].text, clarification.answer);
-storedHistory = []; writes = 0;
+storedHistory = []; conversationStore.clearConversation("test"); writes = 0;
 
 mode = "compare";
 const comparison = await chat.chatService({ message: "Desglosa enero y febrero por rubro", sessionId: "test" });
@@ -482,7 +504,7 @@ assert.equal(modelCalls, callsBeforeFollowups);
 assert.ok(failedComparison.answer.includes("No fue posible completar"));
 assert.ok(!failedComparison.answer.includes("₲ 3.000"));
 
-mode = "vs-sales"; comparisonStep = 0; storedHistory = [];
+mode = "vs-sales"; comparisonStep = 0; storedHistory = []; conversationStore.clearConversation("test");
 const beforeComparisonModel = modelCalls;
 const vsSales = await chat.chatService({ sessionId: "test", message: "Compara canjes con ventas por local en enero 2023" });
 assert.equal(modelCalls - beforeComparisonModel, 1);
@@ -491,7 +513,7 @@ assert.match(vsSales.answer, /25 %/);
 assert.match(vsSales.answer, /Local sintético/);
 assert.equal(storedHistory.at(-1).content[0].text, vsSales.answer);
 
-mode = "campaign"; comparisonStep = 0; storedHistory = [];
+mode = "campaign"; comparisonStep = 0; storedHistory = []; conversationStore.clearConversation("test");
 const beforeCampaignModel = modelCalls;
 const campaignResponse = await chat.chatService({ sessionId: "test", message: "Analiza las ventas antes, durante y después de la campaña sintética" });
 assert.equal(modelCalls - beforeCampaignModel, 2);
@@ -501,7 +523,7 @@ assert.match(campaignResponse.answer, /20\/05\/2023/);
 assert.match(campaignResponse.answer, /no demuestran/);
 assert.equal(storedHistory.at(-1).content[0].text, campaignResponse.answer);
 
-mode = "promotion-pages"; comparisonStep = 0; storedHistory = [];
+mode = "promotion-pages"; comparisonStep = 0; storedHistory = []; conversationStore.clearConversation("test");
 const beforePageModels = modelCalls;
 const firstPromotionPage = await chat.chatService({ sessionId: "test", message: "Busca Navidad" });
 assert.equal(modelCalls - beforePageModels, 1);
@@ -518,7 +540,7 @@ assert.match(noMorePages.answer, /No hay más páginas/);
 assert.equal(modelCalls - beforePageModels, 1);
 assert.equal(toolCalls - beforeNextPageTools, 1);
 
-mode = "soles"; comparisonStep = 0; storedHistory = [];
+mode = "soles"; comparisonStep = 0; storedHistory = []; conversationStore.clearConversation("test");
 const beforeSolesModels = modelCalls;
 const solesSummary = await chat.chatService({ sessionId: "test", message: "Soles vigentes de Persona sintética" });
 assert.equal(modelCalls - beforeSolesModels, 3);
@@ -533,7 +555,7 @@ assert.match(solesByExpiration.answer, /Soles de prueba/);
 assert.ok(!solesSummary.answer.includes("₲"));
 assert.equal(storedHistory.at(-1).content[0].text, solesByExpiration.answer);
 const permissionFollowupHistory = structuredClone(storedHistory);
-mode = "soles-detail"; comparisonStep = 0; storedHistory = [];
+mode = "soles-detail"; comparisonStep = 0; storedHistory = []; conversationStore.clearConversation("test");
 const beforeSolesDetailModels = modelCalls;
 const firstSolesPage = await chat.chatService({ sessionId: "test", message: "Detalle de soles" });
 assert.match(firstSolesPage.answer, /Página 1 de 2/);
@@ -543,7 +565,7 @@ assert.equal(modelCalls - beforeSolesDetailModels, 1);
 assert.equal(storedHistory.at(-1).content[0].text, secondSolesPage.answer);
 
 for (const lookup of ["usage-destinations", "usage-movements"]) {
-  mode = lookup; comparisonStep = 0; storedHistory = [];
+  mode = lookup; comparisonStep = 0; storedHistory = []; conversationStore.clearConversation("test");
   const before = modelCalls;
   const result = await chat.chatService({ sessionId: "test", message: "Buscar catálogo de usos de soles" });
   assert.equal(modelCalls, before + 1);
@@ -551,13 +573,13 @@ for (const lookup of ["usage-destinations", "usage-movements"]) {
   assert.match(result.answer, lookup === "usage-destinations" ? /Local sintético/ : /Tipos de movimiento/);
   assert.equal(storedHistory.at(-1).content[0].text, result.answer);
 }
-mode = "usage"; comparisonStep = 0; storedHistory = [];
+mode = "usage"; comparisonStep = 0; storedHistory = []; conversationStore.clearConversation("test");
 const beforeUsageModels = modelCalls;
 const usage = await chat.chatService({ sessionId: "test", message: "Soles utilizados del socio con documento 1234567 de enero a mayo de 2023" });
 assert.equal(modelCalls - beforeUsageModels, 1);
 assert.match(usage.answer, /Soles de prueba \| 10/);
 assert.equal(storedHistory.at(-1).content[0].text, usage.answer);
-mode = "usage-detail"; comparisonStep = 0; storedHistory = [];
+mode = "usage-detail"; comparisonStep = 0; storedHistory = []; conversationStore.clearConversation("test");
 const beforeUsageDetailModels = modelCalls;
 const usageFirstPage = await chat.chatService({ sessionId: "test", message: "Detalle de usos de soles del socio con documento 1234567" });
 assert.match(usageFirstPage.answer, /Página 1 de 2/);
@@ -566,7 +588,7 @@ assert.match(usageNextPage.answer, /Página 2 de 2/);
 assert.equal(modelCalls - beforeUsageDetailModels, 1);
 assert.equal(storedHistory.at(-1).content[0].text, usageNextPage.answer);
 
-mode = "vehicle-detail"; comparisonStep = 0; storedHistory = [];
+mode = "vehicle-detail"; comparisonStep = 0; storedHistory = []; conversationStore.clearConversation("test");
 const beforeVehicleModels = modelCalls;
 const vehiclePage = await chat.chatService({ sessionId: "test", message: "Vehículos registrados hoy, detalle de uno por página" });
 assert.match(vehiclePage.answer, /1 de 2 registros/);
@@ -575,7 +597,7 @@ assert.match(vehicleNextPage.answer, /página 2 de 2/);
 assert.equal(modelCalls - beforeVehicleModels, 1);
 assert.equal(storedHistory.at(-1).content[0].text, vehicleNextPage.answer);
 
-mode = "sales-series"; comparisonStep = 0; storedHistory = [];
+mode = "sales-series"; comparisonStep = 0; storedHistory = []; conversationStore.clearConversation("test");
 const beforeSalesModels = modelCalls;
 const salesSeries = await chat.chatService({ sessionId: "test", message: "Ventas de enero a mayo de 2023 por mes" });
 assert.equal(modelCalls - beforeSalesModels, 1);
@@ -583,7 +605,7 @@ assert.match(salesSeries.answer, /cantidad de facturas presentó subidas y bajad
 assert.match(salesSeries.answer, /-8.073; -2,20 %/);
 assert.equal(storedHistory.at(-1).content[0].text, salesSeries.answer);
 
-mode = "chart-vehicles"; comparisonStep = 0; storedHistory = [];
+mode = "chart-vehicles"; comparisonStep = 0; storedHistory = []; conversationStore.clearConversation("test");
 const beforeChartModels = modelCalls;
 const plotted = await chat.chatService({ sessionId: "test", message: "Vehículos registrados por mes de 2025 en un gráfico" });
 assert.equal(modelCalls - beforeChartModels, 2);
@@ -614,6 +636,7 @@ for (const deniedMode of ["permission-denied", "permission-batch", "permission-c
 
 const exportQuestion = "Ventas de enero a mayo de 2023 por local, con monto total y cantidad de facturas";
 const exportInput = { dateFrom: "01/01/2023", dateTo: "31/05/2023", groupBy: ["customer"], metrics: ["totalAmount", "totalInvoices"], dayType: "weekend", customerIds: ["[PII_CUSTOMER_ID_1]"] };
+seedFixtureFilters(exportInput);
 storedHistory = [
   { role: "user", content: [{ text: exportQuestion }] },
   { role: "assistant", content: [{ toolUse: { name: "get_sales", toolUseId: "expired-sales", input: exportInput } }] },
@@ -695,6 +718,7 @@ for (const reuseMode of ["sales-history-reuse", "sales-history-stubborn", "sales
 }
 
 mode = "sales-equivalent-direct";
+seedFixtureFilters({});
 storedHistory = seedCategoryHistory().slice(0, 4);
 delete storedHistory[1].content[0].toolUse.input.customerIds;
 delete storedHistory[1].content[0].toolUse.input.dayType;
@@ -716,7 +740,7 @@ assert.equal(deniedEquivalent.answer, "El usuario no tiene permisos para consult
 assert.equal(JSON.stringify(deniedEquivalent.actions), "{}");
 assert.equal(modelCalls, beforeDirectModels);
 
-mode = "sales-year-comparison"; storedHistory = [];
+mode = "sales-year-comparison"; storedHistory = []; conversationStore.clearConversation("test");
 const beforeYearModels = modelCalls, beforeYearTools = toolCalls;
 const yearComparison = await chat.chatService({ sessionId: "test", message: "Compara las ventas de 2023 contra 2024, mes a mes, con monto total y cantidad de facturas" });
 assert.match(yearComparison.answer, /Agosto: las ventas de 2024 fueron mayores/);
@@ -798,7 +822,7 @@ let controllerStarted;
 let capturedSignal;
 let sessionValidationError;
 const lifecycle = await load("../../src/services/ai/conversationLifecycle.service.js", {
-  "../../state/conversation.store.js": { clearConversation: (id) => { storedHistory = []; conversationStore.clearConversation(id); } },
+  "../../state/conversation.store.js": { clearConversation: (id) => { storedHistory = []; conversationStore.clearConversation("test"); conversationStore.clearConversation(id); } },
   "../sessions/oracleSession.service.js": { getValidOracleSession: async () => {
     if (sessionValidationError) throw sessionValidationError;
     return {};
@@ -960,6 +984,7 @@ for (const [name, arguments_] of [
 }
 mode = "sqm-followup"; comparisonStep = 0;
 const sqmInput = { customerIds: ["ORIGINAL-CUSTOMER"], categoryIds: ["ORIGINAL-CATEGORY"], dayType: "weekend", dateFrom: "01/01/2023", dateTo: "31/05/2023", groupBy: ["month"] };
+seedFixtureFilters(sqmInput,'get_sales_per_sqm');
 storedHistory = [
   { role: "user", content: [{ text: "Ventas por m²" }] },
   { role: "assistant", content: [{ toolUse: { name: "get_sales_per_sqm", toolUseId: "previous-sqm", input: sqmInput } }] },
@@ -974,8 +999,8 @@ for (const message of ["Ahora cambia el período a 01/02/2023 al 28/02/2023; con
   assert.ok(!result.actions.salesExport);
 }
 assert.equal(modelCalls - sqmModels, 3);
-assert.equal(toolCalls - sqmTools, 3);
-mode = "member-purchase-pages"; comparisonStep = 0; storedHistory = [];
+assert.equal(toolCalls - sqmTools, 5);
+mode = "member-purchase-pages"; comparisonStep = 0; storedHistory = []; conversationStore.clearConversation("test");
 const purchaseModels = modelCalls, purchaseTools = toolCalls;
 let firstPurchaseHistory;
 for (let page = 1; page <= 17; page++) {
@@ -1001,7 +1026,7 @@ const mixedCurrencyPresentation = chat.buildMonthlyIncidenceResponse({ groupBy: 
 assert.match(mixedCurrencyPresentation, /USD 100/);
 assert.match(mixedCurrencyPresentation, /\| 01\/2023 \| USD 100 \| — \| — \| ₲ 1\.000 \| — \|/);
 assert.match(mixedCurrencyPresentation, /no corresponde sumar importes entre monedas/);
-mode="promo-pages";comparisonStep=0;storedHistory=[];
+mode="promo-pages";comparisonStep=0;storedHistory=[]; conversationStore.clearConversation("test");
 const promoModelStart=modelCalls,promoToolStart=toolCalls;
 let promoFirstHistory;
 for(let page=1;page<=3;page++){
@@ -1013,8 +1038,16 @@ assert.equal(modelCalls-promoModelStart,1);assert.equal(toolCalls-promoToolStart
 const promoEnd=await chat.chatService({sessionId:"test",message:"Siguiente página"});assert.match(promoEnd.answer,/No hay más páginas de compras promocionales/);assert.equal(toolCalls-promoToolStart,3);
 mode="promo-denied";storedHistory=promoFirstHistory;
 assert.equal((await chat.chatService({sessionId:"test",message:"Siguiente página"})).answer,"El usuario no tiene permisos para consultar esta información.");
-mode="promo-ambiguity";comparisonStep=0;storedHistory=[];
+mode="promo-ambiguity";comparisonStep=0;storedHistory=[]; conversationStore.clearConversation("test");
 const promoAmbiguous=await chat.chatService({sessionId:"test",message:"Compras promocionales del socio; busca Synthetic"});assert.match(promoAmbiguous.answer,/elige una opción/);assert.ok(!promoAmbiguous.answer.includes("No hay compras"));
 mode="promo-selected";
 const promoSelected=await chat.chatService({sessionId:"test",message:"Opción 2"});assert.match(promoSelected.answer,/Página 1 de 3/);
+mode='search-guard';comparisonStep=0;storedHistory=[]; conversationStore.clearConversation("test");
+seedFixtureFilters({customerIds:['SYNTHETIC-C']});
+const searchTools=toolCalls;
+await chat.chatService({sessionId:'test',message:'Busca un rubro Synthetic para ventas de enero conservando el local'});
+assert.equal(toolCalls-searchTools,1,'Only the ambiguous search may execute');
+mode='search-selected';comparisonStep=0;
+await chat.chatService({sessionId:'test',message:'opción 2'});
+assert.equal(toolCalls-searchTools,2,'Only the explicitly selected query may execute');
 console.log("Lifecycle integration passed");

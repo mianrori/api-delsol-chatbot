@@ -64,7 +64,7 @@ test("approximate fallback ranks all candidates before slicing and counts every 
     calls++;
     if (calls === 1) return { rows: [{ TOTAL_ROWS: 0, COD_PROMOCION: null }] };
     assert.ok(!sql.includes("candidateLimit"));
-    assert.match(sql, /VW_BOT_PROMOCIONES.FECHA_DESDE DESC/);
+    assert.match(sql, /ORDER BY FECHA_DESDE DESC/);
     return { rows: Array.from({ length: 8 }, (_, index) => row(index + 1, 8)).reverse() };
   } }, { page: 2, rows: 5 });
   assert.equal(calls, 2);
@@ -72,6 +72,20 @@ test("approximate fallback ranks all candidates before slicing and counts every 
   assert.equal(result.options.length, 3);
   assert.equal(result.options[0].optionId, "6");
   assert.equal(result.options[0].campaignId, 6);
+});
+
+test('approximate pages have a stable unique option key even when tied rows arrive inverted',async()=>{
+ const a={...row(1),NOMBRE_PROMOCION:'Navidad Alpha',FECHA_DESDE:'01/12/2023',FECHA_HASTA:'31/12/2023'};
+ const b={...a,NOMBRE_PROMOCION:'Navidad Beta'},c={...a,FECHA_HASTA:'30/12/2023'};
+ const key=r=>JSON.stringify([r.NOMBRE_PROMOCION,r.FECHA_HASTA]);
+ const options=[];
+ for(let page=1;page<=4;page++){
+  let count=0;const candidates=page%2?[a,b,c,a]:[a,c,b,a];
+  const r=await searchPromotionsRepository({execute:async()=>({rows:++count===1?[{TOTAL_ROWS:0}]:candidates})},'Naviddad',{page,rows:1});
+  assert.equal(r.totalRows,3);assert.equal(r.hasMore,page<3);assert.equal(r.nextPage,page<3?page+1:null);
+  options.push(...r.items.map(key));
+ }
+ assert.equal(options.length,3);assert.equal(new Set(options).size,3);assert.deepEqual([...options].sort(),[a,b,c].map(key).sort());
 });
 
 test("next-page routing preserves protected search and page size, without crossing topics", () => {
