@@ -18,3 +18,8 @@ export function monthPeriod(date) {
 export const remainingCases=new Set(['INDIVIDUAL_PURCHASES_TWO_MEMBERS','MEMBER_SOLES_HISTORY','SOLES_USAGE_COMBINED_FILTERS','SOLES_USAGE_MEMBER_RANKING','VEHICLE_REGISTRATION_AGE_DISTINCTS']);
 export const diagnosticCases=new Set(['INDIVIDUAL_PURCHASES_TWO_MEMBERS','MEMBER_SOLES_HISTORY','VEHICLE_REGISTRATION_AGE_DISTINCTS']);
 export const purchaseSamples=rows=>[...new Map(rows.filter(r=>r.COD_SOCIO!=null&&r.C!=null&&r.R!=null).map(r=>[String(r.COD_SOCIO),r])).values()].slice(0,2);
+export const solesCases=new Set(['MEMBER_SOLES_HISTORY']);
+// node-oracledb distinguishes two arguments from three arguments with an
+// undefined options value (the latter is NJS-005). Preserve the real overload.
+export const forwardOracleExecute=(connection,text,binds,options)=>options===undefined
+  ? connection.execute(text,binds) : connection.execute(text,binds,options);

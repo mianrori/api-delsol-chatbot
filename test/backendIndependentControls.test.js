@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {sameSolesType,monthPeriod,remainingCases,diagnosticCases,purchaseSamples} from '../scripts/backend-independent-control-values.mjs';
+import {sameSolesType,monthPeriod,remainingCases,diagnosticCases,purchaseSamples,solesCases,forwardOracleExecute} from '../scripts/backend-independent-control-values.mjs';
 import {getMemberSoles} from '../src/services/soles/memberSoles.service.js';
+import oracledb from 'oracledb';
 
 test('control compares contract numeric IDs without turning null or blank into zero',()=>{
   for(const [a,b] of [[1,'01'],[901,'901 '],[null,undefined],[0,'0']])assert.equal(sameSolesType(a,b),true);
@@ -37,4 +38,26 @@ test('purchase discovery carries a local/category pair belonging to each sampled
   assert.deepEqual(got,[rows[1],rows[2]]);
   assert.deepEqual(rows,before);
   assert.equal(purchaseSamples([{COD_SOCIO:'A',C:'C1',R:null}]).length,0);
+});
+
+test('soles stage excludes all twelve approved blocks',()=>{
+  assert.deepEqual([...solesCases],['MEMBER_SOLES_HISTORY']);
+});
+
+test('driver execute overload rejects explicit undefined and forwarding preserves options without Oracle login',async()=>{
+  const connection=new oracledb.Connection();let executions=0;
+  // Only the network implementation is controlled. Real driver overload and
+  // option validation execute, including the exact failure seen in DEV.
+  connection._impl={_getConnImpl(){return this;},async _acquireLock(){},_releaseLock(){},async execute(){executions++;return {rows:[]};}};
+  connection._processExecuteBinds=async()=>[];
+  connection._addDefaultsToExecOpts=()=>{};
+  await assert.rejects(connection.execute('SELECT 1 FROM DUAL',{},undefined),{code:'NJS-005'});
+  assert.equal(executions,0);
+  assert.deepEqual(await forwardOracleExecute(connection,'SELECT 1 FROM DUAL',{},undefined),{rows:[]});
+  assert.deepEqual(await forwardOracleExecute(connection,'SELECT 1 FROM DUAL',{},{outFormat:oracledb.OUT_FORMAT_OBJECT}),{rows:[]});
+  assert.equal(executions,2);
+  await assert.rejects(forwardOracleExecute(connection,'SELECT 1 FROM DUAL',{},null),{code:'NJS-005'});
+  const denied=Object.assign(Error('CONTROLLED'),{code:'ORA-00942'});
+  connection._impl.execute=async()=>{throw denied;};
+  await assert.rejects(forwardOracleExecute(connection,'SELECT 1 FROM DUAL',{}),{code:'ORA-00942'});
 });

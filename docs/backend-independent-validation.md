@@ -2,8 +2,10 @@
 
 Base: `ef9bff4`, PR #37 fusionada y desplegada. Rama separada:
 `test/backend-independent-controls-dev`. PR #38 en borrador. Estado: ocho bloques
-aprobados sobre `7762f35`, más usos y ranking sobre `6e6c423`; tres bloques de
-esta tanda siguen fallidos. No se declara cerrado el backend.
+aprobados sobre `7762f35`, usos/ranking sobre `6e6c423` y compras/edades sobre
+`d529cfd`. De los trece bloques de esta tanda solo saldo de soles sigue abierto.
+Las variantes adicionales y muestras documentadas permanecen fuera de ese conteo.
+No se declara cerrado el backend.
 
 ## Evidencia reutilizada
 
@@ -116,7 +118,44 @@ Dos pruebas nuevas del muestreo y la selección de los tres casos pasan en Node 
 Docker. Las cuatro anteriores conservan su evidencia; no se repitieron los bloques
 Oracle/HTTP aprobados. Helper preparado: `logs/run-backend-independent-diagnostic-dev.ps1`.
 Conserva por hash ambos reportes previos y verifica el código de aplicación sin
-cambios. Pendiente de ejecutar/revisar; la PR conserva el borrador.
+cambios. Su ejecución se revisa a continuación; la PR conserva el borrador.
+
+## Diagnóstico revisado sobre `d529cfd`
+
+Reporte `backend-independent-d529cfd.json`: únicamente tres bloques, compras y
+edades aprobados y soles fallido; duración 8,247 s, 176 archivos idénticos, cierre
+completo y logout propios aprobados. Los 18 checks registrados son verdaderos,
+pero **la ejecución global falla** por la excepción de soles: no es un 18/18 que
+acredite los tres casos. Reutiliza por hash las dos ejecuciones anteriores.
+
+- Compras: dos documentos distintos, resumen mensual por pareja monetaria,
+  local/rubro combinados y conteo real de página inicial contra SQL independiente
+  aprobados. El descubrimiento que agotaba 60 segundos queda eliminado: la fila
+  de muestra ya llevaba una pareja real del mismo documento. Caso completo 6,492 s.
+  No se altera el servicio ni se repite la paginación HTTP histórica.
+- Vehículos: julio de 2025, edades a referencia/al registro, distintos globales
+  y por grupo, filtros marca/modelo/color/débito y detalle aprobados. Los totales
+  globales JS ya coincidían, su calendario/agrupación no; el servicio coincide con
+  el censo Oracle independiente en ambas referencias y sus tres grupos. Se confirma
+  discrepancia del control JS, no un fallo del servicio. El censo conserva DATE/CHAR
+  y DISTINCT en Oracle; no sumar distintos entre grupos.
+- Soles: la discrepancia de grupos/totales sigue abierta. La traza del servicio
+  directo se interrumpió con NJS-005: el adaptador llamaba `execute(sql, binds,
+  undefined)`. node-oracledb considera inválido ese tercer argumento; debe omitirlo
+  al usar la sobrecarga de dos argumentos. Es un fallo del ejecutor, no evidencia
+  de que el servicio Oracle produzca NJS-005 ni explicación del saldo discrepante.
+
+El adaptador ahora conserva la sobrecarga de dos/tres argumentos. Dos pruebas
+nuevas pasan: aislamiento exclusivo de soles y reproducción de NJS-005 con el
+validador real de node-oracledb (solo red controlada, sin login), opciones válidas
+y propagación de errores. El preflight del próximo helper repite esa comprobación
+del driver antes de solicitar valores ocultos; así no basta con importar módulos.
+
+Continuación pendiente: `logs/run-backend-independent-soles-dev.ps1`, únicamente
+saldo y su traza de misma conexión. Reutiliza los doce bloques aprobados mediante
+los tres reportes y sus hashes; exige código de aplicación/configuración/dependencias
+idéntico. No repite compras, vehículos, usos ni los cuatro HTTP. La PR sigue en
+borrador; no se ha corregido ni aprobado aún la discrepancia del saldo.
 
 ## Alcance del ejecutor
 

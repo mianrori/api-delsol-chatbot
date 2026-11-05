@@ -1,6 +1,6 @@
 // Read-only DEV contrasts. Business rows and session identity stay in memory.
 // Invoked by the local hidden-input helper, never with a session in argv/env.
-import {sameSolesType,monthPeriod,remainingCases,diagnosticCases,purchaseSamples} from './backend-independent-control-values.mjs';
+import {sameSolesType,monthPeriod,remainingCases,diagnosticCases,purchaseSamples,solesCases,forwardOracleExecute} from './backend-independent-control-values.mjs';
 const emit = process.stdout.write.bind(process.stdout);
 for (const k of ['log','info','warn','error','debug','trace','dir','table']) console[k] = () => {};
 const report = {suite:'backend-independent-dev', commit:process.argv[2], startedAt:new Date().toISOString(), success:false, checks:[], cases:[], limitations:[], scope:'independent Oracle SELECT versus real tool dispatcher; four prepared-context HTTP checks; no live language-model or frontend test'};
@@ -19,7 +19,8 @@ const df = "TO_DATE(:f,'DD/MM/YYYY')", dt = "TO_DATE(:t,'DD/MM/YYYY')+1";
 const historical = {dateFrom:'01/01/2023',dateTo:'31/05/2023'};
 const isRemaining=process.argv.includes('--remaining');
 const isDiagnostic=process.argv.includes('--diagnostic');
-report.stage=isDiagnostic?'diagnostic':isRemaining?'remaining':'initial';
+const isSolesOnly=process.argv.includes('--soles-only');
+report.stage=isSolesOnly?'soles-only':isDiagnostic?'diagnostic':isRemaining?'remaining':'initial';
 report.diagnostics=[];
 let sessionId, opened=0,closed=0,closeErrors=0;
 let usagePeriod;
@@ -53,7 +54,7 @@ const discoverUsagePeriod=async()=>{
   usagePeriod=monthPeriod(s.F);return usagePeriod;
 };
 const run = async (code,fn) => {
-  if(isDiagnostic?!diagnosticCases.has(code):isRemaining&&!remainingCases.has(code))return;
+  if(isSolesOnly?!solesCases.has(code):isDiagnostic?!diagnosticCases.has(code):isRemaining&&!remainingCases.has(code))return;
   operation='CASE_START';
   const start=Date.now();const index=report.checks.length;
   try {await fn();report.cases.push({code,status:'passed',durationMs:Date.now()-start});}
@@ -154,7 +155,7 @@ try {
           const calls=[];
           const args={documentNumber:d,status,referenceDate:'30/06/2023',useCurrentGenerationPeriod:false,...(filtered?{generationDateFrom:'01/01/2023',generationDateTo:'31/05/2023',expirationDateFrom:'01/01/2023',expirationDateTo:'31/12/2023'}:{})};
           const direct=await getMemberSoles(args,{execute:async(text,binds,options)=>{
-            const result=await connection.execute(text,binds,options);
+            const result=await forwardOracleExecute(connection,text,binds,options);
             calls.push({documentBindExact:String(binds.documentNumber)===d,documentBindTrimmed:String(binds.documentNumber)===d.trim(),groupedByType:/GROUP BY\s+COD_TIPO_SOL\s*(?:ORDER|$)/i.test(text),hasUnexpectedDateFilter:status==='all'&&!filtered&&/TO_DATE/.test(text),objectRows:!result.rows?.length||!Array.isArray(result.rows[0]),rows:result.rows});
             return result;
           }});
