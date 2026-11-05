@@ -1,14 +1,16 @@
 # Contrastes independientes restantes del backend
 
 Base: `ef9bff4`, PR #37 fusionada y desplegada. Rama separada:
-`test/backend-independent-controls-dev`. Estado: candidato corregido; validación
-Oracle/HTTP nueva pendiente de entrada local oculta. No se declara cerrado el backend.
+`test/backend-independent-controls-dev`. PR #38 en borrador. Estado: ejecución
+parcial revisada sobre `7762f35`; ocho bloques aprobados, dos fallidos y tres sin
+muestra en el período inicial. No se declara cerrado el backend.
 
 ## Evidencia reutilizada
 
 Se conservan H/B/D, Q/I/R, G, XLSX y los buscadores/ciclo completo de filtros
 con sus commits y límites de la [matriz](backend-functional-matrix.md).
-No se ejecutaron nuevamente sus suites ni el login. La comprobación desplegada
+No se ejecutaron nuevamente sus suites. El login existente se usó solo para
+obtener una sesión vigente y su logout propio aprobó. La comprobación desplegada
 de PR #37 fue 30/30 sobre `ef9bff4`, con modelo controlado y Oracle real.
 Su ausencia de ventas en el perfil de enero de 2023 no es una muestra de filas
 registradas cuya suma sea cero.
@@ -37,12 +39,60 @@ Código funcional: `222d761`. Además, **1/1** prueba nueva del puente HTTP
 (`backendIndependentHttp.test.js`) pasa con autenticación/datos controlados,
 sin login ni acceso a Oracle. Es una verificación del ejecutor, no evidencia DEV.
 
-## Ejecutor preparado: evidencia todavía no obtenida
+## Resultado Oracle/HTTP sobre `7762f35`
+
+Reporte local `backend-independent-7762f35.json`: 13 bloques, ocho aprobados,
+dos fallidos y tres sin muestra. **69/70 comprobaciones verdaderas; la ejecución
+global falló**, no es un resultado 69/69 aprobado. Duración 92,248 s; 175 archivos
+de fuente coinciden con Git. Todas las conexiones cerraron, incluso tras el timeout.
+El logout de la sesión creada aprobó. La revisión compacta de logs retenidos del
+intervalo devolvió cero líneas de ambos contenedores; no acredita otros intervalos.
+
+| Bloque aprobado | Contraste que acredita | Lo que no acredita |
+| --- | --- | --- |
+| Ficha | Todos los campos de una ficha y documento ausente, contra Oracle independiente | Otros perfiles o cada combinación de nulos |
+| Vehículos del socio | Documento, solo activos y débito sí/no contra filas independientes | No apareció chapa activa compartida; chapa única y ausencia no se ensayaron |
+| Canjes/ventas | Ambos universos, resumen y mes, filtros local/rubro, importes/conteos/porcentajes y etiquetas monetarias | No acredita toda combinación de divisas reales |
+| Campaña | Antes/durante/después, duración y límites, filtros e importes/facturas/moneda | No todas las campañas ni bases cero reales |
+| Facturas | Cliente/fecha/número/período/anuladas y seguridad de consulta, moneda, importe y facturas únicas; total de detalle | No chapa ni recorrido de todas las páginas |
+| Condiciones/costo | Identidad, área, conceptos/configuración, último facturado, vigencia, IVA y costo en misma moneda | No conversión con tasa real ni todos los empates/ausencias posibles |
+| Colisión `$` | CTE Oracle con USD/CAD/sin identificar y ambos órdenes, servicio real con adaptador controlado | **No** es muestra real de socio multimoneda |
+| Cuatro HTTP positivos | Canjes/ventas, facturas, condiciones y costo, argumentos y resultados coincidentes con los contrastados | Modelo/resolución preparados; no integración frontend/ERP ni lenguaje libre |
+
+## Cinco bloques que requieren continuación acotada
+
+- Compras: `NJS-123` a los 60,179 s antes de la primera conciliación. La búsqueda
+  global agrupaba/ordenaba socios; se sustituye en el ejecutor por una muestra
+  acotada sin ese agregado global, conservando filtros y límites. Falta repetir
+  solo este contraste y registrar la operación exacta si vuelve a fallar.
+- Saldo de soles: falló la primera comparación de tipos/totales. Se reproduce con
+  datos controlados la diferencia NUMBER/CHAR con ceros/espacios; el contrato de
+  la herramienta devuelve IDs numéricos. El control ahora normaliza exclusivamente
+  ese ID y mantiene nulo distinto de cero. **La causa real sigue sin confirmar**:
+  el próximo reporte compara etiquetas crudas y numéricas con los mismos totales,
+  sin publicar valores. No cambia validación de documentos ni identidad de sesión.
+- Usos combinados, ranking de usos y edades/únicos de altas no encontraron muestra
+  en enero–mayo de 2023. Esto no demuestra que falten datos en toda la vista. La
+  continuación descubre un mes con filas disponibles, en memoria, y registra
+  únicamente el período y códigos seguros.
+
+Las cuatro pruebas nuevas de `backendIndependentControls.test.js` pasan en Node 22
+Docker. Cubren normalización numérica/nulos, respuesta controlada, límites reales
+del mes y exclusión de los ocho bloques aprobados. No se repiten las 10+1 pruebas
+previas porque el código de aplicación y el puente HTTP permanecen iguales.
+
+El nuevo helper `logs/run-backend-independent-remaining-dev.ps1` usa `--remaining`.
+Reutiliza los ocho bloques por SHA del reporte y verifica que `src/`, configuración
+y dependencias sean idénticos a `7762f35`. No suma sus comprobaciones al nuevo total
+ni reutiliza los dos fallos como aprobados. Aún pendiente de ejecutar/revisar.
+
+## Alcance del ejecutor
 
 `scripts/check-backend-independent-dev.mjs` compara el dispatcher real con SELECT
 independientes, sin reutilizar generadores SQL de repositorios. Consultas limitadas
 a 10.000 filas de control y 60 segundos por llamada Oracle. Período histórico de
-compras/usos/vehículos/canjes: enero–mayo de 2023. La selección de muestras ocurre
+compras/canjes: enero–mayo de 2023. Para usos y vehículos la continuación descubre
+un mes disponible tras la ausencia en ese período. La selección de muestras ocurre
 dentro del usuario Oracle autorizado; los documentos nunca salen de memoria.
 El presupuesto global es de ocho minutos entre operaciones; una llamada ya
 iniciada conserva su timeout. Agotar el presupuesto o el límite de filas produce

@@ -1,5 +1,6 @@
 // Read-only DEV contrasts. Business rows and session identity stay in memory.
 // Invoked by the local hidden-input helper, never with a session in argv/env.
+import {sameSolesType,monthPeriod,remainingCases} from './backend-independent-control-values.mjs';
 const emit = process.stdout.write.bind(process.stdout);
 for (const k of ['log','info','warn','error','debug','trace','dir','table']) console[k] = () => {};
 const report = {suite:'backend-independent-dev', commit:process.argv[2], startedAt:new Date().toISOString(), success:false, checks:[], cases:[], limitations:[], scope:'independent Oracle SELECT versus real tool dispatcher; four prepared-context HTTP checks; no live language-model or frontend test'};
@@ -16,7 +17,11 @@ const key = (...v) => JSON.stringify(v);
 const sort = a => a.map(v=>JSON.stringify(v)).sort();
 const df = "TO_DATE(:f,'DD/MM/YYYY')", dt = "TO_DATE(:t,'DD/MM/YYYY')+1";
 const historical = {dateFrom:'01/01/2023',dateTo:'31/05/2023'};
+const isRemaining=process.argv.includes('--remaining');
+report.stage=isRemaining?'remaining':'initial';
+report.diagnostics=[];
 let sessionId, opened=0,closed=0,closeErrors=0;
+let usagePeriod;
 const httpRequests=[];
 const {default:config} = await import('../config.js');
 const pageRows=Math.min(3,Number.isSafeInteger(Number(config.limitFilter))&&Number(config.limitFilter)>0?Number(config.limitFilter):3);
@@ -30,6 +35,7 @@ driver.getConnection = async (...args) => {
   c.close = async () => {try {await close();if(!done){done=true;closed++;}}catch(e){closeErrors++;throw e;}};
   return c;
 };
+let operation='PREPARE';
 const sql = (text,binds={}) => withOracleProxySession(sessionId,async({connection})=>{
   budget();
   if(!/^\s*(SELECT|WITH)\b/i.test(text)) throw Error('READ_ONLY_REQUIRED');
@@ -38,10 +44,19 @@ const sql = (text,binds={}) => withOracleProxySession(sessionId,async({connectio
   return rows;
 });
 const tool = (name,args) => {budget();return executeTool({name,arguments:args,context:{sessionId}});};
+const discoverUsagePeriod=async()=>{
+  if(usagePeriod)return usagePeriod;
+  operation='USAGE_AVAILABLE_PERIOD_DISCOVERY';
+  const s=(await sql("SELECT TO_CHAR(FECHA_MOVIMIENTO,'DD/MM/YYYY') F FROM VW_BOT_SOLES_UTILIZADOS WHERE FECHA_MOVIMIENTO IS NOT NULL AND COD_SOCIO IS NOT NULL AND ROWNUM<=1"))[0];
+  if(!s)missing('SOLES_USAGE_AVAILABLE_PERIOD_NOT_FOUND');
+  usagePeriod=monthPeriod(s.F);return usagePeriod;
+};
 const run = async (code,fn) => {
+  if(isRemaining&&!remainingCases.has(code))return;
+  operation='CASE_START';
   const start=Date.now();const index=report.checks.length;
   try {await fn();report.cases.push({code,status:'passed',durationMs:Date.now()-start});}
-  catch(e){report.cases.push({code,status:e.missing?'sample_missing':e.blocked?'not_run':'failed',reason:e.missing??e.blocked??safeCode(e),durationMs:Date.now()-start});if(e.missing||e.blocked)report.limitations.push(e.missing??e.blocked);}
+  catch(e){report.cases.push({code,status:e.missing?'sample_missing':e.blocked?'not_run':'failed',reason:e.missing??e.blocked??safeCode(e),operation,durationMs:Date.now()-start});if(e.missing||e.blocked)report.limitations.push(e.missing??e.blocked);}
   check(opened===closed&&closeErrors===0,'ORACLE_CONNECTIONS_CLOSED_AFTER_CASE');
   // A skipped fixture is never counted as a passed contrast.
   if(report.checks.length===index) throw Error('CASE_WITHOUT_EVIDENCE');
@@ -77,27 +92,30 @@ try {
   });
 
   await run('INDIVIDUAL_PURCHASES_TWO_MEMBERS',async()=>{
-    const docs=await sql("SELECT COD_SOCIO FROM VW_BOT_COMPRAS_SOCIO WHERE FECHA_COMPRA>=DATE '2023-01-01' AND FECHA_COMPRA<DATE '2023-06-01' AND COD_SOCIO IS NOT NULL GROUP BY COD_SOCIO HAVING COUNT(*) BETWEEN 2 AND 500 ORDER BY COD_SOCIO FETCH FIRST 2 ROWS ONLY");
+    operation='PURCHASE_BOUNDED_SAMPLE_DISCOVERY';
+    const pool=await sql("SELECT COD_SOCIO FROM VW_BOT_COMPRAS_SOCIO WHERE FECHA_COMPRA>=DATE '2023-01-01' AND FECHA_COMPRA<DATE '2023-06-01' AND COD_SOCIO IS NOT NULL AND ROWNUM<=100");
+    const docs=[...new Map(pool.map(r=>[str(r.COD_SOCIO),r])).values()].slice(0,2);
+    if(docs.length===1){const next=(await sql("SELECT COD_SOCIO FROM VW_BOT_COMPRAS_SOCIO WHERE FECHA_COMPRA>=DATE '2023-01-01' AND FECHA_COMPRA<DATE '2023-06-01' AND COD_SOCIO IS NOT NULL AND COD_SOCIO<>:d AND ROWNUM<=1",{d:str(docs[0].COD_SOCIO)}))[0];if(next)docs.push(next);}
     if(docs.length<2)missing('TWO_POSITIVE_PURCHASE_MEMBERS_NOT_FOUND');
     for(const sample of docs){
       const d=str(sample.COD_SOCIO);
+      operation='PURCHASE_FILTER_PAIR_DISCOVERY';
       const combos=await sql("SELECT COD_CLIENTE C,COD_RUBRO R FROM VW_BOT_COMPRAS_SOCIO WHERE COD_SOCIO=:d AND FECHA_COMPRA>=DATE '2023-01-01' AND FECHA_COMPRA<DATE '2023-06-01' AND COD_CLIENTE IS NOT NULL AND COD_RUBRO IS NOT NULL GROUP BY COD_CLIENTE,COD_RUBRO ORDER BY COD_CLIENTE,COD_RUBRO FETCH FIRST 1 ROWS ONLY",{d});
       for(const filter of [null,combos[0]].filter(v=>v!==undefined)){
         const binds={d,f:historical.dateFrom,t:historical.dateTo,...(filter?{c:str(filter.C),r:str(filter.R)}:{})};
         const where=`COD_SOCIO=:d AND FECHA_COMPRA>=${df} AND FECHA_COMPRA<${dt}${filter?' AND COD_CLIENTE=:c AND COD_RUBRO=:r':''}`;
+        operation='PURCHASE_INDEPENDENT_SUMMARY';
         const rows=await sql(`SELECT TO_CHAR(FECHA_COMPRA,'YYYY-MM') M,MONEDA D,SIMBOLO_MONEDA S,SUM(NVL(IMPORTE,0)) A,COUNT(*) N FROM VW_BOT_COMPRAS_SOCIO WHERE ${where} GROUP BY TO_CHAR(FECHA_COMPRA,'YYYY-MM'),MONEDA,SIMBOLO_MONEDA`,binds);
         const args={...historical,documentNumber:d,...(filter?{customerIds:[str(filter.C)],categoryIds:[str(filter.R)]}:{}),mode:'summary',groupBy:['month'],metrics:['totalAmount','purchaseCount']};
-        const summary=await tool('get_member_purchases',args);
+        operation='PURCHASE_TOOL_SUMMARY';const summary=await tool('get_member_purchases',args);
         check(summary.documentNumber===d&&summary.data.length===rows.length&&rows.every(r=>summary.data.some(g=>g.month===r.M&&g.currency.description===r.D&&g.currency.symbol===r.S&&near(g.totalAmount,r.A)&&g.purchaseCount===r.N)),'PURCHASE_SUMMARY_SQL_MEMBER_PERIOD_COMBINED_FILTERS');
         // New SQL evidence only: prior full HTTP paging remains reused.
-        const detail=await tool('get_member_purchases',{...args,mode:'detail',rows:pageRows,page:1});
+        operation='PURCHASE_TOOL_INITIAL_PAGE';const detail=await tool('get_member_purchases',{...args,mode:'detail',rows:pageRows,page:1});
         const count=rows.reduce((n,r)=>n+r.N,0);
         check(detail.totalRows===count&&detail.hasMore===(count>pageRows)&&detail.nextPage===(count>pageRows?2:null)&&detail.returnedRows===Math.min(pageRows,count),'PURCHASE_REAL_COUNT_AND_FIRST_PAGE_SQL');
       }
     }
-    const currencies=await sql("SELECT COD_SOCIO FROM VW_BOT_COMPRAS_SOCIO WHERE FECHA_COMPRA>=DATE '2023-01-01' AND FECHA_COMPRA<DATE '2023-06-01' GROUP BY COD_SOCIO HAVING COUNT(DISTINCT MONEDA)>1 FETCH FIRST 1 ROWS ONLY");
-    if(!currencies.length)report.limitations.push('INDIVIDUAL_MIXED_CURRENCY_MEMBER_NOT_FOUND_IN_TEST_PERIOD');
-    else report.limitations.push('INDIVIDUAL_MIXED_CURRENCY_PROFILE_AVAILABLE_NOT_YET_CONTRASTED');
+    report.limitations.push('INDIVIDUAL_MIXED_CURRENCY_MEMBER_NOT_EXHAUSTIVELY_SEARCHED');
   });
 
   await run('MEMBER_VEHICLES',async()=>{
@@ -115,49 +133,67 @@ try {
   });
 
   await run('MEMBER_SOLES_HISTORY',async()=>{
+    operation='SOLES_SAMPLE_DISCOVERY';
     const s=(await sql('SELECT COD_SOCIO FROM VW_BOT_SOLES_GENERADOS WHERE COD_SOCIO IS NOT NULL GROUP BY COD_SOCIO ORDER BY COD_SOCIO FETCH FIRST 1 ROWS ONLY'))[0];
     if(!s)missing('GENERATED_SOLES_SAMPLE_NOT_FOUND');
     for(const status of ['all','current','expired'])for(const filtered of [false,true]){
       const d=str(s.COD_SOCIO),where=`COD_SOCIO=:d${status==='all'?'':status==='current'?" AND (VENCIMIENTO IS NULL OR VENCIMIENTO>=DATE '2023-06-30')":" AND VENCIMIENTO<DATE '2023-06-30'"}${filtered?" AND FECHA_ALTA>=DATE '2023-01-01' AND FECHA_ALTA<DATE '2023-06-01' AND VENCIMIENTO>=DATE '2023-01-01' AND VENCIMIENTO<DATE '2024-01-01'":''}`;
-      const rows=await sql(`SELECT COD_TIPO_SOL T,SUM(NVL(TOTAL,0)) G,SUM(NVL(SALDO,0)) B,COUNT(*) N FROM VW_BOT_SOLES_GENERADOS WHERE ${where} GROUP BY COD_TIPO_SOL`,{d});
-      const got=await tool('get_member_soles',{documentNumber:d,status,referenceDate:'30/06/2023',useCurrentGenerationPeriod:false,...(filtered?{generationDateFrom:'01/01/2023',generationDateTo:'31/05/2023',expirationDateFrom:'01/01/2023',expirationDateTo:'31/12/2023'}:{})});
-      check(got.data.length===rows.length&&rows.every(r=>got.data.some(g=>str(g.typeId)===str(r.T)&&near(g.generatedAmount,r.G)&&near(g.balance,r.B)&&g.recordCount===r.N)),'SOLES_TYPE_BALANCE_EXPIRY_GENERATION_SQL');
+      operation='SOLES_INDEPENDENT_SUMMARY';const rows=await sql(`SELECT COD_TIPO_SOL T,SUM(NVL(TOTAL,0)) G,SUM(NVL(SALDO,0)) B,COUNT(*) N FROM VW_BOT_SOLES_GENERADOS WHERE ${where} GROUP BY COD_TIPO_SOL`,{d});
+      operation='SOLES_TOOL_SUMMARY';const got=await tool('get_member_soles',{documentNumber:d,status,referenceDate:'30/06/2023',useCurrentGenerationPeriod:false,...(filtered?{generationDateFrom:'01/01/2023',generationDateTo:'31/05/2023',expirationDateFrom:'01/01/2023',expirationDateTo:'31/12/2023'}:{})});
+      const match=matchType=>got.data.length===rows.length&&rows.every(r=>got.data.some(g=>matchType(g.typeId,r.T)&&near(g.generatedAmount,r.G)&&near(g.balance,r.B)&&g.recordCount===r.N));
+      const component=fn=>rows.every(r=>got.data.some(g=>sameSolesType(g.typeId,r.T)&&fn(g,r)));
+      report.diagnostics.push({code:'SOLES_COMPARISON_COMPONENTS',status,filtered,groupCountMatches:got.data.length===rows.length,rawTypeAndTotalsMatch:match((a,b)=>str(a)===str(b)),numericTypeAndTotalsMatch:match(sameSolesType),numericTypeGroupsMatch:component(()=>true),generatedAmountsMatch:component((g,r)=>near(g.generatedAmount,r.G)),balancesMatch:component((g,r)=>near(g.balance,r.B)),recordCountsMatch:component((g,r)=>g.recordCount===r.N)});
+      check(match(sameSolesType),'SOLES_TYPE_BALANCE_EXPIRY_GENERATION_SQL');
       if(status==='current')check(near(got.summary.currentBalance,rows.reduce((n,r)=>n+Number(r.B),0))&&got.summary.recordCount===rows.reduce((n,r)=>n+r.N,0),'SOLES_GLOBAL_BALANCE_RECORD_COUNT_SQL');
     }
   });
 
   await run('SOLES_USAGE_COMBINED_FILTERS',async()=>{
-    const s=(await sql("SELECT COD_SOCIO D,TIPO_MOVIMIENTO M,TIPO_DESTINO Y,COD_DESTINO C,ID_TIPO_SOL T,COD_RUBRO R,NRO_TRANSACCION N,SOLES_UTILIZADOS Q FROM VW_BOT_SOLES_UTILIZADOS WHERE FECHA_MOVIMIENTO>=DATE '2023-01-01' AND FECHA_MOVIMIENTO<DATE '2023-06-01' AND COD_SOCIO IS NOT NULL AND COD_DESTINO IS NOT NULL AND ID_TIPO_SOL IS NOT NULL AND COD_RUBRO IS NOT NULL AND NRO_TRANSACCION IS NOT NULL AND SOLES_UTILIZADOS IS NOT NULL FETCH FIRST 1 ROWS ONLY"))[0];
+    operation='USAGE_COMBINED_AVAILABLE_SAMPLE_DISCOVERY';
+    const s=(await sql("SELECT COD_SOCIO D,TIPO_MOVIMIENTO M,TIPO_DESTINO Y,COD_DESTINO C,ID_TIPO_SOL T,COD_RUBRO R,NRO_TRANSACCION N,SOLES_UTILIZADOS Q,TO_CHAR(FECHA_MOVIMIENTO,'DD/MM/YYYY') F FROM VW_BOT_SOLES_UTILIZADOS WHERE FECHA_MOVIMIENTO IS NOT NULL AND COD_SOCIO IS NOT NULL AND TIPO_MOVIMIENTO IS NOT NULL AND TIPO_DESTINO IN ('LOCAL','SOCIO') AND COD_DESTINO IS NOT NULL AND ID_TIPO_SOL IS NOT NULL AND COD_RUBRO IS NOT NULL AND NRO_TRANSACCION IS NOT NULL AND SOLES_UTILIZADOS IS NOT NULL AND ROWNUM<=1"))[0];
     if(!s)missing('SOLES_USAGE_COMBINED_SAMPLE_NOT_FOUND');
+    const period=monthPeriod(s.F);usagePeriod=period;
+    report.diagnostics.push({code:'USAGE_AVAILABLE_MONTH',...period});
     for(const full of [false,true]){
-      const binds={d:str(s.D),...(full?{m:s.M,y:s.Y,c:str(s.C),i:s.T,r:str(s.R),n:str(s.N),q:s.Q}:{})};
-      const where=`COD_SOCIO=:d AND FECHA_MOVIMIENTO>=DATE '2023-01-01' AND FECHA_MOVIMIENTO<DATE '2023-06-01'${full?' AND TIPO_MOVIMIENTO=:m AND TIPO_DESTINO=:y AND COD_DESTINO=:c AND ID_TIPO_SOL=:i AND COD_RUBRO=:r AND NRO_TRANSACCION=:n AND SOLES_UTILIZADOS>=:q AND SOLES_UTILIZADOS<=:q':''}`;
+      const binds={d:str(s.D),f:period.dateFrom,t:period.dateTo,...(full?{m:s.M,y:s.Y,c:str(s.C),i:s.T,r:str(s.R),n:str(s.N),q:s.Q}:{})};
+      const where=`COD_SOCIO=:d AND FECHA_MOVIMIENTO>=${df} AND FECHA_MOVIMIENTO<${dt}${full?' AND TIPO_MOVIMIENTO=:m AND TIPO_DESTINO=:y AND COD_DESTINO=:c AND ID_TIPO_SOL=:i AND COD_RUBRO=:r AND NRO_TRANSACCION=:n AND SOLES_UTILIZADOS>=:q AND SOLES_UTILIZADOS<=:q':''}`;
+      operation='USAGE_INDEPENDENT_SUMMARY';
       const rows=await sql(`SELECT ID_TIPO_SOL T,SUM(NVL(SOLES_UTILIZADOS,0)) A,COUNT(*) N,COUNT(DISTINCT CASE WHEN NRO_TRANSACCION IS NOT NULL THEN NVL(TIPO_MOVIMIENTO,'?')||':'||TO_CHAR(NRO_TRANSACCION) END) X,COUNT(DISTINCT COD_SOCIO) U FROM VW_BOT_SOLES_UTILIZADOS WHERE ${where} GROUP BY ID_TIPO_SOL`,binds);
-      const args={...historical,documentNumber:str(s.D),metrics:['totalSolesUsed','movementCount','transactionCount','distinctMembers'],...(full?{movementTypes:[str(s.M)],destinationTypes:[str(s.Y)],destinations:[{destinationType:str(s.Y),destinationCode:str(s.C)}],solesTypeIds:[Number(s.T)],categoryIds:[str(s.R)],transactionNumber:str(s.N),solesMin:s.Q,solesMax:s.Q}:{})};
-      const got=await tool('get_soles_usage',args);
-      check(got.data.length===rows.length&&rows.every(r=>got.data.some(g=>str(g.solesTypeId)===str(r.T)&&near(g.totalSolesUsed,r.A)&&g.movementCount===r.N&&g.transactionCount===r.X&&g.distinctMembers===r.U)),'SOLES_USAGE_QUANTITY_DISTINCTS_COMBINED_FILTERS_SQL');
+      const args={...period,documentNumber:str(s.D),metrics:['totalSolesUsed','movementCount','transactionCount','distinctMembers'],...(full?{movementTypes:[str(s.M)],destinationTypes:[str(s.Y)],destinations:[{destinationType:str(s.Y),destinationCode:str(s.C)}],solesTypeIds:[Number(s.T)],categoryIds:[str(s.R)],transactionNumber:str(s.N),solesMin:s.Q,solesMax:s.Q}:{})};
+      operation='USAGE_TOOL_SUMMARY';const got=await tool('get_soles_usage',args);
+      check(got.data.length===rows.length&&rows.every(r=>got.data.some(g=>sameSolesType(g.solesTypeId,r.T)&&near(g.totalSolesUsed,r.A)&&g.movementCount===r.N&&g.transactionCount===r.X&&g.distinctMembers===r.U)),'SOLES_USAGE_QUANTITY_DISTINCTS_COMBINED_FILTERS_SQL');
+      operation='USAGE_TOOL_DETAIL';
       const detail=await tool('get_soles_usage',{...args,mode:'detail',pageSize:pageRows});
       check(detail.pagination.totalRows===rows.reduce((n,r)=>n+r.N,0),'SOLES_USAGE_DETAIL_FILTERED_COUNT_SQL');
     }
   });
 
   await run('SOLES_USAGE_MEMBER_RANKING',async()=>{
-    const rows=await sql("SELECT COD_SOCIO D,SUM(NVL(SOLES_UTILIZADOS,0)) A FROM VW_BOT_SOLES_UTILIZADOS WHERE FECHA_MOVIMIENTO>=DATE '2023-01-01' AND FECHA_MOVIMIENTO<DATE '2023-06-01' AND COD_SOCIO IS NOT NULL GROUP BY COD_SOCIO,NOM_SOCIO ORDER BY SUM(NVL(SOLES_UTILIZADOS,0)) DESC,NOM_SOCIO,COD_SOCIO FETCH FIRST 5 ROWS ONLY");
+    const period=await discoverUsagePeriod(),bounds={f:period.dateFrom,t:period.dateTo};
+    report.diagnostics.push({code:'USAGE_RANKING_AVAILABLE_MONTH',...period});
+    operation='USAGE_INDEPENDENT_RANKING';
+    const rows=await sql(`SELECT COD_SOCIO D,SUM(NVL(SOLES_UTILIZADOS,0)) A FROM VW_BOT_SOLES_UTILIZADOS WHERE FECHA_MOVIMIENTO>=${df} AND FECHA_MOVIMIENTO<${dt} AND COD_SOCIO IS NOT NULL GROUP BY COD_SOCIO,NOM_SOCIO ORDER BY SUM(NVL(SOLES_UTILIZADOS,0)) DESC,NOM_SOCIO,COD_SOCIO FETCH FIRST 5 ROWS ONLY`,bounds);
     if(!rows.length)missing('SOLES_MEMBER_RANKING_SAMPLE_NOT_FOUND');
-    const got=await tool('get_soles_usage',{...historical,groupBy:['member'],metrics:['totalSolesUsed'],limit:5,orderBy:'totalSolesUsed'});
+    operation='USAGE_TOOL_RANKING';const got=await tool('get_soles_usage',{...period,groupBy:['member'],metrics:['totalSolesUsed'],limit:5,orderBy:'totalSolesUsed'});
     check(got.data.length===rows.length&&rows.every((r,i)=>str(got.data[i].documentNumber)===str(r.D)&&near(got.data[i].totalSolesUsed,r.A)),'SOLES_RANKING_DISTINCT_MEMBERS_AND_ORDER_SQL');
     for(const g of got.data){
-      const types=await sql("SELECT ID_TIPO_SOL T,SUM(NVL(SOLES_UTILIZADOS,0)) A FROM VW_BOT_SOLES_UTILIZADOS WHERE FECHA_MOVIMIENTO>=DATE '2023-01-01' AND FECHA_MOVIMIENTO<DATE '2023-06-01' AND COD_SOCIO=:d GROUP BY ID_TIPO_SOL,DES_TIPO_SOL",{d:str(g.documentNumber)});
-      check(g.solesTypes.length===types.length&&types.every(r=>g.solesTypes.some(t=>str(t.solesTypeId)===str(r.T)&&near(t.totalSolesUsed,r.A))),'SOLES_RANKING_TYPE_BREAKDOWN_SQL');
+      const types=await sql(`SELECT ID_TIPO_SOL T,SUM(NVL(SOLES_UTILIZADOS,0)) A FROM VW_BOT_SOLES_UTILIZADOS WHERE FECHA_MOVIMIENTO>=${df} AND FECHA_MOVIMIENTO<${dt} AND COD_SOCIO=:d GROUP BY ID_TIPO_SOL,DES_TIPO_SOL`,{...bounds,d:str(g.documentNumber)});
+      check(g.solesTypes.length===types.length&&types.every(r=>g.solesTypes.some(t=>sameSolesType(t.solesTypeId,r.T)&&near(t.totalSolesUsed,r.A))),'SOLES_RANKING_TYPE_BREAKDOWN_SQL');
     }
   });
 
   await run('VEHICLE_REGISTRATION_AGE_DISTINCTS',async()=>{
-    const rows=await sql("SELECT V.COD_SOCIO D,V.MATRICULA P,V.MARCA B,V.MODELO M,V.COLOR C,V.DEBITO_AUTOMATICO A,TO_CHAR(V.FECHA_ALTA,'YYYY-MM-DD') F FROM VW_BOT_VEHICULOS V WHERE V.ACTIVO='S' AND V.FECHA_ALTA>=DATE '2023-01-01' AND V.FECHA_ALTA<DATE '2023-06-01'");
-    if(!rows.length)missing('VEHICLE_REGISTRATION_2023_SAMPLE_NOT_FOUND');
-    const demo=await sql("SELECT S.COD_SOCIO D,MIN(S.FECHA_NACIMIENTO) B,COUNT(DISTINCT S.FECHA_NACIMIENTO) N FROM VW_BOT_SOCIOS S WHERE EXISTS(SELECT 1 FROM VW_BOT_VEHICULOS V WHERE V.COD_SOCIO=S.COD_SOCIO AND V.ACTIVO='S' AND V.FECHA_ALTA>=DATE '2023-01-01' AND V.FECHA_ALTA<DATE '2023-06-01') GROUP BY S.COD_SOCIO");
+    operation='VEHICLE_AVAILABLE_MONTH_DISCOVERY';
+    const date=(await sql("SELECT TO_CHAR(FECHA_ALTA,'DD/MM/YYYY') F FROM VW_BOT_VEHICULOS WHERE ACTIVO='S' AND FECHA_ALTA IS NOT NULL AND ROWNUM<=1"))[0];
+    if(!date)missing('VEHICLE_REGISTRATION_AVAILABLE_PERIOD_NOT_FOUND');
+    const period=monthPeriod(date.F),bounds={f:period.dateFrom,t:period.dateTo};
+    report.diagnostics.push({code:'VEHICLE_AVAILABLE_MONTH',...period});
+    operation='VEHICLE_INDEPENDENT_MONTH_ROWS';
+    const rows=await sql(`SELECT V.COD_SOCIO D,V.MATRICULA P,V.MARCA B,V.MODELO M,V.COLOR C,V.DEBITO_AUTOMATICO A,TO_CHAR(V.FECHA_ALTA,'YYYY-MM-DD') F FROM VW_BOT_VEHICULOS V WHERE V.ACTIVO='S' AND V.FECHA_ALTA>=${df} AND V.FECHA_ALTA<${dt}`,bounds);
+    if(!rows.length)missing('VEHICLE_REGISTRATION_AVAILABLE_PERIOD_NOT_FOUND');
+    const demo=await sql(`SELECT S.COD_SOCIO D,MIN(S.FECHA_NACIMIENTO) B,COUNT(DISTINCT S.FECHA_NACIMIENTO) N FROM VW_BOT_SOCIOS S WHERE EXISTS(SELECT 1 FROM VW_BOT_VEHICULOS V WHERE V.COD_SOCIO=S.COD_SOCIO AND V.ACTIVO='S' AND V.FECHA_ALTA>=${df} AND V.FECHA_ALTA<${dt}) GROUP BY S.COD_SOCIO`,bounds);
     const people=new Map(demo.map(r=>[str(r.D),r]));
-    const reference='2023-06-30';
+    const reference=period.dateTo.split('/').reverse().join('-');
     const ageAt=(birth,date)=>{
       if(!birth)return null;
       const b=new Date(birth),d=new Date(date+'T00:00:00Z');
@@ -171,13 +207,13 @@ try {
     for(const ageReference of ['current','registration']){
       const groups=new Map();
       for(const r of rows){const person=people.get(str(r.D)),age=ageAt(person?.N===1?person.B:null,ageReference==='registration'?r.F:reference);const k=key(age);if(!groups.has(k))groups.set(k,{age,rows:[]});groups.get(k).rows.push(r);}
-      const got=await tool('get_vehicle_registrations',{...historical,groupBy:['age'],ageReference,referenceDate:'30/06/2023'});
+      operation='VEHICLE_TOOL_AGE_SUMMARY';const got=await tool('get_vehicle_registrations',{...period,groupBy:['age'],ageReference,referenceDate:period.dateTo});
       check(equal(got.totals,totals(rows))&&got.data.length===groups.size&&got.data.every(g=>{const r=groups.get(key(g.age));return r&&equal({vehicleCount:g.vehicleCount,plateCount:g.plateCount,memberCount:g.memberCount},totals(r.rows));}),'VEHICLE_AGE_REFERENCE_DISTINCTS_NULLS_SQL');
     }
     const sample=rows.find(r=>r.B&&r.M&&r.C&&['S','N'].includes(r.A));
     if(sample){
       const filtered=rows.filter(r=>['B','M','C'].every(k=>str(r[k])?.trim().toUpperCase()===str(sample[k]).trim().toUpperCase())&&r.A===sample.A);
-      const got=await tool('get_vehicle_registrations',{...historical,brand:sample.B,model:sample.M,color:sample.C,automaticDebit:sample.A==='S',mode:'detail',rows:pageRows});
+      operation='VEHICLE_TOOL_COMBINED_DETAIL';const got=await tool('get_vehicle_registrations',{...period,brand:sample.B,model:sample.M,color:sample.C,automaticDebit:sample.A==='S',mode:'detail',rows:pageRows});
       check(equal(got.totals,totals(filtered))&&got.pagination.totalRows===filtered.length&&got.data.length===Math.min(pageRows,filtered.length),'VEHICLE_COMBINED_FILTER_DETAIL_SQL');
     }else report.limitations.push('VEHICLE_FULL_FILTER_SAMPLE_NOT_FOUND');
     report.limitations.push('VEHICLE_RELATIVE_PERIOD_ORACLE_BOUNDARIES_NOT_IN_THIS_CONTRAST');
