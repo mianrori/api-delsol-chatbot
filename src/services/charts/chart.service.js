@@ -30,7 +30,11 @@ const currencyOf = (row, result, valuePath) => {
   const parentPath = valuePath.split(".").slice(0, -1).join(".");
   const parent = parentPath ? ownPath(row, parentPath) : row;
   const currency = parent?.currency ?? row.currency ?? result.currency;
-  return currency?.abbreviation ?? currency?.symbol ?? null;
+  if (currency?.status && currency.status !== 'identified') return null;
+  const value = currency?.code ?? currency?.abbreviation ?? currency?.symbol ?? null;
+  const recognized = v => ({PYG:'PYG','₲':'PYG',GS:'PYG','GS.':'PYG',GUARANIES:'PYG',USD:'USD','US$':'USD'})[String(v??'').trim().toUpperCase()];
+  if (new Set([currency?.code,currency?.abbreviation,currency?.symbol].map(recognized).filter(Boolean)).size>1) return null;
+  return value === '$' ? null : value;
 };
 const format = (value) => new Intl.NumberFormat("es-PY", { maximumFractionDigits: 6 }).format(value);
 const draw = ({ type, title, labels, datasets, width, height, valuePrefix, valueSuffix, subtitle = "" }) => {
@@ -157,7 +161,7 @@ export const generateChart = async (args = {}, { sources = {}, restoreText = (va
   }).join(" / "));
   const chartDatasets = datasets.map((series) => ({ label: text(series.label, 80), values: rows.map((row) => number(ownPath(row, series.valuePath))) }));
   const normalizedTitle = text(title);
-  const q = result.queryContext ?? {};
+  const q = { ...source.queryContext, ...result.queryContext };
   const subtitle = [q.dateFrom || q.dateTo ? `Período: ${q.dateFrom ?? "inicio"} a ${q.dateTo ?? "fin"}` : "",
     (Array.isArray(q.groupBy) && q.groupBy.some((key) => ["age", "ageRange"].includes(key)) || q.ageMin != null || q.ageMax != null)
       ? q.ageReference === "registration" ? "Edad al registrar el vehículo" : `Edad al ${q.referenceDate}` : ""].filter(Boolean).join(" · ");

@@ -12,7 +12,7 @@ const metric = (extra = {}) => ({ TOTAL_AMOUNT: 1000, TOTAL_INVOICES: 5, SALES_R
   MIN_AREA: 100, MAX_AREA: 100, AREA_VALUE_COUNT: 1, MISSING_AREA_ROWS: 0, AMBIGUOUS_AREA_ROWS: 0, INVALID_AREA_ROWS: 0,
   CURRENCY_ABBREVIATION: "PYG", CURRENCY_DESCRIPTION: "GUARANIES", CURRENCY_COUNT: 1, ...extra });
 const connectionFor = (...rows) => ({ queries: [], async execute(sql, binds) { this.queries.push({ sql, binds }); return { rows }; } });
-const rate = { getUsdSellRate: async () => ({ source: "Synthetic rate", sellRate: 2 }) };
+const rate = { getUsdSellRate: async () => ({ source: "Synthetic rate", sellRate: 2, retrievedAt:'2026-11-05T12:00:00Z',quotedAt:null,dateBasis:'CURRENT_QUOTE_AT_RETRIEVAL_NOT_HISTORICAL' }) };
 
 test("historical area query binds filters and does not pick a contract or fall back around zero area", async () => {
   const connection = connectionFor(metric());
@@ -34,6 +34,9 @@ test("historical area query binds filters and does not pick a contract or fall b
   assert.equal(result.salesPerSqm.pyg, 10);
   assert.equal(result.salesPerSqm.usd, 5);
   assert.equal(result.exchange.currentRate, true);
+  assert.equal(result.exchange.retrievedAt,'2026-11-05T12:00:00Z');
+  assert.equal(result.exchange.quotedAt,null);
+  assert.equal(result.exchange.dateBasis,'CURRENT_QUOTE_AT_RETRIEVAL_NOT_HISTORICAL');
 });
 
 test("missing, zero, partial and ambiguous areas never produce a per-square-meter value", async () => {

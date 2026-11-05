@@ -47,6 +47,12 @@ sin sumarlos como checks únicos ni afirmar que ambas cohortes sean idénticas.
 Quedan conversión bloqueada por timeout del proveedor, ambigüedad contractual
 sin muestra y las variantes HTTP de gráficos; no hay fallo funcional confirmado.
 Ver [resultados acotados](backend-pending-variants-validation.md).
+Pendientes de conversión/gráficos abordados desde `4428874` en rama separada
+`fix/conversion-provider-chart-http`: moneda `$` ambigua en costo, fecha de
+consulta de tasa y período perdido en gráficos corregidos como candidato.
+Las respuestas controladas, llamada pública y fuente Oracle/HTTP se acreditan
+por separado; resultados DEV del candidato aún pendientes, no aprobados por
+preparar el ejecutor. Ver [alcance y validación](conversion-chart-validation.md).
 Ver [resultados y límites](backend-independent-validation.md).
 
 ### Evidencia histórica reutilizada

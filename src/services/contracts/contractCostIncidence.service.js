@@ -137,7 +137,7 @@ export const analyzeContractCostIncidence = async (input, connection, { getUsdSe
   let exchange = { available: false, reason: "EXCHANGE_RATE_NOT_REQUIRED", currentRate: true, rateType: "sell" };
   if (periods.some((r) => [r.sales, r.shoppingCost].some((v) => v.currency.code === "PYG" && v.amount !== null))) {
     try { const r = await getUsdSellRate(); if (!Number.isFinite(r?.sellRate) || r.sellRate <= 0) throw Error("Invalid rate");
-      exchange = { available: true, sellRate: r.sellRate, source: r.source, currentRate: true, rateType: "sell" }; }
+      exchange = { available: true, sellRate: r.sellRate, source: r.source, currentRate: true, rateType: "sell", retrievedAt: r.retrievedAt, quotedAt: r.quotedAt, dateBasis: r.dateBasis }; }
     catch { exchange.reason = "EXCHANGE_RATE_UNAVAILABLE"; }
     throwIfRequestAborted();
   }

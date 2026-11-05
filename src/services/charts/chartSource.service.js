@@ -9,15 +9,17 @@ export const getChartSources = (messages = []) => {
     if (message.role === "user" && message.content?.some((block) => typeof block.text === "string")) turns.push([]);
     for (const block of message.content ?? []) {
       if (message.role === "assistant" && block.toolUse) {
-        calls.set(block.toolUse.toolUseId, block.toolUse.name);
+        calls.set(block.toolUse.toolUseId, block.toolUse);
         if (businessTools.has(block.toolUse.name)) attempted.add(turns.length - 1);
       }
       const response = message.role === "user" ? block.toolResult : null;
       if (response?.status !== "success") continue;
       const result = response.content?.find((item) => item.json)?.json;
-      const name = calls.get(response.toolUseId);
+      const call = calls.get(response.toolUseId), name = call?.name;
       if (businessTools.has(name) && result) {
-        const source = { name, result };
+        // Keep provenance separate: never mutate a successful tool result/history.
+        const input = call.input ?? {};
+        const source = { name, result, queryContext: Object.fromEntries(['dateFrom','dateTo'].filter(k=>typeof input[k]==='string').map(k=>[k,input[k]])) };
         results.set(response.toolUseId, source);
         turns.at(-1)?.push([response.toolUseId, source]);
       } else if (name === "generate_chart" && result?.sourceToolUseId) turns.at(-1)?.push([result.sourceToolUseId, null]);

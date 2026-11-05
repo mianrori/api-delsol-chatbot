@@ -1,4 +1,5 @@
 import { contractBusinessConfig } from "../../config/contractBusiness.config.js";
+import { getMaxicambiosQuote } from '../../repositories/exchange/maxicambios.repository.js';
 
 const parseRate = (value) => {
   const normalized = String(value ?? "").trim().replace(/\s/g, "");
@@ -10,49 +11,35 @@ const parseRate = (value) => {
   return Number.isFinite(numeric) ? numeric : null;
 };
 
-export const getCurrentUsdSellRateFromMaxicambios = async () => {
-  const { url, timeoutMs } = contractBusinessConfig.maxicambios;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    const response = await fetch(url, {
-      headers: { Accept: "text/html" },
-      signal: controller.signal,
-    });
-
-    if (!response.ok) {
-      throw new Error(`Maxicambios respondió HTTP ${response.status}.`);
-    }
-
-    const html = await response.text();
+export const getCurrentUsdSellRateFromMaxicambios = async ({ fetchImpl, timeoutMs = contractBusinessConfig.maxicambios.timeoutMs } = {}) => {
+    const { html, retrievedAt } = await getMaxicambiosQuote({fetchImpl,timeoutMs});
     const text = html
       .replace(/<[^>]+>/g, " ")
       .replace(/&nbsp;/gi, " ")
       .replace(/\s+/g, " ");
 
-    const match = text.match(
-      /D[oó]lar\s+Compra\s+([\d.,]+)\s+Venta\s+([\d.,]+)/i,
-    );
+    const matches = [...text.matchAll(/D[oó]lar\s+Compra\s+([\d.,]+)\s+Venta\s+([^\s]+)/gi)];
+    const rates = matches.map(match=>parseRate(match[2]));
 
-    if (!match) {
+    if (!matches.length) {
       throw new Error(
         "No se pudo identificar la cotización principal del dólar en Maxicambios.",
       );
     }
 
-    const sellRate = parseRate(match[2]);
+    const sellRate = rates[0];
 
     if (!Number.isFinite(sellRate) || sellRate <= 0) {
       throw new Error("La cotización de venta obtenida no es válida.");
     }
+    if (rates.some(rate=>rate!==sellRate)) throw new Error('La cotización de venta del proveedor es ambigua.');
 
     return {
       source: "Maxicambios",
       currency: "USD",
       sellRate,
+      rateType: 'sell', currentRate: true, retrievedAt,
+      quotedAt: null,
+      dateBasis: 'CURRENT_QUOTE_AT_RETRIEVAL_NOT_HISTORICAL',
     };
-  } finally {
-    clearTimeout(timer);
-  }
 };
