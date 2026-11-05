@@ -375,3 +375,83 @@ estos artefactos. PR #37 sigue en borrador para revisión final, sin merge, desp
 ni cambios de datos, permisos o expiraciones. Se conservan las muestras reales
 faltantes de superficie cero/cambiante, ventas registradas de suma cero y socios
 con varias monedas, con su cobertura controlada y limitaciones originales.
+
+## Resolución de local y rubro independiente del historial recortado
+
+Hallazgo de revisión posterior: sin selección durante más de diez turnos, el
+lookup ambiguo salía del historial y el guard dejaba de reconocer su estado
+pendiente. No lo cubrían los 110 controles anteriores, que siguen aprobados para
+su SHA/perfil. No se transforma esa evidencia en aprobación del código nuevo.
+
+**Corregido en `003f740`; 60/60 pruebas afectadas Node 22 aprobadas.** Estado de
+resolución por sesión para cada dominio: pendiente con sus opciones, seleccionado
+con el ID validado, y retirado explícitamente. Las transiciones se procesan una
+vez por mensaje y resultado de lookup; no se reconstruyen al reproducir el
+historial. Se conservan opciones/inputs pseudonimizados, sin filas de negocio,
+credenciales, identidades Oracle ni conexiones. Lecturas y escrituras del store
+se clonan profundamente para aislar sesiones e historial; reset elimina el estado
+y el diccionario PII. No se alteran expiraciones.
+
+Si falta evidencia de resolución se pide seleccionar/buscar de nuevo antes de
+consultar; ni IDs propuestos por el modelo ni los de argumentos históricos la
+reemplazan. Cambiar período conserva el resto de filtros. Una nueva búsqueda
+explícita invalida la selección anterior del dominio indicado, conservando el
+otro. Un filtro retirado solo se reincorpora con petición explícita y resolución
+nueva. Las menciones negativas no habilitan búsquedas, y una elección de otro
+catálogo no selecciona accidentalmente un local/rubro pendiente.
+
+Las pruebas unitarias y HTTP controladas atraviesan el límite real de diez turnos
+para ambos buscadores: doce seguimientos pendientes, elección posterior, doce
+seguimientos seleccionados, cambio, retirada, doce seguimientos retirados y nueva
+búsqueda ambigua con selección después de otros doce. Incluyen ambos órdenes de
+composición, dos pendientes simultáneos, tema ajeno, aislamiento entre sesiones,
+denegación y reset por la ruta real. Se comprueban argumentos, período, métricas,
+desglose e inmutabilidad del historial. Modelo/auth/repositorios/consumidores son
+controlados en estas pruebas; no acreditan Oracle DEV del código nuevo.
+
+**502/502 controles Oracle/HTTP DEV aprobados sobre `003f740`**, 05/11/2026
+13:27:49.669–13:27:53.540 UTC (**3,871 s**, tramo HTTP 2.833 ms), helper COMPLETE,
+success=true/salida 0. **170 archivos candidatos iguales por hash**, sin pendientes
+propios del perfil. Preflight completo sin credenciales aprobado antes de las
+entradas ocultas; candidato aislado en Docker, sin despliegue del backend.
+
+- **120 peticiones de chat y dos resets**: ambas composiciones, doce turnos sin
+  seleccionar por buscador, selección tras recorte, doce turnos seleccionados,
+  cambio explícito, retirada, doce turnos retirados y nueva búsqueda ambigua con
+  doce turnos antes de volver a seleccionar. No se admitieron IDs del modelo.
+- **60 comprobaciones de argumentos exactos y 120 de historial previo**, más
+  comprobación de que la búsqueda salió del historial, cambio de tema, aislamiento
+  entre sesiones, reset y exigencia de resolución nueva después del reset.
+- **Seis checks exactos de IDs** (tres por dominio) y **cuatro de pertenencia de
+  opciones ambiguas** a catálogos independientes Oracle DEV; no se imprimen valores.
+- Autenticación, ruta/controller/chat y lookups reales; modelo con PII protegida
+  y consumidor de ventas controlados para inspeccionar argumentos. Sin consultar
+  ventas/compras ni acreditar interpretación libre exhaustiva.
+- Denegación sin datos ni acciones para ambos buscadores, identidades PG/proxy
+  coincidentes, usuarios Oracle distintos y todos los proxies cerrados. **Dos
+  logout propios aprobados aparte** de los 502 checks.
+- Logs stdout/stderr del intervalo: cuatro eventos ERP compactos, cero error/
+  campos o valores inválidos; sin error fatal/de cierre detectado en chatbot.
+  Se inspeccionaron solo conteos técnicos, sin publicar líneas crudas o secretos.
+
+Los conteos HTTP/argumentos/historial se solapan: no sumarlos como casos únicos.
+Se verificaron por hash los 110 checks `13e8ea8`, conservando su SHA y sin
+repetirlos como suite. Solo se recorrieron los flujos afectados por la persistencia;
+sin repetir promociones, paginación, consultas de negocio o suites completas.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\logs\run-search-resolution-state-dev.ps1
+```
+
+Helper NUEVO de persistencia (no usar el de retirada anterior): cuatro entradas
+ocultas para las dos cuentas DEV, login protegido existente solo para obtener
+sesiones nuevas y logout propios. Credenciales/sesiones exclusivamente en memoria
+y stdin; nunca en argumentos, variables de entorno, reportes, temporales o Git.
+Reportes sanitizados `logs/search-resolution-state-final.json` y
+`logs/search-resolution-state-final-summary.json`, helpers y `.env` ignorados por
+Git y no versionados. No se repitieron pruebas/login al revisar estos reportes;
+esta actualización posterior solo documenta resultados. PR #37 en borrador para
+revisión final, sin merge/despliegue ni cambios de datos, permisos o expiraciones.
+Se conservan las muestras reales pendientes de superficie cero/cambiante,
+ventas registradas de suma cero y socios con varias monedas, y las limitaciones
+históricas de muestras/interpretación libre, sin fabricar datos de DEV.

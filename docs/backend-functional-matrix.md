@@ -67,6 +67,30 @@ de los 110 checks. No sumar conteos solapados; no se repitieron otros perfiles.
 Sin pendientes propios del retry ejecutado; las muestras reales faltantes siguen
 abiertas. PR #37 en borrador para revisión final de la corrección, sin merge.
 
+Actualización 05/11/2026 — **estado de resolución por sesión, código `003f740`**:
+el hallazgo de selección pendiente tras recorte está corregido y validado en DEV.
+Local y rubro conservan estados independientes pendiente/seleccionado/retirado,
+opciones e inputs protegidos; reset limpia estos estados junto con el historial
+y PII. Sin evidencia de resolución no se admiten IDs del modelo, aunque aparezcan
+en argumentos anteriores. **60/60 pruebas afectadas Node 22 aprobadas**: recorte
+real, selección posterior, cambios explícitos, retiradas/reincorporación, ambos
+órdenes, temas, aislamiento y reset HTTP; búsquedas negadas y opciones de otro
+catálogo no cambian una identidad confirmada. Preflight completo sin credenciales
+aprobado. **502/502 controles Oracle/HTTP DEV de `003f740` aprobados**, 05/11/2026
+13:27:49.669–13:27:53.540 UTC (3,871 s), helper COMPLETE/success=true/salida 0.
+170 archivos candidatos idénticos; 120 peticiones de chat y dos resets, 60 checks
+de argumentos y 120 de historial (conteos solapados). Seis checks de coincidencia
+exacta y cuatro de pertenencia de opciones contra catálogos independientes,
+denegación/aislamiento para ambos buscadores y proxies cerrados. Dos logout
+propios aprobados aparte. Auth y lookups Oracle reales; modelo/consumidor de ventas
+controlados, sin consultar ventas/compras. Los 110 checks `13e8ea8` se verificaron
+por hash y mantienen su SHA; no se atribuyen al código nuevo ni se suman.
+Cuatro eventos ERP compactos, sin errores/campos extra; sin error fatal/de cierre
+detectado en stdout/stderr de chatbot. Sin pendientes propios del perfil ejecutado.
+PR #37 en borrador para revisión final, sin merge. Muestras históricas de superficie
+cero/cambiante, ventas registradas de suma cero y socios con varias monedas
+conservadas sin cambios; no se fabricaron datos.
+
 ## Comparación con el chat original
 
 Se compararon los registros `src/tools/index.js` y los nombres de sus herramientas:
