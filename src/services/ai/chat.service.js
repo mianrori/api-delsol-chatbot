@@ -1,5 +1,5 @@
 import { buildMemberPurchasesResponse, resolveMemberPurchasesPage } from "./memberPurchasesPresentation.service.js";
-import {preserveSearchSelection,beginSearchSelectionTurn,recordSearchToolResult} from './searchSelection.service.js';
+import {preserveSearchSelection,beginSearchSelectionTurn,recordSearchToolResult,captureSearchQueryContext} from './searchSelection.service.js';
 import { buildMemberPromoResponse, resolveMemberPromoPage, resolveMemberPromoSelection, preserveMemberPromoFollowup } from "./memberPromoPurchasesPresentation.service.js";
 import { preserveSalesPerSqmFollowup } from "./salesPerSqmFollowup.service.js";
 import { preserveContractIncidenceFollowup } from "./contractIncidenceFollowup.service.js";
@@ -34,7 +34,7 @@ import {
   getConversation,
   setConversation,
   getSearchResolutions,
-  setSearchResolutions,
+  getSearchSelectionTurn,
 } from "../../state/conversation.store.js";
 import {
   compactMemberPurchasePaginationHistory,
@@ -1412,7 +1412,8 @@ const executeToolRequests = async ({ content, sessionId, sourceMessages = [], ch
     }
 
     try {
-      input=preserveSearchSelection({name,input,history:sourceMessages,currentCalls:internalContext.presentationCalls,resolutionState:getSearchResolutions(sessionId),saveResolutionState:state=>setSearchResolutions(sessionId,state)});
+      captureSearchQueryContext(sessionId,name,protectPiiDeep(sessionId,input));
+      input=preserveSearchSelection({name,input,history:sourceMessages,currentCalls:internalContext.presentationCalls,resolutionState:getSearchResolutions(sessionId),selectionTurn:getSearchSelectionTurn(sessionId)});
       block.toolUse.input=input;presentationCall.input=input;
       validateProtectedToolInput({ name, input });
 

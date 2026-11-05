@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {beginSearchSelectionTurn,recordSearchToolResult,preserveSearchSelection} from '../src/services/ai/searchSelection.service.js';
-import {getSearchResolutions,setSearchResolutions,clearConversation} from '../src/state/conversation.store.js';
+import {beginSearchSelectionTurn,recordSearchToolResult,preserveSearchSelection,captureSearchQueryContext} from '../src/services/ai/searchSelection.service.js';
+import {getSearchResolutions,getSearchSelectionTurn,clearConversation} from '../src/state/conversation.store.js';
 import {trimConversation} from '../src/services/ai/conversation.service.js';
 const user=text=>({role:'user',content:[{text}]});
 const use=(name,id,input)=>({role:'assistant',content:[{toolUse:{name,toolUseId:id,input}}]});
 const response=(id,json,status='success')=>({role:'user',content:[{toolResult:{toolUseId:id,status,content:[{json}]}}]});
-const guard=(sessionId,name,input,history=[])=>preserveSearchSelection({name,input,history,resolutionState:getSearchResolutions(sessionId),saveResolutionState:s=>setSearchResolutions(sessionId,s)});
+const guard=(sessionId,name,input,history=[])=>{captureSearchQueryContext(sessionId,name,input);return preserveSearchSelection({name,input,history,resolutionState:getSearchResolutions(sessionId),selectionTurn:getSearchSelectionTurn(sessionId)});};
 const base={dateFrom:'01/01/2023',dateTo:'31/01/2023',groupBy:['month'],metrics:['totalAmount'],dayType:'business'};
 for(const [search,field,key,label] of [['search_customers','customerIds','codCliente','local'],['search_categories','categoryIds','codRubro','rubro']])test(search+' persists pending/selected/removed through real trimming, topics and reset',()=>{
  const session='SYNTHETIC-'+search;clearConversation(session);
@@ -33,11 +33,12 @@ for(const [search,field,key,label] of [['search_customers','customerIds','codCli
   assert.deepEqual(guard(session,'get_sales',{[field]:['MODEL-ID']}),base);
   assert.equal(getSearchResolutions(session).domains[search].kind,'cleared');
   beginSearchSelectionTurn(session,'Cambia el período');assert.equal(guard(session,'get_sales',{[field]:['MODEL-ID'],dateFrom:'01/02/2023'})[field],undefined);
-  assert.throws(()=>guard(session,search,{search:'Synthetic'}),{code:'SEARCH_SELECTION_REQUIRED'});
+  assert.throws(()=>guard(session,search,{search:'Synthetic'}),{code:'SEARCH_FILTER_REMOVED'});
   beginSearchSelectionTurn(session,'Vuelve a añadir el '+label);assert.throws(()=>guard(session,'get_sales',input),{code:'SEARCH_SELECTION_REQUIRED'});
   guard(session,search,{search:'Synthetic new'});recordSearchToolResult(session,search,{},search==='search_customers'?{status:'RESOLVED',customer:{[key]:'[PII_TEST_3]'}}:{status:'RESOLVED',category:{[key]:'[PII_TEST_3]'}});
   assert.deepEqual(guard(session,'get_sales',input)[field],['[PII_TEST_3]']);
   clearConversation(session);assert.deepEqual(getSearchResolutions(session),{domains:{},contexts:{}});
+  assert.deepEqual(getSearchSelectionTurn(session),{});
   assert.throws(()=>guard(session,'get_sales',input),{code:'SEARCH_SELECTION_REQUIRED'});
  }finally{clearConversation(session);}
 });
@@ -74,8 +75,8 @@ test('two pending domains cannot share one numeric choice; removing one permits 
 test('a negative new-search mention and a different catalog choice cannot replace a persistent identity',()=>{
  const s='SYNTHETIC-TOPICS';clearConversation(s);
  try{
-  beginSearchSelectionTurn(s,'Busca local');recordSearchToolResult(s,'search_customers',{}, {status:'AMBIGUOUS',options:[{optionId:'2',codCliente:'[PII_CUSTOMER_ID_2]'}]});
-  recordSearchToolResult(s,'search_members',{}, {status:'AMBIGUOUS',options:[{optionId:'2',documentNumber:'SYNTHETIC'}]});
+  beginSearchSelectionTurn(s,'Busca local');recordSearchToolResult(s,'search_customers',{}, {status:'AMBIGUOUS',options:[{optionId:'1',codCliente:'[PII_CUSTOMER_ID_1]'},{optionId:'2',codCliente:'[PII_CUSTOMER_ID_2]'}]});
+  recordSearchToolResult(s,'search_members',{}, {status:'AMBIGUOUS',options:[{optionId:'1',documentNumber:'SYNTHETIC-A'},{optionId:'2',documentNumber:'SYNTHETIC'}]});
   beginSearchSelectionTurn(s,'opción 2');assert.equal(getSearchResolutions(s).domains.search_customers.kind,'pending');
   beginSearchSelectionTurn(s,'No hagas una nueva búsqueda');assert.throws(()=>guard(s,'search_customers',{search:'MODEL'}),{code:'SEARCH_SELECTION_REQUIRED'});
   beginSearchSelectionTurn(s,'Busca el local');guard(s,'search_customers',{search:'Synthetic'});recordSearchToolResult(s,'search_customers',{}, {status:'RESOLVED',customer:{codCliente:'[PII_CUSTOMER_ID_3]'}});
@@ -90,7 +91,7 @@ test('fresh pending query context outranks old successful history when selecting
   beginSearchSelectionTurn(s,'Busca local');recordSearchToolResult(s,'search_customers',{}, {status:'RESOLVED',customer:{codCliente:'[PII_CUSTOMER_ID_1]'}});
   const old={...base,customerIds:['[PII_CUSTOMER_ID_1]']};recordSearchToolResult(s,'get_sales',old,{data:[]});
   const history=[user('Ventas enero'),use('get_sales','old',old),response('old',{data:[]})];
-  beginSearchSelectionTurn(s,'Cambia el local');guard(s,'search_customers',{search:'Synthetic'});recordSearchToolResult(s,'search_customers',{}, {status:'AMBIGUOUS',options:[{optionId:'2',codCliente:'[PII_CUSTOMER_ID_2]'}]});
+  beginSearchSelectionTurn(s,'Cambia el local');guard(s,'search_customers',{search:'Synthetic'});recordSearchToolResult(s,'search_customers',{}, {status:'AMBIGUOUS',options:[{optionId:'1',codCliente:'[PII_CUSTOMER_ID_1]'},{optionId:'2',codCliente:'[PII_CUSTOMER_ID_2]'}]});
   const next={...old,dateFrom:'01/02/2023',dateTo:'28/02/2023'};
   assert.throws(()=>guard(s,'get_sales',next,history),{code:'SEARCH_SELECTION_REQUIRED'});
   beginSearchSelectionTurn(s,'opción 2');history.push(user('opción 2'));

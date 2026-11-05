@@ -1,5 +1,5 @@
 import {getSearchFilterActions,isExplicitSearchRequest} from './searchFilterIntent.service.js';
-import {getSearchResolutions,setSearchResolutions} from '../../state/conversation.store.js';
+import {getSearchResolutions,setSearchResolutions,getSearchSelectionTurn,setSearchSelectionTurn} from '../../state/conversation.store.js';
 const specs={
  search_customers:{consumers:['get_sales','get_sales_per_sqm','analyze_members','get_member_purchases','get_member_promo_purchases','compare_member_purchases_vs_sales','analyze_campaign_sales_performance','get_contract_conditions','get_contract_cost_per_sqm','analyze_contract_cost_incidence'],fields:o=>({customerIds:[o.codCliente],customerId:o.codCliente})},
  search_categories:{consumers:['get_sales','get_sales_per_sqm','analyze_members','get_member_purchases','get_member_promo_purchases','get_soles_usage','compare_member_purchases_vs_sales','analyze_campaign_sales_performance'],fields:o=>({categoryIds:[o.codRubro]})},
@@ -17,48 +17,75 @@ const required={search_customers:['codCliente'],search_categories:['codRubro'],s
 const optionFrom=result=>result.customer??result.category??result.member??result;
 const persistentSearches=['search_customers','search_categories'];
 const domainFields=search=>search==='search_customers'?['customerId','customerIds']:['categoryIds'];
+const validId=value=>typeof value==='string'?value.trim().length>0:typeof value==='number'&&Number.isFinite(value);
+const validOption=(name,option)=>required[name].every(key=>validId(option?.[key]));
+const optionNumber=o=>String(o?.optionId??o?.option??'');
+const validOptions=(name,options)=>Array.isArray(options)&&options.every(o=>validOption(name,o)&&/^[1-9]\d*$/.test(optionNumber(o)))&&new Set(options.map(optionNumber)).size===options.length;
+const lookupShape=(name,result)=>{
+ const resolved=result?.status==='RESOLVED'&&result.hasMore!==true&&validOption(name,optionFrom(result??{}));
+ const listed=['AMBIGUOUS','LISTED'].includes(result?.status)&&validOptions(name,result.options)&&result.options.length>=1&&(result.status!=='AMBIGUOUS'||result.options.length>=2||result.hasMore===true&&Number(result.totalMatches)>result.options.length);
+ const missing=result?.status==='NOT_FOUND'&&(result.options==null||Array.isArray(result.options)&&result.options.length===0);
+ return {resolved,valid:result?.success!==false&&!result?.error&&(resolved||listed||missing)};
+};
 
 // Applied once to the protected user message, never by replaying bounded history.
 export function beginSearchSelectionTurn(sessionId,message){
- const state=getSearchResolutions(sessionId);state.selectedThisTurn=[];state.freshLookups=[];state.capturedConsumers=[];
+ const state=getSearchResolutions(sessionId),turn={selectedThisTurn:[],validLookups:[],capturedConsumers:[],requestedDomains:[]};let changed=false;
  const normalized=String(message??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();
  const newLookup=/^(?:(?:realiza|haz) (?:una )?)?nueva busqueda\b|^busca (?:de nuevo|opciones)\b/.test(normalized);
- state.allowLookup=Object.fromEntries(persistentSearches.map(name=>[name,isExplicitSearchRequest(message,name)||newLookup]));
+ turn.allowLookup=Object.fromEntries(persistentSearches.map(name=>[name,isExplicitSearchRequest(message,name)||newLookup]));
  for(const {search,action} of getSearchFilterActions(message)){
-  state.domains[search]=action==='remove'?{kind:'cleared'}:{kind:'pending',result:{options:[]}};
+  if(action==='remove'){state.domains[search]={kind:'cleared'};changed=true;}
+  else turn.requestedDomains.push(search);
  }
- if(state.domains[state.choiceFocus]?.kind==='cleared')delete state.choiceFocus;
+ if(state.domains[state.choiceFocus]?.kind==='cleared'&&changed)delete state.choiceFocus;
  const choice=selection(message),pending=Object.entries(state.domains).filter(([,s])=>s.kind==='pending');
  const selectable=pending.length?pending:Object.entries(state.domains).filter(([,s])=>s.kind==='selected');
  if(choice&&selectable.length===1&&(!state.choiceFocus||state.choiceFocus===selectable[0][0])){
-  const [name,s]=selectable[0],selected=s.result?.options?.find(o=>String(o.optionId??o.option)===String(Number(choice)));
-  state.domains[name]=selected?{...s,kind:'selected',selected}:{...s,kind:'pending'};
-  if(selected)state.selectedThisTurn.push(name);
- }else if(choice&&selectable.length>1)for(const [name,s] of selectable)state.domains[name]={...s,kind:'pending'};
- setSearchResolutions(sessionId,state);
+  const [name,s]=selectable[0],options=s.result?.options;
+  const selected=validOptions(name,options)?options.find(o=>optionNumber(o)===String(Number(choice))):null;
+  if(selected){state.domains[name]={...s,kind:'selected',selected};turn.selectedThisTurn.push(name);changed=true;}
+ }
+ turn.selectionRejected=Boolean(choice)&&turn.selectedThisTurn.length===0&&(!state.choiceFocus||persistentSearches.includes(state.choiceFocus));
+ if(changed)setSearchResolutions(sessionId,state);
+ setSearchSelectionTurn(sessionId,turn);
 }
 
 // Store only protected resolver IDs/options and arguments, never business rows.
 export function recordSearchToolResult(sessionId,name,input,result){
  const state=getSearchResolutions(sessionId);
- if(name.startsWith('search_'))state.choiceFocus=name;
  if(persistentSearches.includes(name)){
   const selected=optionFrom(result??{}),minimal=o=>Object.fromEntries(['optionId','option',...required[name]].filter(k=>o?.[k]!=null).map(k=>[k,o[k]]));
-  state.domains[name]=result?.status==='RESOLVED'&&result.hasMore!==true&&required[name].every(k=>selected[k]!=null)
+  const {resolved,valid}=lookupShape(name,result);if(!valid)return false;
+  state.domains[name]=resolved
    ?{kind:'selected',selected:minimal(selected),result:{options:[]}}
    :{kind:'pending',result:{options:(result?.options??[]).map(minimal)}};
+  state.choiceFocus=name;
+  const turn=getSearchSelectionTurn(sessionId);turn.validLookups=[...new Set([...(turn.validLookups??[]),name])];setSearchSelectionTurn(sessionId,turn);
  }else if(persistentSearches.some(s=>specs[s].consumers.includes(name))&&result?.success!==false&&!result?.error){
   state.contexts[name]=structuredClone(input);
- }
- setSearchResolutions(sessionId,state);
+ }else if(Object.hasOwn(specs,name)&&lookupShape(name,result).valid||name==='search_promotions'&&result?.success!==false&&!result?.error&&['RESOLVED','AMBIGUOUS','LISTED','NOT_FOUND'].includes(result?.status)){
+  state.choiceFocus=name;
+ }else return false;
+ setSearchResolutions(sessionId,state);return true;
+}
+
+// A query proposal may supply context for a lookup already validated this turn.
+// Rejected lookups have no such evidence and cannot write even query metadata.
+export function captureSearchQueryContext(sessionId,name,input){
+ const turn=getSearchSelectionTurn(sessionId);
+ if(!turn.validLookups?.some(search=>specs[search].consumers.includes(name))||turn.capturedConsumers?.includes(name))return;
+ const state=getSearchResolutions(sessionId);
+ state.contexts[name]=structuredClone({...state.contexts[name],...input});setSearchResolutions(sessionId,state);
+ turn.capturedConsumers=[...(turn.capturedConsumers??[]),name];setSearchSelectionTurn(sessionId,turn);
 }
 
 // Reconstruct resolution state across turns and tool iterations. A failed query
 // or a non-selection message must not erase an unresolved lookup.
-export function preserveSearchSelection({name,input,history=[],currentCalls=[],removedFilters=[],resolutionState,saveResolutionState=()=>{}}){
+export function preserveSearchSelection({name,input,history=[],currentCalls=[],removedFilters=[],resolutionState,selectionTurn={}}){
  const states=new Map(),calls=new Map(),queries=[],turnTexts=new Map();let turn=-1,currentText='';
  const persistent=search=>Boolean(resolutionState)&&persistentSearches.includes(search);
- if(resolutionState)for(const [search,state] of Object.entries(resolutionState.domains))states.set(search,{...state,originTurn:-1,selectedTurn:resolutionState.selectedThisTurn?.includes(search)?Infinity:-1});
+ if(resolutionState)for(const [search,state] of Object.entries(resolutionState.domains))states.set(search,{...state,originTurn:-1,selectedTurn:selectionTurn.selectedThisTurn?.includes(search)?Infinity:-1});
  for(const search of removedFilters)if(['search_customers','search_categories'].includes(search))states.set(search,{kind:'cleared',originTurn:-1,clearedTurn:-1});
  const update=(call,result)=>{
   if(!specs[call.name]||!result)return;
@@ -93,19 +120,16 @@ export function preserveSearchSelection({name,input,history=[],currentCalls=[],r
  }
  for(const call of currentCalls)if(specs[call.name])update({...call,turn},call.result);
  if(persistent(name)){
+  if(typeof input?.search!=='string'||Object.keys(input).some(key=>key!=='search'))throw Object.assign(Error('Los argumentos del buscador no son válidos.'),{code:'SEARCH_ARGUMENTS_INVALID'});
   const state=states.get(name);
-  if(state&&!resolutionState.allowLookup?.[name]&&!isExplicitSearchRequest(currentText,name,input))throw Object.assign(Error('Solicita una nueva búsqueda o selecciona una opción.'),{code:'SEARCH_SELECTION_REQUIRED'});
-  resolutionState.domains[name]={kind:'pending',result:{options:[]}};saveResolutionState(resolutionState);
-  resolutionState.freshLookups=[...new Set([...(resolutionState.freshLookups??[]),name])];saveResolutionState(resolutionState);
+  if(state?.kind==='cleared'&&!selectionTurn.requestedDomains?.includes(name)&&!isExplicitSearchRequest(currentText,name,input))throw Object.assign(Error('El filtro fue retirado. Solicita volver a añadirlo antes de buscarlo.'),{code:'SEARCH_FILTER_REMOVED'});
+  if(state&&!selectionTurn.allowLookup?.[name]&&!isExplicitSearchRequest(currentText,name,input))fail();
  }
- if(resolutionState&&persistentSearches.some(s=>specs[s].consumers.includes(name))&&(!resolutionState.contexts[name]||resolutionState.freshLookups?.some(s=>specs[s].consumers.includes(name))&&!resolutionState.capturedConsumers?.includes(name))){
-  resolutionState.contexts[name]=structuredClone({...resolutionState.contexts[name],...input});
-  resolutionState.capturedConsumers=[...(resolutionState.capturedConsumers??[]),name];saveResolutionState(resolutionState);
- }
- if(states.get(name)?.kind==='cleared'&&!isExplicitSearchRequest(currentText,name,input))throw Object.assign(Error('El filtro fue retirado. Solicita volver a añadirlo antes de buscarlo.'),{code:'SEARCH_FILTER_REMOVED'});
+ if(!persistent(name)&&states.get(name)?.kind==='cleared'&&!isExplicitSearchRequest(currentText,name,input))throw Object.assign(Error('El filtro fue retirado. Solicita volver a añadirlo antes de buscarlo.'),{code:'SEARCH_FILTER_REMOVED'});
  const resolutions=[],removed=[];
  for(const [search,spec] of Object.entries(specs)){
   if(!spec.consumers.includes(name))continue;
+  if(persistent(search)&&(selectionTurn.selectionRejected||selectionTurn.requestedDomains?.includes(search)&&!selectionTurn.validLookups?.includes(search)))fail();
   const state=states.get(search);if(!state)continue;
   if(state.kind==='pending')fail();
   if(state.kind==='cleared'){removed.push(search);continue;}
@@ -119,7 +143,7 @@ export function preserveSearchSelection({name,input,history=[],currentCalls=[],r
  const origin=queries.filter(c=>c.name===name&&origins.has(c.turn)).sort((a,b)=>a.turn-b.turn)[0];
  const successful=queries.filter(c=>c.name===name&&c.turn<turn&&c.resultStatus==='success').at(-1);
  const original={...(successful?.input??{}),...((successful&&successful.turn>=(origin?.turn??-1)?successful:origin)?.input??{}),...(resolutionState?.contexts[name]??{})};
- const selectingNow=Boolean(selection(currentText))&&resolutions.some(r=>r.state.selectedTurn===turn||persistent(r.search)&&resolutionState.selectedThisTurn?.includes(r.search));
+ const selectingNow=Boolean(selection(currentText))&&resolutions.some(r=>r.state.selectedTurn===turn||persistent(r.search)&&selectionTurn.selectedThisTurn?.includes(r.search));
  const result=selectingNow?{...input,...original}:{...original,...input};
  const identifiers={};
  // A confirmed lookup may have left the bounded history, while its executed

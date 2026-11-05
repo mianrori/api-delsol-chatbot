@@ -4,8 +4,11 @@ const conversations = new Map();
 // Protected local/category resolution and query arguments, process/session scoped.
 // Independent of bounded history; no credentials, Oracle identities or connections.
 const searchResolutions = new Map();
+const searchSelectionTurns = new Map();
 export const getSearchResolutions=sessionId=>structuredClone(searchResolutions.get(sessionId)??{domains:{},contexts:{}});
 export const setSearchResolutions=(sessionId,state)=>searchResolutions.set(sessionId,structuredClone(state));
+export const getSearchSelectionTurn=sessionId=>structuredClone(searchSelectionTurns.get(sessionId)??{});
+export const setSearchSelectionTurn=(sessionId,turn)=>searchSelectionTurns.set(sessionId,structuredClone(turn));
 export const getRemovedSearchFilters=sessionId=>new Set(Object.entries(getSearchResolutions(sessionId).domains).filter(([,s])=>s.kind==='cleared').map(([name])=>name));
 export const setSearchFilterRemoved=(sessionId,search,removed)=>{
   const state=getSearchResolutions(sessionId);
@@ -25,5 +28,6 @@ export const setConversation = (sessionId, messages) => {
 export const clearConversation = (sessionId) => {
   conversations.delete(sessionId);
   searchResolutions.delete(sessionId);
+  searchSelectionTurns.delete(sessionId);
   clearPiiSession(sessionId);
 };

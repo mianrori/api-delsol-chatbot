@@ -7,10 +7,10 @@ import {protectPiiDeep} from '../src/services/ai/pii.service.js';
 // Actual candidate route/controller/chat/PII, with deterministic model output.
 // Only business consumers are doubles: this check verifies their exact inputs,
 // and never queries purchases/usages outside the narrowly affected lookup flow.
-export async function checkSearchCorrectionsHttp({sessionId,deniedSessionId,lookup,uniqueSearch,ambiguousSearch,compositionProfile,lifecycleOnly=false,lifecycleRetry=false,resolutionProfile=false,validateSession,check}){
+export async function checkSearchCorrectionsHttp({sessionId,deniedSessionId,lookup,uniqueSearch,ambiguousSearch,compositionProfile,lifecycleOnly=false,lifecycleRetry=false,resolutionProfile=false,transitionProfile=false,validateSession,check}){
  const context=vm.createContext({console,process,structuredClone,Intl,Date,Map,Set,Number,String,Array,JSON,Math,RegExp,Object,Boolean,Error,AbortController});
  const synthetic=exports=>new vm.SyntheticModule(Object.keys(exports),function(){for(const [k,v] of Object.entries(exports))this.setExport(k,v);},{context});
- const plans=[];let consumerCalls=0,lastLookup,expectedConsumer,requestSessionId=sessionId;
+ const plans=[];let consumerCalls=0,lookupCalls=0,lastLookup,expectedConsumer,requestSessionId=sessionId,lookupFault;
  const canonical=v=>v&&typeof v==='object'?(Array.isArray(v)?v.map(canonical):Object.fromEntries(Object.keys(v).sort().map(k=>[k,canonical(v[k])]))):v;
  const command=(name,input,id)=>({toolUse:{name,toolUseId:id,input}});
  const protectModelBlock=b=>{
@@ -25,7 +25,11 @@ export async function checkSearchCorrectionsHttp({sessionId,deniedSessionId,look
  };
  const model={BedrockRuntimeClient:class{async send(){const content=plans.shift()?.map(protectModelBlock);return {stopReason:content?'tool_use':'end_turn',output:{message:{role:'assistant',content:content??[{text:'Selecciona una opción válida para continuar.'}]}}};}},ConverseCommand:class{}};
  const executeTool=async({name,arguments:args,context:toolContext})=>{
-  if(name==='search_categories'||name==='search_customers'){lastLookup=await lookup(args,toolContext,name);return lastLookup;}
+  if(name==='search_categories'||name==='search_customers'){
+   if(lookupFault){const fault=lookupFault;lookupFault=null;if(fault==='throw')throw Object.assign(Error('Controlled lookup rejection'),{code:'SYNTHETIC_LOOKUP_REJECTED'});return {status:'AMBIGUOUS',options:[{optionId:'1'},{optionId:'1'}]};}
+   lookupCalls++;lastLookup=await lookup(args,toolContext,name);return lastLookup;
+  }
+  if(transitionProfile&&name==='search_members')return {status:'AMBIGUOUS',options:[{optionId:'1',documentNumber:'SYNTHETIC-M1'},{optionId:'2',documentNumber:'SYNTHETIC-M2'}]};
   check(name===expectedConsumer?.name,'HTTP_EXPECTED_CONSUMER_ONLY');consumerCalls++;
   check(JSON.stringify(canonical(args))===JSON.stringify(canonical(expectedConsumer.input)),'HTTP_SELECTED_ID_AND_FILTERS_EXACT');
   return name==='get_soles_usage'?{mode:'summary',data:[],queryContext:args}:{data:[]};
@@ -39,11 +43,44 @@ export async function checkSearchCorrectionsHttp({sessionId,deniedSessionId,look
  const routes=await load('../src/routes/index.js',{'../controllers/chat.controller.js':controller});
  const app=express();app.use(express.json());app.use('/chatbot/api',routes.router);
  const server=await new Promise(resolve=>{const s=app.listen(0,'127.0.0.1',()=>resolve(s));});
- const post=async(message,session=sessionId)=>{requestSessionId=session;const priorHistory=getConversation(session);const snapshot=compositionProfile?structuredClone(priorHistory):null;const response=await fetch(`http://127.0.0.1:${server.address().port}/chatbot/api/bot/chat`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({sessionId:session,message}),signal:AbortSignal.timeout(90000)});const body=await response.json();check(response.status===200&&body.success===true,'HTTP_CANDIDATE_CHAT_SUCCESS');if(snapshot)check(JSON.stringify(canonical(lifecycleOnly||resolutionProfile?priorHistory:getConversation(session).slice(0,snapshot.length)))===JSON.stringify(canonical(snapshot)),'HTTP_PRIOR_HISTORY_UNCHANGED');return body;};
+ const post=async(message,session=sessionId)=>{requestSessionId=session;const priorHistory=getConversation(session);const snapshot=compositionProfile?structuredClone(priorHistory):null;const response=await fetch(`http://127.0.0.1:${server.address().port}/chatbot/api/bot/chat`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({sessionId:session,message}),signal:AbortSignal.timeout(90000)});const body=await response.json();check(response.status===200&&body.success===true,'HTTP_CANDIDATE_CHAT_SUCCESS');if(snapshot)check(JSON.stringify(canonical(lifecycleOnly||resolutionProfile||transitionProfile?priorHistory:getConversation(session).slice(0,snapshot.length)))===JSON.stringify(canonical(snapshot)),'HTTP_PRIOR_HISTORY_UNCHANGED');return body;};
  const sales={dateFrom:'01/01/2023',dateTo:'31/01/2023',...(compositionProfile?{customerIds:['SYNTHETIC-C']}:{}),categoryIds:['SYNTHETIC-ARBITRARY'],groupBy:['month'],metrics:['totalAmount']};
  const usage={documentNumber:'SYNTHETIC-M',dateFrom:'01/01/2023',dateTo:'31/05/2023',movementTypes:['SYNTHETIC-MOVEMENT'],destinations:[{destinationType:'LOCAL',destinationCode:'SYNTHETIC-D'}],categoryIds:['SYNTHETIC-ARBITRARY'],mode:'summary'};
  try{
   if(compositionProfile){
+   if(transitionProfile){
+    const p=compositionProfile,equal=(a,b)=>JSON.stringify(canonical(a))===JSON.stringify(canonical(b));
+    for(const trimmed of [false,true])for(const [name,field,label] of [['search_customers','customerIds','local'],['search_categories','categoryIds','rubro']]){
+     clearConversation(sessionId);plans.length=0;
+     expectedConsumer={name:'get_sales',input:{...sales,customerIds:[p.customers[0].id],categoryIds:[p.categories[0].id]}};
+     plans.push([command('search_customers',{search:p.customers[0].search},'atomic-c'),command('search_categories',{search:p.categories[0].search},'atomic-r'),command('get_sales',sales,'atomic-query')]);await post('Busca local y rubro para ventas de enero');plans.length=0;
+     const query=async()=>{const count=consumerCalls;plans.push([command('get_sales',{customerIds:['MODEL-C'],categoryIds:['MODEL-R']},'atomic-consumer')]);await post('continúa');plans.length=0;check(consumerCalls===count+1,'HTTP_ATOMIC_PRESERVED_ARGUMENTS');};
+     plans.push([command('search_members',{search:'Synthetic'},'foreign-catalog')]);await post('Busca opciones de socios');plans.length=0;
+     if(trimmed){for(let i=0;i<12;i++)await query();check(!getConversation(sessionId).some(m=>m.content?.some(b=>b.toolUse?.name==='search_members')),'HTTP_FOREIGN_CATALOG_LEFT_HISTORY');}
+     const before=getSearchResolutions(sessionId);await post('opción 2');check(equal(before,getSearchResolutions(sessionId)),'HTTP_FULL_STATE_UNCHANGED_FOREIGN_CHOICE_'+name+'_'+trimmed);await query();
+     const removal='quita el filtro de '+label;delete expectedConsumer.input[field];const count=consumerCalls;
+     if(name==='search_customers')plans.push([command('get_sales',sales,'remove-local')]);await post(removal);plans.length=0;check(consumerCalls===count+1,'HTTP_ATOMIC_REMOVAL_EXECUTED');
+     if(trimmed){for(let i=0;i<12;i++)await query();check(!getConversation(sessionId).some(m=>m.content?.some(b=>b.text===removal)),'HTTP_RETIRED_FILTER_LEFT_HISTORY');}
+     const retired=getSearchResolutions(sessionId),entry=(name==='search_customers'?p.customers:p.categories)[0],lookups=lookupCalls;
+     plans.push([command(name,{search:entry.search},'rejected-retired')]);await post('Busca opciones de '+(name==='search_customers'?'rubro':'local'));plans.length=0;
+     check(lookupCalls===lookups&&equal(retired,getSearchResolutions(sessionId)),'HTTP_FULL_STATE_UNCHANGED_REJECTED_LOOKUP_'+name+'_'+trimmed);
+     for(const fault of ['throw','malformed']){
+      lookupFault=fault;plans.push([command(name,{search:entry.search},'controlled-'+fault)]);await post('Vuelve a añadir el '+label);plans.length=0;
+      check(equal(retired,getSearchResolutions(sessionId)),'HTTP_FULL_STATE_UNCHANGED_CONTROLLED_'+fault+'_'+name+'_'+trimmed);
+     }
+     const ambiguous=name==='search_customers'?p.ambiguousCustomerSearch:p.ambiguousCategorySearch;
+     plans.push([command(name,{search:ambiguous},'valid-ambiguous')]);await post('Vuelve a añadir el '+label);plans.length=0;
+     check(lastLookup.status==='AMBIGUOUS'&&lastLookup.options?.length>=2,'HTTP_ATOMIC_VALID_OPTIONS_PROFILE');
+     const pending=getSearchResolutions(sessionId),chosen=pending.domains[name].result.options[1];
+     plans.push([command('get_sales',sales,'invalid-choice-consumer')]);const calls=consumerCalls;await post('opción 999');plans.length=0;
+     check(consumerCalls===calls&&equal(pending,getSearchResolutions(sessionId)),'HTTP_FULL_STATE_UNCHANGED_INVALID_OPTION_'+name+'_'+trimmed);
+     await post('opción 2');const expected=structuredClone(pending);expected.domains[name]={...expected.domains[name],kind:'selected',selected:chosen};
+     check(equal(expected,getSearchResolutions(sessionId)),'HTTP_VALID_SELECTION_CHANGES_ONLY_CATALOG_'+name+'_'+trimmed);
+     expectedConsumer.input[field]=[name==='search_customers'?lastLookup.options[1].codCliente:lastLookup.options[1].codRubro];await query();
+     if(deniedSessionId){clearConversation(deniedSessionId);await post('quita el filtro de '+label,deniedSessionId);const original=getSearchResolutions(deniedSessionId);plans.push([command(name,{search:entry.search},'real-denial')]);const denied=await post('Vuelve a añadir el '+label,deniedSessionId);plans.length=0;check(denied.response==='El usuario no tiene permisos para consultar esta información.'&&Object.keys(denied.actions??{}).length===0&&Object.keys(denied).every(k=>['env','success','response','actions'].includes(k))&&equal(original,getSearchResolutions(deniedSessionId)),'HTTP_ORACLE_DENIAL_PRESERVES_FULL_STATE_'+name+'_'+trimmed);}
+    }
+    return;
+   }
    if(resolutionProfile){
     const p=compositionProfile;
     for(const order of [['search_customers','search_categories'],['search_categories','search_customers']]){
