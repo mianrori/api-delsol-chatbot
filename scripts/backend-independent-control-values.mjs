@@ -19,6 +19,7 @@ export const remainingCases=new Set(['INDIVIDUAL_PURCHASES_TWO_MEMBERS','MEMBER_
 export const diagnosticCases=new Set(['INDIVIDUAL_PURCHASES_TWO_MEMBERS','MEMBER_SOLES_HISTORY','VEHICLE_REGISTRATION_AGE_DISTINCTS']);
 export const purchaseSamples=rows=>[...new Map(rows.filter(r=>r.COD_SOCIO!=null&&r.C!=null&&r.R!=null).map(r=>[String(r.COD_SOCIO),r])).values()].slice(0,2);
 export const solesCases=new Set(['MEMBER_SOLES_HISTORY']);
+export const currencyCases=new Set(['PURCHASES_VS_SALES_INDEPENDENT','COMPARISON_DOLLAR_COLLISION_ORACLE_CTE','AFFECTED_AND_MISSING_POSITIVE_HTTP']);
 // node-oracledb distinguishes two arguments from three arguments with an
 // undefined options value (the latter is NJS-005). Preserve the real overload.
 export const forwardOracleExecute=(connection,text,binds,options)=>options===undefined

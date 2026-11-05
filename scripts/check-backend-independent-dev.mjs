@@ -1,6 +1,6 @@
 // Read-only DEV contrasts. Business rows and session identity stay in memory.
 // Invoked by the local hidden-input helper, never with a session in argv/env.
-import {sameSolesType,monthPeriod,remainingCases,diagnosticCases,purchaseSamples,solesCases,forwardOracleExecute,normalizeSolesDocumentForControl} from './backend-independent-control-values.mjs';
+import {sameSolesType,monthPeriod,remainingCases,diagnosticCases,purchaseSamples,solesCases,currencyCases,forwardOracleExecute,normalizeSolesDocumentForControl} from './backend-independent-control-values.mjs';
 const emit = process.stdout.write.bind(process.stdout);
 for (const k of ['log','info','warn','error','debug','trace','dir','table']) console[k] = () => {};
 const report = {suite:'backend-independent-dev', commit:process.argv[2], startedAt:new Date().toISOString(), success:false, checks:[], cases:[], limitations:[], scope:'independent Oracle SELECT versus real tool dispatcher; four prepared-context HTTP checks; no live language-model or frontend test'};
@@ -20,7 +20,9 @@ const historical = {dateFrom:'01/01/2023',dateTo:'31/05/2023'};
 const isRemaining=process.argv.includes('--remaining');
 const isDiagnostic=process.argv.includes('--diagnostic');
 const isSolesOnly=process.argv.includes('--soles-only');
-report.stage=isSolesOnly?'soles-only':isDiagnostic?'diagnostic':isRemaining?'remaining':'initial';
+const isCurrency=process.argv.includes('--currency');
+report.stage=isCurrency?'currency-correction':isSolesOnly?'soles-only':isDiagnostic?'diagnostic':isRemaining?'remaining':'initial';
+if(isCurrency)report.scope='currency correction only; independent real PYG comparison and one HTTP; Oracle CTE currency fixtures with controlled SQL adapter; no real multicurrency member claim';
 report.diagnostics=[];
 let sessionId, opened=0,closed=0,closeErrors=0;
 let usagePeriod;
@@ -54,7 +56,7 @@ const discoverUsagePeriod=async()=>{
   usagePeriod=monthPeriod(s.F);return usagePeriod;
 };
 const run = async (code,fn) => {
-  if(isSolesOnly?!solesCases.has(code):isDiagnostic?!diagnosticCases.has(code):isRemaining&&!remainingCases.has(code))return;
+  if(isCurrency?!currencyCases.has(code):isSolesOnly?!solesCases.has(code):isDiagnostic?!diagnosticCases.has(code):isRemaining&&!remainingCases.has(code))return;
   operation='CASE_START';
   const start=Date.now();const index=report.checks.length;
   try {await fn();report.cases.push({code,status:'passed',durationMs:Date.now()-start});}
@@ -259,25 +261,9 @@ try {
   });
 
   await run('PURCHASES_VS_SALES_INDEPENDENT',async()=>{
-    const sample=(await sql("SELECT COD_CLIENTE C,COD_RUBRO R FROM VW_BOT_COMPRAS_SOCIO WHERE FECHA_COMPRA>=DATE '2023-01-01' AND FECHA_COMPRA<DATE '2023-06-01' AND COD_CLIENTE IS NOT NULL AND COD_RUBRO IS NOT NULL GROUP BY COD_CLIENTE,COD_RUBRO ORDER BY COD_CLIENTE,COD_RUBRO FETCH FIRST 1 ROWS ONLY"))[0];
-    if(!sample)missing('COMPARISON_FILTERED_SAMPLE_NOT_FOUND');
-    for(const monthly of [false,true]){
-      const b={c:str(sample.C),r:str(sample.R)};
-      const sales=await sql(`SELECT ${monthly?"TO_CHAR(FECHA,'YYYY-MM')":"NULL"} M,DES_MONEDA D,SIGLAS_MONEDA S,SUM(NVL(MONTO_TOTAL,0)) A FROM VW_BOT_VENTAS_LOCALES WHERE FECHA>=DATE '2023-01-01' AND FECHA<DATE '2023-06-01' AND COD_CLIENTE=:c AND COD_RUBRO=:r GROUP BY ${monthly?"TO_CHAR(FECHA,'YYYY-MM'),":''}DES_MONEDA,SIGLAS_MONEDA`,b);
-      const purchases=await sql(`SELECT ${monthly?"TO_CHAR(FECHA_COMPRA,'YYYY-MM')":"NULL"} M,MONEDA D,SIMBOLO_MONEDA S,SUM(NVL(IMPORTE,0)) A,COUNT(*) N,COUNT(DISTINCT COD_SOCIO) U FROM VW_BOT_COMPRAS_SOCIO WHERE FECHA_COMPRA>=DATE '2023-01-01' AND FECHA_COMPRA<DATE '2023-06-01' AND COD_CLIENTE=:c AND COD_RUBRO=:r GROUP BY ${monthly?"TO_CHAR(FECHA_COMPRA,'YYYY-MM'),":''}MONEDA,SIMBOLO_MONEDA`,b);
-      const expected=new Map();
-      for(const r of sales)expected.set(key(r.M,r.D,r.S),{m:r.M,d:r.D,s:r.S,sales:Number(r.A),purchases:0,n:0,u:0});
-      for(const r of purchases){const k=key(r.M,r.D,r.S);if(!expected.has(k))expected.set(k,{m:r.M,d:r.D,s:r.S,sales:0});Object.assign(expected.get(k),{purchases:Number(r.A),n:r.N,u:r.U});}
-      const got=await tool('compare_member_purchases_vs_sales',{...historical,customerIds:[b.c],categoryIds:[b.r],breakdownBy:monthly?['month']:[]});
-      check(got.results.length===expected.size&&got.results.every(g=>{
-        const r=expected.get(key(g.dimensions[0]?.id??null,g.currency.description,g.currency.symbol));
-        if(!r||!near(g.auditedSalesAmount,r.sales)||!near(g.exchangeAmount,r.purchases)||g.invoiceCount!==(r.n??0)||g.memberCount!==(r.u??0))return false;
-        const known=Boolean(str(r.d)?.trim())||['PYG','GS','GS.','₲','USD','US$','U$S'].includes(String(r.s??'').trim().toUpperCase());
-        return r.sales>0&&known?near(g.percentage,Math.round((r.purchases/r.sales*100+Number.EPSILON)*100)/100):g.percentage===null;
-      }),'COMPARISON_BOTH_UNIVERSES_CURRENCY_COUNTS_PERCENTAGE_SQL');
-      if(monthly)httpRequests.push({name:'compare_member_purchases_vs_sales',args:{...historical,customerIds:[b.c],categoryIds:[b.r],breakdownBy:['month']},result:got});
-      if(!sales.length)report.limitations.push('COMPARISON_SELECTED_FILTER_HAS_NO_SALES');
-    }
+    const {contrastRealComparison}=await import('./pr38-currency-controls.mjs');
+    const request=await contrastRealComparison({query:sql,tool,check,missing,mark:code=>{operation=code;}});
+    httpRequests.push(request);
   });
 
   await run('CAMPAIGN_THREE_PERIODS',async()=>{
@@ -357,24 +343,16 @@ try {
   });
 
   await run('COMPARISON_DOLLAR_COLLISION_ORACLE_CTE',async()=>{
-    const {compareMemberPurchasesVsSales}=await import('../src/services/members/memberPurchasesVsSales.service.js');
-    await withOracleProxySession(sessionId,async({connection})=>{
-      for(const reverse of [false,true]){
-        const base="SELECT 'DOLARES AMERICANOS' D,'$' S,100 A,20 P FROM DUAL UNION ALL SELECT 'DOLARES CANADIENSES','$',400,40 FROM DUAL UNION ALL SELECT CAST(NULL AS VARCHAR2(50)),'$',100,7 FROM DUAL";
-        const sales=(await connection.execute(`SELECT D CURRENCY_DESCRIPTION,S CURRENCY_SYMBOL,A SALES_AMOUNT FROM (${base}) ORDER BY P ${reverse?'DESC':'ASC'}`,{},{outFormat:4002})).rows;
-        const purchases=(await connection.execute(`SELECT D CURRENCY_DESCRIPTION,S CURRENCY_SYMBOL,P EXCHANGE_AMOUNT,1 INVOICE_COUNT,1 MEMBER_COUNT FROM (${base}) ORDER BY P ${reverse?'DESC':'ASC'}`,{},{outFormat:4002})).rows;
-        // SQL inputs are controlled Oracle CTE data, never described as a real
-        // member with several currencies. The service/SQL seam is explicit.
-        const got=await compareMemberPurchasesVsSales(historical,{execute:async text=>({rows:text.includes('VW_BOT_VENTAS_LOCALES')?sales:purchases})});
-        check(got.results.length===3&&got.results.find(r=>r.currency.description==='DOLARES AMERICANOS')?.percentage===20&&got.results.find(r=>r.currency.description==='DOLARES CANADIENSES')?.percentage===10&&got.results.find(r=>r.currency.description===null)?.percentage===null,'CONTROLLED_ORACLE_DOLLAR_GROUPS_BOTH_ORDERS');
-      }
-    });
+    operation='CURRENCY_CONTROLLED_ORACLE_CTE';
+    const {contrastCurrencyFixtures}=await import('./pr38-currency-controls.mjs');
+    await contrastCurrencyFixtures({query:sql,check});
   });
   await run('AFFECTED_AND_MISSING_POSITIVE_HTTP',async()=>{
+    operation='CURRENCY_AFFECTED_HTTP';
     budget();
     const {contrastPreparedHttp}=await import('./backend-independent-http.mjs');
     await contrastPreparedHttp({sessionId,requests:httpRequests,executeTool,check});
-    check(httpRequests.length===4,'FOUR_ORACLE_CONTRASTED_POSITIVE_HTTP_PROFILES');
+    check(httpRequests.length===(isCurrency?1:4),'EXPECTED_ORACLE_CONTRASTED_POSITIVE_HTTP_PROFILES');
   });
   report.coverageComplete=report.cases.every(c=>c.status==='passed');
   report.success=report.cases.every(c=>['passed','sample_missing'].includes(c.status))&&report.checks.every(c=>c.passed);

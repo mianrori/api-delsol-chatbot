@@ -23,6 +23,35 @@ const getCurrencyKey = ({ description, symbol }) => {
   return JSON.stringify([description ?? null, symbol ?? null]);
 };
 
+const currencyAliases = new Map([
+  ["PYG", ["PYG", "GS", "GS.", "₲", "GUARANI", "GUARANIES", "GUARANI PARAGUAYO", "GUARANIES PARAGUAYOS"]],
+  ["USD", ["USD", "US$", "U$S", "DOLAR", "DOLARES", "DOLAR AMERICANO", "DOLARES AMERICANOS", "DOLAR ESTADOUNIDENSE", "DOLARES ESTADOUNIDENSES", "US DOLLAR", "US DOLLARS", "UNITED STATES DOLLAR", "UNITED STATES DOLLARS"]],
+  ["CAD", ["CAD", "C$", "CA$", "DOLAR CANADIENSE", "DOLARES CANADIENSES", "CANADIAN DOLLAR", "CANADIAN DOLLARS"]],
+].flatMap(([code, aliases]) => aliases.map(alias => [alias, code])));
+
+const identifyCurrency = ({ description, symbol }) => {
+  const values = [description, symbol].map(value => normalizeText(value)
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " "));
+  const codes = values.map(value => currencyAliases.get(value) ?? null);
+  if (codes[0] && codes[1] && codes[0] !== codes[1]) {
+    return { code: null, status: "contradictory" };
+  }
+  // "$" is neutral, never a USD identifier. Every other nonempty field must
+  // be recognized; a known symbol cannot override an unknown description.
+  if (values.some((value, index) => value && value !== "$" && !codes[index]) || !codes.some(Boolean)) {
+    return { code: null, status: "ambiguous" };
+  }
+  return { code: codes[0] ?? codes[1], status: "identified" };
+};
+
+const percentageReasons = {
+  CURRENCY_AMBIGUOUS: "La moneda no está identificada de forma inequívoca; no se calcula el porcentaje.",
+  CURRENCY_CONTRADICTION: "La descripción y el símbolo indican monedas distintas; no se calcula el porcentaje.",
+  CURRENCY_INCOMPATIBLE: "Los canjes y las ventas indican monedas distintas para este grupo; no se comparan sus importes.",
+  CURRENCY_METADATA_MISMATCH: "No hay contraparte con la misma descripción y símbolo de moneda; no se unen alias ni se convierten importes.",
+  SALES_NOT_POSITIVE: "No hay ventas positivas en esta moneda para calcular el porcentaje.",
+};
+
 const buildDimensions = ({ row, breakdownBy }) => {
   return breakdownBy.map((type, index) => {
     const position = index + 1;
@@ -180,6 +209,13 @@ export const compareMemberPurchasesVsSales = async (args, connection) => {
    * Partimos de ventas porque representan el denominador.
    */
   const resultMap = new Map();
+  const salesCurrencies = new Map();
+  const purchaseCurrencies = new Map();
+  const rememberCurrency = (map, dimensions, currency) => {
+    const dimensionKey = getDimensionKey(dimensions);
+    if (!map.has(dimensionKey)) map.set(dimensionKey, new Map());
+    map.get(dimensionKey).set(getCurrencyKey(currency), identifyCurrency(currency));
+  };
 
   for (const row of repositoryResult.salesRows) {
     const dimensions = buildDimensions({
@@ -190,6 +226,7 @@ export const compareMemberPurchasesVsSales = async (args, connection) => {
     const currencyDescription = row.CURRENCY_DESCRIPTION ?? null;
 
     const currencySymbol = row.CURRENCY_SYMBOL ?? null;
+    rememberCurrency(salesCurrencies, dimensions, { description: currencyDescription, symbol: currencySymbol });
 
     const key = buildCompositeKey({
       dimensions,
@@ -231,6 +268,7 @@ export const compareMemberPurchasesVsSales = async (args, connection) => {
     const currencyDescription = row.CURRENCY_DESCRIPTION ?? null;
 
     const currencySymbol = row.CURRENCY_SYMBOL ?? null;
+    rememberCurrency(purchaseCurrencies, dimensions, { description: currencyDescription, symbol: currencySymbol });
 
     const key = buildCompositeKey({
       dimensions,
@@ -266,16 +304,33 @@ export const compareMemberPurchasesVsSales = async (args, connection) => {
     item.memberCount = Number(row.MEMBER_COUNT ?? 0);
   }
 
-  const calculatedResults = Array.from(resultMap.values()).map((item) => ({
-    ...item,
-
-    percentage:
-      item.auditedSalesAmount > 0 &&
-      (Boolean(normalizeText(item.currency.description)) ||
-        ["PYG", "GS", "GS.", "₲", "USD", "US$", "U$S"].includes(normalizeText(item.currency.symbol)))
-        ? roundPercentage((item.exchangeAmount / item.auditedSalesAmount) * 100)
-        : null,
-  }));
+  const calculatedResults = Array.from(resultMap.values()).map(item => {
+    const identity = identifyCurrency(item.currency);
+    let reasonCode = identity.status === "contradictory" ? "CURRENCY_CONTRADICTION"
+      : identity.status !== "identified" ? "CURRENCY_AMBIGUOUS" : null;
+    const dimensionKey = getDimensionKey(item.dimensions), currencyKey = getCurrencyKey(item.currency);
+    const sales = salesCurrencies.get(dimensionKey), purchases = purchaseCurrencies.get(dimensionKey);
+    // A missing counterpart must not become a calculated zero when the other
+    // source has a different/unknown currency for this same dimension. Genuine
+    // absence of all purchases still represents zero purchases in a known unit.
+    if (!reasonCode) {
+      const counterparts = !sales?.has(currencyKey) ? sales : !purchases?.has(currencyKey) ? purchases : null;
+      if (counterparts?.size) {
+        const identities = [...counterparts.values()];
+        reasonCode = identities.some(other => other.status !== "identified") ? "CURRENCY_AMBIGUOUS"
+          : identities.some(other => other.code === identity.code) ? "CURRENCY_METADATA_MISMATCH"
+            : "CURRENCY_INCOMPATIBLE";
+      }
+    }
+    if (!reasonCode && item.auditedSalesAmount <= 0) reasonCode = "SALES_NOT_POSITIVE";
+    return {
+      ...item,
+      currency: { ...item.currency, ...identity },
+      percentage: reasonCode ? null : roundPercentage((item.exchangeAmount / item.auditedSalesAmount) * 100),
+      percentageReasonCode: reasonCode,
+      percentageReason: reasonCode ? percentageReasons[reasonCode] : null,
+    };
+  });
 
   const sortedResult = sortResults({
     results: calculatedResults,
