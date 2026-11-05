@@ -44,7 +44,7 @@ el usuario. El reporte seguro es `logs/backend-pending-variants.json`.
 
 Se reutilizan por hash los trece bloques para sus perfiles y la corrección
 monetaria W; se verifica que `src`, configuración y dependencias no difieran de
-la base desplegada. Se comprobará cierre de conexiones en cada caso nuevo.
+la base desplegada. Cierre de conexiones comprobado en cada caso nuevo.
 
 ## Estado
 
@@ -80,7 +80,8 @@ asumía siempre `{data}` y fallaba antes del check del resumen. Se corrige solo 
 adaptador del control (`invoiceSummaryRows`), sin cambiar el servicio ni agrupar
 monedas. Dos regresiones adicionales consumen el servicio real con conexión
 controlada: objeto PYG único y lista PYG/USD separada; rechazan formatos ajenos.
-Seis pruebas enfocadas pasan localmente (cuatro previas y dos nuevas).
+Seis pruebas enfocadas pasan en Node 22/Docker (cuatro previas y dos nuevas),
+junto con el preflight completo de `255fd53`.
 
 Helper nuevo `logs/run-backend-pending-summary-dev.ps1`: ejecuta **solo el resumen
 de facturas por chapa**, con un SELECT independiente. Conserva por hash los
@@ -89,9 +90,24 @@ cuerpos y el código de aplicación no hayan cambiado. No vuelve a recorrer
 páginas, buscar contratos ambiguos ni consultar el proveedor bloqueado. La
 cohorte del nuevo resumen se descubre de nuevo: no se afirma que sea idéntica
 a la del recorrido anterior ni se suman sus checks como casos únicos.
-Resultado nuevo aún pendiente: `logs/backend-pending-invoice-summary.json`.
+Resultado del resumen: **6/6 aprobado sobre
+`255fd53ae31ffcf1c90b13923c5f7d977efd23fa`**, 05/11/2026
+20:37:55–20:37:56 UTC, caso de 690 ms. Importes y facturas distintas por moneda
+contra SELECT independiente, sin sumar grupos; identidad proxy, cierre por caso,
+cierre global y logout aprobados. 179 archivos candidatos coinciden; los cinco
+cuerpos de casos reutilizados y `src`/configuración/dependencias no cambiaron.
+`coverageComplete` corresponde solo al caso exclusivo, no al backend completo.
+
+Reporte local congelado `logs/backend-pending-invoice-summary-255fd53.json`,
+SHA-256 `419820e76b763afb31cc6d3ce74b8ef893e30e97951a0c5bee3bd6d22996deb1`.
+Su vínculo al reporte parcial coincide con el hash anterior. Logs desde antes
+del login hasta terminar el helper/logout: chatbot cero líneas y ERP dos; sin
+códigos Oracle/driver ni marcadores sensibles detectados. No se repiten los
+cinco bloques, las páginas, la muestra ausente ni la llamada pública bloqueada.
 
 Las cuatro muestras DEV conocidas de la matriz y las limitaciones específicas
 de G/R/T/V se conservan. Gráficos HTTP horizontal/circular/multiserie siguen como
 variante backend separada, sin Oracle nuevo ni UI. No hay hallazgo funcional de
-aplicación confirmado; esta corrección de pruebas se presenta en borrador.
+aplicación confirmado; la PR #39 sigue en borrador para revisión de la corrección
+y de la evidencia. No hay merge ni despliegue. El commit posterior de resultados
+modifica únicamente estos dos documentos; no requiere repetir controles.
