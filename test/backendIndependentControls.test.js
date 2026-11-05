@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {sameSolesType,monthPeriod,remainingCases} from '../scripts/backend-independent-control-values.mjs';
+import {sameSolesType,monthPeriod,remainingCases,diagnosticCases,purchaseSamples} from '../scripts/backend-independent-control-values.mjs';
 import {getMemberSoles} from '../src/services/soles/memberSoles.service.js';
 
 test('control compares contract numeric IDs without turning null or blank into zero',()=>{
@@ -25,4 +25,16 @@ test('available-month discovery derives actual calendar boundaries and rejects i
 test('remaining stage excludes every approved block and HTTP replay',()=>{
   assert.equal(remainingCases.size,5);
   for(const code of ['MEMBER_PROFILE','MEMBER_VEHICLES','PURCHASES_VS_SALES_INDEPENDENT','CAMPAIGN_THREE_PERIODS','INVOICE_FILTERS','CONTRACT_CONCEPTS_LATEST_INVOICE_COST','COMPARISON_DOLLAR_COLLISION_ORACLE_CTE','AFFECTED_AND_MISSING_POSITIVE_HTTP'])assert.equal(remainingCases.has(code),false);
+});
+
+test('diagnostic stage also excludes the newly approved usages and ranking',()=>{
+  assert.deepEqual([...diagnosticCases],['INDIVIDUAL_PURCHASES_TWO_MEMBERS','MEMBER_SOLES_HISTORY','VEHICLE_REGISTRATION_AGE_DISTINCTS']);
+});
+
+test('purchase discovery carries a local/category pair belonging to each sampled document',()=>{
+  const rows=[{COD_SOCIO:'A',C:'C1',R:'R1'},{COD_SOCIO:'A',C:'C2',R:'R2'},{COD_SOCIO:'B',C:'C3',R:'R3'},{COD_SOCIO:'C',C:null,R:'R4'}];
+  const before=structuredClone(rows),got=purchaseSamples(rows);
+  assert.deepEqual(got,[rows[1],rows[2]]);
+  assert.deepEqual(rows,before);
+  assert.equal(purchaseSamples([{COD_SOCIO:'A',C:'C1',R:null}]).length,0);
 });

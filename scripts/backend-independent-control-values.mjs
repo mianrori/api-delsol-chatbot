@@ -16,3 +16,5 @@ export function monthPeriod(date) {
 }
 
 export const remainingCases=new Set(['INDIVIDUAL_PURCHASES_TWO_MEMBERS','MEMBER_SOLES_HISTORY','SOLES_USAGE_COMBINED_FILTERS','SOLES_USAGE_MEMBER_RANKING','VEHICLE_REGISTRATION_AGE_DISTINCTS']);
+export const diagnosticCases=new Set(['INDIVIDUAL_PURCHASES_TWO_MEMBERS','MEMBER_SOLES_HISTORY','VEHICLE_REGISTRATION_AGE_DISTINCTS']);
+export const purchaseSamples=rows=>[...new Map(rows.filter(r=>r.COD_SOCIO!=null&&r.C!=null&&r.R!=null).map(r=>[String(r.COD_SOCIO),r])).values()].slice(0,2);

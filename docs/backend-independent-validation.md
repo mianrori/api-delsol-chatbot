@@ -1,9 +1,9 @@
 # Contrastes independientes restantes del backend
 
 Base: `ef9bff4`, PR #37 fusionada y desplegada. Rama separada:
-`test/backend-independent-controls-dev`. PR #38 en borrador. Estado: ejecución
-parcial revisada sobre `7762f35`; ocho bloques aprobados, dos fallidos y tres sin
-muestra en el período inicial. No se declara cerrado el backend.
+`test/backend-independent-controls-dev`. PR #38 en borrador. Estado: ocho bloques
+aprobados sobre `7762f35`, más usos y ranking sobre `6e6c423`; tres bloques de
+esta tanda siguen fallidos. No se declara cerrado el backend.
 
 ## Evidencia reutilizada
 
@@ -81,10 +81,42 @@ Docker. Cubren normalización numérica/nulos, respuesta controlada, límites re
 del mes y exclusión de los ocho bloques aprobados. No se repiten las 10+1 pruebas
 previas porque el código de aplicación y el puente HTTP permanecen iguales.
 
-El nuevo helper `logs/run-backend-independent-remaining-dev.ps1` usa `--remaining`.
-Reutiliza los ocho bloques por SHA del reporte y verifica que `src/`, configuración
-y dependencias sean idénticos a `7762f35`. No suma sus comprobaciones al nuevo total
-ni reutiliza los dos fallos como aprobados. Aún pendiente de ejecutar/revisar.
+El helper `logs/run-backend-independent-remaining-dev.ps1` ejecutó únicamente
+los cinco pendientes. Reutilizó los ocho bloques por SHA del reporte y comprobó
+que `src/`, configuración y dependencias eran idénticos a `7762f35`.
+
+## Continuación revisada sobre `6e6c423`
+
+Reporte local `backend-independent-6e6c423.json`: cinco bloques, dos aprobados y
+tres fallidos; global fallida (**18/20 checks verdaderos**, no sumar con N).
+Duración 63,795 s; 176 archivos candidatos idénticos, cierre completo y logout
+propio aprobados. La referencia al reporte de `7762f35` coincide por SHA-256.
+
+| Caso | Resultado y alcance |
+| --- | --- |
+| Usos de soles | Aprobado en octubre de 2023: socio, movimiento, tipo/código de destino, tipo de sol, rubro, transacción, cantidad; suma, movimientos, transacciones y socios distintos por tipo; conteo del detalle. No suma distintos entre grupos. |
+| Ranking de usos | Aprobado en octubre de 2023: orden y límite de socios y desglose por tipo contra Oracle independiente. La muestra devuelve cuatro socios; no inventa el quinto. |
+| Compras | NJS-123 después de 60,848 s en `PURCHASE_FILTER_PAIR_DISCOVERY`, no en el descubrimiento inicial ya acotado. No hay conciliación aprobada. La siguiente revisión reutiliza local/rubro de cada fila muestreada y elimina ese segundo agregado/ordenamiento de descubrimiento. |
+| Saldo de soles | Falla nuevamente `all` sin ventanas. Difieren número de grupos, generado, saldo y conteos; la equivalencia numérica del tipo **no** lo resuelve. No atribuir el fallo únicamente a ceros/espacios ni modificar importes para hacerlo pasar. |
+| Edades/únicos de vehículos | Ya existe muestra de julio de 2025, pero falla el primer contraste de edades. No es una limitación de muestra ausente. Hace falta separar discrepancia del control JS de un fallo del servicio. |
+
+La continuación no cambió código de aplicación. La próxima etapa de diagnóstico
+ejecuta únicamente compras, saldo y edades. En soles captura SQL/binds/resultados
+solo en memoria para comparar el control, el servicio directo sobre **la misma
+conexión**, el resultado SQL anterior al mapeo y el dispatcher. Publica únicamente
+indicadores de coincidencia y cantidades de grupos, no documentos ni importes.
+
+En edades añade un censo Oracle independiente con búsqueda correlacionada de fecha
+de nacimiento y conteos globales separados. Conserva el calendario/Map de JS como
+diagnóstico: no debe sustituir la semántica de DATE/CHAR y DISTINCT de Oracle.
+Todavía no se declara corregida la discrepancia; se exige coincidencia con ese
+censo. Los conteos distintos globales se calculan aparte, nunca sumando grupos.
+
+Dos pruebas nuevas del muestreo y la selección de los tres casos pasan en Node 22
+Docker. Las cuatro anteriores conservan su evidencia; no se repitieron los bloques
+Oracle/HTTP aprobados. Helper preparado: `logs/run-backend-independent-diagnostic-dev.ps1`.
+Conserva por hash ambos reportes previos y verifica el código de aplicación sin
+cambios. Pendiente de ejecutar/revisar; la PR conserva el borrador.
 
 ## Alcance del ejecutor
 

@@ -1,6 +1,6 @@
 // Read-only DEV contrasts. Business rows and session identity stay in memory.
 // Invoked by the local hidden-input helper, never with a session in argv/env.
-import {sameSolesType,monthPeriod,remainingCases} from './backend-independent-control-values.mjs';
+import {sameSolesType,monthPeriod,remainingCases,diagnosticCases,purchaseSamples} from './backend-independent-control-values.mjs';
 const emit = process.stdout.write.bind(process.stdout);
 for (const k of ['log','info','warn','error','debug','trace','dir','table']) console[k] = () => {};
 const report = {suite:'backend-independent-dev', commit:process.argv[2], startedAt:new Date().toISOString(), success:false, checks:[], cases:[], limitations:[], scope:'independent Oracle SELECT versus real tool dispatcher; four prepared-context HTTP checks; no live language-model or frontend test'};
@@ -18,7 +18,8 @@ const sort = a => a.map(v=>JSON.stringify(v)).sort();
 const df = "TO_DATE(:f,'DD/MM/YYYY')", dt = "TO_DATE(:t,'DD/MM/YYYY')+1";
 const historical = {dateFrom:'01/01/2023',dateTo:'31/05/2023'};
 const isRemaining=process.argv.includes('--remaining');
-report.stage=isRemaining?'remaining':'initial';
+const isDiagnostic=process.argv.includes('--diagnostic');
+report.stage=isDiagnostic?'diagnostic':isRemaining?'remaining':'initial';
 report.diagnostics=[];
 let sessionId, opened=0,closed=0,closeErrors=0;
 let usagePeriod;
@@ -52,7 +53,7 @@ const discoverUsagePeriod=async()=>{
   usagePeriod=monthPeriod(s.F);return usagePeriod;
 };
 const run = async (code,fn) => {
-  if(isRemaining&&!remainingCases.has(code))return;
+  if(isDiagnostic?!diagnosticCases.has(code):isRemaining&&!remainingCases.has(code))return;
   operation='CASE_START';
   const start=Date.now();const index=report.checks.length;
   try {await fn();report.cases.push({code,status:'passed',durationMs:Date.now()-start});}
@@ -93,14 +94,15 @@ try {
 
   await run('INDIVIDUAL_PURCHASES_TWO_MEMBERS',async()=>{
     operation='PURCHASE_BOUNDED_SAMPLE_DISCOVERY';
-    const pool=await sql("SELECT COD_SOCIO FROM VW_BOT_COMPRAS_SOCIO WHERE FECHA_COMPRA>=DATE '2023-01-01' AND FECHA_COMPRA<DATE '2023-06-01' AND COD_SOCIO IS NOT NULL AND ROWNUM<=100");
-    const docs=[...new Map(pool.map(r=>[str(r.COD_SOCIO),r])).values()].slice(0,2);
-    if(docs.length===1){const next=(await sql("SELECT COD_SOCIO FROM VW_BOT_COMPRAS_SOCIO WHERE FECHA_COMPRA>=DATE '2023-01-01' AND FECHA_COMPRA<DATE '2023-06-01' AND COD_SOCIO IS NOT NULL AND COD_SOCIO<>:d AND ROWNUM<=1",{d:str(docs[0].COD_SOCIO)}))[0];if(next)docs.push(next);}
+    const pool=await sql("SELECT COD_SOCIO,COD_CLIENTE C,COD_RUBRO R FROM VW_BOT_COMPRAS_SOCIO WHERE FECHA_COMPRA>=DATE '2023-01-01' AND FECHA_COMPRA<DATE '2023-06-01' AND COD_SOCIO IS NOT NULL AND COD_CLIENTE IS NOT NULL AND COD_RUBRO IS NOT NULL AND ROWNUM<=100");
+    const docs=purchaseSamples(pool);
+    if(docs.length===1){const next=(await sql("SELECT COD_SOCIO,COD_CLIENTE C,COD_RUBRO R FROM VW_BOT_COMPRAS_SOCIO WHERE FECHA_COMPRA>=DATE '2023-01-01' AND FECHA_COMPRA<DATE '2023-06-01' AND COD_SOCIO IS NOT NULL AND COD_CLIENTE IS NOT NULL AND COD_RUBRO IS NOT NULL AND COD_SOCIO<>:d AND ROWNUM<=1",{d:str(docs[0].COD_SOCIO)}))[0];if(next)docs.push(next);}
     if(docs.length<2)missing('TWO_POSITIVE_PURCHASE_MEMBERS_NOT_FOUND');
     for(const sample of docs){
       const d=str(sample.COD_SOCIO);
-      operation='PURCHASE_FILTER_PAIR_DISCOVERY';
-      const combos=await sql("SELECT COD_CLIENTE C,COD_RUBRO R FROM VW_BOT_COMPRAS_SOCIO WHERE COD_SOCIO=:d AND FECHA_COMPRA>=DATE '2023-01-01' AND FECHA_COMPRA<DATE '2023-06-01' AND COD_CLIENTE IS NOT NULL AND COD_RUBRO IS NOT NULL GROUP BY COD_CLIENTE,COD_RUBRO ORDER BY COD_CLIENTE,COD_RUBRO FETCH FIRST 1 ROWS ONLY",{d});
+      // The bounded sample already carries a real local/category pair for this
+      // document. Do not regroup the entire underlying view just to discover it.
+      operation='PURCHASE_SAMPLED_FILTER_PAIR';const combos=[{C:sample.C,R:sample.R}];
       for(const filter of [null,combos[0]].filter(v=>v!==undefined)){
         const binds={d,f:historical.dateFrom,t:historical.dateTo,...(filter?{c:str(filter.C),r:str(filter.R)}:{})};
         const where=`COD_SOCIO=:d AND FECHA_COMPRA>=${df} AND FECHA_COMPRA<${dt}${filter?' AND COD_CLIENTE=:c AND COD_RUBRO=:r':''}`;
@@ -143,6 +145,26 @@ try {
       const match=matchType=>got.data.length===rows.length&&rows.every(r=>got.data.some(g=>matchType(g.typeId,r.T)&&near(g.generatedAmount,r.G)&&near(g.balance,r.B)&&g.recordCount===r.N));
       const component=fn=>rows.every(r=>got.data.some(g=>sameSolesType(g.typeId,r.T)&&fn(g,r)));
       report.diagnostics.push({code:'SOLES_COMPARISON_COMPONENTS',status,filtered,groupCountMatches:got.data.length===rows.length,rawTypeAndTotalsMatch:match((a,b)=>str(a)===str(b)),numericTypeAndTotalsMatch:match(sameSolesType),numericTypeGroupsMatch:component(()=>true),generatedAmountsMatch:component((g,r)=>near(g.generatedAmount,r.G)),balancesMatch:component((g,r)=>near(g.balance,r.B)),recordCountsMatch:component((g,r)=>g.recordCount===r.N)});
+      if(!match(sameSolesType)){
+        operation='SOLES_SAME_CONNECTION_DIAGNOSTIC';
+        const {getMemberSoles}=await import('../src/services/soles/memberSoles.service.js');
+        await withOracleProxySession(sessionId,async({connection})=>{
+          const statement=`SELECT COD_TIPO_SOL T,SUM(NVL(TOTAL,0)) G,SUM(NVL(SALDO,0)) B,COUNT(*) N FROM VW_BOT_SOLES_GENERADOS WHERE ${where} GROUP BY COD_TIPO_SOL`;
+          const before=(await connection.execute(statement,{d},{outFormat:4002,maxRows:10001})).rows;
+          const calls=[];
+          const args={documentNumber:d,status,referenceDate:'30/06/2023',useCurrentGenerationPeriod:false,...(filtered?{generationDateFrom:'01/01/2023',generationDateTo:'31/05/2023',expirationDateFrom:'01/01/2023',expirationDateTo:'31/12/2023'}:{})};
+          const direct=await getMemberSoles(args,{execute:async(text,binds,options)=>{
+            const result=await connection.execute(text,binds,options);
+            calls.push({documentBindExact:String(binds.documentNumber)===d,documentBindTrimmed:String(binds.documentNumber)===d.trim(),groupedByType:/GROUP BY\s+COD_TIPO_SOL\s*(?:ORDER|$)/i.test(text),hasUnexpectedDateFilter:status==='all'&&!filtered&&/TO_DATE/.test(text),objectRows:!result.rows?.length||!Array.isArray(result.rows[0]),rows:result.rows});
+            return result;
+          }});
+          const after=(await connection.execute(statement,{d},{outFormat:4002,maxRows:10001})).rows;
+          const compare=(a,b)=>a.length===b.length&&a.every(r=>b.some(x=>sameSolesType(r.T,x.T)&&near(r.G,x.G)&&near(r.B,x.B)&&r.N===x.N));
+          const fromMapped=result=>result.data.map(g=>({T:g.typeId,G:g.generatedAmount,B:g.balance,N:g.recordCount}));
+          const captured=calls[0]?.rows?.map(r=>({T:r.TYPE_ID,G:r.GENERATED_AMOUNT,B:r.BALANCE,N:r.RECORD_COUNT}))??[];
+          report.diagnostics.push({code:'SOLES_SAME_CONNECTION_TRACE',status,filtered,sampleDocumentHasOuterWhitespace:d!==d.trim(),independentGroupCount:before.length,toolGroupCount:got.data.length,directGroupCount:direct.data.length,capturedQueryCount:calls.length,defaultFormatObjectRows:calls.every(c=>c.objectRows),documentBindsExact:calls.every(c=>c.documentBindExact),documentBindsTrimmed:calls.every(c=>c.documentBindTrimmed),queryGroupedByType:calls.every(c=>c.groupedByType),unexpectedDateFilter:calls.some(c=>c.hasUnexpectedDateFilter),independentStable:compare(before,after),capturedSqlMatchesIndependent:compare(before,captured),mappedDirectMatchesCaptured:compare(captured,fromMapped(direct)),mappedDirectMatchesIndependent:compare(before,fromMapped(direct)),dispatcherMatchesDirect:compare(fromMapped(direct),fromMapped(got))});
+        });
+      }
       check(match(sameSolesType),'SOLES_TYPE_BALANCE_EXPIRY_GENERATION_SQL');
       if(status==='current')check(near(got.summary.currentBalance,rows.reduce((n,r)=>n+Number(r.B),0))&&got.summary.recordCount===rows.reduce((n,r)=>n+r.N,0),'SOLES_GLOBAL_BALANCE_RECORD_COUNT_SQL');
     }
@@ -204,17 +226,29 @@ try {
       return age>=0&&age<=120?age:null;
     };
     const totals=records=>({vehicleCount:records.length,plateCount:new Set(records.map(r=>str(r.P)?.trim().toUpperCase()).filter(Boolean)).size,memberCount:new Set(records.map(r=>str(r.D)).filter(v=>v!==null)).size});
+    const sourceWhere=`V.ACTIVO='S' AND V.FECHA_ALTA>=${df} AND V.FECHA_ALTA<${dt}`;
+    const global=(await sql(`SELECT COUNT(*) N,COUNT(DISTINCT UPPER(TRIM(V.MATRICULA))) P,COUNT(DISTINCT V.COD_SOCIO) U FROM VW_BOT_VEHICULOS V WHERE ${sourceWhere}`,bounds))[0];
+    const oracleTotals={vehicleCount:Number(global.N),plateCount:Number(global.P),memberCount:Number(global.U)};
     for(const ageReference of ['current','registration']){
       const groups=new Map();
       for(const r of rows){const person=people.get(str(r.D)),age=ageAt(person?.N===1?person.B:null,ageReference==='registration'?r.F:reference);const k=key(age);if(!groups.has(k))groups.set(k,{age,rows:[]});groups.get(k).rows.push(r);}
       operation='VEHICLE_TOOL_AGE_SUMMARY';const got=await tool('get_vehicle_registrations',{...period,groupBy:['age'],ageReference,referenceDate:period.dateTo});
-      check(equal(got.totals,totals(rows))&&got.data.length===groups.size&&got.data.every(g=>{const r=groups.get(key(g.age));return r&&equal({vehicleCount:g.vehicleCount,plateCount:g.plateCount,memberCount:g.memberCount},totals(r.rows));}),'VEHICLE_AGE_REFERENCE_DISTINCTS_NULLS_SQL');
+      const calendarMatches=equal(got.totals,totals(rows))&&got.data.length===groups.size&&got.data.every(g=>{const r=groups.get(key(g.age));return r&&equal({vehicleCount:g.vehicleCount,plateCount:g.plateCount,memberCount:g.memberCount},totals(r.rows));});
+      // Independent census uses a correlated birth-date lookup, rather than the
+      // repository's joined CTE. Oracle itself owns DATE/CHAR and DISTINCT
+      // semantics; a JavaScript Map/calendar is a diagnostic, not its substitute.
+      operation='VEHICLE_INDEPENDENT_ORACLE_AGE_CENSUS';
+      const at=ageReference==='registration'?'F':"TO_DATE(:a,'DD/MM/YYYY')",age=`TRUNC(MONTHS_BETWEEN(${at},B)/12)`;
+      const census=await sql(`WITH cohort AS (SELECT V.COD_SOCIO D,V.MATRICULA P,V.FECHA_ALTA F,(SELECT CASE WHEN MIN(S.FECHA_NACIMIENTO)=MAX(S.FECHA_NACIMIENTO) THEN MIN(S.FECHA_NACIMIENTO) END FROM VW_BOT_SOCIOS S WHERE S.COD_SOCIO=V.COD_SOCIO) B FROM VW_BOT_VEHICULOS V WHERE ${sourceWhere}), aged AS (SELECT D,P,CASE WHEN B<=${at} AND ${age} BETWEEN 0 AND 120 THEN ${age} END A FROM cohort) SELECT A,COUNT(*) N,COUNT(DISTINCT UPPER(TRIM(P))) P,COUNT(DISTINCT D) U FROM aged GROUP BY A`,{...bounds,...(ageReference==='current'?{a:period.dateTo}:{})});
+      const oracleMatches=equal(got.totals,oracleTotals)&&got.data.length===census.length&&census.every(r=>got.data.some(g=>g.age===(r.A??null)&&g.vehicleCount===Number(r.N)&&g.plateCount===Number(r.P)&&g.memberCount===Number(r.U)));
+      report.diagnostics.push({code:'VEHICLE_AGE_CONTROL_COMPONENTS',ageReference,javascriptGlobalTotalsMatchOracle:equal(totals(rows),oracleTotals),javascriptCalendarMatchesTool:calendarMatches,toolGlobalTotalsMatchOracle:equal(got.totals,oracleTotals),oracleCensusMatchesTool:oracleMatches,independentGroupCount:census.length,toolGroupCount:got.data.length});
+      check(oracleMatches,'VEHICLE_AGE_REFERENCE_DISTINCTS_NULLS_SQL');
     }
     const sample=rows.find(r=>r.B&&r.M&&r.C&&['S','N'].includes(r.A));
     if(sample){
-      const filtered=rows.filter(r=>['B','M','C'].every(k=>str(r[k])?.trim().toUpperCase()===str(sample[k]).trim().toUpperCase())&&r.A===sample.A);
+      const filtered=(await sql(`SELECT COUNT(*) N,COUNT(DISTINCT UPPER(TRIM(V.MATRICULA))) P,COUNT(DISTINCT V.COD_SOCIO) U FROM VW_BOT_VEHICULOS V WHERE ${sourceWhere} AND UPPER(TRIM(V.MARCA))=:b AND UPPER(TRIM(V.MODELO))=:m AND UPPER(TRIM(V.COLOR))=:c AND UPPER(TRIM(V.DEBITO_AUTOMATICO))=:a`,{...bounds,b:sample.B.trim().toUpperCase(),m:sample.M.trim().toUpperCase(),c:sample.C.trim().toUpperCase(),a:sample.A}))[0];
       operation='VEHICLE_TOOL_COMBINED_DETAIL';const got=await tool('get_vehicle_registrations',{...period,brand:sample.B,model:sample.M,color:sample.C,automaticDebit:sample.A==='S',mode:'detail',rows:pageRows});
-      check(equal(got.totals,totals(filtered))&&got.pagination.totalRows===filtered.length&&got.data.length===Math.min(pageRows,filtered.length),'VEHICLE_COMBINED_FILTER_DETAIL_SQL');
+      check(equal(got.totals,{vehicleCount:Number(filtered.N),plateCount:Number(filtered.P),memberCount:Number(filtered.U)})&&got.pagination.totalRows===Number(filtered.N)&&got.data.length===Math.min(pageRows,Number(filtered.N)),'VEHICLE_COMBINED_FILTER_DETAIL_SQL');
     }else report.limitations.push('VEHICLE_FULL_FILTER_SAMPLE_NOT_FOUND');
     report.limitations.push('VEHICLE_RELATIVE_PERIOD_ORACLE_BOUNDARIES_NOT_IN_THIS_CONTRAST');
   });
