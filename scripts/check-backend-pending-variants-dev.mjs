@@ -1,5 +1,5 @@
 // Read-only pending variants only. No credentials, identities or business rows in output.
-import {near,multisetEqual,relativeBounds,validPage,invoiceTuple,safeTechnicalCode,day} from './backend-pending-variant-controls.mjs';
+import {near,multisetEqual,relativeBounds,validPage,invoiceTuple,invoiceSummaryRows,safeTechnicalCode,day} from './backend-pending-variant-controls.mjs';
 import {sameSolesType} from './backend-independent-control-values.mjs';
 const emit=process.stdout.write.bind(process.stdout);
 for(const k of ['log','info','warn','error','debug','trace','dir','table'])console[k]=()=>{};
@@ -17,7 +17,9 @@ const deadline=Date.now()+8*60*1000;
 const budget=()=>{if(Date.now()>deadline)throw Object.assign(Error(),{blocked:'EIGHT_MINUTE_BUDGET_EXHAUSTED'});};
 const query=(sql,binds={})=>withOracleProxySession(sessionId,async({connection})=>{budget();if(!/^\s*(SELECT|WITH)\b/i.test(sql))throw Error();const r=(await connection.execute(sql,binds,{outFormat:4002,maxRows:10001})).rows;if(r.length>10000)throw Object.assign(Error(),{blocked:'CONTROL_ROW_LIMIT_EXCEEDED'});return r;});
 const tool=(name,args)=>{budget();return executeTool({name,arguments:args,context:{sessionId}});};
-async function run(code,fn){operation='DISCOVERY';const t=Date.now();try{await fn();report.cases.push({code,status:'passed',durationMs:Date.now()-t});}catch(e){const reason=e.missing??e.blocked??safeTechnicalCode(e);report.cases.push({code,status:e.missing?'sample_missing':e.blocked?'not_run':'failed',reason,operation,durationMs:Date.now()-t});if(e.missing||e.blocked)report.limitations.push(reason);}check(opened===closed&&!closeErrors,'ORACLE_CONNECTIONS_CLOSED_AFTER_CASE');}
+const summaryOnly=process.argv.includes('--invoice-summary-only');
+report.stage=summaryOnly?'invoice-summary-only':'initial';
+async function run(code,fn){if(summaryOnly&&code!=='INVOICE_PLATE_COMPLETE_BOUNDED_TRAVERSAL')return;operation='DISCOVERY';const t=Date.now();try{await fn();report.cases.push({code:summaryOnly?'INVOICE_PLATE_CURRENCY_SUMMARY':code,status:'passed',durationMs:Date.now()-t});}catch(e){const reason=e.missing??e.blocked??safeTechnicalCode(e);report.cases.push({code:summaryOnly?'INVOICE_PLATE_CURRENCY_SUMMARY':code,status:e.missing?'sample_missing':e.blocked?'not_run':'failed',reason,operation,durationMs:Date.now()-t});if(e.missing||e.blocked)report.limitations.push(reason);}check(opened===closed&&!closeErrors,'ORACLE_CONNECTIONS_CLOSED_AFTER_CASE');}
 try{
  check(/^[a-f0-9]{40}$/.test(report.commit??''),'SOURCE_COMMIT_PRESENT');
  check(config.env==='development'&&!config.piiDebugShowRaw&&!config.bedrockDebugPayloads,'DEV_SAFE_CONFIGURATION');
@@ -44,10 +46,10 @@ try{
   if(!samples.length)missing('BOUNDED_INVOICE_PLATE_COHORT_NOT_FOUND');
   const s=samples[0],f=s.D,b={c:str(s.C),f,p:'%'+s.P+'%'};
   const where="NVL(USER_CAN_CONSULT,'S')<>'N' AND COD_CLIENTE=:c AND FECHA_EMISION>=TO_DATE(:f,'DD/MM/YYYY') AND FECHA_EMISION<TO_DATE(:f,'DD/MM/YYYY')+1 AND REPLACE(REPLACE(UPPER(MATRICULA),'-',''),' ','') LIKE :p";
+  if(!summaryOnly){
   const expected=await query(`SELECT NRO_FACTURA N,COD_CLIENTE C,COD_CONCEPTO K,SIMBOLO_MONEDA S,IMPORTE A,CANTIDAD Q,IVA V,MATRICULA P FROM VW_BOT_FACTURAS WHERE ${where}`,b);
   if(expected.length<3||expected.length>20)missing('INVOICE_PARTIAL_PLATE_COHORT_OUTSIDE_BUDGET');
   const counts=(await query(`SELECT COUNT(*) N,COUNT(DISTINCT NRO_FACTURA) I FROM VW_BOT_FACTURAS WHERE ${where}`,b))[0];
-  const groups=await query(`SELECT SIMBOLO_MONEDA S,SUM(IMPORTE) A,COUNT(DISTINCT NRO_FACTURA) I FROM VW_BOT_FACTURAS WHERE ${where} GROUP BY SIMBOLO_MONEDA`,b);
   const symbol=v=>['PYG','GS','GS.','GUARANI','GUARANIES'].includes(str(v)?.trim().toUpperCase())?'₲':v;
   const args={customerIds:[str(s.C)],dateFrom:f,dateTo:f,plate:str(s.P).toLowerCase().split('').join(' - ')};
   const size=Math.min(2,Number.isSafeInteger(Number(config.limitFilter))&&Number(config.limitFilter)>0?Number(config.limitFilter):2);
@@ -57,8 +59,13 @@ try{
    check(validPage(p,page,size,counts.N,counts.I),'INVOICE_REAL_COUNT_NEXT_PAGE_AND_END');accumulated.push(...p.data);
   }
   check(multisetEqual(accumulated.map(invoiceTuple),expected.map(r=>[r.N,str(r.C),str(r.K),symbol(r.S),r.A,r.Q,r.V,r.P])),'INVOICE_COMPLETE_DETAIL_MULTISET_SQL');
-  const summary=await tool('get_invoices',{...args,mode:'summary'});
-  check(summary.data.length===groups.length&&groups.every(r=>summary.data.some(g=>g.currencySymbol===symbol(r.S)&&near(g.totalAmount,r.A)&&g.invoiceCount===r.I)),'INVOICE_PLATE_CURRENCY_TOTALS_DISTINCT_INVOICES_SQL');
+  }
+  operation='INVOICE_INDEPENDENT_CURRENCY_SUMMARY';
+  const groups=await query(`SELECT SIMBOLO_MONEDA S,SUM(IMPORTE) A,COUNT(DISTINCT NRO_FACTURA) I FROM VW_BOT_FACTURAS WHERE ${where} GROUP BY SIMBOLO_MONEDA`,b);
+  const symbol=v=>['PYG','GS','GS.','GUARANI','GUARANIES'].includes(str(v)?.trim().toUpperCase())?'₲':v;
+  const args={customerIds:[str(s.C)],dateFrom:f,dateTo:f,plate:str(s.P).toLowerCase().split('').join(' - ')};
+  const summary=invoiceSummaryRows(await tool('get_invoices',{...args,mode:'summary'}));
+  check(summary.length===groups.length&&groups.every(r=>summary.some(g=>g.currencySymbol===symbol(r.S)&&(r.A==null?g.totalAmount==null:near(g.totalAmount,r.A))&&g.invoiceCount===r.I)),'INVOICE_PLATE_CURRENCY_TOTALS_DISTINCT_INVOICES_SQL');
  });
 
  await run('POSITIVE_SOLES_COMBINED_WINDOWS',async()=>{

@@ -48,8 +48,50 @@ la base desplegada. Se comprobará cierre de conexiones en cada caso nuevo.
 
 ## Estado
 
-Contrastes DEV aún no ejecutados. No hay resultados nuevos acreditados ni
-hallazgo funcional confirmado. Las cuatro muestras DEV conocidas de la matriz
-y las limitaciones específicas de G/R/T/V se conservan. Los gráficos HTTP
-horizontal/circular/multiserie quedan como variante backend separada; no se
-reabren sus unitarias ni se incluye la UI.
+Ejecución `cafc5f11c34e7b19e538dc55de5feaeb61256dbb`, 05/11/2026
+20:24:10–20:24:45 UTC, **global fallida**. Cinco bloques aprobados, dos fallidos,
+uno sin muestra; sus 37 checks verdaderos **no equivalen a suite aprobada**.
+179 archivos candidatos coinciden; cierre tras cada caso, cierre global y logout
+de la sesión creada aprobados. `src`, configuración y dependencias sin cambios
+respecto de `30ffab4`. No se volvieron a ejecutar los trece bloques históricos.
+
+| Contraste | Resultado atribuido a `cafc5f1` |
+| --- | --- |
+| Chapa única/ausente | Aprobado, dueño y campos del vehículo contra SELECT, ausencia sin dueño. No chapa compartida. |
+| Facturación por chapa | Parcial: tres páginas comprobadas (incluida la posterior vacía), metadatos y multiconjunto completo contra SELECT aprobados. Falla después, al leer el resumen como lista cuando es un único objeto; no aprueba el bloque completo. |
+| Soles con ventanas combinadas positivas | Aprobado: filas reales para todos, vigentes al vencimiento y vencidos al día siguiente; cantidades, tipos, generado y saldo. Fechas descubiertas, no las tres ventanas históricas vacías de V. |
+| Dos socios promocionales distintos | Aprobado: identidad exacta, períodos descubiertos, conteos e importes por pareja monetaria contra SQL; no constituye muestra multimoneda. |
+| Cinco períodos relativos de vehículos | Aprobado: límites Asunción y distintos globales contra SQL. Hoy/ayer/semana/mes vacíos; año con filas. No sumar distintos de períodos. |
+| Condiciones sin contrato | Aprobado: ausencia SQL y `NOT_FOUND` sin importes. |
+| Condiciones ambiguas | `sample_missing`: la búsqueda de 2–20 contratos CNT activos por cliente no devolvió cohorte. No se declara ausencia de toda ambigüedad posible ni se reutiliza incidencia como prueba de este endpoint. |
+| Conversión real de costo | Fallo durante la llamada al proveedor. Diagnóstico posterior sin sesión ni Oracle reproduce `PROVIDER_TIMEOUT` a los ocho segundos desde Docker. Pendiente externo; no hay tasa/importe aprobado ni bug aritmético demostrado. |
+
+Reporte congelado local `logs/backend-pending-variants-cafc5f1.json`, SHA-256
+`52886678e0945d2b55130659f5b79df76ed8a9338599645acaf9e762d24d8b2b`.
+Logs del intervalo ampliado para incluir login/logout: chatbot cero líneas,
+ERP dos, sin códigos Oracle/driver ni marcadores de campos sensibles. Solo se
+inspeccionaron metadatos, sin publicar líneas crudas.
+
+## Corrección del control y continuación mínima
+
+El servicio de facturas tiene un contrato existente: sin dimensiones, cero/un
+grupo monetario devuelve un objeto; varios grupos devuelven `{data}`. El control
+asumía siempre `{data}` y fallaba antes del check del resumen. Se corrige solo el
+adaptador del control (`invoiceSummaryRows`), sin cambiar el servicio ni agrupar
+monedas. Dos regresiones adicionales consumen el servicio real con conexión
+controlada: objeto PYG único y lista PYG/USD separada; rechazan formatos ajenos.
+Seis pruebas enfocadas pasan localmente (cuatro previas y dos nuevas).
+
+Helper nuevo `logs/run-backend-pending-summary-dev.ps1`: ejecuta **solo el resumen
+de facturas por chapa**, con un SELECT independiente. Conserva por hash los
+cinco bloques aprobados y los checks parciales del recorrido; comprueba que sus
+cuerpos y el código de aplicación no hayan cambiado. No vuelve a recorrer
+páginas, buscar contratos ambiguos ni consultar el proveedor bloqueado. La
+cohorte del nuevo resumen se descubre de nuevo: no se afirma que sea idéntica
+a la del recorrido anterior ni se suman sus checks como casos únicos.
+Resultado nuevo aún pendiente: `logs/backend-pending-invoice-summary.json`.
+
+Las cuatro muestras DEV conocidas de la matriz y las limitaciones específicas
+de G/R/T/V se conservan. Gráficos HTTP horizontal/circular/multiserie siguen como
+variante backend separada, sin Oracle nuevo ni UI. No hay hallazgo funcional de
+aplicación confirmado; esta corrección de pruebas se presenta en borrador.

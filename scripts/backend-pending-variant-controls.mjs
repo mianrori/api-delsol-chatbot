@@ -18,4 +18,11 @@ export function validPage(p, page, rows, total, invoices) {
   return p.page===page && p.rows===rows && p.totalRows===total && p.totalInvoices===invoices && p.totalPages===pages && p.returnedRows===p.data.length && p.data.length===Math.min(rows,Math.max(0,total-(page-1)*rows)) && p.hasMore===more && p.nextPage===(more?page+1:null);
 }
 export const invoiceTuple = r => [r.invoiceNumber,String(r.customer.customerId),String(r.concept.conceptId),r.currencySymbol,r.amount,r.quantity,r.vatAmount,r.plate];
+// The established invoice contract returns a scalar for zero/one monetary
+// group without dimensions, and {data} for multiple groups. Never merge them.
+export function invoiceSummaryRows(result) {
+  if (Array.isArray(result?.data)) return result.data;
+  if (result && Object.hasOwn(result,'invoiceCount') && Object.hasOwn(result,'currencySymbol')) return [result];
+  throw Error('INVOICE_SUMMARY_SHAPE_INVALID');
+}
 export const safeTechnicalCode = e => /^(ORA-\d{5}|NJS-\d{3}|DPI-\d{4})$/.test(e?.code) ? e.code : 'PENDING_VARIANT_CONTROL_FAILED';

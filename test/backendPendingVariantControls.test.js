@@ -1,6 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {relativeBounds,multisetEqual,validPage,near,safeTechnicalCode} from '../scripts/backend-pending-variant-controls.mjs';
+import {relativeBounds,multisetEqual,validPage,near,safeTechnicalCode,invoiceSummaryRows} from '../scripts/backend-pending-variant-controls.mjs';
+import {getInvoices} from '../src/services/invoices/invoices.service.js';
+test('independent control accepts the real scalar invoice summary contract',async()=>{
+ const result=await getInvoices({mode:'summary'},{execute:async()=>({rows:[{CURRENCY_SYMBOL:'PYG',TOTAL_AMOUNT:30,INVOICE_COUNT:2}]})});
+ assert.equal(result.data,undefined);
+ assert.deepEqual(invoiceSummaryRows(result).map(r=>[r.currencySymbol,r.totalAmount,r.invoiceCount]),[['₲',30,2]]);
+});
+test('independent control keeps multiple invoice currency groups separate',async()=>{
+ const result=await getInvoices({mode:'summary'},{execute:async()=>({rows:[{CURRENCY_SYMBOL:'PYG',TOTAL_AMOUNT:30,INVOICE_COUNT:2},{CURRENCY_SYMBOL:'USD',TOTAL_AMOUNT:5,INVOICE_COUNT:1}]})});
+ assert.deepEqual(invoiceSummaryRows(result).map(r=>[r.currencySymbol,r.totalAmount,r.invoiceCount]),[['₲',30,2],['USD',5,1]]);
+ assert.throws(()=>invoiceSummaryRows({}));assert.throws(()=>invoiceSummaryRows(null));
+});
 test('relative boundaries use Paraguay, Monday and year rollover',()=>{
  const now=new Date('2024-01-01T02:00:00Z');
  assert.deepEqual(relativeBounds('today',now),{dateFrom:'31/12/2023',dateTo:'31/12/2023'});
