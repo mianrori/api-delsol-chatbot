@@ -7,7 +7,7 @@ import {clearConversation,setSearchResolutions} from '../src/state/conversation.
 
 // Only the model and prior resolved context are controlled. Route, controller,
 // session resolution, tool/service/repository and Oracle connections are real.
-export async function contrastPreparedHttp({sessionId,requests,executeTool,check}) {
+export async function contrastPreparedHttp({sessionId,requests,executeTool,check,controllerOverrides={}}) {
   const context=vm.createContext({console,process,structuredClone,Intl,Date,Map,Set,Number,String,Array,JSON,Math,RegExp,Object,Boolean,Error,AbortController});
   const synthetic=exports=>new vm.SyntheticModule(Object.keys(exports),function(){for(const [k,v]of Object.entries(exports))this.setExport(k,v);},{context});
   const load=async(relative,stubs)=>{
@@ -23,7 +23,7 @@ export async function contrastPreparedHttp({sessionId,requests,executeTool,check
     const result=await executeTool(request);seen++;
     check(canonical(result)===canonical(expected.result),'HTTP_RESULT_MATCHES_ORACLE_CONTRASTED_RESULT');return result;
   }}});
-  const controller=await load('../src/controllers/chat.controller.js',{'../services/ai/chat.service.js':{chatService:chat.chatService}});
+  const controller=await load('../src/controllers/chat.controller.js',{'../services/ai/chat.service.js':{chatService:chat.chatService},...controllerOverrides});
   const routes=await load('../src/routes/index.js',{'../controllers/chat.controller.js':controller});
   const app=express();app.use(express.json());app.use('/chatbot/api',routes.router);
   const server=await new Promise(resolve=>{const s=app.listen(0,'127.0.0.1',()=>resolve(s));});

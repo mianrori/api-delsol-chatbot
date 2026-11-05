@@ -33,6 +33,9 @@ Validación enfocada: **10/10** pruebas de `memberPurchasesVsSales.test.js`,
 Node 22 en imagen aislada de validación; incluye orden invertido, colisión de `$`,
 metadatos distintos, filtros, porcentaje no calculable, permisos y cancelación.
 No se reconstruyó ni desplegó DEV para ejecutar estas pruebas.
+Código funcional: `222d761`. Además, **1/1** prueba nueva del puente HTTP
+(`backendIndependentHttp.test.js`) pasa con autenticación/datos controlados,
+sin login ni acceso a Oracle. Es una verificación del ejecutor, no evidencia DEV.
 
 ## Ejecutor preparado: evidencia todavía no obtenida
 
@@ -41,6 +44,10 @@ independientes, sin reutilizar generadores SQL de repositorios. Consultas limita
 a 10.000 filas de control y 60 segundos por llamada Oracle. Período histórico de
 compras/usos/vehículos/canjes: enero–mayo de 2023. La selección de muestras ocurre
 dentro del usuario Oracle autorizado; los documentos nunca salen de memoria.
+El presupuesto global es de ocho minutos entre operaciones; una llamada ya
+iniciada conserva su timeout. Agotar el presupuesto o el límite de filas produce
+`not_run`, distinto de muestra ausente y de aprobación. Las páginas iniciales
+respetan el límite configurado y usan como máximo tres filas.
 
 | Contraste funcional pendiente | Caso preparado | Límite explícito |
 | --- | --- | --- |
