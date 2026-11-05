@@ -53,7 +53,25 @@ solo si no se proporciona sesión vigente. Secretos en memoria/stdin, sin argv,
 reportes ni archivos; logout solo de sesión creada. Presupuesto Oracle por llamada
 60 s y controles limitados a 10.000 filas. Reporte sanitizado sin filas/identidades.
 
-Pendientes de evidencia: llamada real al proveedor y Oracle/HTTP del candidato
-aún sin acreditar. Se conservan las muestras DEV ausentes y todas las pruebas
+## Resultado del candidato `e5868ea`
+
+Seis archivos de pruebas enfocados aprobados en Node 22/Docker: proveedor,
+gráficos HTTP, gráficos, contratos, ventas por m² e incidencia contractual.
+Son los consumidores afectados, no las suites generales del backend. Preflight
+completo y verificación de archivos comprometidos aprobados; aplicación DEV
+desplegada permanece en `4428874`, sin reconstrucción.
+
+Llamada real del candidato, 05/11/2026 21:20:23–21:20:29 UTC:
+`status=not_available`, `EXCHANGE_PROVIDER_QUOTE_UNAVAILABLE`. Se recibió la
+página pero no se acreditó una cotización válida bajo el contrato de extracción.
+No es el timeout anterior ni equivale a tasa aprobada. Diagnóstico adicional
+solo de estructura/etiquetas confirma que no hay fila de tabla inequívoca de
+USD/Dólar en el texto inspeccionado; no se elige otra moneda o primer número ni
+se relaja el parser. HTML solo en memoria. Reporte local ignorado:
+`logs/conversion-provider-live.json`. No hay fecha de publicación acreditada.
+
+Pendientes de evidencia: Oracle/HTTP del candidato aún sin ejecutar con sesión
+vigente; tasa real positiva sigue sin acreditar. Se conservan las muestras DEV
+ausentes y todas las pruebas
 anteriores con su SHA; no se suman ejecuciones como casos únicos. PR en borrador
 hasta revisar resultados y correcciones; sin despliegue ni merge.

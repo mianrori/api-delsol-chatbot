@@ -1,6 +1,6 @@
 # Alcance y evidencia del backend del chatbot
 
-Corte actualizado: **05/11/2026**, base desplegada `30ffab4` (PR #38 fusionada).
+Corte actualizado: **05/11/2026**, base desplegada `4428874` (PR #39 fusionada).
 PR #38 — corrección monetaria `8ee5b14`: identificación inequívoca PYG/USD/CAD,
 contradicción/ambigüedad y compatibilidad de contraparte comprobadas antes del
 porcentaje; motivos por fila, parejas exactas separadas, sin conversión ni unión
@@ -50,9 +50,12 @@ Ver [resultados acotados](backend-pending-variants-validation.md).
 Pendientes de conversión/gráficos abordados desde `4428874` en rama separada
 `fix/conversion-provider-chart-http`: moneda `$` ambigua en costo, fecha de
 consulta de tasa y período perdido en gráficos corregidos como candidato.
-Las respuestas controladas, llamada pública y fuente Oracle/HTTP se acreditan
-por separado; resultados DEV del candidato aún pendientes, no aprobados por
-preparar el ejecutor. Ver [alcance y validación](conversion-chart-validation.md).
+`e5868ea`: seis archivos de pruebas enfocados y preflight Node 22/Docker
+aprobados; HTTP de gráficos con fuente/auth controlados. Llamada pública real:
+`EXCHANGE_PROVIDER_QUOTE_UNAVAILABLE`, no hay tasa válida acreditada; se recibió
+página pero no se eligió arbitrariamente un número/moneda. Oracle/HTTP del
+candidato aún pendiente. No se confunden pruebas controladas con tasa real ni
+muestra Oracle. Ver [alcance y validación](conversion-chart-validation.md).
 Ver [resultados y límites](backend-independent-validation.md).
 
 ### Evidencia histórica reutilizada
