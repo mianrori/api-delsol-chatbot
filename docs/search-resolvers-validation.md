@@ -455,3 +455,78 @@ revisión final, sin merge/despliegue ni cambios de datos, permisos o expiracion
 Se conservan las muestras reales pendientes de superficie cero/cambiante,
 ventas registradas de suma cero y socios con varias monedas, y las limitaciones
 históricas de muestras/interpretación libre, sin fabricar datos de DEV.
+
+## Transiciones validadas antes de aplicar cambios de estado
+
+Revisión posterior a `997c592`: dos P2 de transición, distintos de muestras DEV
+faltantes. Con local/rubro confirmados, una opción de otro catálogo podía convertir
+ambos en pendientes. Además, una búsqueda de un dominio retirado guardaba pending
+antes de lanzar el error de rechazo. Reproducción sintética privada conservada,
+sin repetir controles aprobados ni usar login/Oracle durante la revisión.
+
+**Corregido en `0668b1b`; 66/66 pruebas enfocadas Node 22 aprobadas.**
+Las instrucciones de turno se guardan separadas de los dominios/contextos/foco
+duraderos. Las selecciones validan primero catálogo, ordinal único e identidad
+real de la opción; una opción ajena, inválida o no inequívoca no modifica ninguno
+de esos datos. Pedir un nuevo lookup deja pendiente la operación del turno, pero
+no reemplaza el estado duradero hasta recibir un resultado válido. El guard de
+lookup ya no persiste cambios anticipados. Se validan argumentos según el contrato
+de local/rubro, estado del resultado, IDs presentes y ordinales sin duplicados;
+errores, resultados mal formados y catálogos desconocidos no cambian la resolución.
+Un AMBIGUOUS limitado a una opción sigue siendo válido solo si declara más
+coincidencias, y únicamente permite seleccionar la opción visible.
+
+Las pruebas comparan **el estado completo antes/después** (dominios, opciones,
+contextos y foco), con y sin atravesar el recorte real. Incluyen opción ajena con
+ambos filtros confirmados, opción inexistente, lookup rechazado de un filtro
+retirado, argumentos/resultados inválidos, fallo del ejecutor y selección válida
+que modifica solo su catálogo. Se mantiene el ciclo completo, la independencia
+del historial, el aislamiento de sesiones y la limpieza de estado/turno al reset.
+Las fixtures HTTP nuevas acumulan fallos para que una excepción capturada por el
+chat no produzca un falso positivo.
+
+**452/452 controles Oracle/HTTP DEV aprobados sobre `0668b1b`**, 05/11/2026
+14:29:22.561–14:29:26.058 UTC (**3,497 s**, tramo HTTP 2.747 ms), helper COMPLETE,
+success=true/salida 0. **171 archivos candidatos iguales por hash**, sin pendientes
+propios del perfil. Preflight completo sin credenciales aprobado antes del login.
+
+- **104 peticiones HTTP**, **64 comprobaciones de argumentos exactos y 104 de
+  historial previo**. Conteos solapados: no sumarlos como casos independientes.
+- **24 comparaciones del estado completo** ante opción ajena/inexistente,
+  búsqueda rechazada, fallo controlado, respuesta mal formada y denegación real;
+  con local/rubro, antes/después del recorte. **Cuatro comparaciones adicionales**
+  confirman que una opción válida cambia únicamente su catálogo.
+- **Ocho checks de IDs exactos y cuatro de pertenencia de opciones ambiguas**
+  contra catálogos Oracle DEV independientes. Autenticación, ruta/controller/chat
+  y lookups de local/rubro reales. Modelo con PII protegida, consumidor de ventas,
+  opciones del catálogo ajeno de socios y fallos artificiales/malformados son
+  controlados y se distinguen explícitamente en el reporte.
+- **Cuatro denegaciones Oracle reales**, sin datos/acciones, conservan también
+  el estado retirado de la sesión sin permisos. Identidades PG/proxy coincidentes,
+  usuarios Oracle distintos, todos los proxies cerrados y **dos logout propios
+  aprobados aparte** de los 452 checks.
+- Logs stdout/stderr del intervalo: cuatro eventos ERP compactos, cero error/
+  campos o valores inválidos; sin error fatal/de cierre detectado en chatbot.
+  Solo se publican conteos técnicos, sin líneas crudas, identidades ni secretos.
+
+Se verificaron por hash los 502 checks `003f740`, con su SHA original. No se les
+atribuye el código nuevo ni se suman conteos históricos. Solo se ejecutaron las
+transiciones afectadas antes/después del recorte; sin consultas de ventas/compras,
+promociones/paginación ni suites completas. No se repitieron pruebas o login al
+revisar estos resultados. La revisión conjunta mantuvo los rechazos sin escrituras
+anticipadas y la selección válida limitada al dominio correcto.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\logs\run-search-state-transitions-dev.ps1
+```
+
+Helper NUEVO de transiciones: dos cuentas DEV en cuatro entradas ocultas, sin
+documentos. Usa login protegido existente para sesiones nuevas y logout propios;
+credenciales/sesiones solo en memoria/stdin, nunca argv/env/archivos/reportes/Git.
+Reportes sanitizados `logs/search-state-transitions-final.json` y
+`logs/search-state-transitions-final-summary.json`, helpers y evidencia anterior
+ignorados por Git y no versionados. Esta actualización posterior solo documenta
+resultados; PR #37 en borrador para revisión final, sin merge/despliegue ni cambios
+de datos, permisos o expiraciones. Muestras reales pendientes de superficie
+cero/cambiante, ventas registradas de suma cero y socios con varias monedas
+conservadas, con su cobertura controlada y limitaciones históricas.

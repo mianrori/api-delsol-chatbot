@@ -91,6 +91,30 @@ PR #37 en borrador para revisión final, sin merge. Muestras históricas de supe
 cero/cambiante, ventas registradas de suma cero y socios con varias monedas
 conservadas sin cambios; no se fabricaron datos.
 
+Transiciones posteriores — **código `0668b1b`, 66/66 pruebas afectadas aprobadas**
+y **452/452 controles Oracle/HTTP DEV aprobados**, 05/11/2026
+14:29:22.561–14:29:26.058 UTC (3,497 s), helper COMPLETE/success=true/salida 0.
+Las opciones ajenas/incorrectas y las búsquedas rechazadas conservan el estado
+completo anterior (dominios, opciones, contexto y foco), también después de
+recortar el historial. Una selección válida cambia solo su catálogo. Se separan
+las instrucciones efímeras del turno del estado duradero por sesión; pedir una
+búsqueda no invalida por adelantado una selección o retirada. Solo un resultado
+válido puede aplicar esa transición. Reset limpia ambos almacenes.
+Preflight completo sin credenciales aprobado; helper nuevo
+`logs/run-search-state-transitions-dev.ps1`. Los 502 checks `003f740` se conservan
+por hash y SHA: no validan estas variantes nuevas. El control acotado usa Oracle
+real para lookups/denegaciones de local-rubro; catálogo ajeno y fallos del ejecutor
+son controlados y se identifican como tales. Sin repetir suites completas ni
+consultas de negocio. 171 archivos candidatos idénticos; 104 peticiones HTTP,
+64 checks de argumentos y 104 de historial (conteos solapados), 24 comparaciones
+del estado completo ante errores/rechazos y cuatro de selección válida limitada
+a su catálogo. Ocho checks de IDs exactos y cuatro de pertenencia de opciones
+contra catálogos independientes; cuatro denegaciones Oracle reales conservan
+el estado retirado. Proxies cerrados y dos logout propios aprobados aparte de los
+452 checks. Cuatro eventos ERP compactos, sin error/campos inválidos; sin error
+fatal/de cierre detectado en stdout/stderr de chatbot. Sin pendientes propios
+del perfil; muestras reales faltantes conservadas. PR en borrador para revisión.
+
 ## Comparación con el chat original
 
 Se compararon los registros `src/tools/index.js` y los nombres de sus herramientas:
