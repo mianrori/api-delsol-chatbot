@@ -1,13 +1,13 @@
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
 import express from 'express';
-import {clearConversation,getConversation} from '../src/state/conversation.store.js';
+import {clearConversation,getConversation,getSearchResolutions} from '../src/state/conversation.store.js';
 import {protectPiiDeep} from '../src/services/ai/pii.service.js';
 
 // Actual candidate route/controller/chat/PII, with deterministic model output.
 // Only business consumers are doubles: this check verifies their exact inputs,
 // and never queries purchases/usages outside the narrowly affected lookup flow.
-export async function checkSearchCorrectionsHttp({sessionId,deniedSessionId,lookup,uniqueSearch,ambiguousSearch,compositionProfile,lifecycleOnly=false,lifecycleRetry=false,validateSession,check}){
+export async function checkSearchCorrectionsHttp({sessionId,deniedSessionId,lookup,uniqueSearch,ambiguousSearch,compositionProfile,lifecycleOnly=false,lifecycleRetry=false,resolutionProfile=false,validateSession,check}){
  const context=vm.createContext({console,process,structuredClone,Intl,Date,Map,Set,Number,String,Array,JSON,Math,RegExp,Object,Boolean,Error,AbortController});
  const synthetic=exports=>new vm.SyntheticModule(Object.keys(exports),function(){for(const [k,v] of Object.entries(exports))this.setExport(k,v);},{context});
  const plans=[];let consumerCalls=0,lastLookup,expectedConsumer,requestSessionId=sessionId;
@@ -35,15 +35,67 @@ export async function checkSearchCorrectionsHttp({sessionId,deniedSessionId,look
   await main.link(async spec=>synthetic(stubs[spec]??await import(spec.startsWith('.')?new URL(spec,url).href:spec)));await main.evaluate();return main.namespace;
  };
  const chat=await load('../src/services/ai/chat.service.js',{'@aws-sdk/client-bedrock-runtime':model,'./toolExecutor.service.js':{executeTool}});
- const controller=await load('../src/controllers/chat.controller.js',{'../services/ai/chat.service.js':{chatService:chat.chatService},...(validateSession?{'../services/sessions/oracleSession.service.js':{getValidOracleSession:validateSession}}:{})});
+ const controller=await load('../src/controllers/chat.controller.js',{'../services/ai/chat.service.js':{chatService:chat.chatService},...(validateSession?{'../services/sessions/oracleSession.service.js':{getValidOracleSession:validateSession},'../services/ai/conversationLifecycle.service.js':{...await import('../src/services/ai/conversationLifecycle.service.js'),resetConversation:async id=>{await validateSession(id);clearConversation(id);}}}:{})});
  const routes=await load('../src/routes/index.js',{'../controllers/chat.controller.js':controller});
  const app=express();app.use(express.json());app.use('/chatbot/api',routes.router);
  const server=await new Promise(resolve=>{const s=app.listen(0,'127.0.0.1',()=>resolve(s));});
- const post=async(message,session=sessionId)=>{requestSessionId=session;const priorHistory=getConversation(session);const snapshot=compositionProfile?structuredClone(priorHistory):null;const response=await fetch(`http://127.0.0.1:${server.address().port}/chatbot/api/bot/chat`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({sessionId:session,message}),signal:AbortSignal.timeout(90000)});const body=await response.json();check(response.status===200&&body.success===true,'HTTP_CANDIDATE_CHAT_SUCCESS');if(snapshot)check(JSON.stringify(canonical(lifecycleOnly?priorHistory:getConversation(session).slice(0,snapshot.length)))===JSON.stringify(canonical(snapshot)),'HTTP_PRIOR_HISTORY_UNCHANGED');return body;};
- const sales={dateFrom:'01/01/2023',dateTo:'31/01/2023',customerIds:['SYNTHETIC-C'],categoryIds:['SYNTHETIC-ARBITRARY'],groupBy:['month'],metrics:['totalAmount']};
+ const post=async(message,session=sessionId)=>{requestSessionId=session;const priorHistory=getConversation(session);const snapshot=compositionProfile?structuredClone(priorHistory):null;const response=await fetch(`http://127.0.0.1:${server.address().port}/chatbot/api/bot/chat`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({sessionId:session,message}),signal:AbortSignal.timeout(90000)});const body=await response.json();check(response.status===200&&body.success===true,'HTTP_CANDIDATE_CHAT_SUCCESS');if(snapshot)check(JSON.stringify(canonical(lifecycleOnly||resolutionProfile?priorHistory:getConversation(session).slice(0,snapshot.length)))===JSON.stringify(canonical(snapshot)),'HTTP_PRIOR_HISTORY_UNCHANGED');return body;};
+ const sales={dateFrom:'01/01/2023',dateTo:'31/01/2023',...(compositionProfile?{customerIds:['SYNTHETIC-C']}:{}),categoryIds:['SYNTHETIC-ARBITRARY'],groupBy:['month'],metrics:['totalAmount']};
  const usage={documentNumber:'SYNTHETIC-M',dateFrom:'01/01/2023',dateTo:'31/05/2023',movementTypes:['SYNTHETIC-MOVEMENT'],destinations:[{destinationType:'LOCAL',destinationCode:'SYNTHETIC-D'}],categoryIds:['SYNTHETIC-ARBITRARY'],mode:'summary'};
  try{
   if(compositionProfile){
+   if(resolutionProfile){
+    const p=compositionProfile;
+    for(const order of [['search_customers','search_categories'],['search_categories','search_customers']]){
+     clearConversation(sessionId);plans.length=0;const count=consumerCalls;
+     expectedConsumer={name:'get_sales',input:{...sales,customerIds:[p.customers[0].id],categoryIds:[p.categories[0].id]}};
+     plans.push([...order.map((name,i)=>command(name,{search:(name==='search_customers'?p.customers:p.categories)[0].search},'persistent-combined-'+i)),command('get_sales',sales,'combined-consumer')]);
+     await post(order[0]==='search_customers'?'Busca local y rubro':'Busca rubro y local');plans.length=0;
+     plans.push([command('get_sales',{customerIds:['MODEL-C'],categoryIds:['MODEL-R']},'combined-continue')]);await post('continúa');plans.length=0;
+     check(consumerCalls===count+2,'HTTP_PERSISTENT_COMBINED_IDENTITIES_'+order[0]);
+    }
+    for(const [name,field,label] of [['search_customers','customerIds','local'],['search_categories','categoryIds','rubro']]){
+     clearConversation(sessionId);plans.length=0;const before=consumerCalls;
+     const initial={...sales};delete initial[name==='search_customers'?'categoryIds':'customerIds'];
+     const ambiguous=name==='search_customers'?p.ambiguousCustomerSearch:p.ambiguousCategorySearch;
+     plans.push([command(name,{search:ambiguous},'persist-lookup'),command('get_sales',initial,'persist-guess')]);
+     await post('Busca opciones de '+label+' para ventas de enero');plans.length=0;
+     check(lastLookup.status==='AMBIGUOUS'&&lastLookup.options?.length>=2&&consumerCalls===before,'HTTP_PERSISTENT_PENDING_INITIAL_'+name);
+     const chosen=name==='search_customers'?lastLookup.options[1].codCliente:lastLookup.options[1].codRubro;
+     const blocked=async()=>{const count=consumerCalls;plans.push([command('get_sales',{[field]:['MODEL-ID'],dateFrom:'01/01/2000'},'pending-guess')]);await post('continúa');plans.length=0;check(consumerCalls===count,'HTTP_PERSISTENT_PENDING_BLOCKS_'+name);};
+     for(let i=0;i<12;i++)await blocked();
+     check(!getConversation(sessionId).some(m=>m.content?.some(b=>b.toolUse?.name===name)),'HTTP_PENDING_LOOKUP_LEFT_BOUNDED_HISTORY_'+name);
+     await post('Otra consulta: hola');check(getSearchResolutions(sessionId).domains[name]?.kind==='pending','HTTP_TOPIC_CHANGE_RETAINS_PENDING_'+name);
+     expectedConsumer={name:'get_sales',input:{...initial,[field]:[chosen]}};
+     const execute=async(text,lookupBlocks=[])=>{const count=consumerCalls;plans.push([...lookupBlocks,command('get_sales',{[field]:['MODEL-ID']},'persistent-query')]);await post(text);plans.length=0;check(consumerCalls===count+1,'HTTP_PERSISTENT_EXPLICIT_CONSUMER_'+name);};
+     await execute('opción 2');for(let i=0;i<12;i++)await execute('continúa');
+     const entry=(name==='search_customers'?p.customers:p.categories)[0];
+     expectedConsumer.input={...initial,[field]:[entry.id]};
+     await execute('Cambia el '+label,[command(name,{search:entry.search},'persistent-change')]);
+     delete expectedConsumer.input[field];
+     if(name==='search_categories'){const count=consumerCalls;await post('quita el filtro de rubro');check(consumerCalls===count+1,'HTTP_NATIVE_CATEGORY_REMOVAL_EXECUTED');}
+     else await execute('quita el filtro de local');
+     for(let i=0;i<12;i++)await execute('continúa');
+     check(getSearchResolutions(sessionId).domains[name]?.kind==='cleared','HTTP_REMOVED_STATE_SURVIVES_TRIM_'+name);
+     plans.push([command(name,{search:ambiguous},'readd-pending'),command('get_sales',initial,'readd-guess')]);
+     const calls=consumerCalls;await post('Vuelve a añadir el '+label);plans.length=0;
+     check(consumerCalls===calls&&lastLookup.status==='AMBIGUOUS','HTTP_READD_REQUIRES_NEW_SELECTION_'+name);
+     const fresh=name==='search_customers'?lastLookup.options[0].codCliente:lastLookup.options[0].codRubro;
+     for(let i=0;i<12;i++)await blocked();expectedConsumer.input={...initial,[field]:[fresh]};await execute('opción 1');
+     if(deniedSessionId){
+      clearConversation(deniedSessionId);const snapshot=JSON.stringify(getSearchResolutions(sessionId));
+      plans.push([command('get_sales',{[field]:['MODEL-ID']},'other-session-guess')]);const count=consumerCalls;await post('continúa',deniedSessionId);plans.length=0;
+      check(consumerCalls===count&&Object.keys(getSearchResolutions(deniedSessionId).domains).length===0&&snapshot===JSON.stringify(getSearchResolutions(sessionId)),'HTTP_RESOLUTION_SESSION_ISOLATION_'+name);
+      plans.push([command(name,{search:entry.search},'persistent-denied')]);const denied=await post('Busca '+label,deniedSessionId);plans.length=0;
+      check(denied.response==='El usuario no tiene permisos para consultar esta información.'&&Object.keys(denied.actions??{}).length===0&&Object.keys(denied).every(k=>['env','success','response','actions'].includes(k)),'HTTP_PERSISTENT_DENIED_NO_DATA_'+name);
+     }
+     const response=await fetch(`http://127.0.0.1:${server.address().port}/chatbot/api/bot/chat/reset`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({sessionId}),signal:AbortSignal.timeout(90000)});
+     const reset=await response.json();check(response.status===200&&reset.success&&getConversation(sessionId).length===0&&Object.keys(getSearchResolutions(sessionId).domains).length===0&&Object.keys(getSearchResolutions(sessionId).contexts).length===0,'HTTP_RESET_CLEARS_RESOLUTION_STATE_'+name);
+     const count=consumerCalls;plans.push([command('get_sales',{[field]:['MODEL-ID']},'post-reset-guess')]);await post('opción 1');plans.length=0;
+     check(consumerCalls===count,'HTTP_RESET_REQUIRES_FRESH_RESOLUTION_'+name);
+    }
+    return;
+   }
    if(lifecycleOnly){
     const p=compositionProfile;
     for(const removed of lifecycleRetry?['both-customer']:['categoryIds','customerIds','both-customer','both-category']){

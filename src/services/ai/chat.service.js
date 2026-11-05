@@ -1,6 +1,5 @@
 import { buildMemberPurchasesResponse, resolveMemberPurchasesPage } from "./memberPurchasesPresentation.service.js";
-import {preserveSearchSelection,reenabledSearchFilters} from './searchSelection.service.js';
-import {getSearchFilterActions} from './searchFilterIntent.service.js';
+import {preserveSearchSelection,beginSearchSelectionTurn,recordSearchToolResult} from './searchSelection.service.js';
 import { buildMemberPromoResponse, resolveMemberPromoPage, resolveMemberPromoSelection, preserveMemberPromoFollowup } from "./memberPromoPurchasesPresentation.service.js";
 import { preserveSalesPerSqmFollowup } from "./salesPerSqmFollowup.service.js";
 import { preserveContractIncidenceFollowup } from "./contractIncidenceFollowup.service.js";
@@ -34,9 +33,8 @@ import { executeTool } from "./toolExecutor.service.js";
 import {
   getConversation,
   setConversation,
-  getRemovedSearchFilters,
-  setSearchFilterRemoved,
-  clearRemovedSearchFilters,
+  getSearchResolutions,
+  setSearchResolutions,
 } from "../../state/conversation.store.js";
 import {
   compactMemberPurchasePaginationHistory,
@@ -1414,9 +1412,7 @@ const executeToolRequests = async ({ content, sessionId, sourceMessages = [], ch
     }
 
     try {
-      const removedFilters=getRemovedSearchFilters(sessionId);
-      input=preserveSearchSelection({name,input,history:sourceMessages,currentCalls:internalContext.presentationCalls,removedFilters});
-      for(const search of reenabledSearchFilters(name,input,removedFilters))setSearchFilterRemoved(sessionId,search,false);
+      input=preserveSearchSelection({name,input,history:sourceMessages,currentCalls:internalContext.presentationCalls,resolutionState:getSearchResolutions(sessionId),saveResolutionState:state=>setSearchResolutions(sessionId,state)});
       block.toolUse.input=input;presentationCall.input=input;
       validateProtectedToolInput({ name, input });
 
@@ -1494,6 +1490,7 @@ const executeToolRequests = async ({ content, sessionId, sourceMessages = [], ch
         null,
         [name],
       );
+      recordSearchToolResult(sessionId,name,input,protectedResultForModel);
       if(name.startsWith('search_'))presentationCall.result=protectedResultForModel;
       if (isChartSourceTool(name) && protectedResultForModel && typeof protectedResultForModel === "object" && !Array.isArray(protectedResultForModel)) {
         protectedResultForModel.chartSourceId = toolUseId;
@@ -1592,8 +1589,6 @@ export const chatService = async ({ message, sessionId }) => {
   }
 
   const history = getConversation(sessionId) ?? [];
-  if(!history.length)clearRemovedSearchFilters(sessionId);
-  for(const {search,action} of getSearchFilterActions(message))if(action==='remove')setSearchFilterRemoved(sessionId,search,true);
 
   const protectedHistory = protectPiiDeep(
     sessionId,
@@ -1612,6 +1607,7 @@ export const chatService = async ({ message, sessionId }) => {
     },
   ];
 
+  beginSearchSelectionTurn(sessionId,messages.at(-1).content[0].text);
   const systemPrompt = getSystemPrompt({
     currentDate: getCurrentDateParaguay(),
   }) + "\n" + chartsPrompt;
