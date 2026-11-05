@@ -6,22 +6,23 @@ peticiones HTTP con modelo controlado, selección/reelección y lecturas Oracle
 reales, conciliación independiente y cierre. El perfil seleccionado no tenía
 ventas en enero de 2023: acredita ausencia, no importes positivos ni suma cero.
 
-La revisión de cierre se prepara en `test/backend-independent-controls-dev`.
-Se detectó una colisión monetaria en canjes/ventas, reproducida y corregida con
-10/10 pruebas enfocadas Node 22. Sobre `7762f35`, ocho de trece bloques Oracle/HTTP
-aprobaron; dos fallaron y tres no encontraron muestra en enero–mayo de 2023.
-La ejecución global no aprobó (69/70 comprobaciones verdaderas). Cierre de todas
-las conexiones y logout propio aprobados. Se prepara continuación solo de esos
-cinco bloques; no se repiten los ocho aprobados. La continuación `6e6c423` aprueba
-usos/ranking en octubre de 2023 y conserva tres fallos: compras, saldo de soles y
-edades de vehículos (ahora con muestra de julio de 2025). Global 18/20, fallida;
-no sumar con N. El diagnóstico `d529cfd` aprueba compras y edades: censo Oracle
-independiente coincide con el servicio y detecta discrepancia del control JS.
-La traza de saldo `ef27c48` ya supera NJS-005 y confirma que el control usaba un
-documento con espacios exteriores mientras el servicio lo normaliza con `.trim()`.
-Corregido solo el argumento del control, conservando igualdad exacta SQL e identidad;
-queda pendiente contrastar en Oracle las seis variantes corregidas. Doce bloques
-reutilizados por hash. Ver [resultados y límites](backend-independent-validation.md).
+PR #38, rama `test/backend-independent-controls-dev`: corregida la colisión por
+símbolo monetario en canjes/ventas (`222d761`), con 10/10 enfocadas y contraste
+Oracle/HTTP `7762f35`. Los trece bloques de esta tanda quedan acreditados para sus
+perfiles: ocho en N, usos/ranking en O, compras/edades en T y saldo en V.
+Las ejecuciones fallidas conservan su estado; no sumar checks entre ejecuciones.
+
+Saldo: **19/19 sobre `a709b35`**, seis variantes, documento exacto y conciliación
+SQL independiente, cierre y logout aprobados; doce bloques reutilizados por hash.
+Hay filas reales sin ventanas para todos/vigentes/vencidos; las tres ventanas
+combinadas están vacías para el socio seleccionado y no son muestras positivas.
+La discrepancia era del control (documento con espacios frente al `.trim()` del
+contrato); no se modificó el servicio ni se relajó identidad o igualdad en SQL.
+
+No se declara verificación exhaustiva del backend: las variantes funcionales
+sin contraste específico siguen separadas de las muestras DEV ausentes ya
+cubiertas de forma controlada. PR en borrador, sin merge ni despliegue.
+Ver [resultados y límites](backend-independent-validation.md).
 
 ### Evidencia histórica reutilizada
 
@@ -227,6 +228,7 @@ ni importes del socio. Las letras siguientes identifican evidencia ya ejecutada:
 | O | `backend-independent-6e6c423.json`: cinco bloques pendientes exclusivamente; usos combinados y ranking aprobados con Oracle independiente en octubre de 2023. Tres fallidos, global 18/20; 176 archivos idénticos, cierre/logout aprobados; N reutilizado por hash. | Compras vuelve a NJS-123 en descubrimiento de pareja; saldo difiere en grupos/totales, no solo formato; edades falla con muestra de julio de 2025. No marcar ninguno como aprobado ni como muestra ausente global. [Detalle](backend-independent-validation.md). |
 | T | `backend-independent-d529cfd.json`: tres bloques exclusivamente; compras y edades aprobados. 8,247 s, 176 archivos idénticos, cierre/logout aprobados; N/O conservados por hash. | Global fallida por NJS-005 del adaptador de traza de soles, aunque los 18 checks registrados sean verdaderos. Edades: censo Oracle independiente coincide con el servicio; el control JS discrepa. Saldo no aprobado; no confundir arreglar la sobrecarga del driver con conciliar saldo. [Detalle](backend-independent-validation.md). |
 | U | `backend-independent-ef27c48.json`: saldo exclusivo; traza completa en una misma conexión, 0,754 s, cierre/logout aprobados, 176 archivos idénticos; global fallida (5/6). | Causa confirmada: control y servicio recibían documentos distintos por espacios exteriores. Mapeo/SQL y dispatcher/servicio coinciden. Se corrige la entrada del control; U no se reclasifica como aprobado. [Detalle](backend-independent-validation.md). |
+| V | `backend-independent-a709b35.json`: saldo exclusivo, 19/19, seis variantes, 1,818 s total, 176 archivos idénticos, cierre/logout aprobados; N/O/T reutilizados por hashes verificados. | Tres variantes sin ventanas tienen filas reales; las tres ventanas combinadas no tienen filas para ese socio. Igualdad exacta del documento y SQL independiente conciliados. `coverageComplete` del caso no equivale a cobertura global del backend; U sigue siendo investigación fallida. [Detalle](backend-independent-validation.md). |
 
 Las validaciones históricas conservan su SHA: no se declaran recién ejecutadas
 en la base actual. Las suites controladas de aquellas etapas incluyen 251 pruebas
@@ -263,7 +265,7 @@ dentro de `test/`. **Sin acreditar** indica falta de evidencia, no fallo probado
 | `get_contract_cost_per_sqm` — costo por m² | `contracts/contractCostPerSqm.service.js` | `contracts`, `chatLifecycle` | B reutilizado; N: importe neto/área y costo en misma moneda contra Oracle independiente; HTTP positivo | `b315ff9` histórico; `7762f35` independiente/HTTP | Conversión con tasa real y muestras inválidas específicas no acreditadas; sus controles anteriores se conservan. |
 | `analyze_contract_cost_incidence` — incidencia | `contracts/contractCostIncidence.service.js` | `contractIncidence`, `contracts`, `chatLifecycle` | I: resumen/mes, SQL independiente, límites de vigencia, empates invertidos, FX y seguimientos | `dcd9530`; desplegado `8e80887` | **Muestra DEV:** ventas registradas cuya suma sea cero; no confundir con ausencia real ya verificada. |
 | `search_soles_types` — tipos de soles | `soles/searchSolesTypes.service.js` | Nuevas: searchResolvers/searchSelection y chatLifecycle; 68/68 enfocadas del bloque (conteos solapados) | L: exacta/parcial/ausencia y alias normales obtenido de Oracle; rechazo/cierre. | `7ced8d9` Oracle; `c8525a6` controladas | Descripciones/alias duplicados controlados; no muestra real acreditada de cada empate o positivo fuzzy. S no se repite. |
-| `get_member_soles` — saldo/vencimiento | `soles/memberSoles.service.js` | `memberSoles`, `chatLifecycle`; sobrecarga real del driver y 2/2 regresiones nuevas de documento canónico | U confirma argumentos distintos del control por espacios exteriores; SQL/mapeo y servicio/dispatcher coinciden | S sin SHA; N/O/T/U no acreditan saldo conciliado | Control corregido para enviar el mismo documento normalizado que el servicio, sin TRIM de columna ni eliminación de ceros/espacios internos. Pendiente repetición Oracle de las seis variantes; ventanas vacías se documentan, no son perfiles positivos. |
+| `get_member_soles` — saldo/vencimiento | `soles/memberSoles.service.js` | `memberSoles`, `chatLifecycle`; driver real y 2/2 regresiones de documento canónico | V: 19/19, seis variantes de estado/ventanas, documento exacto y SQL independiente; cierre/logout | `a709b35` independiente; S histórico sin SHA propio | Control alineado con el contrato `.trim()`, sin TRIM de columna ni cambio de servicio/identidad. Tres estados sin ventanas tienen filas; tres ventanas vacías para el socio seleccionado no acreditan perfiles positivos ni ausencia global en DEV. |
 | `get_soles_usage` — usos | `soles/solesUsage.service.js` | `solesUsage`, `chatLifecycle`; guard de rubros `2094624` | O: filtros combinados, sumas/conteos/distintos y detalle; ranking de socios/orden/desglose por tipo contra SQL independiente en octubre de 2023 | `6e6c423` Oracle real; guard `2bfa637`; S sin SHA histórico | Perfil ensayado aprobado; no todas las combinaciones individuales de filtros. Muestra de ranking devuelve cuatro socios, no cinco inventados. Soles son cantidades, no monedas. S se reutiliza sin repetir la conversación/paginación. |
 | `search_soles_usage_destinations` — destinos | `soles/solesUsageDestination.resolver.js` | Nuevas: searchResolvers/searchSelection y chatLifecycle; 68/68 enfocadas del bloque (conteos solapados) | L: exacta/parcial/ausencia, pareja tipo/código y conteo/hasMore con límite; rechazo/cierre. | `7ced8d9` Oracle; `c8525a6` controladas | Pareja SOCIO/LOCAL con igual código: controlada; muestra real conjunta no acreditada. No hay contrato page. |
 | `search_soles_usage_movement_types` — movimientos | `soles/solesUsageMovementType.resolver.js` | Nuevas: searchResolvers/searchSelection y chatLifecycle; 68/68 enfocadas del bloque (conteos solapados) | L: exacta/parcial/ausencia y listado limitado; conteo real/hasMore, denegación/cierre. Selección: controlada. | `7ced8d9` Oracle; `c8525a6` controladas | No se revalida el signo/importe de los usos como parte del catálogo. Interpretación libre no exhaustiva. |
@@ -305,9 +307,11 @@ pendiente de evidencia; no declararlas aprobadas como casos reales.
 2. Segmentación G y buscadores L/C/M, persistencia, transiciones, reelección y
    despliegue de PR #37 están aprobados para sus perfiles. No quedan pendientes
    de implementación ni corresponde volver a ejecutar esos controles.
-3. Ficha/vehículos por documento aprobados en N; usos/ranking en O y compras/
-   edades en T. Continuar exclusivamente saldo y su traza en esta tanda, sin
-   repetir los doce bloques aprobados ni conversaciones/paginación históricas.
+3. Ficha/vehículos por documento aprobados en N; usos/ranking en O, compras/
+   edades en T y saldo en V. Tanda de trece bloques cerrada para sus perfiles,
+   sin repetir bloques aprobados ni conversaciones/paginación históricas.
+   La muestra positiva de ventanas combinadas de soles sigue sin acreditar;
+   el reporte verifica ausencia solo en el socio/período seleccionado.
 4. Añadir solo el contraste independiente que falta para compras individuales,
    canjes/ventas y campañas; en facturación/condiciones/costo por m², una consulta
    HTTP positiva y controles de los filtros aún no acreditados. N ya acredita

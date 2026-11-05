@@ -2,10 +2,41 @@
 
 Base: `ef9bff4`, PR #37 fusionada y desplegada. Rama separada:
 `test/backend-independent-controls-dev`. PR #38 en borrador. Estado: ocho bloques
-aprobados sobre `7762f35`, usos/ranking sobre `6e6c423` y compras/edades sobre
-`d529cfd`. De los trece bloques de esta tanda solo saldo de soles sigue abierto.
-Las variantes adicionales y muestras documentadas permanecen fuera de ese conteo.
-No se declara cerrado el backend.
+aprobados sobre `7762f35`, usos/ranking sobre `6e6c423`, compras/edades sobre
+`d529cfd` y saldo sobre `a709b35`: los trece bloques de esta tanda acreditados
+para sus perfiles, con las limitaciones detalladas abajo. No se suman checks
+de ejecuciones distintas ni se declara verificado todo el backend.
+
+## Resultado vigente
+
+`backend-independent-a709b35.json`: ejecución exclusiva de saldo, **19/19 checks
+aprobados**, seis variantes conciliadas, 1,818 s total (caso: 1,319 s), 176 archivos
+candidatos idénticos a Git. Documento exacto, grupos, generado, saldo y conteos
+coinciden con SQL independiente; totales globales de vigentes también coinciden.
+Todas las conexiones cerraron y el logout propio aprobó.
+
+| Estado a referencia 30/06/2023 | Sin ventanas adicionales | Con generación enero–mayo y vencimiento 2023 |
+| --- | --- | --- |
+| Todos | Filas reales; conciliación aprobada | Sin filas en el socio seleccionado; ausencia conciliada |
+| Vigentes | Filas reales; conciliación aprobada | Sin filas en el socio seleccionado; ausencia conciliada |
+| Vencidos | Filas reales; conciliación aprobada | Sin filas en el socio seleccionado; ausencia conciliada |
+
+Se conserva explícitamente `SOLES_ALL_WITH_WINDOWS_HAS_NO_ROWS_FOR_SELECTED_MEMBER`,
+`SOLES_CURRENT_WITH_WINDOWS_HAS_NO_ROWS_FOR_SELECTED_MEMBER` y
+`SOLES_EXPIRED_WITH_WINDOWS_HAS_NO_ROWS_FOR_SELECTED_MEMBER`. No demuestran ausencia
+en toda DEV ni son muestras positivas de esos filtros combinados. El indicador
+`coverageComplete=true` del reporte significa que se ejecutaron las variantes
+configuradas de este caso; no significa cobertura exhaustiva del backend.
+
+Los doce bloques anteriores se reutilizaron por SHA-256, con código de aplicación,
+configuración y dependencias sin cambios desde `7762f35`. La investigación fallida
+`ef27c48` conserva su hash y `notCountedAsPassed=true`; no se reescribe el historial.
+La corrección del control no relajó identidad: ambos caminos recibieron el mismo
+documento normalizado, conservando ceros e igualdad SQL exacta.
+
+La PR #38 queda en borrador para revisión del diff/evidencia y límites. No merge,
+despliegue ni suites completas repetidas. Solo se actualizará documentación tras
+este reporte; no hace falta repetir controles para un commit exclusivamente documental.
 
 ## Evidencia reutilizada
 
@@ -61,7 +92,7 @@ intervalo devolvió cero líneas de ambos contenedores; no acredita otros interv
 | Colisión `$` | CTE Oracle con USD/CAD/sin identificar y ambos órdenes, servicio real con adaptador controlado | **No** es muestra real de socio multimoneda |
 | Cuatro HTTP positivos | Canjes/ventas, facturas, condiciones y costo, argumentos y resultados coincidentes con los contrastados | Modelo/resolución preparados; no integración frontend/ERP ni lenguaje libre |
 
-## Cinco bloques que requieren continuación acotada
+## Historial: cinco bloques pendientes tras `7762f35`
 
 - Compras: `NJS-123` a los 60,179 s antes de la primera conciliación. La búsqueda
   global agrupaba/ordenaba socios; se sustituye en el ejecutor por una muestra
@@ -187,7 +218,8 @@ registra esta traza como investigación, **sin contarla como aprobada**. Su pref
 verifica tanto las dos nuevas regresiones como la sobrecarga real del driver antes
 de pedir secretos. Añade comprobación del documento exacto en cada variante y
 registra explícitamente las ventanas sin filas; no las describe como muestra positiva.
-Pendiente de ejecutar/revisar el contraste corregido para las seis variantes.
+El contraste corregido de seis variantes ya aprobó en `a709b35`, como detalla el
+resultado vigente. Este apartado conserva la causa y evidencia de la investigación.
 
 ## Alcance del ejecutor
 
@@ -202,7 +234,7 @@ iniciada conserva su timeout. Agotar el presupuesto o el límite de filas produc
 `not_run`, distinto de muestra ausente y de aprobación. Las páginas iniciales
 respetan el límite configurado y usan como máximo tres filas.
 
-| Contraste funcional pendiente | Caso preparado | Límite explícito |
+| Contraste incluido | Perfil del ejecutor | Límite explícito |
 | --- | --- | --- |
 | Ficha de socio | Encontrado, todos los campos/nulos de la muestra y ausencia comprobada | No promete muestra con cada campo nulo ni prueba de PII con usuario ajeno |
 | Compras individuales | Dos documentos positivos distintos; mes/moneda/importe/conteo; local+rubro; conteo real de página inicial | Recorrido HTTP anterior reutilizado; muestra multimoneda se detecta, no se acredita automáticamente |
@@ -237,8 +269,17 @@ credenciales ni errores crudos. El preflight no inicia sesión.
 - Compras promocionales: socio real con varias monedas; grupos reconocidos/ambiguos controlados en CTE. Segundo socio positivo aún sin acreditar.
 - Segmentación: muestra real multimoneda pendiente, con su propia cobertura controlada.
 - Compras individuales: variantes multimoneda sin evidencia específica; no extrapolar la cobertura de promociones.
+- Soles: las tres ventanas combinadas ensayadas no tienen filas para el socio seleccionado; falta una muestra positiva, no demostrar ausencia global en DEV.
 - Otras coincidencias nominales/fuzzy, combinaciones no exhaustivas y muestras de catálogos conservan los límites de la matriz; los buscadores aprobados no se repiten.
 
+**Contrastes funcionales todavía no acreditados individualmente:** chapa única y
+ausencia en vehículos del socio; fechas relativas de altas; chapa y recorrido
+completo de facturación; segundo socio promocional; conversión real de costo por m²
+y variantes adicionales de ausencia/ambigüedad de condiciones. Están diferenciados
+de las muestras DEV faltantes ya cubiertas de forma controlada: esta tanda no los
+ejecutó ni probó que no haya datos. Gráficos horizontal/circular/multiserie son
+variantes HTTP sin fuente Oracle propia, fuera de estos contrastes independientes.
+
 No se cambian datos, permisos, expiraciones ni integración frontend/ERP. No merge
-ni despliegue de la corrección. La PR debe permanecer en borrador hasta revisar
-el nuevo reporte y resolver cualquier hallazgo.
+ni despliegue de la corrección. El reporte ya fue revisado; la PR conserva el
+borrador para revisión final del diff y las limitaciones documentadas.
