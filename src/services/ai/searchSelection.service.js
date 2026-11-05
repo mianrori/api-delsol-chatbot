@@ -40,7 +40,10 @@ export function beginSearchSelectionTurn(sessionId,message){
  }
  if(state.domains[state.choiceFocus]?.kind==='cleared'&&changed)delete state.choiceFocus;
  const choice=selection(message),pending=Object.entries(state.domains).filter(([,s])=>s.kind==='pending');
- const selectable=pending.length?pending:Object.entries(state.domains).filter(([,s])=>s.kind==='selected');
+ const focused=Object.entries(state.domains).find(([name,s])=>name===state.choiceFocus&&['pending','selected'].includes(s.kind));
+ // The focused catalog owns a reselection. Two unresolved catalogs still need
+ // clarification; a choice must never resolve both or alter an unrelated one.
+ const selectable=pending.length>1?pending:focused?[focused]:pending.length?pending:Object.entries(state.domains).filter(([,s])=>s.kind==='selected');
  if(choice&&selectable.length===1&&(!state.choiceFocus||state.choiceFocus===selectable[0][0])){
   const [name,s]=selectable[0],options=s.result?.options;
   const selected=validOptions(name,options)?options.find(o=>optionNumber(o)===String(Number(choice))):null;
