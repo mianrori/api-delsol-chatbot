@@ -1,12 +1,20 @@
 # Alcance y evidencia del backend del chatbot
 
 Corte actualizado: **05/11/2026**, base desplegada `ef9bff4` (PR #37 fusionada).
+PR #38 — corrección monetaria `8ee5b14`: identificación inequívoca PYG/USD/CAD,
+contradicción/ambigüedad y compatibilidad de contraparte comprobadas antes del
+porcentaje; motivos por fila, parejas exactas separadas, sin conversión ni unión
+de alias. **15/15 enfocadas** y **2/2 del nuevo ejecutor** aprobadas en Node 22.
+Oracle/HTTP de esta corrección aún pendientes; PR en borrador. Reutiliza diez
+bloques no afectados y tres peticiones financieras, no los contrastes monetarios
+anteriores como si validaran la regla nueva. Ver [detalle](backend-independent-validation.md).
+
 Su comprobación posterior al despliegue aprobó 30/30 controles puntuales: siete
 peticiones HTTP con modelo controlado, selección/reelección y lecturas Oracle
 reales, conciliación independiente y cierre. El perfil seleccionado no tenía
 ventas en enero de 2023: acredita ausencia, no importes positivos ni suma cero.
 
-PR #38, rama `test/backend-independent-controls-dev`: corregida la colisión por
+Evidencia previa a `8ee5b14`, rama `test/backend-independent-controls-dev`: corregida la colisión por
 símbolo monetario en canjes/ventas (`222d761`), con 10/10 enfocadas y contraste
 Oracle/HTTP `7762f35`. Los trece bloques de esta tanda quedan acreditados para sus
 perfiles: ocho en N, usos/ranking en O, compras/edades en T y saldo en V.
@@ -255,7 +263,7 @@ dentro de `test/`. **Sin acreditar** indica falta de evidencia, no fallo probado
 | `get_member_promo_purchases` — compras promocionales | `members/memberPromoPurchase.service.js` | `memberPromoPurchases`, `promotionHardeningHarness`, `chatLifecycle` | R: siete páginas reales, multiconjunto y resumen, filtros/selección/seguimientos; denegación/cierre | `89a4e59`; desplegado `6b1303e` | **Muestra DEV:** socio con varias monedas; grupos ambiguos ya controlados en Oracle CTE. Segundo socio positivo no acreditado. |
 | `get_member_vehicles` — vehículos del socio/chapa | `members/memberVehicle.service.js` | `vehicleRegistrations`, PII y ciclo | N: documento, activos y débito sí/no contra Oracle independiente | `7762f35` | Chapa activa compartida no encontrada; chapa única/ausencia siguen sin contraste dedicado. No confundir H de altas agregadas con búsqueda de dueño. |
 | `analyze_members` — segmentación/ranking | `members/memberAnalysis.service.js` | Suites existentes de segmentación; 46/46 previas. Corrección del contrato orderBy: 17/17 enfocadas (5 nuevas; conteos solapados) | G: 50/50 finales Oracle/HTTP y cierre reutilizados; baseline y 40 controles/denegación previos. Null rechazado antes de SQL: 5/5 nuevos tests controlados en Docker DEV, sin nuevas lecturas Oracle | `345827f` validación orderBy; `7c34c14` Oracle/HTTP; `6b1303e` baseline; `82e72ba` parcial | Muestra real con varias monedas pendiente; CTE multimoneda aprobadas. Lenguaje inicial y carga general no exhaustivos. P2 orderBy:null corregido conforme al esquema no nullable; PR #36 fusionada y desplegada `00a1acb` (10/10 controles puntuales). |
-| `compare_member_purchases_vs_sales` — canjes/ventas | `members/memberPurchasesVsSales.service.js` | `memberPurchasesVsSales`, `chatLifecycle`; 10/10 enfocadas, símbolos compartidos y orden invertido | N aprobado: SQL independiente de ambos universos, resumen/mes, filtros combinados y cuatro perfiles HTTP del bloque; colisión `$` con CTE controladas | Código `222d761`; Oracle/HTTP `7762f35` | Pareja exacta descripción/símbolo conservada; no une alias ni suma socios distintos. `$` sin descripción no habilita porcentaje. CTE multimoneda no acredita socio real multimoneda. |
+| `compare_member_purchases_vs_sales` — canjes/ventas | `members/memberPurchasesVsSales.service.js` | `memberPurchasesVsSales`, `chatLifecycle`; corrección P2 con 15/15 enfocadas y 2/2 del ejecutor monetario | N previo sobre `222d761`/`7762f35`; no acredita la nueva identificación. Nuevo contraste Oracle/HTTP de PYG real y CTE preparados, todavía pendientes | `8ee5b14` código y pruebas enfocadas; Oracle/HTTP nuevo sin acreditar | Porcentaje solo con identificación inequívoca y contraparte compatible por pareja exacta. Ambigüedad, contradicción, incompatibilidad y alias distintos producen nulo con motivo. No convierte ni suma distintos. CTE no acredita socio real multimoneda; pendientes anteriores conservados. |
 | `generate_chart` — gráficos | `charts/chart.service.js` | `charts`, `chatLifecycle` | H: barras/líneas de ventas, SVG y fuente | `b315ff9` | HTTP de barras horizontales/circular, varias series/fuentes y datos de otras herramientas no acreditado; no exige Oracle al graficar. Revisión frontend excluida. |
 | `analyze_campaign_sales_performance` — antes/durante/después | `sales/campaignSalesPerformance.service.js` | `campaignSalesPerformance`, `chatLifecycle` | H reutilizado; N: SQL independiente de tres períodos, límites, filtros local/rubro, importes/facturas/moneda | `b315ff9` HTTP histórico; `7762f35` independiente | Perfil ensayado aprobado; ausencia/base cero/monedas diferentes en otras campañas no acreditadas individualmente. |
 | `search_invoice_concepts` — conceptos facturados | `invoices/searchInvoiceConcepts.service.js` | Nuevas: searchResolvers/searchSelection y chatLifecycle; 68/68 enfocadas del bloque (conteos solapados) | L: exacta/parcial/ausencia y límite; denegación/cierre. Selección/contexto: controlados. | `7ced8d9` Oracle; `c8525a6` controladas | Sin paginación en contrato: opciones limitadas y refinamiento. Conversación inicial libre no exhaustiva. |

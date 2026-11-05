@@ -1,13 +1,66 @@
 # Contrastes independientes restantes del backend
 
 Base: `ef9bff4`, PR #37 fusionada y desplegada. Rama separada:
-`test/backend-independent-controls-dev`. PR #38 en borrador. Estado: ocho bloques
+`test/backend-independent-controls-dev`. PR #38 en borrador. Evidencia anterior
+a la corrección monetaria `8ee5b14`: ocho bloques
 aprobados sobre `7762f35`, usos/ranking sobre `6e6c423`, compras/edades sobre
 `d529cfd` y saldo sobre `a709b35`: los trece bloques de esta tanda acreditados
 para sus perfiles, con las limitaciones detalladas abajo. No se suman checks
 de ejecuciones distintas ni se declara verificado todo el backend.
 
-## Resultado vigente
+## Corrección de identificación monetaria — `8ee5b14`
+
+La revisión de `01e6411` detectó un P2: una descripción no vacía habilitaba el
+porcentaje incluso si solo contenía `$` o contradecía el símbolo (`GUARANIES`/`USD`).
+La corrección está implementada; **sus nuevos contrastes Oracle/HTTP están pendientes**.
+Los resultados anteriores siguen acreditando sus perfiles sobre sus SHA originales,
+no acreditan automáticamente esta regla nueva.
+
+La identificación admite los códigos/alias conocidos de PYG, USD y CAD. Cada campo
+no vacío debe ser reconocido o ser el marcador neutro `$`; al menos uno debe
+identificar la divisa. Dos códigos reconocidos diferentes son contradicción.
+Una etiqueta desconocida no se sustituye por el código de otro campo; otras divisas
+no reconocidas quedan sin identificar y sin porcentaje. `$` nunca identifica USD
+por sí solo. No se cambia la unión exacta por descripción/símbolo ni se convierten
+importes o suman socios distintos entre grupos.
+
+| Situación | Porcentaje y motivo |
+| --- | --- |
+| Identificación inequívoca, pareja exacta compatible y ventas positivas | Calculado; `percentageReasonCode` y `percentageReason` nulos |
+| Etiquetas desconocidas o solo `$` | Nulo, `CURRENCY_AMBIGUOUS` |
+| Descripción y símbolo reconocidos pero contradictorios | Nulo, `CURRENCY_CONTRADICTION` |
+| Otra moneda reconocida en la contraparte de la misma dimensión | Nulo, `CURRENCY_INCOMPATIBLE`; conserva ambos importes por separado |
+| Misma divisa reconocida, etiquetas diferentes sin contraparte exacta | Nulo, `CURRENCY_METADATA_MISMATCH`; no une alias |
+| Sin ventas positivas | Nulo, `SALES_NOT_POSITIVE` |
+
+Se conserva el cero de canjes genuinamente ausentes cuando no hay canjes de ninguna
+moneda en esa dimensión y sí ventas positivas identificadas. No se usa ese cero
+para ocultar una contraparte con otra moneda. La presentación incorpora el motivo
+por fila y mantiene las etiquetas e importes originales separados.
+
+Pruebas afectadas: **15/15** de `memberPurchasesVsSales.test.js` en Node 22 Docker,
+con los dos casos reproducidos, reconocidas compatibles/incompatibles, alias,
+grupos ambiguos e inversión de filas, resultados/presentación y permisos/cancelación.
+Ejecutor nuevo: **2/2** de `pr38CurrencyControls.test.js`; consulta CTE enlazada por
+binds y expectativas explícitas independientes del clasificador, con resultado y
+presentación del servicio real sobre datos controlados.
+
+El helper `logs/run-pr38-currency-dev.ps1` pide sesión vigente oculta, o cuenta
+autorizada oculta para el login DEV protegido si hace falta. Prepara únicamente:
+SQL independiente del perfil PYG real (total/mes), CTE monetarias controladas en
+ambos órdenes y una consulta HTTP afectada de canjes/ventas. El consumidor/modelo
+HTTP se describe con su alcance preparado; la consulta de negocio es Oracle real.
+CTE USD/CAD/ambiguas no se presentan como socio real multimoneda.
+
+La reutilización verifica hashes de la cadena previa y que solo cambien los dos
+servicios de canjes/ventas/presentación: conserva **diez bloques no afectados** y
+las tres peticiones financieras del bloque HTTP anterior. No reutiliza como nueva
+validación los dos bloques monetarios ni la petición HTTP de canjes/ventas.
+No repite saldo, compras individuales, vehículos, usos, campaña, facturación ni
+contratos. Reporte nuevo: `logs/pr38-currency.json`, sin identidades, importes,
+documentos, credenciales, sesiones o errores crudos. Pendientes anteriores intactos.
+
+## Resultado vigente de saldo (no afectado)
 
 `backend-independent-a709b35.json`: ejecución exclusiva de saldo, **19/19 checks
 aprobados**, seis variantes conciliadas, 1,818 s total (caso: 1,319 s), 176 archivos
