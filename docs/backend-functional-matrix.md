@@ -115,6 +115,25 @@ el estado retirado. Proxies cerrados y dos logout propios aprobados aparte de lo
 fatal/de cierre detectado en stdout/stderr de chatbot. Sin pendientes propios
 del perfil; muestras reales faltantes conservadas. PR en borrador para revisión.
 
+Reelección enfocada — **código `047c361`, 75/75 pruebas afectadas aprobadas**.
+Con local y rubro confirmados, una opción mostrada del catálogo enfocado puede
+elegirse de nuevo sin alterar el otro. Se valida catálogo/ordinal/ID; dos catálogos
+aún pendientes siguen requiriendo aclaración. Pruebas de ambos buscadores antes/
+después del recorte, reelección repetida `1 → 2 → 1`, listas con los mismos números
+de opción, argumentos finales y estado completo ante opciones inválidas/ajenas.
+**370/370 controles Oracle/HTTP DEV aprobados sobre `047c361`**, 05/11/2026
+15:06:49.108–15:06:51.287 UTC (2,179 s), helper COMPLETE/success=true/salida 0.
+172 archivos candidatos idénticos; 88 peticiones HTTP, 44 checks de argumentos
+y 88 de historial (conteos solapados). Doce comparaciones del estado confirman
+que una reelección válida cambia solo su catálogo; opciones inválidas/ajenas e
+aislamiento conservan el estado completo. Ocho checks de pertenencia de opciones
+a catálogos Oracle independientes; auth/lookups reales, catálogo ajeno/modelo/
+ventas controlados. Proxies cerrados, dos logout propios aprobados aparte y
+cuatro eventos ERP compactos sin error/campos inválidos; sin error fatal/de cierre
+detectado en stdout/stderr de chatbot. Los 452 checks `0668b1b` se verificaron por
+hash, conservan su SHA y no se suman. Sin pendientes propios del perfil; PR #37
+en borrador para revisión final. Muestras históricas faltantes conservadas.
+
 ## Comparación con el chat original
 
 Se compararon los registros `src/tools/index.js` y los nombres de sus herramientas:

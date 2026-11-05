@@ -530,3 +530,73 @@ resultados; PR #37 en borrador para revisión final, sin merge/despliegue ni cam
 de datos, permisos o expiraciones. Muestras reales pendientes de superficie
 cero/cambiante, ventas registradas de suma cero y socios con varias monedas
 conservadas, con su cobertura controlada y limitaciones históricas.
+
+## Reelección de opciones del catálogo enfocado
+
+Revisión posterior: cuando ambos dominios estaban confirmados, el guard exigía
+un único estado seleccionable antes de consultar el foco. Una segunda opción
+mostrada de ese catálogo se rechazaba aunque el otro filtro no debiera cambiar.
+Reproducción nueva sintética para ambos buscadores conservada fuera de Git;
+no se repitieron controles aprobados ni login/Oracle durante esa revisión.
+
+**Corregido en `047c361`; 75/75 pruebas enfocadas Node 22 aprobadas.**
+El catálogo enfocado posee la reelección: debe estar pendiente/seleccionado y la
+opción debe existir en su lista validada. Solo cambia su selección; las opciones,
+contextos, foco y el otro dominio permanecen iguales. Si hay dos catálogos todavía
+pendientes, se conserva la exigencia de aclaración; no se seleccionan ambos con
+un número ni se resuelve una identidad por propuesta del modelo.
+
+Las pruebas cubren local y rubro, antes/después del límite real de recorte,
+incluyendo listas de ambos catálogos con los mismos ordinales y reelecciones
+`1 → 2 → 1`. Comparan el estado completo con un esperado que modifica únicamente
+la selección enfocada, el historial sin mutaciones y los argumentos finales:
+nuevo ID elegido, otro ID confirmado y período/métricas/desglose conservados.
+Las opciones inexistentes o de un catálogo ajeno mantienen todo el estado.
+Modelo, autenticación y fuentes son controlados en estas pruebas; no acreditan
+Oracle DEV de esta corrección.
+
+**370/370 controles Oracle/HTTP DEV aprobados sobre `047c361`**, 05/11/2026
+15:06:49.108–15:06:51.287 UTC (**2,179 s**, tramo HTTP 1.522 ms), helper COMPLETE,
+success=true/salida 0. **172 archivos candidatos iguales por hash**, sin pendientes
+propios del perfil. Preflight completo sin credenciales aprobado antes del login.
+
+- **88 peticiones HTTP**, **44 comprobaciones de argumentos exactos y 88 de
+  historial previo**, ambas direcciones local/rubro y antes/después del recorte.
+- **Doce comparaciones completas del estado** para reelecciones `1 → 2 → 1`
+  confirman que cambia solo la selección del catálogo enfocado, con ambos filtros
+  confirmados y listas cuyos ordinales coinciden. Los argumentos contienen el
+  nuevo ID y conservan el otro filtro, fechas, métricas y desglose.
+- Cuatro comprobaciones de estado completo ante opción inexistente, cuatro de
+  catálogo ajeno y cuatro de aislamiento entre sesiones, sin cambios imprevistos.
+  En dos perfiles se comprobó que ambos lookups ya salieron del historial.
+- **Ocho checks de pertenencia de opciones** a catálogos Oracle DEV independientes,
+  cuatro por buscador. Ruta/controller/chat, auth y lookups reales; modelo con
+  PII protegida, consumidor de ventas y opciones de socios ajenos controlados.
+  Sin consultar ventas/compras ni acreditar interpretación libre exhaustiva.
+- Identidades PG/proxy coincidentes, usuarios Oracle distintos, todos los proxies
+  cerrados y **dos logout propios aprobados aparte** de los 370 controles.
+- Logs stdout/stderr del intervalo: cuatro eventos ERP compactos, cero error/
+  campos o valores inválidos; sin error fatal/de cierre detectado en chatbot.
+  No se imprimieron líneas crudas, identidades ni secretos.
+
+Los conteos HTTP/argumentos/historial se solapan: no se suman como casos únicos.
+Se verificaron por hash los 452 checks `0668b1b`, conservando su SHA original,
+sin atribuirlos al código nuevo. Solo se ejecutaron reelección, opciones inválidas/
+ajenas, argumentos y aislamiento antes/después del recorte. No se repitieron
+denegaciones/errores anteriores, promociones, paginación, consultas de negocio
+ni suites completas. No se repitieron pruebas/login al revisar estos resultados.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\logs\run-search-reselection-dev.ps1
+```
+
+Helper NUEVO de reelección: cuatro entradas ocultas para las dos cuentas DEV,
+login protegido existente solo para obtener sesiones nuevas, usuarios Oracle
+distintos sin mostrar identidades y logout propios. Credenciales/sesiones solo
+en memoria/stdin, nunca argv/env/archivos/reportes/Git. Reportes sanitizados
+`logs/search-reselection-final.json` y `logs/search-reselection-final-summary.json`,
+helpers y `.env` ignorados por Git y no versionados. Esta actualización posterior
+solo documenta resultados; PR #37 sigue en borrador para revisión final, sin merge,
+despliegue ni cambios de datos, permisos o expiraciones. Muestras reales pendientes
+de superficie cero/cambiante, ventas registradas de suma cero y socios con varias
+monedas conservadas, con su cobertura controlada y limitaciones históricas.
