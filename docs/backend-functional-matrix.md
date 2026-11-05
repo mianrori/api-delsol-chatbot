@@ -336,9 +336,10 @@ pendiente de evidencia; no declararlas aprobadas como casos reales.
 3. Ficha/vehículos por documento aprobados en N; usos/ranking en O, compras/
    edades en T y saldo en V. Tanda de trece bloques cerrada para sus perfiles,
    sin repetir bloques aprobados ni conversaciones/paginación históricas.
-   La muestra positiva de ventanas combinadas de soles sigue sin acreditar;
-   el reporte verifica ausencia solo en el socio/período seleccionado.
-4. Ejecutar exclusivamente los ocho contrastes enumerados abajo. N/T/W y el
+   V conserva tres ventanas históricas vacías para su socio/período; `cafc5f1`
+   acredita otras ventanas combinadas positivas, sin reemplazar esa limitación.
+4. Conservar el estado de los ocho contrastes enumerados abajo; ejecutar solo
+   los pendientes cuando estén disponibles sus dependencias/muestras. N/T/W y el
    despliegue de PR #38 ya acreditan los perfiles de compras individuales,
    canjes/ventas, campañas y los tres endpoints financieros: no repetirlos.
 5. Después, completar HTTP de gráficos horizontal/circular/multiserie como
