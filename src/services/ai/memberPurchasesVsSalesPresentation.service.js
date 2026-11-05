@@ -15,14 +15,14 @@ export const buildMemberPurchasesVsSalesResponse = (calls = []) => {
     lines.push("No se encontraron ventas ni canjes registrados para este período y los filtros solicitados.");
     return lines.join("\n");
   }
-  lines.push(`| ${[...dimensions.map((type) => labels[type]), "Moneda", "Ventas", "Importe de canjes", "Cantidad de canjes", "Socios", "Canjes sobre ventas"].join(" | ")} |`);
-  lines.push(`| ${Array(dimensions.length + 6).fill("---").join(" | ")} |`);
+  lines.push(`| ${[...dimensions.map((type) => labels[type]), "Moneda", "Ventas", "Importe de canjes", "Cantidad de canjes", "Socios", "Canjes sobre ventas", "Motivo"].join(" | ")} |`);
+  lines.push(`| ${Array(dimensions.length + 7).fill("---").join(" | ")} |`);
   for (const row of result.results) {
     lines.push(`| ${[...row.dimensions.map((dimension) => cell(dimension.name)),
-      cell(row.currency.symbol || row.currency.description), number(row.auditedSalesAmount), number(row.exchangeAmount),
-      number(row.invoiceCount), number(row.memberCount), row.percentage == null ? "No calculable" : `${number(row.percentage)} %`].join(" | ")} |`);
+      cell([row.currency.description, row.currency.symbol].filter(Boolean).join(" / ") || "Moneda sin identificar"), number(row.auditedSalesAmount), number(row.exchangeAmount),
+      number(row.invoiceCount), number(row.memberCount), row.percentage == null ? "No calculable" : `${number(row.percentage)} %`, cell(row.percentageReason)].join(" | ")} |`);
   }
-  if (result.results.some((row) => row.percentage == null)) lines.push("", "No se calcula el porcentaje cuando el importe de ventas no es positivo.");
+  if (result.results.some((row) => row.percentage == null)) lines.push("", "Solo se comparan monedas identificadas sin contradicción y grupos con la misma descripción y símbolo. Los motivos de no cálculo se indican por fila; no se convierten importes ni se unen alias.");
   if (result.summary.hasMore) lines.push("", `Se muestran ${result.summary.returnedGroups} de ${result.summary.totalGroups} grupos, según el orden solicitado.`);
   return lines.join("\n");
 };

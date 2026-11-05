@@ -16,6 +16,113 @@ const connectionFor = (sales, purchases, queries = []) => ({
 });
 const present = (result) => buildMemberPurchasesVsSalesResponse([{ name: "compare_member_purchases_vs_sales", result }]);
 
+test("ambiguous dollar descriptions and contradictory metadata leave amounts intact and explain non-calculation", async () => {
+  for (const [description,symbol,status,reason] of [
+    ["$","$","ambiguous","CURRENCY_AMBIGUOUS"],
+    ["GUARANIES","USD","contradictory","CURRENCY_CONTRADICTION"],
+    ["DOLARES","₲","contradictory","CURRENCY_CONTRADICTION"],
+    ["CAD","USD","contradictory","CURRENCY_CONTRADICTION"],
+    ["SIN IDENTIFICAR","USD","ambiguous","CURRENCY_AMBIGUOUS"],
+    [null,null,"ambiguous","CURRENCY_AMBIGUOUS"],
+  ]) {
+    const money={CURRENCY_DESCRIPTION:description,CURRENCY_SYMBOL:symbol};
+    const result=await compareMemberPurchasesVsSales(period,connectionFor([
+      {...money,SALES_AMOUNT:100},
+    ],[{...money,EXCHANGE_AMOUNT:20,INVOICE_COUNT:2,MEMBER_COUNT:1}]));
+    const r=result.results[0];
+    assert.equal(r.percentage,null);assert.equal(r.percentageReasonCode,reason);
+    assert.equal(r.currency.status,status);assert.equal(r.currency.code,null);
+    assert.equal(r.auditedSalesAmount,100);assert.equal(r.exchangeAmount,20);
+    assert.equal(r.invoiceCount,2);assert.equal(r.memberCount,1);
+    const text=present(result);
+    assert.match(text,/No calculable/);assert.ok(text.includes(r.percentageReason));
+    assert.ok(!text.includes("20 %"));assert.match(text,/\| 100 \| 20 \|/);
+  }
+});
+
+test("recognized compatible currencies calculate only within the exact source metadata pair",async()=>{
+  for(const [description,symbol,code] of [
+    ["GUARANÍES","₲","PYG"],["PYG",null,"PYG"],
+    ["Dólares americanos","$","USD"],[null,"USD","USD"],["$","US$","USD"],
+    ["DOLARES CANADIENSES","$","CAD"],["CAD","C$","CAD"],
+  ]){
+    const money={CURRENCY_DESCRIPTION:description,CURRENCY_SYMBOL:symbol};
+    const result=await compareMemberPurchasesVsSales(period,connectionFor([{...money,SALES_AMOUNT:100}],[{...money,EXCHANGE_AMOUNT:20}]));
+    const r=result.results[0];assert.equal(r.currency.code,code);assert.equal(r.currency.status,"identified");
+    assert.equal(r.percentage,20);assert.equal(r.percentageReasonCode,null);assert.equal(r.percentageReason,null);
+    assert.match(present(result),/20 %/);assert.ok(!present(result).includes("No calculable"));
+  }
+});
+
+test("recognized incompatible source currencies keep both amounts separate and neither row calculates a percentage",async()=>{
+  const result=await compareMemberPurchasesVsSales(period,connectionFor([
+    {CURRENCY_DESCRIPTION:"DOLARES",CURRENCY_SYMBOL:"USD",SALES_AMOUNT:100},
+  ],[{CURRENCY_DESCRIPTION:"GUARANIES",CURRENCY_SYMBOL:"₲",EXCHANGE_AMOUNT:20,INVOICE_COUNT:2,MEMBER_COUNT:1}]));
+  assert.equal(result.results.length,2);
+  for(const r of result.results){assert.equal(r.percentage,null);assert.equal(r.percentageReasonCode,"CURRENCY_INCOMPATIBLE");assert.ok(present(result).includes(r.percentageReason));}
+  assert.equal(result.results.find(r=>r.currency.code==="USD").auditedSalesAmount,100);
+  assert.equal(result.results.find(r=>r.currency.code==="USD").exchangeAmount,0);
+  assert.equal(result.results.find(r=>r.currency.code==="PYG").exchangeAmount,20);
+  assert.equal(result.results.find(r=>r.currency.code==="PYG").auditedSalesAmount,0);
+  assert.equal((present(result).match(/No calculable/g)??[]).length,2);
+});
+
+test("recognized aliases remain separate without conversions or addition of distinct members",async()=>{
+  const result=await compareMemberPurchasesVsSales(period,connectionFor([
+    {CURRENCY_DESCRIPTION:"DOLARES",CURRENCY_SYMBOL:"USD",SALES_AMOUNT:100},
+  ],[{CURRENCY_DESCRIPTION:"DOLARES AMERICANOS",CURRENCY_SYMBOL:"US$",EXCHANGE_AMOUNT:20,MEMBER_COUNT:2}]));
+  assert.equal(result.results.length,2);
+  for(const r of result.results){assert.equal(r.currency.code,"USD");assert.equal(r.percentage,null);assert.equal(r.percentageReasonCode,"CURRENCY_METADATA_MISMATCH");}
+  assert.deepEqual(result.results.map(r=>r.memberCount),[0,2]);
+  assert.match(present(result),/no se unen alias/);
+});
+
+test("ambiguous groups never merge and inversion preserves every group's amounts and reason",async()=>{
+  const money=["$","MONEDA SIN DEFINIR",null].map(d=>({CURRENCY_DESCRIPTION:d,CURRENCY_SYMBOL:"$"}));
+  const sales=money.map((m,i)=>({...m,SALES_AMOUNT:100*(i+1)}));
+  const purchases=money.map((m,i)=>({...m,EXCHANGE_AMOUNT:10*(i+1),MEMBER_COUNT:1}));
+  const values=[];
+  for(const reverse of [false,true]){
+    const result=await compareMemberPurchasesVsSales(period,connectionFor(reverse?[...sales].reverse():sales,reverse?[...purchases].reverse():purchases));
+    assert.equal(result.results.length,3);
+    assert.ok(result.results.every(r=>r.percentage===null&&r.percentageReasonCode==="CURRENCY_AMBIGUOUS"&&r.memberCount===1));
+    values.push(result.results.map(r=>JSON.stringify(r)).sort());
+  }
+  assert.deepEqual(values[0],values[1]);
+});
+
+test("a shared dollar symbol cannot merge different currency descriptions", async () => {
+  const usd = { CURRENCY_DESCRIPTION: "DOLARES AMERICANOS", CURRENCY_SYMBOL: "$" };
+  const cad = { CURRENCY_DESCRIPTION: "DOLARES CANADIENSES", CURRENCY_SYMBOL: "$" };
+  const ambiguous = { CURRENCY_DESCRIPTION: null, CURRENCY_SYMBOL: "$" };
+  for (const reverse of [false, true]) {
+    const sales = [row("1", "Local", { SALES_AMOUNT: 100 }, usd), row("1", "Local", { SALES_AMOUNT: 400 }, cad), row("1", "Local", { SALES_AMOUNT: 100 }, ambiguous)];
+    const purchases = [row("1", "Local", { EXCHANGE_AMOUNT: 20, MEMBER_COUNT: 1 }, usd), row("1", "Local", { EXCHANGE_AMOUNT: 40, MEMBER_COUNT: 1 }, cad), row("1", "Local", { EXCHANGE_AMOUNT: 7, MEMBER_COUNT: 1 }, ambiguous)];
+    const result = await compareMemberPurchasesVsSales({ ...period, breakdownBy: ["customer"] }, connectionFor(reverse ? sales.reverse() : sales, reverse ? purchases.reverse() : purchases));
+    assert.equal(result.results.length, 3);
+    assert.equal(result.results.find(r => r.currency.description === usd.CURRENCY_DESCRIPTION).percentage, 20);
+    assert.equal(result.results.find(r => r.currency.description === cad.CURRENCY_DESCRIPTION).percentage, 10);
+    const unknown = result.results.find(r => r.currency.description === null);
+    assert.equal(unknown.exchangeAmount, 7);
+    assert.equal(unknown.percentage, null);
+    const text = present(result);
+    assert.match(text, /DOLARES AMERICANOS/);
+    assert.match(text, /DOLARES CANADIENSES/);
+  }
+});
+
+test("different currency metadata is retained without summing distinct members or matching aliases", async () => {
+  const result = await compareMemberPurchasesVsSales(period, connectionFor([
+    { ...currency, SALES_AMOUNT: 100 },
+  ], [
+    { ...currency, EXCHANGE_AMOUNT: 10, MEMBER_COUNT: 2 },
+    { ...currency, CURRENCY_SYMBOL: "PYG", EXCHANGE_AMOUNT: 20, MEMBER_COUNT: 2 },
+  ]));
+  assert.equal(result.results.length, 2);
+  assert.deepEqual(result.results.map(r => r.memberCount), [2, 2]);
+  assert.equal(result.results.find(r => r.currency.symbol === "PYG").percentage, null);
+});
+
 test("compares aggregate canjes with sales, including unmatched groups and separate currencies", async () => {
   const usd = { CURRENCY_DESCRIPTION: "DOLARES", CURRENCY_SYMBOL: "USD" };
   const result = await compareMemberPurchasesVsSales({ ...period, breakdownBy: ["customer"] }, connectionFor([
