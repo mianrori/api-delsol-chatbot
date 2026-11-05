@@ -1,6 +1,23 @@
 # Alcance y evidencia del backend del chatbot
 
-Corte actualizado: **04/11/2026**, base desplegada `00a1acb` (PR #36 fusionada).
+Corte actualizado: **05/11/2026**, base desplegada `ef9bff4` (PR #37 fusionada).
+Su comprobación posterior al despliegue aprobó 30/30 controles puntuales: siete
+peticiones HTTP con modelo controlado, selección/reelección y lecturas Oracle
+reales, conciliación independiente y cierre. El perfil seleccionado no tenía
+ventas en enero de 2023: acredita ausencia, no importes positivos ni suma cero.
+
+La revisión de cierre se prepara en `test/backend-independent-controls-dev`.
+Se detectó una colisión monetaria en canjes/ventas, reproducida y corregida con
+10/10 pruebas enfocadas Node 22. **Los nuevos contrastes Oracle/HTTP están
+preparados, todavía pendientes de ejecución con una sesión oculta vigente.**
+No atribuirles un resultado aprobado. Ver [plan y resultados de cierre](backend-independent-validation.md).
+
+### Evidencia histórica reutilizada
+
+Los estados de borrador que aparecen a continuación describen cada revisión
+histórica; la PR #37 ya está fusionada. Sus controles no se repiten ni se suman
+como casos únicos.
+
 Segmentación: 50/50 Oracle/HTTP en `7c34c14`; corrección orderBy en `345827f`
 (17/17 enfocadas, 5/5 controladas Docker DEV); despliegue `00a1acb`, 10/10
 conciliaciones de una consulta real y cierre, salud correcta y 159 archivos idénticos.
@@ -221,7 +238,7 @@ dentro de `test/`. **Sin acreditar** indica falta de evidencia, no fallo probado
 | `get_member_promo_purchases` — compras promocionales | `members/memberPromoPurchase.service.js` | `memberPromoPurchases`, `promotionHardeningHarness`, `chatLifecycle` | R: siete páginas reales, multiconjunto y resumen, filtros/selección/seguimientos; denegación/cierre | `89a4e59`; desplegado `6b1303e` | **Muestra DEV:** socio con varias monedas; grupos ambiguos ya controlados en Oracle CTE. Segundo socio positivo no acreditado. |
 | `get_member_vehicles` — vehículos del socio/chapa | `members/memberVehicle.service.js` | `vehicleRegistrations`, PII y ciclo | H comprueba registros agregados, no la búsqueda real de dueño por chapa | Sin validación DEV dedicada acreditada | Chapa única/múltiples socios, documento, débito/activo y ausencia: contraste real dirigido. |
 | `analyze_members` — segmentación/ranking | `members/memberAnalysis.service.js` | Suites existentes de segmentación; 46/46 previas. Corrección del contrato orderBy: 17/17 enfocadas (5 nuevas; conteos solapados) | G: 50/50 finales Oracle/HTTP y cierre reutilizados; baseline y 40 controles/denegación previos. Null rechazado antes de SQL: 5/5 nuevos tests controlados en Docker DEV, sin nuevas lecturas Oracle | `345827f` validación orderBy; `7c34c14` Oracle/HTTP; `6b1303e` baseline; `82e72ba` parcial | Muestra real con varias monedas pendiente; CTE multimoneda aprobadas. Lenguaje inicial y carga general no exhaustivos. P2 orderBy:null corregido conforme al esquema no nullable; PR #36 fusionada y desplegada `00a1acb` (10/10 controles puntuales). |
-| `compare_member_purchases_vs_sales` — canjes/ventas | `members/memberPurchasesVsSales.service.js` | `memberPurchasesVsSales`, `chatLifecycle` | H: meses/total/cambio de período; coherencia HTTP | `b315ff9` | SQL independiente de ambos universos con mismos filtros; otras monedas/denominador cero ya controlados, no muestra real acreditada de cada variante. |
+| `compare_member_purchases_vs_sales` — canjes/ventas | `members/memberPurchasesVsSales.service.js` | `memberPurchasesVsSales`, `chatLifecycle`; 10/10 enfocadas del nuevo bloque, incluidos símbolos compartidos y orden invertido | H reutilizado para el código previo. Nuevo SQL independiente, CTE multimoneda y HTTP afectados preparados, **sin ejecutar aún** | `b315ff9` histórico; nuevo candidato pendiente de Oracle/HTTP | Corregida la colisión por símbolo: conserva descripción/símbolo exactos, sin unir alias ni sumar socios distintos. No calcula con `$` sin identificación. La nueva presentación distingue las etiquetas. Falta acreditar la corrección contra DEV. |
 | `generate_chart` — gráficos | `charts/chart.service.js` | `charts`, `chatLifecycle` | H: barras/líneas de ventas, SVG y fuente | `b315ff9` | HTTP de barras horizontales/circular, varias series/fuentes y datos de otras herramientas no acreditado; no exige Oracle al graficar. Revisión frontend excluida. |
 | `analyze_campaign_sales_performance` — antes/durante/después | `sales/campaignSalesPerformance.service.js` | `campaignSalesPerformance`, `chatLifecycle` | H: selección y comparación temporal | `b315ff9` | Control SQL independiente de tres períodos con filtros; variantes reales de ausencia/base cero/monedas diferentes no acreditadas. |
 | `search_invoice_concepts` — conceptos facturados | `invoices/searchInvoiceConcepts.service.js` | Nuevas: searchResolvers/searchSelection y chatLifecycle; 68/68 enfocadas del bloque (conteos solapados) | L: exacta/parcial/ausencia y límite; denegación/cierre. Selección/contexto: controlados. | `7ced8d9` Oracle; `c8525a6` controladas | Sin paginación en contrato: opciones limitadas y refinamiento. Conversación inicial libre no exhaustiva. |
@@ -270,18 +287,18 @@ pendiente de evidencia; no declararlas aprobadas como casos reales.
 1. Completar trazabilidad de S/P usando artefactos/manifiestos ya existentes.
    Si no permiten anclar SHA, conservar «sin acreditar»; no inventar un commit
    por fecha ni repetir suites completas para subsanar un dato documental.
-2. `analyze_members`: bloque dedicado completado para los perfiles/variantes
-   declarados en G, con contraste independiente, segmentos, ranking, filtros,
-   períodos, monedas controladas, seguimientos y permiso/cierre. Revisar la PR
-   y conservar la muestra multimoneda real como limitación; no repetir lo aprobado.
-3. Cubrir resolutores/ficha y variantes de soles/vehículos sin evidencia directa:
-   pruebas enfocadas de buscadores donde no existen y consultas DEV mínimas de
-   exacta/ambigua/vacía, selección, aislamiento del socio y únicos. Reutilizar S/H
-   para no repetir saldo, usos paginados y total/género ya aprobados.
+2. Segmentación G y buscadores L/C/M, persistencia, transiciones, reelección y
+   despliegue de PR #37 están aprobados para sus perfiles. No quedan pendientes
+   de implementación ni corresponde volver a ejecutar esos controles.
+3. Contrastar ficha y variantes de soles/vehículos sin evidencia directa.
+   Reutilizar S/H para no repetir conversaciones, usos paginados y total/género.
 4. Añadir solo el contraste independiente que falta para compras individuales,
    canjes/ventas y campañas; en facturación/condiciones/costo por m², una consulta
-   HTTP positiva y controles de los filtros aún no acreditados. No repetir B/H
-   ni los bloques Q/I/R aprobados. Un caso nuevo puede cubrir varios pendientes.
+   HTTP positiva y controles de los filtros aún no acreditados. El nuevo ejecutor
+   prepara estos perfiles (y HTTP afectado de canjes/ventas) sin repetir B/H ni
+   Q/I/R. Segundo socio promocional, fechas relativas de vehículos, chapa/todas
+   las páginas de facturación y conversión de costo por m² siguen diferenciados
+   como variantes sin contraste real específico; no se cierran por preparar un script.
 5. Cerrar variantes HTTP de gráficos horizontal/circular/multiserie solo si se
    incluyen en la aceptación backend; verificar contrato/series/fuente sin UI.
    Recoger las cuatro muestras anteriores solo cuando existan legítimamente.

@@ -19,10 +19,10 @@ export const buildMemberPurchasesVsSalesResponse = (calls = []) => {
   lines.push(`| ${Array(dimensions.length + 6).fill("---").join(" | ")} |`);
   for (const row of result.results) {
     lines.push(`| ${[...row.dimensions.map((dimension) => cell(dimension.name)),
-      cell(row.currency.symbol || row.currency.description), number(row.auditedSalesAmount), number(row.exchangeAmount),
+      cell([row.currency.description, row.currency.symbol].filter(Boolean).join(" / ") || "Moneda sin identificar"), number(row.auditedSalesAmount), number(row.exchangeAmount),
       number(row.invoiceCount), number(row.memberCount), row.percentage == null ? "No calculable" : `${number(row.percentage)} %`].join(" | ")} |`);
   }
-  if (result.results.some((row) => row.percentage == null)) lines.push("", "No se calcula el porcentaje cuando el importe de ventas no es positivo.");
+  if (result.results.some((row) => row.percentage == null)) lines.push("", "No se calcula el porcentaje cuando el importe de ventas no es positivo o la moneda no está identificada. Solo se comparan grupos con la misma descripción y símbolo de moneda, sin conversión ni unión de alias.");
   if (result.summary.hasMore) lines.push("", `Se muestran ${result.summary.returnedGroups} de ${result.summary.totalGroups} grupos, según el orden solicitado.`);
   return lines.join("\n");
 };

@@ -16,6 +16,38 @@ const connectionFor = (sales, purchases, queries = []) => ({
 });
 const present = (result) => buildMemberPurchasesVsSalesResponse([{ name: "compare_member_purchases_vs_sales", result }]);
 
+test("a shared dollar symbol cannot merge different currency descriptions", async () => {
+  const usd = { CURRENCY_DESCRIPTION: "DOLARES AMERICANOS", CURRENCY_SYMBOL: "$" };
+  const cad = { CURRENCY_DESCRIPTION: "DOLARES CANADIENSES", CURRENCY_SYMBOL: "$" };
+  const ambiguous = { CURRENCY_DESCRIPTION: null, CURRENCY_SYMBOL: "$" };
+  for (const reverse of [false, true]) {
+    const sales = [row("1", "Local", { SALES_AMOUNT: 100 }, usd), row("1", "Local", { SALES_AMOUNT: 400 }, cad), row("1", "Local", { SALES_AMOUNT: 100 }, ambiguous)];
+    const purchases = [row("1", "Local", { EXCHANGE_AMOUNT: 20, MEMBER_COUNT: 1 }, usd), row("1", "Local", { EXCHANGE_AMOUNT: 40, MEMBER_COUNT: 1 }, cad), row("1", "Local", { EXCHANGE_AMOUNT: 7, MEMBER_COUNT: 1 }, ambiguous)];
+    const result = await compareMemberPurchasesVsSales({ ...period, breakdownBy: ["customer"] }, connectionFor(reverse ? sales.reverse() : sales, reverse ? purchases.reverse() : purchases));
+    assert.equal(result.results.length, 3);
+    assert.equal(result.results.find(r => r.currency.description === usd.CURRENCY_DESCRIPTION).percentage, 20);
+    assert.equal(result.results.find(r => r.currency.description === cad.CURRENCY_DESCRIPTION).percentage, 10);
+    const unknown = result.results.find(r => r.currency.description === null);
+    assert.equal(unknown.exchangeAmount, 7);
+    assert.equal(unknown.percentage, null);
+    const text = present(result);
+    assert.match(text, /DOLARES AMERICANOS/);
+    assert.match(text, /DOLARES CANADIENSES/);
+  }
+});
+
+test("different currency metadata is retained without summing distinct members or matching aliases", async () => {
+  const result = await compareMemberPurchasesVsSales(period, connectionFor([
+    { ...currency, SALES_AMOUNT: 100 },
+  ], [
+    { ...currency, EXCHANGE_AMOUNT: 10, MEMBER_COUNT: 2 },
+    { ...currency, CURRENCY_SYMBOL: "PYG", EXCHANGE_AMOUNT: 20, MEMBER_COUNT: 2 },
+  ]));
+  assert.equal(result.results.length, 2);
+  assert.deepEqual(result.results.map(r => r.memberCount), [2, 2]);
+  assert.equal(result.results.find(r => r.currency.symbol === "PYG").percentage, null);
+});
+
 test("compares aggregate canjes with sales, including unmatched groups and separate currencies", async () => {
   const usd = { CURRENCY_DESCRIPTION: "DOLARES", CURRENCY_SYMBOL: "USD" };
   const result = await compareMemberPurchasesVsSales({ ...period, breakdownBy: ["customer"] }, connectionFor([

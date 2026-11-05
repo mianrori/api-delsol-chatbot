@@ -16,13 +16,11 @@ const normalizeText = (value) => {
 };
 
 const getCurrencyKey = ({ description, symbol }) => {
-  const normalizedSymbol = normalizeText(symbol);
-
-  if (normalizedSymbol) {
-    return `SYMBOL:${normalizedSymbol}`;
-  }
-
-  return `DESCRIPTION:${normalizeText(description)}`;
+  // The SQL groups by both fields. A symbol alone is not a currency identity
+  // (several currencies use "$"), and collapsing those groups loses amounts
+  // and distinct-member counts. Preserve the exact source pair; no FX or
+  // speculative alias matching is performed by this comparison.
+  return JSON.stringify([description ?? null, symbol ?? null]);
 };
 
 const buildDimensions = ({ row, breakdownBy }) => {
@@ -272,7 +270,9 @@ export const compareMemberPurchasesVsSales = async (args, connection) => {
     ...item,
 
     percentage:
-      item.auditedSalesAmount > 0
+      item.auditedSalesAmount > 0 &&
+      (Boolean(normalizeText(item.currency.description)) ||
+        ["PYG", "GS", "GS.", "₲", "USD", "US$", "U$S"].includes(normalizeText(item.currency.symbol)))
         ? roundPercentage((item.exchangeAmount / item.auditedSalesAmount) * 100)
         : null,
   }));
