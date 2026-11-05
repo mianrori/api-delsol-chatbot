@@ -12,9 +12,25 @@ de ejecuciones distintas ni se declara verificado todo el backend.
 
 La revisión de `01e6411` detectó un P2: una descripción no vacía habilitaba el
 porcentaje incluso si solo contenía `$` o contradecía el símbolo (`GUARANIES`/`USD`).
-La corrección está implementada; **sus nuevos contrastes Oracle/HTTP están pendientes**.
-Los resultados anteriores siguen acreditando sus perfiles sobre sus SHA originales,
-no acreditan automáticamente esta regla nueva.
+La corrección está implementada y **sus tres bloques afectados Oracle/HTTP
+aprobaron 86/86 checks sobre `7bebb3d`**. Los resultados anteriores conservan
+sus SHA; los contrastes monetarios se ejecutaron de nuevo sobre la regla corregida,
+sin atribuirle automáticamente las aprobaciones anteriores.
+
+Reporte `pr38-currency-7bebb3d.json`: 18,815 s total, 177 archivos candidatos
+idénticos, cierre de todas las conexiones y logout propio aprobados. `7bebb3d`
+solo cambia documentación respecto de `8ee5b14`; el código validado es idéntico.
+
+| Bloque afectado | Evidencia nueva y alcance |
+| --- | --- |
+| Canjes/ventas real | PYG, total/mes y local/rubro; importes, conteos, socios distintos por grupo, porcentaje y compatibilidad contra SQL independiente. 14,537 s. |
+| CTE monetarias | Doce entradas controladas y catorce grupos conservados, ambos órdenes: `$`/`$`, contradicción, desconocidas, PYG/USD/CAD identificadas, divisas incompatibles, alias sin unir y símbolo compartido. Resultado, importes, conteos, porcentaje/motivo y presentación por fila. 0,232 s. Adaptador SQL controlado con entradas leídas de Oracle; no es socio real multimoneda. |
+| HTTP afectado | Una consulta de canjes/ventas: ruta/controller/chat reales en loopback del candidato; sesión/consulta Oracle reales, modelo y resolución preparados. Argumentos y resultado coinciden con el perfil contrastado. 3,525 s. |
+
+No sumar los 86 checks con ejecuciones históricas ni interpretarlos como casos
+únicos: los dos órdenes repiten deliberadamente comprobaciones de las mismas
+entradas. Los diez bloques no afectados y tres peticiones financieras se reutilizan
+por la cadena de hashes verificada; ninguno se volvió a ejecutar.
 
 La identificación admite los códigos/alias conocidos de PYG, USD y CAD. Cada campo
 no vacío debe ser reconocido o ser el marcador neutro `$`; al menos uno debe
@@ -46,7 +62,7 @@ binds y expectativas explícitas independientes del clasificador, con resultado 
 presentación del servicio real sobre datos controlados.
 
 El helper `logs/run-pr38-currency-dev.ps1` pide sesión vigente oculta, o cuenta
-autorizada oculta para el login DEV protegido si hace falta. Prepara únicamente:
+autorizada oculta para el login DEV protegido si hace falta. Ejecutó únicamente:
 SQL independiente del perfil PYG real (total/mes), CTE monetarias controladas en
 ambos órdenes y una consulta HTTP afectada de canjes/ventas. El consumidor/modelo
 HTTP se describe con su alcance preparado; la consulta de negocio es Oracle real.
@@ -56,9 +72,11 @@ La reutilización verifica hashes de la cadena previa y que solo cambien los dos
 servicios de canjes/ventas/presentación: conserva **diez bloques no afectados** y
 las tres peticiones financieras del bloque HTTP anterior. No reutiliza como nueva
 validación los dos bloques monetarios ni la petición HTTP de canjes/ventas.
-No repite saldo, compras individuales, vehículos, usos, campaña, facturación ni
-contratos. Reporte nuevo: `logs/pr38-currency.json`, sin identidades, importes,
-documentos, credenciales, sesiones o errores crudos. Pendientes anteriores intactos.
+No repitió saldo, compras individuales, vehículos, usos, campaña, facturación ni
+contratos. Reporte conservado: `logs/pr38-currency-7bebb3d.json`, sin identidades,
+importes, documentos, credenciales, sesiones o errores crudos. Pendientes anteriores
+intactos. PR #38 mantiene borrador para revisión final de la corrección; sin merge
+ni despliegue. La actualización posterior a esta evidencia es solo documental.
 
 ## Resultado vigente de saldo (no afectado)
 
