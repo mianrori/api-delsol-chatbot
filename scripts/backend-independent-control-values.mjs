@@ -23,3 +23,9 @@ export const solesCases=new Set(['MEMBER_SOLES_HISTORY']);
 // undefined options value (the latter is NJS-005). Preserve the real overload.
 export const forwardOracleExecute=(connection,text,binds,options)=>options===undefined
   ? connection.execute(text,binds) : connection.execute(text,binds,options);
+// Match get_member_soles' existing input contract. This normalizes the input
+// only; never trim/cast the database column or strip leading/internal digits.
+export function normalizeSolesDocumentForControl(value){
+  if(typeof value!=='string'||!value.trim())throw Error('CONTROL_DOCUMENT_REQUIRED');
+  return value.trim();
+}

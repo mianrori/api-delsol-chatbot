@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {sameSolesType,monthPeriod,remainingCases,diagnosticCases,purchaseSamples,solesCases,forwardOracleExecute} from '../scripts/backend-independent-control-values.mjs';
+import {sameSolesType,monthPeriod,remainingCases,diagnosticCases,purchaseSamples,solesCases,forwardOracleExecute,normalizeSolesDocumentForControl} from '../scripts/backend-independent-control-values.mjs';
 import {getMemberSoles} from '../src/services/soles/memberSoles.service.js';
 import oracledb from 'oracledb';
 
@@ -60,4 +60,31 @@ test('driver execute overload rejects explicit undefined and forwarding preserve
   const denied=Object.assign(Error('CONTROLLED'),{code:'ORA-00942'});
   connection._impl.execute=async()=>{throw denied;};
   await assert.rejects(forwardOracleExecute(connection,'SELECT 1 FROM DUAL',{}),{code:'ORA-00942'});
+});
+
+test('canonical soles control input trims only outside whitespace and preserves exact identity',()=>{
+  assert.equal(normalizeSolesDocumentForControl('  00123  '),'00123');
+  assert.equal(normalizeSolesDocumentForControl('\t001 23\n'),'001 23');
+  assert.notEqual(normalizeSolesDocumentForControl('00123'),'123');
+  for(const value of ['', ' ', null, undefined, 123])assert.throws(()=>normalizeSolesDocumentForControl(value));
+});
+
+test('canonical soles control and real service query the same exact document without merging padded database identities',async()=>{
+  const raw=' 00123 ',canonical=normalizeSolesDocumentForControl(raw);
+  const records=[
+    {document:raw,type:901,generated:999,balance:999},
+    {document:canonical,type:901,generated:10,balance:4},
+    {document:canonical,type:902,generated:20,balance:8},
+  ];
+  const control=document=>records.filter(r=>r.document===document).map(r=>({typeId:r.type,generatedAmount:r.generated,balance:r.balance,recordCount:1}));
+  const binds=[];
+  const result=await getMemberSoles({documentNumber:raw,status:'all',useCurrentGenerationPeriod:false},{execute:async(sql,input)=>{
+    assert.ok(!/TRIM\s*\(\s*COD_SOCIO\s*\)/i.test(sql));
+    assert.equal(input.documentNumber,canonical);binds.push(input.documentNumber);
+    return {rows:control(input.documentNumber).map(r=>({TYPE_ID:r.typeId,GENERATED_AMOUNT:r.generatedAmount,BALANCE:r.balance,RECORD_COUNT:r.recordCount}))};
+  }});
+  const values=result.data.map(({typeId,generatedAmount,balance,recordCount})=>({typeId,generatedAmount,balance,recordCount}));
+  assert.notDeepEqual(values,control(raw),'reproduces the original control using a different padded input');
+  assert.deepEqual(values,control(canonical));
+  assert.equal(result.documentNumber,canonical);assert.deepEqual(binds,[canonical]);
 });

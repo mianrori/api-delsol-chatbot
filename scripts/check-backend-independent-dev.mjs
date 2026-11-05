@@ -1,6 +1,6 @@
 // Read-only DEV contrasts. Business rows and session identity stay in memory.
 // Invoked by the local hidden-input helper, never with a session in argv/env.
-import {sameSolesType,monthPeriod,remainingCases,diagnosticCases,purchaseSamples,solesCases,forwardOracleExecute} from './backend-independent-control-values.mjs';
+import {sameSolesType,monthPeriod,remainingCases,diagnosticCases,purchaseSamples,solesCases,forwardOracleExecute,normalizeSolesDocumentForControl} from './backend-independent-control-values.mjs';
 const emit = process.stdout.write.bind(process.stdout);
 for (const k of ['log','info','warn','error','debug','trace','dir','table']) console[k] = () => {};
 const report = {suite:'backend-independent-dev', commit:process.argv[2], startedAt:new Date().toISOString(), success:false, checks:[], cases:[], limitations:[], scope:'independent Oracle SELECT versus real tool dispatcher; four prepared-context HTTP checks; no live language-model or frontend test'};
@@ -139,13 +139,17 @@ try {
     operation='SOLES_SAMPLE_DISCOVERY';
     const s=(await sql('SELECT COD_SOCIO FROM VW_BOT_SOLES_GENERADOS WHERE COD_SOCIO IS NOT NULL GROUP BY COD_SOCIO ORDER BY COD_SOCIO FETCH FIRST 1 ROWS ONLY'))[0];
     if(!s)missing('GENERATED_SOLES_SAMPLE_NOT_FOUND');
+    const rawDocument=str(s.COD_SOCIO),d=normalizeSolesDocumentForControl(rawDocument);
+    report.diagnostics.push({code:'SOLES_CONTROL_DOCUMENT_CONTRACT',sampleRequiredOuterTrim:rawDocument!==d,leadingCharactersPreserved:d===rawDocument.trim()});
     for(const status of ['all','current','expired'])for(const filtered of [false,true]){
-      const d=str(s.COD_SOCIO),where=`COD_SOCIO=:d${status==='all'?'':status==='current'?" AND (VENCIMIENTO IS NULL OR VENCIMIENTO>=DATE '2023-06-30')":" AND VENCIMIENTO<DATE '2023-06-30'"}${filtered?" AND FECHA_ALTA>=DATE '2023-01-01' AND FECHA_ALTA<DATE '2023-06-01' AND VENCIMIENTO>=DATE '2023-01-01' AND VENCIMIENTO<DATE '2024-01-01'":''}`;
+      const where=`COD_SOCIO=:d${status==='all'?'':status==='current'?" AND (VENCIMIENTO IS NULL OR VENCIMIENTO>=DATE '2023-06-30')":" AND VENCIMIENTO<DATE '2023-06-30'"}${filtered?" AND FECHA_ALTA>=DATE '2023-01-01' AND FECHA_ALTA<DATE '2023-06-01' AND VENCIMIENTO>=DATE '2023-01-01' AND VENCIMIENTO<DATE '2024-01-01'":''}`;
       operation='SOLES_INDEPENDENT_SUMMARY';const rows=await sql(`SELECT COD_TIPO_SOL T,SUM(NVL(TOTAL,0)) G,SUM(NVL(SALDO,0)) B,COUNT(*) N FROM VW_BOT_SOLES_GENERADOS WHERE ${where} GROUP BY COD_TIPO_SOL`,{d});
       operation='SOLES_TOOL_SUMMARY';const got=await tool('get_member_soles',{documentNumber:d,status,referenceDate:'30/06/2023',useCurrentGenerationPeriod:false,...(filtered?{generationDateFrom:'01/01/2023',generationDateTo:'31/05/2023',expirationDateFrom:'01/01/2023',expirationDateTo:'31/12/2023'}:{})});
+      check(got.documentNumber===d,'SOLES_EXACT_DOCUMENT_MATCHES_CONTROL');
       const match=matchType=>got.data.length===rows.length&&rows.every(r=>got.data.some(g=>matchType(g.typeId,r.T)&&near(g.generatedAmount,r.G)&&near(g.balance,r.B)&&g.recordCount===r.N));
       const component=fn=>rows.every(r=>got.data.some(g=>sameSolesType(g.typeId,r.T)&&fn(g,r)));
-      report.diagnostics.push({code:'SOLES_COMPARISON_COMPONENTS',status,filtered,groupCountMatches:got.data.length===rows.length,rawTypeAndTotalsMatch:match((a,b)=>str(a)===str(b)),numericTypeAndTotalsMatch:match(sameSolesType),numericTypeGroupsMatch:component(()=>true),generatedAmountsMatch:component((g,r)=>near(g.generatedAmount,r.G)),balancesMatch:component((g,r)=>near(g.balance,r.B)),recordCountsMatch:component((g,r)=>g.recordCount===r.N)});
+      report.diagnostics.push({code:'SOLES_COMPARISON_COMPONENTS',status,filtered,hasSourceRows:rows.length>0,groupCountMatches:got.data.length===rows.length,rawTypeAndTotalsMatch:match((a,b)=>str(a)===str(b)),numericTypeAndTotalsMatch:match(sameSolesType),numericTypeGroupsMatch:component(()=>true),generatedAmountsMatch:component((g,r)=>near(g.generatedAmount,r.G)),balancesMatch:component((g,r)=>near(g.balance,r.B)),recordCountsMatch:component((g,r)=>g.recordCount===r.N)});
+      if(!rows.length)report.limitations.push(`SOLES_${status.toUpperCase()}_${filtered?'WITH_WINDOWS':'FULL_HISTORY'}_HAS_NO_ROWS_FOR_SELECTED_MEMBER`);
       if(!match(sameSolesType)){
         operation='SOLES_SAME_CONNECTION_DIAGNOSTIC';
         const {getMemberSoles}=await import('../src/services/soles/memberSoles.service.js');

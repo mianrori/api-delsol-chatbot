@@ -151,11 +151,43 @@ validador real de node-oracledb (solo red controlada, sin login), opciones váli
 y propagación de errores. El preflight del próximo helper repite esa comprobación
 del driver antes de solicitar valores ocultos; así no basta con importar módulos.
 
-Continuación pendiente: `logs/run-backend-independent-soles-dev.ps1`, únicamente
+Continuación ejecutada: `logs/run-backend-independent-soles-dev.ps1`, únicamente
 saldo y su traza de misma conexión. Reutiliza los doce bloques aprobados mediante
 los tres reportes y sus hashes; exige código de aplicación/configuración/dependencias
 idéntico. No repite compras, vehículos, usos ni los cuatro HTTP. La PR sigue en
-borrador; no se ha corregido ni aprobado aún la discrepancia del saldo.
+borrador. El resultado y la corrección del control se detallan a continuación.
+
+## Causa confirmada sobre `ef27c48`
+
+Reporte `backend-independent-ef27c48.json`: únicamente saldo, fallido; cinco de
+seis checks verdaderos, 0,754 s, 176 archivos idénticos, cierre y logout aprobados.
+El adaptador ya supera NJS-005 y la traza de misma conexión confirma:
+
+- La muestra tiene espacios exteriores. El control usaba ese valor crudo; el
+  servicio aplica `.trim()` al argumento, conforme a su contrato existente.
+- Los binds no eran iguales: el control seleccionaba un grupo y servicio/dispatcher
+  dos. El control era estable antes/después, sin cambio de datos durante la lectura.
+- El SQL capturado coincide con su mapeo y el servicio directo con el dispatcher.
+  No hay filtro de fecha inesperado ni problema de formato de filas del driver.
+
+La discrepancia se localiza en **argumentos distintos del ejecutor**, no en el
+mapeo ni en el cálculo del servicio. El control ahora normaliza una vez la entrada
+igual que `get_member_soles` y entrega exactamente la misma cadena a ambos caminos.
+Se conserva `COD_SOCIO = :d`: **no** se aplica TRIM a la columna, no se mezclan
+identificadores almacenados con/sin espacios ni se eliminan ceros iniciales o
+espacios internos. No se cambia el servicio, la resolución de identidad ni permisos.
+
+Dos regresiones nuevas Node 22 Docker reproducen los conjuntos distintos con datos
+controlados y verifican la conciliación al usar el mismo argumento canónico, la
+preservación de identidad y el rechazo de entrada vacía/no textual. Pasan 2/2.
+No sustituyen la repetición Oracle del control corregido.
+
+El helper exclusivo de saldo conserva los doce bloques aprobados por hash y
+registra esta traza como investigación, **sin contarla como aprobada**. Su preflight
+verifica tanto las dos nuevas regresiones como la sobrecarga real del driver antes
+de pedir secretos. Añade comprobación del documento exacto en cada variante y
+registra explícitamente las ventanas sin filas; no las describe como muestra positiva.
+Pendiente de ejecutar/revisar el contraste corregido para las seis variantes.
 
 ## Alcance del ejecutor
 
