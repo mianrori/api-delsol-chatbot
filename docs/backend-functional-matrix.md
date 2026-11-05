@@ -1,6 +1,6 @@
 # Alcance y evidencia del backend del chatbot
 
-Corte actualizado: **05/11/2026**, base desplegada `ef9bff4` (PR #37 fusionada).
+Corte actualizado: **05/11/2026**, base desplegada `30ffab4` (PR #38 fusionada).
 PR #38 — corrección monetaria `8ee5b14`: identificación inequívoca PYG/USD/CAD,
 contradicción/ambigüedad y compatibilidad de contraparte comprobadas antes del
 porcentaje; motivos por fila, parejas exactas separadas, sin conversión ni unión
@@ -8,13 +8,18 @@ de alias. **15/15 enfocadas** y **2/2 del nuevo ejecutor** aprobadas en Node 22.
 **86/86 checks Oracle/HTTP afectados aprobados sobre `7bebb3d`**, código idéntico
 a `8ee5b14`, 177 archivos coincidentes, cierre/logout aprobados. Reutiliza diez
 bloques no afectados y tres peticiones financieras por hash; los contrastes
-monetarios se renovaron, sin repetir otros perfiles. PR en borrador para revisar
-la corrección. Ver [detalle](backend-independent-validation.md).
+monetarios se renovaron, sin repetir otros perfiles. `ade722f` solo documentó
+resultados. PR #38 fusionada y desplegada; ver [detalle](backend-independent-validation.md).
 
-Su comprobación posterior al despliegue aprobó 30/30 controles puntuales: siete
+La comprobación posterior al despliegue de PR #37 aprobó 30/30 controles puntuales: siete
 peticiones HTTP con modelo controlado, selección/reelección y lecturas Oracle
 reales, conciliación independiente y cierre. El perfil seleccionado no tenía
 ventas en enero de 2023: acredita ausencia, no importes positivos ni suma cero.
+En `30ffab4`, el despliegue de PR #38 acredita **26/26** controles de una consulta
+HTTP mensual real de canjes/ventas contra SELECT independientes: importes PYG,
+monedas, cantidades, porcentaje y presentación. Modelo/resolución preparados;
+no es una muestra multimoneda ni una nueva CTE. Salud/arranque y 179 archivos
+coincidentes aprobados. No se repiten estas comprobaciones.
 
 Evidencia previa a `8ee5b14`, rama `test/backend-independent-controls-dev`: corregida la colisión por
 símbolo monetario en canjes/ventas (`222d761`), con 10/10 enfocadas y contraste
@@ -31,7 +36,10 @@ contrato); no se modificó el servicio ni se relajó identidad o igualdad en SQL
 
 No se declara verificación exhaustiva del backend: las variantes funcionales
 sin contraste específico siguen separadas de las muestras DEV ausentes ya
-cubiertas de forma controlada. PR en borrador, sin merge ni despliegue.
+cubiertas de forma controlada. La nueva tanda de variantes está en la rama
+`test/backend-pending-variants-dev`, sin cambios de aplicación ni despliegue.
+Su ejecución DEV está pendiente de entrada oculta; preparar el ejecutor no
+acredita sus casos. Ver [plan acotado](backend-pending-variants-validation.md).
 Ver [resultados y límites](backend-independent-validation.md).
 
 ### Evidencia histórica reutilizada
@@ -310,7 +318,7 @@ No alterar contratos, ventas ni socios para obtenerlas. Si DEV no contiene esas
 muestras, cerrar la implementación con la limitación explícita y conservar el
 pendiente de evidencia; no declararlas aprobadas como casos reales.
 
-**Verificación backend restante**, en orden de aprovechamiento de evidencia:
+**Verificación backend restante**, priorizada por efecto sobre resultados/permisos:
 
 1. Completar trazabilidad de S/P usando artefactos/manifiestos ya existentes.
    Si no permiten anclar SHA, conservar «sin acreditar»; no inventar un commit
@@ -323,18 +331,31 @@ pendiente de evidencia; no declararlas aprobadas como casos reales.
    sin repetir bloques aprobados ni conversaciones/paginación históricas.
    La muestra positiva de ventanas combinadas de soles sigue sin acreditar;
    el reporte verifica ausencia solo en el socio/período seleccionado.
-4. Añadir solo el contraste independiente que falta para compras individuales,
-   canjes/ventas y campañas; en facturación/condiciones/costo por m², una consulta
-   HTTP positiva y controles de los filtros aún no acreditados. N ya acredita
-   canjes/ventas, campaña y los tres endpoints financieros para sus perfiles;
-   no repetirlos. Compras individuales ya aprobado en T para los dos perfiles.
-   Segundo socio promocional,
-   fechas relativas de vehículos, chapa/todas
-   las páginas de facturación y conversión de costo por m² siguen diferenciados
-   como variantes sin contraste real específico; no se cierran por preparar un script.
-5. Cerrar variantes HTTP de gráficos horizontal/circular/multiserie solo si se
-   incluyen en la aceptación backend; verificar contrato/series/fuente sin UI.
-   Recoger las cuatro muestras anteriores solo cuando existan legítimamente.
+4. Ejecutar exclusivamente los ocho contrastes enumerados abajo. N/T/W y el
+   despliegue de PR #38 ya acreditan los perfiles de compras individuales,
+   canjes/ventas, campañas y los tres endpoints financieros: no repetirlos.
+5. Después, completar HTTP de gráficos horizontal/circular/multiserie como
+   contrato backend, sin UI ni nuevo contraste Oracle de importes ya acreditados.
+   Sus unitarias aprobadas se conservan; ese paso HTTP sigue sin acreditar.
+
+| Prioridad | Variante ejecutable con DEV | Evidencia adicional mínima / estado |
+| --- | --- | --- |
+| P1 | Vehículos por chapa única y ausente | Dueño/vehículo contra SELECT; ausencia confirmada sin propietario. Nuevo ejecutor preparado, no ejecutado. Chapa compartida sigue dependiendo de muestra real. |
+| P1 | Facturas por chapa y todas las páginas de una cohorte completa acotada | Seguridad `USER_CAN_CONSULT`, cliente/período/chapa combinados; multiconjunto, cantidades, importes por moneda y facturas distintas globales; fin real y página siguiente vacía. Preparado, no ejecutado. |
+| P1 | Condiciones sin contrato | Ausencia independiente y respuesta sin conceptos/importes. Preparado, no ejecutado. |
+| P1 | Condiciones ambiguas | Todas las identidades de una cohorte activa contra SELECT, sin elección arbitraria ni importes. Preparado; muestra puede no existir. No inferir de incidencia. |
+| P1 | Costo por m² con conversión real | Neto/área Oracle y tasa pública realmente consumida, segundo parseo y aritmética. Preparado; depende de cohorte reconocida y proveedor externo disponible. Tasa actual, no histórica; no es una cotización de Oracle. |
+| P2 | Ventanas positivas combinadas de generación/vencimiento de soles | Descubrir fechas del registro real; todos/vigentes al vencimiento/vencidos al día siguiente, saldo/cantidad por tipo. Preparado. No reemplaza las tres ventanas históricas vacías de V. |
+| P2 | Otro socio con compras promocionales | Dos documentos distintos positivos elegidos en memoria; resumen por pareja monetaria exacta y período contra SELECT. Al menos uno será distinto del perfil personal anterior. Preparado, no ejecutado. |
+| P2 | Fechas relativas de altas de vehículos | Hoy/ayer/semana/mes/año en Asunción, límites y distintos globales contra SELECT; rangos vacíos no acreditan muestra positiva. Preparado, no ejecutado. |
+
+La denegación D y el aislamiento por `sessionId` se reutilizan: estos contrastes
+no cambian rutas, servicios de sesión, dispatcher ni permisos. Cada operación
+nueva comprueba cierre real; no se pide otra cuenta sin permisos para repetir D.
+Las variantes no exhaustivas de lenguaje/dimensiones no constituyen tareas de
+implementación. La trazabilidad S/P permanece sin SHA acreditado y no se corrige
+por fecha. Las muestras de segmentación multimoneda mantienen su cobertura G;
+compras individuales multimoneda sigue sin búsqueda exhaustiva y no hereda R/G.
 
 El criterio de cierre es: registro completo, cálculo y filtros con evidencia
 atribuida, aislamiento/denegación/cierre cubiertos en cada nuevo flujo, sin bugs
