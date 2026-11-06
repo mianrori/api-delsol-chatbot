@@ -73,12 +73,13 @@ test("zero reference amounts have no invented percentages and empty periods rema
 test("inconsistent currencies suppress monetary comparisons while invoice counts remain comparable", async () => {
   const result = await getCampaignSalesPerformance(args, connectionFor(args, { currencies: ["PYG", "USD", "PYG"] }));
   assert.equal(result.currency.consistent, false);
-  for (const comparison of Object.values(result.comparisons)) {
+  for (const comparison of [result.comparisons.duringVsBefore, result.comparisons.afterVsDuring]) {
     assert.equal(comparison.totalAmount, null);
     assert.equal(comparison.averageDailyAmount, null);
     assert.ok(comparison.totalInvoices);
   }
-  assert.match(present(result), /monedas difieren/);
+  assert.ok(result.comparisons.afterVsBefore.totalAmount);
+  assert.match(present(result), /monedas distintas/);
 });
 
 test("invalid dates, missing identities and malformed filters never query sales", async () => {

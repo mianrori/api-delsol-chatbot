@@ -19,11 +19,8 @@ export const getCampaignPeriodSales = async ({ connection, dateFrom, dateTo, cus
   const data = rows.map(row => {
     const description = row.CURRENCY_DESCRIPTION ?? null;
     const abbreviation = row.CURRENCY_ABBREVIATION ?? null;
-    const normalize = value => String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase();
-    // Preserve the existing PYG display without assigning a symbol to other currencies.
-    const symbol = normalize(description).includes("GUARANI") || normalize(abbreviation) === "PYG" || normalize(abbreviation).includes("GUARANI") ? "\u20b2" : null;
     return {
-      currency: { description, abbreviation, symbol, symbolPosition: symbol ? "prefix" : null },
+      currency: { description, abbreviation },
       totalAmount: Number(row.TOTAL_AMOUNT ?? 0),
       totalInvoices: Number(row.TOTAL_INVOICES ?? 0),
       sourceRows: Number(row.SOURCE_ROWS),

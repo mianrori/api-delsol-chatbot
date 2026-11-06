@@ -8,7 +8,7 @@ export const buildCampaignSalesPerformanceResponse = (calls = []) => {
   const cell = (value) => String(value ?? "—").replace(/\|/g, "\\|").replace(/[\r\n]+/g, " ");
   const number = (value) => value == null ? "No calculable" : new Intl.NumberFormat("es-PY", { maximumFractionDigits: 4 }).format(value);
   const money = (value, currency) => {
-    const unit = currency?.symbol || currency?.abbreviation || currency?.description || "";
+    const unit = currency?.status && currency.status !== "identified" ? "Moneda sin identificar" : currency?.symbol || currency?.code || currency?.abbreviation || currency?.description || "";
     return value == null ? "No calculable" : `${cell(unit)} ${number(value)}`.trim();
   };
   const lines = ["**Ventas antes, durante y después de la campaña**", "",
@@ -23,12 +23,13 @@ export const buildCampaignSalesPerformanceResponse = (calls = []) => {
   lines.push("", "| Comparación | Variación de ventas | Variación de ventas (%) | Variación de facturas | Variación de facturas (%) |", "| --- | --- | --- | --- | --- |");
   const pct = (value) => value == null ? "No calculable" : `${number(value)} %`;
   for (const comparison of Object.values(result.comparisons)) {
-    lines.push(`| ${LABELS[comparison.currentPeriod]} frente a ${LABELS[comparison.previousPeriod]} | ${money(comparison.totalAmount?.absoluteChange, result.periods[comparison.currentPeriod].currency)} | ${pct(comparison.totalAmount?.percentageChange)} | ${number(comparison.totalInvoices.absoluteChange)} | ${pct(comparison.totalInvoices.percentageChange)} |`);
+    lines.push(`| ${LABELS[comparison.currentPeriod]} frente a ${LABELS[comparison.previousPeriod]} | ${money(comparison.totalAmount?.absoluteChange, comparison.currency)} | ${pct(comparison.totalAmount?.percentageChange)} | ${number(comparison.totalInvoices.absoluteChange)} | ${pct(comparison.totalInvoices.percentageChange)} |`);
   }
-  if (!result.currency.consistent) lines.push("", "Las monedas difieren entre períodos o dentro de ellos; no se comparan sus importes.");
-  for(const [key,period]of Object.entries(result.periods))if(period.currencyGroups?.length>1){
+  for (const comparison of Object.values(result.comparisons)) if (comparison.calculationReason) lines.push("", `Motivo (${LABELS[comparison.currentPeriod]} frente a ${LABELS[comparison.previousPeriod]}): ${cell(comparison.calculationReason)}`);
+  if (!result.currency.consistent) lines.push("", "Hay monedas distintas o sin identificar; solo se comparan los períodos con moneda compatible.");
+  for(const [key,period]of Object.entries(result.periods))if(period.calculationReason){
     lines.push('',`**${LABELS[key]}: ${period.calculationReason}**`,'| Moneda | Ventas | Cantidad de facturas |','| --- | --- | --- |');
-    for(const group of period.currencyGroups)lines.push(`| ${cell(group.currency.description??group.currency.abbreviation)} | ${money(group.totalAmount,group.currency)} | ${number(group.totalInvoices)} |`);
+    for(const group of period.currencyGroups)lines.push(`| ${cell([group.currency.description,group.currency.abbreviation].filter(Boolean).join(' / ')||'Sin datos')} | ${money(group.totalAmount,group.currency)} | ${number(group.totalInvoices)} |`);
   }
   if (Object.values(result.comparisons).some((item) => item.totalAmount?.percentageChange == null || item.totalInvoices.percentageChange == null)) {
     lines.push("", "La variación porcentual no se calcula cuando el valor del período de referencia es cero o los importes no son comparables.");

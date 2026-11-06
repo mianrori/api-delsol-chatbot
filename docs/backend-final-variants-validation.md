@@ -120,3 +120,50 @@ PR #41 permanece **en borrador** para revisar las dos correcciones. F5 se
 delimita en [formas de gráficos](chart-result-contract.md); T1 continúa sin
 atribución por fecha. E1, cotización real positiva, permanece separado; no se
 consultó al proveedor, hizo merge ni desplegó.
+
+## Corrección P2: moneda ausente con registros
+
+La revisión final detectó que `filter(Boolean)` descartaba un período con
+registros y moneda nula antes de decidir la compatibilidad. Se reproducía una
+comparación monetaria frente a PYG sin motivo de invalidez. Es un hallazgo
+controlado de código, no una muestra Oracle nueva ni una séptima reserva DEV.
+
+La corrección candidata distingue:
+
+- **Sin registros:** `sourceRows=0`, moneda `empty` sin código asignado. Puede
+  compararse el cero con un período identificado; la moneda de esa comparación
+  procede únicamente del período con registros. Dos períodos vacíos no tienen
+  comparación monetaria (`NO_RECORDS`), sin inferir PYG.
+- **Con registros y moneda inválida:** estados `missing`, `unrecognized` o
+  `contradictory`; total/promedio monetario del período sin calcular. El importe
+  de cada grupo y los metadatos originales se conservan por separado. Los
+  símbolos de presentación ya no se infieren en el repositorio.
+- **Moneda identificada:** alias explícitos de PYG/USD/CAD. `$` es neutral y
+  nunca identifica USD; un campo no vacío desconocido no queda compensado por
+  otro campo conocido. Descripción/abreviatura contradictorias invalidan el
+  grupo. Se conservan los grupos exactos de la fuente, sin fusionar alias dentro
+  de un período ni convertir importes.
+- **Comparaciones por pareja:** solo se invalidan las que contienen un período
+  inválido/mixto o dos monedas identificadas incompatibles. Las otras parejas
+  mantienen importes/porcentajes. `reasonCode` y `calculationReason` aparecen en
+  resultado y el motivo se presenta junto a la comparación y el desglose.
+  Los conteos de facturas conservan su contrato independiente de moneda.
+
+Siete pruebas nuevas en `campaignCurrency` cubren el caso en las tres posiciones,
+ausencia real de filas, campos desconocidos/contradictorios, `$` solo y monedas
+reconocidas compatibles/incompatibles. Las expectativas anteriores se ajustan
+al bloqueo **por pareja**, sin eliminar cobertura de filtros, fechas, identidad
+o cancelación. **18/18 enfocadas locales**; se excluye la regresión F4 no
+afectada. Evidencia Docker y contraste nuevo aún pendientes.
+
+El ejecutor nuevo `scripts/check-campaign-currency-dev.mjs` solo revalida **un
+perfil real PYG de campaña** contra SELECT independientes, incluidas diferencias,
+porcentajes, promedio diario y presentación. Los casos de moneda inválida siguen
+siendo controlados; no se fabrican en Oracle. Reutiliza por hash los positivos
+F1/F2 y las seis reservas del reporte `6ac06bc`; no los repite ni vuelve a buscar
+las muestras. F5/T1 y E1 permanecen sin cambios.
+
+Entrada oculta local: `logs/run-campaign-currency-dev.ps1`, sesión vigente o
+login DEV protegido si se deja vacía. Reporte sanitizado esperado:
+`logs/campaign-currency.json`. PR #41 continúa en borrador hasta revisar la
+corrección y la evidencia nueva; no merge ni despliegue.

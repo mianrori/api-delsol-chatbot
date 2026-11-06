@@ -152,16 +152,48 @@ const compareMetric = (previousValue, currentValue) => {
   };
 };
 
+const currencyAliases = new Map([
+  ["PYG", ["PYG", "GS", "GS.", "₲", "GUARANI", "GUARANIES", "GUARANI PARAGUAYO", "GUARANIES PARAGUAYOS"]],
+  ["USD", ["USD", "US$", "U$S", "DOLAR", "DOLARES", "DOLAR AMERICANO", "DOLARES AMERICANOS", "DOLAR ESTADOUNIDENSE", "DOLARES ESTADOUNIDENSES", "US DOLLAR", "US DOLLARS", "UNITED STATES DOLLAR", "UNITED STATES DOLLARS"]],
+  ["CAD", ["CAD", "C$", "CA$", "DOLAR CANADIENSE", "DOLARES CANADIENSES", "CANADIAN DOLLAR", "CANADIAN DOLLARS"]],
+].flatMap(([code, aliases]) => aliases.map(alias => [alias, code])));
+
+const identifyCurrency = currency => {
+  const values = [currency.description, currency.abbreviation].map(value => String(value ?? "")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase().replace(/\s+/g, " "));
+  const codes = values.map(value => currencyAliases.get(value) ?? null);
+  const status = !values.some(Boolean) ? "missing"
+    : codes[0] && codes[1] && codes[0] !== codes[1] ? "contradictory"
+    : values.some((value, i) => value && value !== "$" && !codes[i]) || !codes.some(Boolean) ? "unrecognized"
+    : "identified";
+  const code = status === "identified" ? codes.find(Boolean) : null;
+  // Raw metadata is retained, but it never grants an inferred display currency.
+  return { ...currency, code, status, symbol: code === "PYG" ? "₲" : null, symbolPosition: code === "PYG" ? "prefix" : null };
+};
+
+const monetaryReasons = {
+  CURRENCY_MISSING: "Hay registros cuya moneda falta; no se comparan sus importes.",
+  CURRENCY_UNRECOGNIZED: "Hay registros cuya moneda no se reconoce inequívocamente; no se comparan sus importes.",
+  CURRENCY_CONTRADICTORY: "La descripción y la abreviatura indican monedas distintas; no se comparan sus importes.",
+  MIXED_CURRENCIES: "Varias monedas en el período; importes separados, total monetario sin calcular.",
+  CURRENCY_INCOMPATIBLE: "Los períodos tienen monedas distintas; no se comparan sus importes.",
+  NO_RECORDS: "Ambos períodos carecen de registros; no hay moneda identificada para una comparación monetaria.",
+};
+
 const normalizeSalesResult = (result, durationDays) => {
-  const groups = result.data;
+  const groups = result.data.map(group => ({ ...group, currency: identifyCurrency(group.currency) }));
   const mixed = groups.length > 1;
-  const totalAmount = mixed ? null : groups[0]?.totalAmount ?? 0;
+  const invalid = groups.find(group => group.currency.status !== "identified");
+  const reasonCode = invalid ? `CURRENCY_${invalid.currency.status.toUpperCase()}` : mixed ? "MIXED_CURRENCIES" : null;
+  const totalAmount = reasonCode ? null : groups[0]?.totalAmount ?? 0;
   const totalInvoices = groups.reduce((n, row) => n + row.totalInvoices, 0);
 
   return {
     currency: (!mixed && groups[0]?.currency) || {
       description: null,
       abbreviation: null,
+      code: null,
+      status: groups.length ? "mixed" : "empty",
     },
 
     totalAmount,
@@ -169,33 +201,22 @@ const normalizeSalesResult = (result, durationDays) => {
     totalInvoices,
 
     averageDailyAmount:
-      !mixed && durationDays > 0 ? round(totalAmount / durationDays) : null,
+      !reasonCode && durationDays > 0 ? round(totalAmount / durationDays) : null,
 
     averageDailyInvoices:
       durationDays > 0 ? round(totalInvoices / durationDays) : null,
     sourceRows: groups.reduce((n, row) => n + row.sourceRows, 0),
     currencyGroups: groups,
-    calculationReason: mixed ? "Varias monedas en el período; importes separados, total monetario sin calcular." : null,
+    reasonCode,
+    calculationReason: monetaryReasons[reasonCode] ?? null,
   };
 };
 
-const getCurrencyKey = period => {
-  const currency = period?.currency;
-  return currency?.description == null && currency?.abbreviation == null ? null
-    : JSON.stringify([currency?.description ?? null, currency?.abbreviation ?? null]);
-};
-
 const validateCurrencyConsistency = (periods) => {
-  const keys = [
-    getCurrencyKey(periods.before),
-    getCurrencyKey(periods.during),
-    getCurrencyKey(periods.after),
-  ].filter(Boolean);
-
-  const distinct = [...new Set(keys)];
+  const distinct = [...new Set(Object.values(periods).map(period => period.currency.code).filter(Boolean))];
 
   return {
-    consistent: distinct.length <= 1 && Object.values(periods).every(period => period.currencyGroups.length <= 1),
+    consistent: distinct.length <= 1 && Object.values(periods).every(period => !period.reasonCode),
 
     values: distinct,
   };
@@ -204,11 +225,19 @@ const validateCurrencyConsistency = (periods) => {
 const buildComparison = (
   previousPeriod,
   currentPeriod,
-  { previousLabel, currentLabel, allowAmountComparison },
-) => ({
+  { previousLabel, currentLabel },
+) => {
+  const reasonCode = previousPeriod.reasonCode ?? currentPeriod.reasonCode
+    ?? (previousPeriod.sourceRows && currentPeriod.sourceRows && previousPeriod.currency.code !== currentPeriod.currency.code ? "CURRENCY_INCOMPATIBLE" : null)
+    ?? (!previousPeriod.sourceRows && !currentPeriod.sourceRows ? "NO_RECORDS" : null);
+  const allowAmountComparison = !reasonCode;
+  return {
   previousPeriod: previousLabel,
 
   currentPeriod: currentLabel,
+  reasonCode,
+  calculationReason: monetaryReasons[reasonCode] ?? null,
+  currency: allowAmountComparison ? (currentPeriod.sourceRows ? currentPeriod.currency : previousPeriod.currency) : null,
 
   totalAmount: allowAmountComparison
     ? compareMetric(previousPeriod.totalAmount, currentPeriod.totalAmount)
@@ -230,7 +259,8 @@ const buildComparison = (
     previousPeriod.averageDailyInvoices,
     currentPeriod.averageDailyInvoices,
   ),
-});
+  };
+};
 
 export const getCampaignSalesPerformance = async (
   {
@@ -393,12 +423,11 @@ export const getCampaignSalesPerformance = async (
   const currency = validateCurrencyConsistency(periods);
 
   /*
-   * Si por alguna razón las monedas no coinciden,
-   * no calculamos comparaciones monetarias.
+   * Solo las parejas con monedas identificadas y compatibles se comparan.
+   * Un período vacío no equivale a registros con moneda desconocida.
    *
    * La cantidad de facturas sí puede compararse.
    */
-  const allowAmountComparison = currency.consistent;
 
   /*
    * -------------------------------------------------------------
@@ -412,7 +441,6 @@ export const getCampaignSalesPerformance = async (
 
       currentLabel: "during",
 
-      allowAmountComparison,
     }),
 
     afterVsDuring: buildComparison(periods.during, periods.after, {
@@ -420,7 +448,6 @@ export const getCampaignSalesPerformance = async (
 
       currentLabel: "after",
 
-      allowAmountComparison,
     }),
 
     afterVsBefore: buildComparison(periods.before, periods.after, {
@@ -428,7 +455,6 @@ export const getCampaignSalesPerformance = async (
 
       currentLabel: "after",
 
-      allowAmountComparison,
     }),
   };
 

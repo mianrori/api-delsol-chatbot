@@ -58,6 +58,15 @@ Reporte congelado local ignorado `backend-final-variants-6ac06bc.json`, SHA-256
 `1d2cef95e077cc79eb912500b94a68b30739f1e88ae2ed6e61beda5b89d0532e`.
 Dispatch real + SELECT independientes; no atribuir a HTTP estos contrastes.
 
+**Seguimiento P2 en curso:** el hallazgo de moneda nula con registros no está
+acreditado por el perfil real anterior. La corrección distingue período vacío
+de `missing`/`unrecognized`/`contradictory`, sin asignar PYG, y valida cada pareja
+por separado con motivo en resultado/presentación. Siete regresiones nuevas,
+18/18 enfocadas locales; candidato Docker/Oracle pendiente. Solo se revalida
+un perfil de campaña afectado con importes/porcentajes/presentación; F1/F2 y
+las seis reservas previas se reutilizan por hash, sin repetirlas. Detalle y
+contrato en [variantes finales](backend-final-variants-validation.md).
+
 ### Trazabilidad histórica de las ampliaciones
 
 PR #38 — corrección monetaria `8ee5b14`: identificación inequívoca PYG/USD/CAD,

@@ -17,6 +17,10 @@ Oracle `6ac06bc`, con código idéntico, aprueba 26/26 checks: cuatro positivos
 F1/F2 y un perfil afectado F3. Conserva seis reservas reales F3/F4/M7;
 la separación de compras multimoneda F4 tiene cobertura propia controlada,
 sin afirmar una muestra real que no apareció. PR #41 permanece en borrador.
+La revisión final abrió un P2 adicional de código: moneda nula con registros
+permitía comparación frente a PYG. Su corrección por pareja está preparada,
+con 18/18 enfocadas locales; falta revisar evidencia Docker/Oracle nueva. No
+se presenta como otra muestra DEV ausente ni sustituye las seis reservas.
 Eso no equivale a acreditar todas las variantes de cada herramienta.
 
 Puede cerrarse el alcance de **los perfiles acreditados**, manteniendo sus
@@ -121,6 +125,9 @@ faltante. Los límites de una búsqueda acotada no prueban ausencia global.
 1. Revisar las dos correcciones PR #41 y su evidencia, sin repetir los controles
    aprobados. F1/F2 ya no requieren ejecución adicional para los positivos
    identificados. Mantener las reservas por ID, sin «backend totalmente validado».
+   Incluir el P2 de moneda ausente/no reconocida: diferencias y porcentajes
+   afectados sin calcular con motivo, importes por grupo conservados. El control
+   nuevo revalida solo un perfil de campaña; no reabre F1/F2, F5/T1 ni las búsquedas.
 2. La revisión de atribución F3/F4/M7 ya se realizó, conservando sus salvedades.
    El contraste `6ac06bc` ya se revisó: 26/26 checks sin fallos, cuatro positivos
    F1/F2 y un perfil afectado F3; seis reservas de muestra, cierre/logout
