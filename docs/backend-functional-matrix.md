@@ -44,8 +44,9 @@ El resumen exclusivo corregido aprueba **6/6 sobre `255fd53`**, contra SELECT
 independiente por moneda/facturas distintas; cierre/logout y 179 archivos
 coincidentes. Se reutilizan por hash los cinco bloques y el recorrido aprobados,
 sin sumarlos como checks únicos ni afirmar que ambas cohortes sean idénticas.
-Quedan conversión bloqueada por timeout del proveedor, ambigüedad contractual
-sin muestra y las variantes HTTP de gráficos; no hay fallo funcional confirmado.
+Al cerrar esa tanda quedaron conversión bloqueada por timeout, ambigüedad
+contractual sin muestra y gráficos HTTP. La tanda siguiente acredita el perfil
+de gráficos; la cotización real positiva y las muestras ausentes siguen pendientes.
 Ver [resultados acotados](backend-pending-variants-validation.md).
 Pendientes de conversión/gráficos abordados desde `4428874` en rama separada
 `fix/conversion-provider-chart-http`: moneda `$` ambigua en costo, fecha de
@@ -53,9 +54,14 @@ consulta de tasa y período perdido en gráficos corregidos como candidato.
 `e5868ea`: seis archivos de pruebas enfocados y preflight Node 22/Docker
 aprobados; HTTP de gráficos con fuente/auth controlados. Llamada pública real:
 `EXCHANGE_PROVIDER_QUOTE_UNAVAILABLE`, no hay tasa válida acreditada; se recibió
-página pero no se eligió arbitrariamente un número/moneda. Oracle/HTTP del
-candidato aún pendiente. No se confunden pruebas controladas con tasa real ni
-muestra Oracle. Ver [alcance y validación](conversion-chart-validation.md).
+página pero no se eligió arbitrariamente un número/moneda. **32/32 controles
+Oracle/HTTP sobre `92b5e11`**, código idéntico a `e5868ea`: neto/área Oracle con
+tasa y fallo de proveedor controlados; tres gráficos HTTP con fuente PYG y
+autenticación reales, modelo planificado, etiquetas/valores/moneda/período
+conciliados. 184 archivos coinciden, cierre/logout aprobados; unitarias previas
+reutilizadas por hash. Cotización real positiva sigue pendiente. No se confunden
+pruebas controladas con tasa real ni muestra Oracle. Ver
+[alcance y validación](conversion-chart-validation.md).
 Ver [resultados y límites](backend-independent-validation.md).
 
 ### Evidencia histórica reutilizada
@@ -291,13 +297,13 @@ dentro de `test/`. **Sin acreditar** indica falta de evidencia, no fallo probado
 | `get_member_vehicles` — vehículos del socio/chapa | `members/memberVehicle.service.js` | `vehicleRegistrations`, PII y ciclo | N: documento, activos y débito sí/no contra Oracle independiente; `cafc5f1`: chapa única/ausente, dueño/vehículo contra SELECT | `7762f35`; `cafc5f1` | Chapa activa compartida no encontrada; única/ausencia acreditadas. No confundir H de altas agregadas con búsqueda de dueño. |
 | `analyze_members` — segmentación/ranking | `members/memberAnalysis.service.js` | Suites existentes de segmentación; 46/46 previas. Corrección del contrato orderBy: 17/17 enfocadas (5 nuevas; conteos solapados) | G: 50/50 finales Oracle/HTTP y cierre reutilizados; baseline y 40 controles/denegación previos. Null rechazado antes de SQL: 5/5 nuevos tests controlados en Docker DEV, sin nuevas lecturas Oracle | `345827f` validación orderBy; `7c34c14` Oracle/HTTP; `6b1303e` baseline; `82e72ba` parcial | Muestra real con varias monedas pendiente; CTE multimoneda aprobadas. Lenguaje inicial y carga general no exhaustivos. P2 orderBy:null corregido conforme al esquema no nullable; PR #36 fusionada y desplegada `00a1acb` (10/10 controles puntuales). |
 | `compare_member_purchases_vs_sales` — canjes/ventas | `members/memberPurchasesVsSales.service.js` | `memberPurchasesVsSales`, `chatLifecycle`; corrección P2 con 15/15 enfocadas y 2/2 del ejecutor monetario | W: 86/86 en Oracle independiente PYG real total/mes/filtros; CTE monetarias y presentación en ambos órdenes; un HTTP afectado. N conserva su SHA histórico | `8ee5b14` código; `7bebb3d` Oracle/HTTP, sin cambios de código | Porcentaje solo con identificación inequívoca y contraparte compatible por pareja exacta. Ambigüedad, contradicción, incompatibilidad y alias distintos producen nulo con motivo. No convierte ni suma distintos. CTE no acredita socio real multimoneda; pendientes anteriores conservados. |
-| `generate_chart` — gráficos | `charts/chart.service.js` | `charts`, `chatLifecycle` | H: barras/líneas de ventas, SVG y fuente | `b315ff9` | HTTP de barras horizontales/circular, varias series/fuentes y datos de otras herramientas no acreditado; no exige Oracle al graficar. Revisión frontend excluida. |
+| `generate_chart` — gráficos | `charts/chart.service.js` | `charts`, `chatLifecycle`, nuevas `chartHttpVariants` | H reutilizado; `92b5e11`: horizontal/circular/multiserie HTTP contra etiquetas/valores/moneda/período del resultado mensual PYG Oracle de canjes/ventas, auth real y modelo planificado | `b315ff9`; `e5868ea` código; `92b5e11` Oracle/HTTP | Fuente única aplicable y perfil ensayado aprobados; no todas las herramientas fuente ni divisas. No acredita muestra multimoneda o combinación arbitraria de fuentes. No nueva lectura Oracle al renderizar. Frontend excluido. |
 | `analyze_campaign_sales_performance` — antes/durante/después | `sales/campaignSalesPerformance.service.js` | `campaignSalesPerformance`, `chatLifecycle` | H reutilizado; N: SQL independiente de tres períodos, límites, filtros local/rubro, importes/facturas/moneda | `b315ff9` HTTP histórico; `7762f35` independiente | Perfil ensayado aprobado; ausencia/base cero/monedas diferentes en otras campañas no acreditadas individualmente. |
 | `search_invoice_concepts` — conceptos facturados | `invoices/searchInvoiceConcepts.service.js` | Nuevas: searchResolvers/searchSelection y chatLifecycle; 68/68 enfocadas del bloque (conteos solapados) | L: exacta/parcial/ausencia y límite; denegación/cierre. Selección/contexto: controlados. | `7ced8d9` Oracle; `c8525a6` controladas | Sin paginación en contrato: opciones limitadas y refinamiento. Conversación inicial libre no exhaustiva. |
 | `search_invoice_customers` — clientes facturados | `invoices/searchInvoiceCustomers.service.js` | Nuevas: searchResolvers/searchSelection y chatLifecycle; 68/68 enfocadas del bloque (conteos solapados) | L: exacta/parcial/ausencia, clientes distintos, período aislado y denegación/cierre; selección con período controlada. | `7ced8d9` Oracle; `c8525a6` controladas | Fallback fuzzy positivo y otras coincidencias de RUC/matrícula no acreditados individualmente. Opciones limitadas; no prometer catálogo completo. |
 | `get_invoices` — facturación | `invoices/invoices.service.js` | `invoices`, `chatLifecycle`; dos regresiones del control de resumen escalar/lista | B/D/N reutilizados; `cafc5f1`: chapa y recorrido completo, metadatos y multiconjunto contra SQL; `255fd53`: resumen por moneda/importe/facturas distintas contra SELECT, 6/6 | `b315ff9` histórico; `7762f35` independiente/HTTP; `cafc5f1` recorrido; `255fd53` resumen | El recorrido y el resumen acreditan sus respectivas cohortes, no identidad entre ellas. La ejecución inicial fallida conserva su estado. HTTP previo con modelo/contexto preparados. |
 | `get_contract_conditions` — condiciones | `contracts/contractConditions.service.js` | `contracts`, `chatLifecycle` | B/D/N reutilizados: identidad, conceptos, último importe/vigencia/neto/IVA y HTTP positivo; `cafc5f1`: ausencia adicional contra SELECT | `b315ff9`; `7762f35`; `cafc5f1` ausencia | Sin cohorte real de 2–20 CNT activos por cliente en la consulta; no acredita toda ambigüedad ni cada empate real de este endpoint. No inferirlos de I. |
-| `get_contract_cost_per_sqm` — costo por m² | `contracts/contractCostPerSqm.service.js` | `contracts`, `chatLifecycle` | B/N reutilizados: neto/área y misma moneda contra SQL; HTTP positivo | `b315ff9`; `7762f35` independiente/HTTP | `cafc5f1`: conversión no aprobada, fallo durante proveedor y diagnóstico `PROVIDER_TIMEOUT`. Sin tasa real acreditada; controles anteriores conservados. |
+| `get_contract_cost_per_sqm` — costo por m² | `contracts/contractCostPerSqm.service.js` | `contracts`, `conversionProvider`; PYG/USD en ambos sentidos controlados y rechazo de moneda ambigua/contradictoria | B/N reutilizados; `92b5e11`: neto/superficie contra SQL con tasa y fallo de proveedor controlados, fecha aplicada y cierre | `7762f35` histórico; `e5868ea` código; `92b5e11` Oracle/controlado | Tasa real positiva pendiente: timeout anterior `cafc5f1`; llamada actual `EXCHANGE_PROVIDER_QUOTE_UNAVAILABLE`. No convertir prueba controlada en tasa real ni fecha de publicación/histórica. |
 | `analyze_contract_cost_incidence` — incidencia | `contracts/contractCostIncidence.service.js` | `contractIncidence`, `contracts`, `chatLifecycle` | I: resumen/mes, SQL independiente, límites de vigencia, empates invertidos, FX y seguimientos | `dcd9530`; desplegado `8e80887` | **Muestra DEV:** ventas registradas cuya suma sea cero; no confundir con ausencia real ya verificada. |
 | `search_soles_types` — tipos de soles | `soles/searchSolesTypes.service.js` | Nuevas: searchResolvers/searchSelection y chatLifecycle; 68/68 enfocadas del bloque (conteos solapados) | L: exacta/parcial/ausencia y alias normales obtenido de Oracle; rechazo/cierre. | `7ced8d9` Oracle; `c8525a6` controladas | Descripciones/alias duplicados controlados; no muestra real acreditada de cada empate o positivo fuzzy. S no se repite. |
 | `get_member_soles` — saldo/vencimiento | `soles/memberSoles.service.js` | `memberSoles`, `chatLifecycle`; driver real y 2/2 regresiones de documento canónico | V: 19/19, seis variantes, documento exacto y SQL independiente; `cafc5f1`: otras ventanas combinadas positivas en tres estados, contra SELECT; cierre/logout | `a709b35`; `cafc5f1`; S histórico sin SHA propio | V conserva sus tres ventanas históricas vacías. Las nuevas fechas se descubren en Oracle, no reemplazan V ni prueban ausencia global. `.trim()` solo al documento de entrada; igualdad SQL sin cambios. |
@@ -351,9 +357,11 @@ pendiente de evidencia; no declararlas aprobadas como casos reales.
    los pendientes cuando estén disponibles sus dependencias/muestras. N/T/W y el
    despliegue de PR #38 ya acreditan los perfiles de compras individuales,
    canjes/ventas, campañas y los tres endpoints financieros: no repetirlos.
-5. Después, completar HTTP de gráficos horizontal/circular/multiserie como
-   contrato backend, sin UI ni nuevo contraste Oracle de importes ya acreditados.
-   Sus unitarias aprobadas se conservan; ese paso HTTP sigue sin acreditar.
+5. Gráficos horizontal/circular/multiserie: perfil mensual PYG acreditado por HTTP
+   en `92b5e11`, contra su fuente Oracle, sin UI ni repetir auditoría de negocio.
+   Otras fuentes/divisas no exhaustivas siguen como limitación; no reabrir este
+   perfil. Proveedor: acreditar una cotización real válida cuando esté disponible,
+   sin confundir el dato controlado del nuevo contraste con tasa pública.
 
 | Prioridad | Variante ejecutable con DEV | Evidencia adicional mínima / estado |
 | --- | --- | --- |
@@ -361,7 +369,7 @@ pendiente de evidencia; no declararlas aprobadas como casos reales.
 | P1 | Facturas por chapa y todas las páginas de una cohorte completa acotada | **Componentes acreditados**: `cafc5f1` recorrido completo/fin vacío/metadatos/multiconjunto; `255fd53` resumen por moneda/importe/facturas distintas, 6/6. No se afirma identidad entre cohortes ni se reescribe la ejecución inicial fallida. |
 | P1 | Condiciones sin contrato | **Aprobado `cafc5f1`**: ausencia independiente y respuesta sin conceptos/importes. |
 | P1 | Condiciones ambiguas | **Sin muestra `cafc5f1`**: no hay cohorte de 2–20 CNT activos por cliente en la consulta realizada. No inferir cobertura de este endpoint desde incidencia. |
-| P1 | Costo por m² con conversión real | **Pendiente externo `cafc5f1`**: falla durante proveedor público; diagnóstico aislado reproduce `PROVIDER_TIMEOUT` (8 s). No aprueba aritmética ni tasa. No repetir hasta disponer del proveedor. Tasa actual, no histórica ni de Oracle. |
+| P1 | Costo por m² con conversión real | **Proveedor real pendiente**: timeout anterior `cafc5f1`; llamada actual sin cotización válida. `92b5e11` acredita neto/área Oracle y aritmética con tasa/fallo controlados, no tasa pública real ni histórica. No elegir una moneda/número arbitrariamente. |
 | P2 | Ventanas positivas combinadas de generación/vencimiento de soles | **Aprobado `cafc5f1`**: filas reales para todos/vigentes al vencimiento/vencidos al día siguiente, saldo/cantidad por tipo. Fechas descubiertas. No reemplaza las tres ventanas históricas vacías de V. |
 | P2 | Otro socio con compras promocionales | **Aprobado `cafc5f1`**: dos documentos distintos positivos, resumen por pareja monetaria exacta y período contra SELECT. No acredita socio multimoneda. |
 | P2 | Fechas relativas de altas de vehículos | **Aprobado `cafc5f1`**: cinco límites Asunción y distintos globales contra SQL. Hoy/ayer/semana/mes vacíos; año con filas. No acredita positivos en los cuatro rangos vacíos. |

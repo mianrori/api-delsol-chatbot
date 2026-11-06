@@ -9,7 +9,7 @@ No despliegue, merge, cambios de datos, permisos, expiraciones o integración.
   Ahora exige evidencia compatible de código/descripción configurados y moneda
   facturada; `$` solo es neutro, no identifica divisa. Monedas desconocidas o
   contradictorias quedan sin calcular con motivo. Destino solo PYG/USD según
-  esquema, validado antes de Oracle. No se cambia la selección contractual.
+  esquema, validado antes del SQL del servicio. No se cambia la selección contractual.
 - La cotización no identificaba fecha de consulta: el proveedor devuelve ahora
   `retrievedAt`, `currentRate`, `rateType` y `dateBasis`; `quotedAt=null` porque
   no se acredita fecha de publicación. Los tres consumidores conservan esa
@@ -70,8 +70,34 @@ USD/Dólar en el texto inspeccionado; no se elige otra moneda o primer número n
 se relaja el parser. HTML solo en memoria. Reporte local ignorado:
 `logs/conversion-provider-live.json`. No hay fecha de publicación acreditada.
 
-Pendientes de evidencia: Oracle/HTTP del candidato aún sin ejecutar con sesión
-vigente; tasa real positiva sigue sin acreditar. Se conservan las muestras DEV
-ausentes y todas las pruebas
+## Resultado Oracle/HTTP `92b5e11`
+
+**32/32 controles en tres bloques aprobados** sobre
+`92b5e114037ac6d41227f974fe6a95f132e407af`, código idéntico a `e5868ea`.
+05/11/2026 21:27:14–21:27:19 UTC, 184 archivos candidatos coincidentes.
+
+| Bloque | Fuente de evidencia | Resultado |
+| --- | --- | --- |
+| Neto/superficie y conversión | SELECT independientes y herramienta Oracle reales; respuesta del proveedor explícitamente controlada | Neto, área, moneda, aritmética con venta 7.100 y fecha de consulta frente a factura histórica aprobados; no es una tasa real del proveedor. |
+| Fallo del proveedor | Consulta contractual Oracle real y fallo de red controlado | Error seguro propagado, sin fallback ni causa cruda; cierre aprobado. No se simula un fallo de Oracle. |
+| Horizontal/circular/multiserie HTTP | Autenticación real, resultado mensual PYG Oracle real del perfil ya acreditado; modelo planificado | Tres peticiones, etiquetas/valores/moneda/período y fuente no mutada conciliados con el resultado. No se vuelve a auditar la consulta fuente con otra suite. |
+
+Identidad proxy, cierre tras cada bloque, cierre global y logout de la sesión
+creada aprobados. Los seis archivos de pruebas enfocadas de `e5868ea` se
+reutilizaron por hash, sin ejecutarlos de nuevo. `coverageComplete` solo describe
+estos tres bloques, no disponibilidad del proveedor ni backend completo.
+
+Reporte congelado local `logs/conversion-chart-92b5e11.json`, SHA-256
+`8d1e9abbac0d0cabc9ace1da0cee78e44e33b4912231472be4d90ff85f7c481b`.
+Logs compactos del intervalo ampliado login/logout: chatbot cero líneas, ERP
+dos; sin códigos Oracle/driver ni marcadores de campos sensibles detectados.
+No se publicaron sesiones, usuarios, documentos o resultados comerciales.
+
+La tasa real positiva y la fecha de publicación siguen sin acreditar; tampoco
+se ensayó conversión histórica ni una muestra real multimoneda. PYG/USD en ambos
+sentidos está cubierto con respuestas y datos controlados; el bloque Oracle
+acredita su propio contrato seleccionado, no todos los contratos o divisas.
+Se conservan las muestras DEV ausentes y todas las pruebas
 anteriores con su SHA; no se suman ejecuciones como casos únicos. PR en borrador
-hasta revisar resultados y correcciones; sin despliegue ni merge.
+hasta revisar resultados y correcciones; sin despliegue ni merge. El commit
+posterior únicamente actualiza documentación, sin repetir controles aprobados.
