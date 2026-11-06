@@ -3,6 +3,20 @@ const domain=word=>word.startsWith('local')?'search_customers':'search_categorie
 const removeVerbs=new Set(['quita','quitar','elimina','eliminar','retira','retirar','saca','sacar','desactiva','desactivar']);
 const verbs='quita|quitar|elimina|eliminar|retira|retirar|saca|sacar|desactiva|desactivar|anade|anadir|agrega|agregar|incluye|incluir|activa|activar|busca|buscar|cambia|cambiar|selecciona|seleccionar|filtra';
 
+// Match the whole instruction. Additional dates/groupings are not pure removals
+// and must not be discarded by this shortcut.
+export const isExclusiveLocalRemoval=message=>/^(?:ahora )?(?:todos los locales|(?:quita|quitar|elimina|eliminar|retira|retirar|saca|sacar|desactiva|desactivar) (?:el )?filtro de local)(?: (?:manteniendo|conservando) (?:el mismo periodo|los demas filtros))?$/.test(normalize(message).replace(/[.!?]+$/,''));
+
+export function getSalesLocalRemovalChange(message){
+ if(isExclusiveLocalRemoval(message))return {};
+ const text=normalize(message).replace(/,/g,' ').replace(/\s+/g,' ').replace(/[.!?]+$/,'');
+ // A bounded explicit compound request. Derive changes from the user's words,
+ // never grant the model unrelated keys. Other wording keeps its existing flow.
+ const match=/^(?:ahora )?todos los locales(?: (?:durante|en|para)(?: el ano)? ((?:19|20)\d{2}))?(?: (?:y )?(?:agrupa )?por (ano|mes|dia|local|rubro))?$/.exec(text);
+ if(!match||!match[1]&&!match[2])return null;
+ return {...(match[1]?{dateFrom:`01/01/${match[1]}`,dateTo:`31/12/${match[1]}`}:{}) ,...(match[2]?{groupBy:[{ano:'year',mes:'month',dia:'day',local:'customer',rubro:'category'}[match[2]]]}:{})};
+}
+
 // Deliberately narrow imperative grammar. Omitted tool arguments and a model's
 // proposed IDs are never evidence that the user removed or re-enabled a filter.
 export function getSearchFilterActions(message){

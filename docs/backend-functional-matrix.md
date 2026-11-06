@@ -82,6 +82,16 @@ sin repetirlas ni presentar este control final como modelo real/HTTP nuevo o
 como el mismo local original. PR #42 en borrador para revisión del diff.
 Los perfiles cerrados en `059ac13` y sus reservas no cambian; sin despliegue.
 
+**P2 posterior en corrección:** el reporte 19/19 anterior no protege frente a
+propuestas de otro año/agrupación al retirar el local. El guard ahora conserva
+los argumentos efectivos de sesión para una retirada exclusiva, también tras
+recortar el historial; fechas/agrupación adicionales reconocidas se derivan del
+texto explícito del usuario. Nuevas regresiones comparan argumentos/SQL y
+estado (2023/mes frente a propuesta 2024/año), cambios explícitos y ausencia de
+contexto. Solo pruebas/controles afectados, preparados; evidencia Docker/Oracle
+nueva pendiente. El control final nuevo es de modelo/historial controlados con
+datos Oracle legítimos; no se repiten ni reatribuyen las reproducciones reales.
+
 PR #39: despliegue `4428874`, resumen real 11/11 contra Oracle independiente.
 PR #40: despliegue `84fd67c`, gráfico HTTP horizontal multiserie **21/21** contra
 SELECT independientes, etiqueta/serie/valor/moneda/período; 187 archivos

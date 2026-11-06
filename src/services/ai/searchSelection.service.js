@@ -1,4 +1,4 @@
-import {getSearchFilterActions,isExplicitSearchRequest} from './searchFilterIntent.service.js';
+import {getSearchFilterActions,isExplicitSearchRequest,getSalesLocalRemovalChange} from './searchFilterIntent.service.js';
 import {getSearchResolutions,setSearchResolutions,getSearchSelectionTurn,setSearchSelectionTurn} from '../../state/conversation.store.js';
 const specs={
  search_customers:{consumers:['get_sales','get_sales_per_sqm','analyze_members','get_member_purchases','get_member_promo_purchases','compare_member_purchases_vs_sales','analyze_campaign_sales_performance','get_contract_conditions','get_contract_cost_per_sqm','analyze_contract_cost_incidence'],fields:o=>({customerIds:[o.codCliente],customerId:o.codCliente})},
@@ -30,7 +30,7 @@ const lookupShape=(name,result)=>{
 
 // Applied once to the protected user message, never by replaying bounded history.
 export function beginSearchSelectionTurn(sessionId,message){
- const state=getSearchResolutions(sessionId),turn={selectedThisTurn:[],validLookups:[],capturedConsumers:[],requestedDomains:[]};let changed=false;
+ const state=getSearchResolutions(sessionId),turn={selectedThisTurn:[],validLookups:[],capturedConsumers:[],requestedDomains:[],salesLocalRemovalChange:getSalesLocalRemovalChange(message)};let changed=false;
  const normalized=String(message??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();
  const newLookup=/^(?:(?:realiza|haz) (?:una )?)?nueva busqueda\b|^busca (?:de nuevo|opciones)\b/.test(normalized);
  turn.allowLookup=Object.fromEntries(persistentSearches.map(name=>[name,isExplicitSearchRequest(message,name)||newLookup]));
@@ -147,7 +147,11 @@ export function preserveSearchSelection({name,input,history=[],currentCalls=[],r
  const successful=queries.filter(c=>c.name===name&&c.turn<turn&&c.resultStatus==='success').at(-1);
  const original={...(successful?.input??{}),...((successful&&successful.turn>=(origin?.turn??-1)?successful:origin)?.input??{}),...(resolutionState?.contexts[name]??{})};
  const selectingNow=Boolean(selection(currentText))&&resolutions.some(r=>r.state.selectedTurn===turn||persistent(r.search)&&selectionTurn.selectedThisTurn?.includes(r.search));
- const result=selectingNow?{...input,...original}:{...original,...input};
+ const removalChange=name==='get_sales'?(selectionTurn.salesLocalRemovalChange??getSalesLocalRemovalChange(currentText)):null;
+ if(removalChange&&!(original.dateFrom&&original.dateTo)&&!(removalChange.dateFrom&&removalChange.dateTo))throw Object.assign(Error('No hay una consulta anterior con período confirmado. Indica el período para consultar todos los locales.'),{code:'SEARCH_QUERY_CONTEXT_REQUIRED'});
+ // A pure removal changes one domain, not arbitrary proposed dates, metrics,
+ // grouping or previously absent keys. The successful context survives trimming.
+ const result=removalChange?{...structuredClone(original),...removalChange}:selectingNow?{...input,...original}:{...original,...input};
  const identifiers={};
  // A confirmed lookup may have left the bounded history, while its executed
  // arguments remain. Those IDs still outrank an unsolicited model proposal.
