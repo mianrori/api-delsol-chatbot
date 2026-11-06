@@ -1,0 +1,294 @@
+import vm from 'node:vm';
+import {readFile} from 'node:fs/promises';
+import express from 'express';
+import {clearConversation,getConversation,getSearchResolutions} from '../src/state/conversation.store.js';
+import {protectPiiDeep} from '../src/services/ai/pii.service.js';
+
+// Actual candidate route/controller/chat/PII, with deterministic model output.
+// Only business consumers are doubles: this check verifies their exact inputs,
+// and never queries purchases/usages outside the narrowly affected lookup flow.
+export async function checkSearchCorrectionsHttp({sessionId,deniedSessionId,lookup,uniqueSearch,ambiguousSearch,compositionProfile,lifecycleOnly=false,lifecycleRetry=false,resolutionProfile=false,transitionProfile=false,reselectionProfile=false,validateSession,check}){
+ const context=vm.createContext({console,process,structuredClone,Intl,Date,Map,Set,Number,String,Array,JSON,Math,RegExp,Object,Boolean,Error,AbortController});
+ const synthetic=exports=>new vm.SyntheticModule(Object.keys(exports),function(){for(const [k,v] of Object.entries(exports))this.setExport(k,v);},{context});
+ const plans=[];let consumerCalls=0,lookupCalls=0,lastLookup,expectedConsumer,requestSessionId=sessionId,lookupFault;
+ const canonical=v=>v&&typeof v==='object'?(Array.isArray(v)?v.map(canonical):Object.fromEntries(Object.keys(v).sort().map(k=>[k,canonical(v[k])]))):v;
+ const command=(name,input,id)=>({toolUse:{name,toolUseId:id,input}});
+ const protectModelBlock=b=>{
+  if(!b.toolUse)return b;const {name}=b.toolUse,input={...b.toolUse.input};
+  // A real model sees the protected user query. Seed commercial lookup names
+  // the same way, before its synthetic toolUse is ever stored in history.
+  if(typeof input.search==='string'&&['search_customers','search_categories'].includes(name)){
+   const key=name==='search_customers'?'customer':'category';
+   input.search=protectPiiDeep(requestSessionId,{[key]:{name:input.search}},null,[name])[key].name;
+  }
+  return {...b,toolUse:{...b.toolUse,input:protectPiiDeep(requestSessionId,input)}};
+ };
+ const model={BedrockRuntimeClient:class{async send(){const content=plans.shift()?.map(protectModelBlock);return {stopReason:content?'tool_use':'end_turn',output:{message:{role:'assistant',content:content??[{text:'Selecciona una opción válida para continuar.'}]}}};}},ConverseCommand:class{}};
+ const executeTool=async({name,arguments:args,context:toolContext})=>{
+  if(name==='search_categories'||name==='search_customers'){
+   if(lookupFault){const fault=lookupFault;lookupFault=null;if(fault==='throw')throw Object.assign(Error('Controlled lookup rejection'),{code:'SYNTHETIC_LOOKUP_REJECTED'});return {status:'AMBIGUOUS',options:[{optionId:'1'},{optionId:'1'}]};}
+   lookupCalls++;lastLookup=await lookup(args,toolContext,name);return lastLookup;
+  }
+  if((transitionProfile||reselectionProfile)&&name==='search_members')return {status:'AMBIGUOUS',options:[{optionId:'1',documentNumber:'SYNTHETIC-M1'},{optionId:'2',documentNumber:'SYNTHETIC-M2'}]};
+  check(name===expectedConsumer?.name,'HTTP_EXPECTED_CONSUMER_ONLY');consumerCalls++;
+  check(JSON.stringify(canonical(args))===JSON.stringify(canonical(expectedConsumer.input)),'HTTP_SELECTED_ID_AND_FILTERS_EXACT');
+  return name==='get_soles_usage'?{mode:'summary',data:[],queryContext:args}:{data:[]};
+ };
+ const load=async(relative,stubs)=>{
+  const url=new URL(relative,import.meta.url),main=new vm.SourceTextModule(await readFile(url,'utf8'),{context});
+  await main.link(async spec=>synthetic(stubs[spec]??await import(spec.startsWith('.')?new URL(spec,url).href:spec)));await main.evaluate();return main.namespace;
+ };
+ const chat=await load('../src/services/ai/chat.service.js',{'@aws-sdk/client-bedrock-runtime':model,'./toolExecutor.service.js':{executeTool}});
+ const controller=await load('../src/controllers/chat.controller.js',{'../services/ai/chat.service.js':{chatService:chat.chatService},...(validateSession?{'../services/sessions/oracleSession.service.js':{getValidOracleSession:validateSession},'../services/ai/conversationLifecycle.service.js':{...await import('../src/services/ai/conversationLifecycle.service.js'),resetConversation:async id=>{await validateSession(id);clearConversation(id);}}}:{})});
+ const routes=await load('../src/routes/index.js',{'../controllers/chat.controller.js':controller});
+ const app=express();app.use(express.json());app.use('/chatbot/api',routes.router);
+ const server=await new Promise(resolve=>{const s=app.listen(0,'127.0.0.1',()=>resolve(s));});
+ const post=async(message,session=sessionId)=>{requestSessionId=session;const priorHistory=getConversation(session);const snapshot=compositionProfile?structuredClone(priorHistory):null;const response=await fetch(`http://127.0.0.1:${server.address().port}/chatbot/api/bot/chat`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({sessionId:session,message}),signal:AbortSignal.timeout(90000)});const body=await response.json();check(response.status===200&&body.success===true,'HTTP_CANDIDATE_CHAT_SUCCESS');if(snapshot)check(JSON.stringify(canonical(lifecycleOnly||resolutionProfile||transitionProfile||reselectionProfile?priorHistory:getConversation(session).slice(0,snapshot.length)))===JSON.stringify(canonical(snapshot)),'HTTP_PRIOR_HISTORY_UNCHANGED');return body;};
+ const sales={dateFrom:'01/01/2023',dateTo:'31/01/2023',...(compositionProfile?{customerIds:['SYNTHETIC-C']}:{}),categoryIds:['SYNTHETIC-ARBITRARY'],groupBy:['month'],metrics:['totalAmount']};
+ const usage={documentNumber:'SYNTHETIC-M',dateFrom:'01/01/2023',dateTo:'31/05/2023',movementTypes:['SYNTHETIC-MOVEMENT'],destinations:[{destinationType:'LOCAL',destinationCode:'SYNTHETIC-D'}],categoryIds:['SYNTHETIC-ARBITRARY'],mode:'summary'};
+ try{
+  if(compositionProfile){
+   if(reselectionProfile){
+    const p=compositionProfile,equal=(a,b)=>JSON.stringify(canonical(a))===JSON.stringify(canonical(b));
+    for(const trimmed of [false,true])for(const [name,field,other,otherField] of [['search_customers','customerIds','search_categories','categoryIds'],['search_categories','categoryIds','search_customers','customerIds']]){
+     clearConversation(sessionId);plans.length=0;const otherArgs={...sales};delete otherArgs[field];
+     const ambiguous=search=>search==='search_customers'?p.ambiguousCustomerSearch:p.ambiguousCategorySearch;
+     const selectedId=(search,o)=>search==='search_customers'?o.codCliente:o.codRubro;
+     plans.push([command(other,{search:ambiguous(other)},'reselection-other'),command('get_sales',otherArgs,'other-guess')]);await post('Busca opciones para ventas de enero');plans.length=0;
+     check(lastLookup.status==='AMBIGUOUS'&&lastLookup.options?.length>=2,'HTTP_RESELECTION_OTHER_OPTIONS_VALID');
+     const otherId=selectedId(other,lastLookup.options[0]);await post('opción 1');
+     plans.push([command(name,{search:ambiguous(name)},'reselection-target'),command('get_sales',sales,'target-guess')]);await post('Busca opciones de '+(name==='search_customers'?'local':'rubro'));plans.length=0;
+     check(lastLookup.status==='AMBIGUOUS'&&lastLookup.options?.length>=2,'HTTP_RESELECTION_TARGET_OPTIONS_VALID');
+     const rawOptions=lastLookup.options;
+     expectedConsumer={name:'get_sales',input:{...sales,[otherField]:[otherId],[field]:[selectedId(name,rawOptions[1])]}};
+     const query=async()=>{const count=consumerCalls;plans.push([command('get_sales',{customerIds:['MODEL-C'],categoryIds:['MODEL-R']},'reselection-query')]);await post('continúa');plans.length=0;check(consumerCalls===count+1,'HTTP_RESELECTION_ARGUMENTS_EXECUTED');};
+     await post('opción 2');await query();
+     if(trimmed){for(let i=0;i<12;i++)await query();check(!getConversation(sessionId).some(m=>m.content?.some(b=>[name,other].includes(b.toolUse?.name))),'HTTP_BOTH_RESELECTION_LOOKUPS_LEFT_HISTORY');}
+     for(const ordinal of ['1','2','1']){
+      const before=getSearchResolutions(sessionId),option=before.domains[name].result.options.find(o=>String(o.optionId)===ordinal);
+      check(before.domains[name].kind==='selected'&&before.domains[other].kind==='selected'&&before.choiceFocus===name&&Boolean(option),'HTTP_RESELECTION_CONFIRMED_FOCUSED_PROFILE');
+      const expected=structuredClone(before);expected.domains[name]={...expected.domains[name],kind:'selected',selected:option};
+      await post('opción '+ordinal);
+      check(equal(expected,getSearchResolutions(sessionId)),'HTTP_RESELECTION_ONLY_FOCUSED_CATALOG_'+name+'_'+trimmed);
+      expectedConsumer.input[field]=[selectedId(name,rawOptions[Number(ordinal)-1])];await query();
+     }
+     const before=getSearchResolutions(sessionId),count=consumerCalls;plans.push([command('get_sales',sales,'invalid-reselection')]);await post('opción 999');plans.length=0;
+     check(consumerCalls===count&&equal(before,getSearchResolutions(sessionId)),'HTTP_RESELECTION_INVALID_PRESERVES_FULL_STATE_'+name+'_'+trimmed);
+     plans.push([command('search_members',{search:'Synthetic'},'reselection-foreign')]);await post('Busca opciones de socios');plans.length=0;
+     const foreign=getSearchResolutions(sessionId);await post('opción 2');
+     check(equal(foreign,getSearchResolutions(sessionId)),'HTTP_RESELECTION_FOREIGN_PRESERVES_FULL_STATE_'+name+'_'+trimmed);await query();
+     if(deniedSessionId){clearConversation(deniedSessionId);const isolated=getSearchResolutions(deniedSessionId),active=getSearchResolutions(sessionId),calls=consumerCalls;plans.push([command('get_sales',sales,'isolated-reselection')]);await post('opción 1',deniedSessionId);plans.length=0;check(consumerCalls===calls&&equal(isolated,getSearchResolutions(deniedSessionId))&&equal(active,getSearchResolutions(sessionId)),'HTTP_RESELECTION_SESSIONS_ISOLATED_'+name+'_'+trimmed);}
+    }
+    return;
+   }
+   if(transitionProfile){
+    const p=compositionProfile,equal=(a,b)=>JSON.stringify(canonical(a))===JSON.stringify(canonical(b));
+    for(const trimmed of [false,true])for(const [name,field,label] of [['search_customers','customerIds','local'],['search_categories','categoryIds','rubro']]){
+     clearConversation(sessionId);plans.length=0;
+     expectedConsumer={name:'get_sales',input:{...sales,customerIds:[p.customers[0].id],categoryIds:[p.categories[0].id]}};
+     plans.push([command('search_customers',{search:p.customers[0].search},'atomic-c'),command('search_categories',{search:p.categories[0].search},'atomic-r'),command('get_sales',sales,'atomic-query')]);await post('Busca local y rubro para ventas de enero');plans.length=0;
+     const query=async()=>{const count=consumerCalls;plans.push([command('get_sales',{customerIds:['MODEL-C'],categoryIds:['MODEL-R']},'atomic-consumer')]);await post('continúa');plans.length=0;check(consumerCalls===count+1,'HTTP_ATOMIC_PRESERVED_ARGUMENTS');};
+     plans.push([command('search_members',{search:'Synthetic'},'foreign-catalog')]);await post('Busca opciones de socios');plans.length=0;
+     if(trimmed){for(let i=0;i<12;i++)await query();check(!getConversation(sessionId).some(m=>m.content?.some(b=>b.toolUse?.name==='search_members')),'HTTP_FOREIGN_CATALOG_LEFT_HISTORY');}
+     const before=getSearchResolutions(sessionId);await post('opción 2');check(equal(before,getSearchResolutions(sessionId)),'HTTP_FULL_STATE_UNCHANGED_FOREIGN_CHOICE_'+name+'_'+trimmed);await query();
+     const removal='quita el filtro de '+label;delete expectedConsumer.input[field];const count=consumerCalls;
+     if(name==='search_customers')plans.push([command('get_sales',sales,'remove-local')]);await post(removal);plans.length=0;check(consumerCalls===count+1,'HTTP_ATOMIC_REMOVAL_EXECUTED');
+     if(trimmed){for(let i=0;i<12;i++)await query();check(!getConversation(sessionId).some(m=>m.content?.some(b=>b.text===removal)),'HTTP_RETIRED_FILTER_LEFT_HISTORY');}
+     const retired=getSearchResolutions(sessionId),entry=(name==='search_customers'?p.customers:p.categories)[0],lookups=lookupCalls;
+     plans.push([command(name,{search:entry.search},'rejected-retired')]);await post('Busca opciones de '+(name==='search_customers'?'rubro':'local'));plans.length=0;
+     check(lookupCalls===lookups&&equal(retired,getSearchResolutions(sessionId)),'HTTP_FULL_STATE_UNCHANGED_REJECTED_LOOKUP_'+name+'_'+trimmed);
+     for(const fault of ['throw','malformed']){
+      lookupFault=fault;plans.push([command(name,{search:entry.search},'controlled-'+fault)]);await post('Vuelve a añadir el '+label);plans.length=0;
+      check(equal(retired,getSearchResolutions(sessionId)),'HTTP_FULL_STATE_UNCHANGED_CONTROLLED_'+fault+'_'+name+'_'+trimmed);
+     }
+     const ambiguous=name==='search_customers'?p.ambiguousCustomerSearch:p.ambiguousCategorySearch;
+     plans.push([command(name,{search:ambiguous},'valid-ambiguous')]);await post('Vuelve a añadir el '+label);plans.length=0;
+     check(lastLookup.status==='AMBIGUOUS'&&lastLookup.options?.length>=2,'HTTP_ATOMIC_VALID_OPTIONS_PROFILE');
+     const pending=getSearchResolutions(sessionId),chosen=pending.domains[name].result.options[1];
+     plans.push([command('get_sales',sales,'invalid-choice-consumer')]);const calls=consumerCalls;await post('opción 999');plans.length=0;
+     check(consumerCalls===calls&&equal(pending,getSearchResolutions(sessionId)),'HTTP_FULL_STATE_UNCHANGED_INVALID_OPTION_'+name+'_'+trimmed);
+     await post('opción 2');const expected=structuredClone(pending);expected.domains[name]={...expected.domains[name],kind:'selected',selected:chosen};
+     check(equal(expected,getSearchResolutions(sessionId)),'HTTP_VALID_SELECTION_CHANGES_ONLY_CATALOG_'+name+'_'+trimmed);
+     expectedConsumer.input[field]=[name==='search_customers'?lastLookup.options[1].codCliente:lastLookup.options[1].codRubro];await query();
+     if(deniedSessionId){clearConversation(deniedSessionId);await post('quita el filtro de '+label,deniedSessionId);const original=getSearchResolutions(deniedSessionId);plans.push([command(name,{search:entry.search},'real-denial')]);const denied=await post('Vuelve a añadir el '+label,deniedSessionId);plans.length=0;check(denied.response==='El usuario no tiene permisos para consultar esta información.'&&Object.keys(denied.actions??{}).length===0&&Object.keys(denied).every(k=>['env','success','response','actions'].includes(k))&&equal(original,getSearchResolutions(deniedSessionId)),'HTTP_ORACLE_DENIAL_PRESERVES_FULL_STATE_'+name+'_'+trimmed);}
+    }
+    return;
+   }
+   if(resolutionProfile){
+    const p=compositionProfile;
+    for(const order of [['search_customers','search_categories'],['search_categories','search_customers']]){
+     clearConversation(sessionId);plans.length=0;const count=consumerCalls;
+     expectedConsumer={name:'get_sales',input:{...sales,customerIds:[p.customers[0].id],categoryIds:[p.categories[0].id]}};
+     plans.push([...order.map((name,i)=>command(name,{search:(name==='search_customers'?p.customers:p.categories)[0].search},'persistent-combined-'+i)),command('get_sales',sales,'combined-consumer')]);
+     await post(order[0]==='search_customers'?'Busca local y rubro':'Busca rubro y local');plans.length=0;
+     plans.push([command('get_sales',{customerIds:['MODEL-C'],categoryIds:['MODEL-R']},'combined-continue')]);await post('continúa');plans.length=0;
+     check(consumerCalls===count+2,'HTTP_PERSISTENT_COMBINED_IDENTITIES_'+order[0]);
+    }
+    for(const [name,field,label] of [['search_customers','customerIds','local'],['search_categories','categoryIds','rubro']]){
+     clearConversation(sessionId);plans.length=0;const before=consumerCalls;
+     const initial={...sales};delete initial[name==='search_customers'?'categoryIds':'customerIds'];
+     const ambiguous=name==='search_customers'?p.ambiguousCustomerSearch:p.ambiguousCategorySearch;
+     plans.push([command(name,{search:ambiguous},'persist-lookup'),command('get_sales',initial,'persist-guess')]);
+     await post('Busca opciones de '+label+' para ventas de enero');plans.length=0;
+     check(lastLookup.status==='AMBIGUOUS'&&lastLookup.options?.length>=2&&consumerCalls===before,'HTTP_PERSISTENT_PENDING_INITIAL_'+name);
+     const chosen=name==='search_customers'?lastLookup.options[1].codCliente:lastLookup.options[1].codRubro;
+     const blocked=async()=>{const count=consumerCalls;plans.push([command('get_sales',{[field]:['MODEL-ID'],dateFrom:'01/01/2000'},'pending-guess')]);await post('continúa');plans.length=0;check(consumerCalls===count,'HTTP_PERSISTENT_PENDING_BLOCKS_'+name);};
+     for(let i=0;i<12;i++)await blocked();
+     check(!getConversation(sessionId).some(m=>m.content?.some(b=>b.toolUse?.name===name)),'HTTP_PENDING_LOOKUP_LEFT_BOUNDED_HISTORY_'+name);
+     await post('Otra consulta: hola');check(getSearchResolutions(sessionId).domains[name]?.kind==='pending','HTTP_TOPIC_CHANGE_RETAINS_PENDING_'+name);
+     expectedConsumer={name:'get_sales',input:{...initial,[field]:[chosen]}};
+     const execute=async(text,lookupBlocks=[])=>{const count=consumerCalls;plans.push([...lookupBlocks,command('get_sales',{[field]:['MODEL-ID']},'persistent-query')]);await post(text);plans.length=0;check(consumerCalls===count+1,'HTTP_PERSISTENT_EXPLICIT_CONSUMER_'+name);};
+     await execute('opción 2');for(let i=0;i<12;i++)await execute('continúa');
+     const entry=(name==='search_customers'?p.customers:p.categories)[0];
+     expectedConsumer.input={...initial,[field]:[entry.id]};
+     await execute('Cambia el '+label,[command(name,{search:entry.search},'persistent-change')]);
+     delete expectedConsumer.input[field];
+     if(name==='search_categories'){const count=consumerCalls;await post('quita el filtro de rubro');check(consumerCalls===count+1,'HTTP_NATIVE_CATEGORY_REMOVAL_EXECUTED');}
+     else await execute('quita el filtro de local');
+     for(let i=0;i<12;i++)await execute('continúa');
+     check(getSearchResolutions(sessionId).domains[name]?.kind==='cleared','HTTP_REMOVED_STATE_SURVIVES_TRIM_'+name);
+     plans.push([command(name,{search:ambiguous},'readd-pending'),command('get_sales',initial,'readd-guess')]);
+     const calls=consumerCalls;await post('Vuelve a añadir el '+label);plans.length=0;
+     check(consumerCalls===calls&&lastLookup.status==='AMBIGUOUS','HTTP_READD_REQUIRES_NEW_SELECTION_'+name);
+     const fresh=name==='search_customers'?lastLookup.options[0].codCliente:lastLookup.options[0].codRubro;
+     for(let i=0;i<12;i++)await blocked();expectedConsumer.input={...initial,[field]:[fresh]};await execute('opción 1');
+     if(deniedSessionId){
+      clearConversation(deniedSessionId);const snapshot=JSON.stringify(getSearchResolutions(sessionId));
+      plans.push([command('get_sales',{[field]:['MODEL-ID']},'other-session-guess')]);const count=consumerCalls;await post('continúa',deniedSessionId);plans.length=0;
+      check(consumerCalls===count&&Object.keys(getSearchResolutions(deniedSessionId).domains).length===0&&snapshot===JSON.stringify(getSearchResolutions(sessionId)),'HTTP_RESOLUTION_SESSION_ISOLATION_'+name);
+      plans.push([command(name,{search:entry.search},'persistent-denied')]);const denied=await post('Busca '+label,deniedSessionId);plans.length=0;
+      check(denied.response==='El usuario no tiene permisos para consultar esta información.'&&Object.keys(denied.actions??{}).length===0&&Object.keys(denied).every(k=>['env','success','response','actions'].includes(k)),'HTTP_PERSISTENT_DENIED_NO_DATA_'+name);
+     }
+     const response=await fetch(`http://127.0.0.1:${server.address().port}/chatbot/api/bot/chat/reset`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({sessionId}),signal:AbortSignal.timeout(90000)});
+     const reset=await response.json();check(response.status===200&&reset.success&&getConversation(sessionId).length===0&&Object.keys(getSearchResolutions(sessionId).domains).length===0&&Object.keys(getSearchResolutions(sessionId).contexts).length===0,'HTTP_RESET_CLEARS_RESOLUTION_STATE_'+name);
+     const count=consumerCalls;plans.push([command('get_sales',{[field]:['MODEL-ID']},'post-reset-guess')]);await post('opción 1');plans.length=0;
+     check(consumerCalls===count,'HTTP_RESET_REQUIRES_FRESH_RESOLUTION_'+name);
+    }
+    return;
+   }
+   if(lifecycleOnly){
+    const p=compositionProfile;
+    for(const removed of lifecycleRetry?['both-customer']:['categoryIds','customerIds','both-customer','both-category']){
+     clearConversation(sessionId);plans.length=0;const before=consumerCalls;
+     let args={...sales,customerIds:[p.customers[0].id],categoryIds:[p.categories[0].id]};
+     const query=async(text,lookups=[],proposal={customerIds:['MODEL-C'],categoryIds:['MODEL-R']})=>{
+      const callsBefore=consumerCalls;
+      expectedConsumer={name:'get_sales',input:structuredClone(args)};
+      if(text!=='quita el filtro de rubro')plans.push([...lookups,command('get_sales',proposal,'lifecycle-query')]);
+      await post(text);plans.length=0;
+      check(consumerCalls===callsBefore+1,'HTTP_LIFECYCLE_EXECUTED_'+removed+'_'+String(consumerCalls-before));
+     };
+     await query('Busca local y rubro para ventas de enero',[
+      command('search_customers',{search:p.customers[0].search},'initial-c'),
+      command('search_categories',{search:p.categories[0].search},'initial-r')],sales);
+     args.customerIds=[p.customers[1].id];
+     await query('Cambia el local y conserva el rubro',[command('search_customers',{search:p.customers[1].search},'change-c')]);
+     if(removed.startsWith('both')){delete args.customerIds;delete args.categoryIds;}
+     else delete args[removed];
+     await query(removed==='categoryIds'?'quita el filtro de rubro':removed==='customerIds'?'quita el filtro de local':'retira ambos filtros');
+     args={...args,dateFrom:'01/02/2023',dateTo:'28/02/2023'};
+     await query('Cambia el período a febrero de 2023',[],{dateFrom:args.dateFrom,dateTo:args.dateTo,customerIds:['MODEL-C'],categoryIds:['MODEL-R']});
+     await query('continúa');
+     const customer=removed==='customerIds'||removed==='both-customer',name=customer?'search_customers':'search_categories';
+     args[customer?'customerIds':'categoryIds']=[customer?p.customers[0].id:p.categories[1].id];
+     await query(customer?'Vuelve a añadir el local':'Vuelve a añadir el rubro',[command(name,{search:customer?p.customers[0].search:p.categories[1].search},'readd')]);
+     await query('continúa');
+     check(consumerCalls===before+7,'HTTP_REMOVE_PERIOD_READD_EXACT_'+removed);
+     if(removed==='both-customer'){
+      for(let i=0;i<12;i++)await query('continúa');
+      check(!getConversation(sessionId).some(m=>m.content?.some(b=>b.text==='retira ambos filtros')),'HTTP_REMOVAL_SURVIVES_HISTORY_TRIMMING');
+     }
+    }
+    // Selection from an ambiguous lookup must also be invalidated by removal.
+    for(const name of lifecycleRetry?[]:['search_customers','search_categories']){
+     clearConversation(sessionId);plans.length=0;const before=consumerCalls,customer=name==='search_customers',field=customer?'customerIds':'categoryIds';
+     const initial={...sales};delete initial[customer?'categoryIds':'customerIds'];
+     plans.push([command(name,{search:customer?p.ambiguousCustomerSearch:p.ambiguousCategorySearch},'ambiguous'),command('get_sales',initial,'guess')]);
+     await post('Busca opciones para ventas');plans.length=0;
+     check(lastLookup.status==='AMBIGUOUS'&&consumerCalls===before,'HTTP_LIFECYCLE_AMBIGUITY_BLOCKS');
+     const selected=customer?lastLookup.options[1].codCliente:lastLookup.options[1].codRubro;
+     expectedConsumer={name:'get_sales',input:{...initial,[field]:[selected]}};
+     plans.push([command('get_sales',initial,'selected')]);await post('opción 2');plans.length=0;
+     delete expectedConsumer.input[field];
+     if(customer)plans.push([command('get_sales',initial,'remove-selected')]);await post(customer?'quita el filtro de local':'quita el filtro de rubro');plans.length=0;
+     plans.push([command('get_sales',initial,'continue-selected')]);await post('continúa');plans.length=0;
+     check(consumerCalls===before+3,'HTTP_SELECTED_FILTER_STAYS_REMOVED_'+name);
+     expectedConsumer.input[field]=[customer?p.customers[1].id:p.categories[1].id];
+     plans.push([command(name,{search:customer?p.customers[1].search:p.categories[1].search},'fresh-after-selection'),command('get_sales',initial,'fresh-selected-query')]);
+     await post(customer?'Vuelve a añadir el local':'Vuelve a añadir el rubro');plans.length=0;
+     check(consumerCalls===before+4,'HTTP_FRESH_RESOLUTION_REPLACES_REMOVED_SELECTION_'+name);
+    }
+    return;
+   }
+   const profiles={search_customers:compositionProfile.customers,search_categories:compositionProfile.categories};
+   const field={search_customers:'customerIds',search_categories:'categoryIds'};
+   const selectedId=(name,result)=>name==='search_customers'?result.options[1].codCliente:result.options[1].codRubro;
+   for(const order of [['search_customers','search_categories'],['search_categories','search_customers']]){
+    clearConversation(sessionId);plans.length=0;let before=consumerCalls;
+    const second=profiles[order[1]],initial={...sales};
+    expectedConsumer={name:'get_sales',input:{...initial,customerIds:[compositionProfile.customers[0].id],categoryIds:[compositionProfile.categories[0].id]}};
+    plans.push([...order.map((name,i)=>command(name,{search:profiles[name][0].search},'combined-'+i)),command('get_sales',initial,'combined-query')]);
+    await post(order[0]==='search_customers'?'Busca local y luego rubro para ventas de enero':'Busca rubro y luego local para ventas de enero');
+    check(consumerCalls===before+1,'HTTP_COMBINED_IDENTITIES_EXECUTED_'+order[0]);
+    plans.push([command('get_sales',{customerIds:['MODEL-C'],categoryIds:['MODEL-R']},'combined-conflicting')]);
+    await post('continúa');
+    expectedConsumer={name:'get_sales',input:{...initial,customerIds:[compositionProfile.customers[1].id],categoryIds:[compositionProfile.categories[0].id]}};
+    plans.push([command('search_customers',{search:compositionProfile.customers[1].search},'changed-local'),command('get_sales',initial,'changed-local-query')]);
+    await post('Cambia solo el local y conserva el rubro y los demás filtros');
+    expectedConsumer={name:'get_sales',input:{...initial,customerIds:[compositionProfile.customers[1].id],categoryIds:[compositionProfile.categories[1].id]}};
+    plans.push([command('search_categories',{search:compositionProfile.categories[1].search},'changed-category'),command('get_sales',initial,'changed-category-query')]);
+    await post('Cambia solo el rubro y conserva el local y los demás filtros');
+    expectedConsumer.input={...expectedConsumer.input,dateFrom:'01/02/2023',dateTo:'28/02/2023'};
+    plans.push([command('get_sales',{dateFrom:'01/02/2023',dateTo:'28/02/2023',customerIds:['MODEL-C'],categoryIds:['MODEL-R']},'changed-period')]);
+    await post('Cambia el período a febrero de 2023 y conserva local y rubro');
+    plans.push([command('get_sales',{customerIds:['MODEL-C'],categoryIds:['MODEL-R']},'continue-new-period')]);
+    await post('continúa');
+    check(consumerCalls===before+6,'HTTP_EXPLICIT_CHANGES_KEEP_OTHER_IDENTITIES_'+order[0]);
+    clearConversation(sessionId);plans.length=0;before=consumerCalls;
+    const oneDomain={...sales};delete oneDomain[field[order[1]]];
+    plans.push([command(order[0],{search:order[0]==='search_customers'?compositionProfile.ambiguousCustomerSearch:compositionProfile.ambiguousCategorySearch},'selected-origin'),command('get_sales',oneDomain,'selected-origin-guess')]);
+    await post('Busca opciones para esta consulta');
+    check(lastLookup.status==='AMBIGUOUS'&&lastLookup.options?.length>=2,'HTTP_CONFIRMED_OPTION_PROFILE');
+    const confirmed=selectedId(order[0],lastLookup);
+    expectedConsumer={name:'get_sales',input:{...oneDomain,[field[order[0]]]:[confirmed]}};
+    plans.push([command('get_sales',oneDomain,'confirmed-query')]);await post('opción 2');
+    expectedConsumer.input={...expectedConsumer.input,[field[order[1]]]:[second[1].id]};
+    plans.push([command(order[1],{search:second[1].search},'other-domain'),command('get_sales',sales,'other-domain-query')]);
+    await post(order[1]==='search_customers'?'Cambia el local y conserva la selección confirmada':'Cambia el rubro y conserva la selección confirmada');
+    check(consumerCalls===before+2,'HTTP_CONFIRMED_SELECTION_SURVIVES_OTHER_RESOLVER_'+order[0]);
+   }
+   if(deniedSessionId){clearConversation(deniedSessionId);plans.length=0;plans.push([command('search_customers',{search:compositionProfile.customers[0].search},'denied-combined-c'),command('search_categories',{search:compositionProfile.categories[0].search},'denied-combined-r'),command('get_sales',sales,'denied-combined-query')]);const denied=await post('Consulta con local y rubro',deniedSessionId);check(denied.response==='El usuario no tiene permisos para consultar esta información.'&&Object.keys(denied.actions??{}).length===0&&Object.keys(denied).every(k=>['env','success','response','actions'].includes(k)),'HTTP_COMBINED_DENIED_NO_DATA_OR_ACTIONS');}
+   return;
+  }
+  for(const [name,original] of [['get_sales',sales],['get_soles_usage',usage]]){
+   clearConversation(sessionId);plans.length=0;const before=consumerCalls;
+   plans.push([command('search_categories',{search:ambiguousSearch},name+'-lookup'),command(name,original,name+'-guess')]);
+   await post('Busca un rubro y conserva los filtros de la consulta');
+   check(lastLookup?.status==='AMBIGUOUS'&&lastLookup.options?.length>=2,'HTTP_LOOKUP_AMBIGUOUS_PROFILE');
+   const selected=lastLookup.options[1].codRubro;
+   check(consumerCalls===before,'HTTP_AMBIGUITY_BLOCKS_SAME_TURN_'+name);
+   for(let i=0;i<2;i++){
+    plans.push([command(name,{categoryIds:['SYNTHETIC-ARBITRARY'],dateFrom:'01/01/2000'},name+'-continue-'+i)]);
+    await post('continúa');check(consumerCalls===before,'HTTP_CONTINUE_KEEPS_SELECTION_PENDING_'+name+'_'+i);
+   }
+   expectedConsumer={name,input:{...original,categoryIds:[selected]}};
+   plans.push([command(name,{},name+'-selected')]);await post('opción 2');
+   check(consumerCalls===before+1,'HTTP_EXPLICIT_SELECTION_EXECUTES_ONCE_'+name);
+  }
+  clearConversation(sessionId);plans.length=0;const before=consumerCalls;
+  plans.push([command('search_categories',{search:ambiguousSearch},'new-lookup'),command('get_sales',sales,'new-guess')]);
+  await post('Busca un rubro para esta consulta');check(consumerCalls===before,'HTTP_NEW_LOOKUP_PENDING');
+  // Discover the exact option privately; the model still proposes an arbitrary ID.
+  const resolved=await lookup({search:uniqueSearch},{sessionId});
+  check(resolved.status==='RESOLVED','HTTP_UNIQUE_LOOKUP_PROFILE');
+  expectedConsumer={name:'get_sales',input:{...sales,categoryIds:[resolved.category.codRubro]}};
+  plans.push([command('search_categories',{search:uniqueSearch},'new-exact'),command('get_sales',{categoryIds:['SYNTHETIC-ARBITRARY']},'new-resolved-query')]);
+  await post('Realiza una nueva búsqueda exacta');check(consumerCalls===before+1,'HTTP_UNIQUE_NEW_SEARCH_RELEASES_CORRECT_ID');
+  if(deniedSessionId){
+   clearConversation(deniedSessionId);plans.length=0;
+   plans.push([command('search_categories',{search:ambiguousSearch},'denied-lookup')]);
+   const denied=await post('Busca este rubro',deniedSessionId);
+   check(denied.response==='El usuario no tiene permisos para consultar esta información.'&&Object.keys(denied.actions??{}).length===0&&Object.keys(denied).every(k=>['env','success','response','actions'].includes(k)),'HTTP_DENIED_NO_DATA_OR_ACTIONS');
+  }
+ }finally{clearConversation(sessionId);if(deniedSessionId)clearConversation(deniedSessionId);await new Promise(resolve=>server.close(resolve));}
+}

@@ -1,0 +1,240 @@
+# Librería 2023: diagnóstico de filtros y alcance de la respuesta
+
+Base `059ac13`, rama `fix/library-category-sales-2023`. Sin merge ni despliegue.
+Pregunta: **Ventas del rubro librería durante 2023, por mes**.
+
+## Causa contrastada
+
+En conversación nueva, **modelo Bedrock real** y Oracle DEV: coincidencia
+exacta única del rubro entre cuatro candidatos; con/sin tilde resuelven la
+misma identidad. El modelo consultó 2023 por mes, sin local ni tipo de día.
+Seis grupos mensuales coincidieron con SELECT independientes. **9/9 controles**,
+dos llamadas al modelo; cierre y logout aprobados. No se reprodujo el vacío.
+
+Después se reprodujeron cuatro preguntas previas aportadas mediante entradas
+ocultas, sin guardarlas ni modificar la conversación original del servidor.
+**Modelo real**, nueve llamadas en los antecedentes y dos en la consulta final:
+el modelo omitió `customerIds`, pero la selección confirmada del local seguía
+activa y el guard la conservó. Rubro, año y agrupación fueron correctos.
+
+Oracle independiente confirmó **cero grupos** para local+rubro y **seis** para
+el rubro sin ese local. El SQL efectivo incorporó ambos filtros con binds
+`customerId0`, `categoryId0`, `dateFrom`, `dateTo`. **7/7 controles diagnósticos**,
+cierre y logout aprobados. Son diagnósticos de reproducción, no una aprobación
+de la presentación defectuosa. La respuesta vacía exacta no se reprodujo
+literalmente: esa ejecución emitió `metrics` escalar, que el servicio normaliza
+pero el presentador anterior rechazaba, dejando la respuesta al modelo.
+
+La diferencia no procede de una tilde, una selección arbitraria del rubro ni
+ventas perdidas. El filtro de local conservado explica el vacío de la
+intersección. **No debe retirarse porque el modelo lo omita.** El defecto es
+que la respuesta no hacía explícito el alcance y podía interpretarse como
+ausencia de ventas del rubro completo.
+
+## Corrección y regresiones
+
+Solo cambia `salesSeriesPresentation.service.js`:
+
+- Expone si se consultan locales/rubros seleccionados o todos, además del tipo
+  de día cuando existe, sin mostrar IDs o identidades.
+- Ante local+rubro sin filas, explica que el vacío corresponde a esa combinación
+  y ofrece la petición explícita **todos los locales**. No hace una consulta
+  alternativa ni borra filtros silenciosamente.
+- Refleja la normalización de métricas escalares reconocidas ya realizada por
+  el servicio; la definición de la herramienta y las reglas de SQL no cambian.
+
+`librarySalesContext` prueba el caso con propuesta del modelo sin local,
+conservación de IDs confirmados, binds/fechas, texto y ausencia de mutaciones
+en argumentos/historial. También prueba retirada explícita solo del local,
+conservando rubro, período, agrupación y tipo de día, y equivalencia de métricas
+escalar/array. Con las regresiones existentes del presentador: **11/11 locales**
+y **11/11 en Node 22.23.4 de Docker DEV**, candidato
+`94808dfe9e95dc0a0670fc0edc28528539b9ed34`. Preflight completo aprobado y
+**262 archivos** src/scripts/test/config/packages coincidentes con Git. No
+modelo real, sesión ni Oracle en el preflight. Reporte ignorado
+`library-sales-final-focused.json`, SHA-256 de la salida enfocada:
+`99827a5d24b0415033a51fd04d12521e23494b67e4e84ef2d385057f9d39a816`.
+Contraste Oracle afectado aprobado sobre `e5240d2`, según el resultado final
+descrito abajo; no es una repetición de las conversaciones con modelo real.
+
+## Separación de evidencias
+
+| Evidencia | Atribución y límite |
+| --- | --- |
+| Conversación nueva real | `059ac13`, 06/11/2026 15:11:11–15:11:20 (Asunción); `library-sales-baseline-059ac13.json`, SHA-256 `b986706b3e89ec04d6eba02956b50f03befb78b7cedd90576331c42068a77b47`. 9/9 técnicos/conciliación, no prueba de la corrección posterior. |
+| Contexto real reproducido | `059ac13`, 06/11/2026 15:20:16–15:20:46 (Asunción); `library-sales-context-059ac13.json`, SHA-256 `03ed70b4b82aa406053f795ab76e077e9010ed30c7bd96cc88be2f8ccb806309`. 7/7 diagnósticos y vacío de la intersección confirmado; no conserva las preguntas/valores privados. |
+| Regresiones nuevas | Datos y propuestas controlados, repositorio/servicio/guard/presentador reales. No simulan una ejecución Oracle ni un modelo real. |
+| Control final aprobado | `e5240d2`, código idéntico a `94808df`: **19/19 verificaciones** de `scripts/check-library-sales-context-dev.mjs`. Modelo y estado de resolución controlados; IDs/filas Oracle legítimos y SELECT independientes. Vacío explicado y posterior retirada explícita con conciliación mensual completa. El local reseleccionado no se declara idéntico al original; no son conversaciones nuevas con modelo real. |
+
+## Resultado final de la corrección
+
+Ejecución del **06/11/2026, 15:54:10–15:54:14 (Asunción)** sobre
+`e5240d223aef4f0f9e5de3be28f6cdae459df508`: **19/19 verificaciones**,
+**262 archivos coincidentes** con Git. Desde `94808df` solo cambian dos
+documentos; código, pruebas, ejecutor y configuración son idénticos.
+
+Se comprobó en el candidato aislado:
+
+- La propuesta sin local conserva el local confirmado, el rubro, 2023 y el mes;
+  SQL efectivo con ambos filtros y vacío concordante con SELECT independiente.
+- Respuesta determinista con alcance activo, explicación de la intersección y
+  petición explícita para ampliar a todos los locales.
+- «Todos los locales» elimina exclusivamente el local aun si el modelo propone
+  el ID anterior; conserva rubro/fechas/mes. El SQL elimina solo ese filtro y
+  todos los grupos mensuales, importes y monedas coinciden con Oracle.
+- Presentación positiva del alcance ampliado; estado de local retirado y rubro
+  seleccionado. Sin alterar reglas de búsqueda, permisos o SQL de producción.
+- Identidad proxy por sesión, cierre de todas las conexiones y logout de la
+  sesión creada por el login DEV protegido aprobados. Sin llamadas a modelo real
+  ni proveedor de conversión en este control final.
+
+Las **11/11 pruebas Node 22** y los reportes de las dos reproducciones reales
+se reutilizaron por hash. Los 19 checks verifican dos turnos controlados y su
+infraestructura; no son 19 conversaciones o variantes distintas ni se suman
+a los 9/7 diagnósticos como cobertura única.
+
+Reporte congelado ignorado `logs/library-sales-final-e5240d2.json`, SHA-256
+`9a81aa7241107094969399e98c23bc85a2c1a22e05026ffeb284651e355407a3`.
+Esquema revisado sin claves sensibles ni UUID de sesión. Logs compactos del
+intervalo completo del helper: chatbot cero líneas, ERP dos, sin códigos
+Oracle/driver, marcadores sensibles o fatales detectados. No se publicaron
+filas, importes, preguntas, binds ni identidades.
+
+Reportes y helpers de `logs/` ignorados. Los logs compactos de cada reproducción:
+chatbot cero líneas, ERP dos, sin códigos técnicos, marcadores sensibles o
+fatales detectados. Sesiones, credenciales, preguntas previas, documentos,
+identidades, binds y resultados completos permanecen en memoria. Solo se cierra
+la sesión que crea el helper; ambas sesiones creadas fueron cerradas.
+
+Ventas sigue consultando **`VW_BOT_VENTAS_LOCALES`**, con su regla vigente de
+ventas auditadas y fallback: no se cambia la vista, el SQL del repositorio ni
+se reemplazan importes para producir positivos. El contraste usa la misma
+fuente autorizada con SELECT escritos por separado; no audita nuevamente la
+definición interna de la vista. Oracle conserva la autoridad de permisos por
+`sessionId` y conexión proxy.
+
+Las seis reservas F3/F4/M7, F5/T1, muestras históricas y cotización real positiva
+siguen documentadas. Sin proveedor de conversión, suites completas, datos,
+permisos, expiraciones ni integración frontend/ERP. **PR #42 en borrador**;
+control final revisado, pendiente de revisión final del diff antes de marcarla
+lista para revisión. Sin merge ni despliegue.
+
+## Corrección P2: retirada exclusiva frente a propuestas contradictorias
+
+La revisión posterior confirmó un límite del control 19/19: su propuesta ya
+contenía 2023/mes. El guard retiraba el local, pero permitía al modelo cambiar
+también a 2024/año. Ese caso sintético nuevo no se considera cubierto por el
+reporte anterior ni por las reproducciones reales del diagnóstico.
+
+La corrección conserva el contexto efectivo de `get_sales` en el estado de la
+sesión. Para **todos los locales** o una retirada exclusiva reconocida, toma
+ese contexto completo y elimina únicamente el local: no admite nuevas claves
+ni reemplazos de fechas, métricas, agrupación o tipo de día del modelo. Sin
+período previo ni período explícito, solicita contexto antes de componer SQL.
+El estado del rubro y el marcador de local retirado se conservan.
+
+Para la forma explícita **todos los locales, durante 2024, por año**, el período
+anual y la agrupación se derivan del texto del usuario, conservando los demás
+argumentos aunque el modelo proponga 2026/día u otros filtros. La gramática
+acotada también admite `en`/`para`, año completo y agrupación por año/mes/día/
+local/rubro. Otras formulaciones siguen su flujo de interpretación existente;
+no se ignoran sus cambios adicionales por clasificarlas como retirada pura.
+Los cambios explícitos posteriores de período y agrupación siguen permitidos.
+
+Se añaden seis regresiones en `salesLocalRemoval`: propuesta 2024/año ante
+contexto 2023/mes, con y sin historial recortado mediante `trimConversation`
+hasta expulsar la llamada original; argumentos finales/SQL, estado, claves
+ausentes e inmutabilidad. También cambio explícito de año/agrupación contra
+otra propuesta contradictoria, cambio posterior, gramática y falta de contexto.
+Se incluyen solo los módulos afectados `librarySalesContext`,
+`searchResolutionState` y `searchFilterLifecycle`; no se repite la suite completa
+ni las reproducciones con modelo real.
+
+Control nuevo preparado: `scripts/check-library-sales-removal-dev.mjs`, tres
+turnos con modelo e historial controlados, IDs/filas Oracle legítimos. Comprueba
+retirada 2023/mes antes y después del recorte real, propuesta indebida de
+2024/año/métricas/tipo de día, y cambio explícito a 2024/año frente a una
+propuesta de 2026/día. Verifica argumentos y SQL, estado y conciliación por
+moneda con SELECT independientes. No afirma reusar el local original. El
+reporte 19/19 y las dos reproducciones reales se preservan por hash, sin repetirlos.
+**24/24 pruebas afectadas aprobadas en Node 22.23.4 de Docker DEV** sobre
+`fb7516a5338d4d96420fb5fa1d48493c1efefb03`; preflight completo y **264 archivos**
+src/scripts/test/config/packages coincidentes. Solo `salesLocalRemoval`,
+`librarySalesContext`, `searchResolutionState` y `searchFilterLifecycle`;
+sin repetir el presentador no modificado ni las reproducciones reales.
+Reporte ignorado `library-sales-removal-focused.json`, SHA-256 de la salida:
+`017d199c4a627948a470e28c850cdd3d49e28499815e00f0972869f05404fbed`.
+El control Oracle nuevo se aprobó posteriormente en `7f61efa`, según el
+resultado siguiente; no se atribuye al nuevo guard el 19/19 anterior como si
+detectara la propuesta contradictoria. PR #42
+permanece en borrador; las seis reservas y F5/T1 se conservan, sin cambios de
+datos, permisos, expiraciones, proveedor, merge o despliegue.
+
+### Intento de control P2 bloqueado en login
+
+El intento del **06/11/2026, 16:25:18–16:26:42 (Asunción)** terminó con
+`ERP_LOGIN_REJECTED`; el ERP registró el código técnico seguro
+`ORA-01017`. **El worker Oracle no se inició**: no hay controles de la
+corrección aprobados ni fallidos por ese intento, ni prueba nueva de permisos.
+Las 24/24 enfocadas de `fb7516a` permanecieron vigentes; el contraste DEV quedó
+pendiente en ese intento y se completó en la ejecución posterior.
+
+Reporte original ignorado `library-sales-removal-login-rejected.json`, SHA-256
+`86dfcff72cdc6b94eaeb4dc2399dc716ebf35886cf9547ad0ec2a9f52fd30867`.
+Su fase heredada `MODULE_PREFLIGHT` y `usedExistingSession=true` no describen
+lo ocurrido: falló la obtención de sesión antes de invocar el control. El
+helper local se ajustó para informar fase `ERP_LOGIN`, procedencia de sesión
+`none`/`provided`/`created` e invocación del worker por separado. No cambia el
+login del ERP ni la aplicación. Se asegura transporte JSON de caracteres
+Unicode y lectura UTF-8; comprobación local con caracteres públicos aprobada,
+sin credenciales ni nueva autenticación.
+
+Logs compactos: chatbot cero líneas, ERP tres; un código técnico de rechazo,
+sin marcadores sensibles ni fatales detectados. No se leyeron ni recuperaron
+los valores introducidos. Hace falta una sesión vigente o credenciales DEV
+válidas, exclusivamente en las entradas ocultas, para ejecutar el control
+que entonces estaba pendiente. No se modifican cuentas, permisos, datos o expiraciones. La PR #42
+permanece en borrador y las reservas no cambian.
+
+### Resultado DEV del P2 de retirada exclusiva
+
+**29/29 verificaciones aprobadas**, ejecución del **06/11/2026,
+16:38:42–16:38:48 (Asunción)** sobre
+`7f61efaebcd2b5ba4230ea84947291f2d8f3e2fe`, **264 archivos coincidentes** con
+Git. `src`, pruebas, ejecutor y configuración son idénticos a `fb7516a`;
+los commits posteriores hasta esta ejecución solo cambiaron documentación.
+
+Se verificaron únicamente tres turnos afectados con modelo/historial
+**controlados** e IDs/filas **Oracle legítimos**:
+
+1. Retirada pura de local frente a una propuesta de 2024/año, otra métrica y
+   fines de semana: argumentos y SQL mantienen 2023/mes y las claves previas,
+   sin inyectar tipo de día. Rubro y estado persistente conservados, local
+   retirado, todos los grupos/importes/monedas mensuales contra SELECT.
+2. La misma transición después de que `trimConversation` expulse la llamada
+   original: contexto persistente y resultado siguen siendo 2023/mes. La
+   presentación refleja ese alcance, sin 2024 propuesto por el modelo.
+3. Petición explícita de 2024/año frente a propuesta de 2026/día: argumentos,
+   SQL, estado y presentación usan lo solicitado por el usuario. Conciliación
+   anual independiente de los resultados disponibles; no se infiere un positivo
+   de 2024 por el mero hecho de que la comprobación concuerde.
+
+Identidad proxy por sesión, cierres después de cada retirada y cierre global
+aprobados. En esta ejecución se creó una sesión mediante login DEV protegido;
+logout aprobado. El rechazo anterior no se cuenta como control ni prueba de
+denegación de herramientas.
+
+Las **24/24 pruebas Node 22** se reutilizaron por hash; también el 19/19 anterior
+y las dos reproducciones con modelo real, con sus tres hashes verificados.
+No se repitieron pruebas o reproducciones aprobadas. Los 29 checks son de esos
+tres turnos y sus controles técnicos, no 29 conversaciones independientes.
+No hay nueva evidencia de modelo real/HTTP ni identidad del local original.
+
+Reporte congelado ignorado `logs/library-sales-removal-7f61efa.json`, SHA-256
+`e7b794a3fd82de62c2c48cd2b6a38006b5bd186a6fe599c2a0860edd483cc522`.
+Esquema revisado sin claves sensibles ni UUID de sesión. Logs compactos del
+intervalo completo del helper: chatbot cero líneas, ERP dos, sin códigos
+Oracle/driver, marcadores sensibles o fatales detectados. Sin modelo real ni
+proveedor en este control final, merge, despliegue o cambios de datos/permisos/
+expiraciones. PR #42 sigue en borrador hasta la revisión final del diff y su
+evidencia; seis reservas, F5/T1 y demás muestras pendientes conservadas.
