@@ -92,6 +92,11 @@ contexto. **24/24 enfocadas Node 22.23.4** sobre `fb7516a`, preflight completo y
 264 archivos coincidentes. Contraste Oracle nuevo pendiente. El control final
 nuevo es de modelo/historial controlados con
 datos Oracle legítimos; no se repiten ni reatribuyen las reproducciones reales.
+El intento DEV P2 posterior quedó bloqueado en `ERP_LOGIN_REJECTED` (código
+seguro `ORA-01017`), antes de iniciar el worker Oracle. No acredita ni invalida
+la corrección ni prueba denegación de herramientas; sus 24/24 enfocadas siguen
+vigentes y el control nuevo permanece pendiente de sesión válida. Diagnóstico
+local del helper corregido sin cambiar la aplicación; PR #42 en borrador.
 
 PR #39: despliegue `4428874`, resumen real 11/11 contra Oracle independiente.
 PR #40: despliegue `84fd67c`, gráfico HTTP horizontal multiserie **21/21** contra

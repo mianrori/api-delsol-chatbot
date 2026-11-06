@@ -168,3 +168,28 @@ El control Oracle de la corrección aún está pendiente; no se atribuye al nuev
 guard el 19/19 anterior como si detectara la propuesta contradictoria. PR #42
 permanece en borrador; las seis reservas y F5/T1 se conservan, sin cambios de
 datos, permisos, expiraciones, proveedor, merge o despliegue.
+
+### Intento de control P2 bloqueado en login
+
+El intento del **06/11/2026, 16:25:18–16:26:42 (Asunción)** terminó con
+`ERP_LOGIN_REJECTED`; el ERP registró el código técnico seguro
+`ORA-01017`. **El worker Oracle no se inició**: no hay controles de la
+corrección aprobados ni fallidos por ese intento, ni prueba nueva de permisos.
+Las 24/24 enfocadas de `fb7516a` permanecen vigentes; contraste DEV pendiente.
+
+Reporte original ignorado `library-sales-removal-login-rejected.json`, SHA-256
+`86dfcff72cdc6b94eaeb4dc2399dc716ebf35886cf9547ad0ec2a9f52fd30867`.
+Su fase heredada `MODULE_PREFLIGHT` y `usedExistingSession=true` no describen
+lo ocurrido: falló la obtención de sesión antes de invocar el control. El
+helper local se ajustó para informar fase `ERP_LOGIN`, procedencia de sesión
+`none`/`provided`/`created` e invocación del worker por separado. No cambia el
+login del ERP ni la aplicación. Se asegura transporte JSON de caracteres
+Unicode y lectura UTF-8; comprobación local con caracteres públicos aprobada,
+sin credenciales ni nueva autenticación.
+
+Logs compactos: chatbot cero líneas, ERP tres; un código técnico de rechazo,
+sin marcadores sensibles ni fatales detectados. No se leyeron ni recuperaron
+los valores introducidos. Hace falta una sesión vigente o credenciales DEV
+válidas, exclusivamente en las entradas ocultas, para ejecutar solo el control
+pendiente. No se modifican cuentas, permisos, datos o expiraciones. La PR #42
+permanece en borrador y las reservas no cambian.
