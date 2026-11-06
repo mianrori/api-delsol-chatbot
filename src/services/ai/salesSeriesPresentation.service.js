@@ -46,11 +46,21 @@ export const buildSalesSeriesResponse = (calls = [], { message = "" } = {}) => {
   const groupBy = Array.isArray(input.groupBy) ? input.groupBy : [input.groupBy];
   if (groupBy.length !== 1 || !["day", "month", "year"].includes(groupBy[0])) return null;
   if (!Array.isArray(result?.data) || result.resultSet?.truncated || result.resultSet?.analysisPolicy === "NO_ANALYSIS" || result.hasMore) return null;
-  const metrics = input.metrics ?? ["totalAmount", "totalInvoices"].filter((metric) => result.data.some((row) => Object.hasOwn(row, metric)));
+  // Match the effective service normalization, including legacy scalar metrics.
+  // This does not change the tool schema or the SQL/filter selection.
+  const requestedMetrics = input.metrics ?? ["totalAmount", "totalInvoices"].filter((metric) => result.data.some((row) => Object.hasOwn(row, metric)));
+  const metrics = Array.isArray(requestedMetrics) ? requestedMetrics : [requestedMetrics];
   if (!Array.isArray(metrics) || !metrics.length || metrics.some((metric) => !Object.hasOwn(metricNames, metric))) return null;
   const lines = ["**Ventas por período**", ""];
   if (input.dateFrom || input.dateTo) lines.push(`Período: ${cell(input.dateFrom)} a ${cell(input.dateTo)}.`, "");
-  if (!result.data.length) return [...lines, "No se encontraron ventas para los filtros consultados."].join("\n");
+  const hasLocal = Array.isArray(input.customerIds) ? input.customerIds.length > 0 : Boolean(input.customerIds);
+  const hasCategory = Array.isArray(input.categoryIds) ? input.categoryIds.length > 0 : Boolean(input.categoryIds);
+  lines.push(`Alcance: ${hasLocal ? "locales seleccionados" : "todos los locales"}; ${hasCategory ? "rubros seleccionados" : "todos los rubros"}${input.dayType === "weekend" ? "; fines de semana" : input.dayType === "weekday" ? "; días hábiles" : ""}.`, "");
+  if (!result.data.length) {
+    lines.push("No se encontraron ventas para los filtros consultados.");
+    if (hasLocal && hasCategory) lines.push("", "La consulta combina el local y el rubro seleccionados; este resultado no describe las ventas del rubro en todos los locales.", "Para retirar solo el filtro de local, indica «todos los locales». Se conservarán el rubro y los demás filtros.");
+    return lines.join("\n");
+  }
   const currencies = new Map();
   for (const raw of result.data) {
     const p = period(raw, groupBy[0]);

@@ -1,24 +1,24 @@
 # Balance del alcance del backend
 
 Fecha: **06/11/2026**. Base revisada y último despliegue acreditado:
-`84fd67c9465cf6a21916c687a184597a3ba9c252` (PR #40 fusionada).
-El balance inicial utilizó exclusivamente documentación y reportes existentes.
-El seguimiento F1/F2/F3/F4/M7 está en una rama separada y se registra abajo;
-no altera la base desplegada ni convierte evidencia histórica en una ejecución nueva.
+`059ac13c2fb7d84a8929dcd14b28219d440a09df` (PR #41 fusionada y desplegada).
+Este cierre utiliza exclusivamente documentación y reportes existentes. No se
+ejecutan nuevas pruebas, consultas Oracle, login ni proveedor; los SHA de la
+evidencia histórica conservan su atribución original.
 
 ## Dictamen y criterio de cierre
 
 Las **25 herramientas originales están implementadas**; el chatbot registra
 **26**, incluida ventas por m². No se identificó herramienta pendiente de migrar
-tras las correcciones de PR #40.
+tras las correcciones de PR #41.
 La revisión posterior identificó dos fallos F3/F4; sus correcciones en `61c5c9f`
 pasan 15/15 enfocadas Node 22.23.4 y preflight (257 archivos). La ejecución
 Oracle `6ac06bc`, con código idéntico, aprueba 26/26 checks: cuatro positivos
 F1/F2 y un perfil afectado F3. Conserva seis reservas reales F3/F4/M7;
 la separación de compras multimoneda F4 tiene cobertura propia controlada,
-sin afirmar una muestra real que no apareció. PR #41 permanece en borrador.
+sin afirmar una muestra real que no apareció. PR #41 fue revisada y fusionada.
 La revisión final abrió un P2 adicional de código: moneda nula con registros
-permitía comparación frente a PYG. Su corrección por pareja está preparada,
+permitía comparación frente a PYG. Su corrección por pareja está desplegada,
 en `c0eabb6`, con 18/18 enfocadas Node 22.23.4, preflight completo y 260 archivos
 coincidentes; **17/17 verificaciones DEV sobre `ff937d8`**, código/pruebas
 idénticos, concilian un perfil real PYG y sus diferencias/porcentajes/presentación
@@ -26,7 +26,7 @@ con SELECT independientes. Cierres/logout aprobados, sin proveedor. No
 se presenta como otra muestra DEV ausente ni sustituye las seis reservas.
 Eso no equivale a acreditar todas las variantes de cada herramienta.
 
-Puede cerrarse el alcance de **los perfiles acreditados**, manteniendo sus
+Se registra el cierre de **los perfiles acreditados sobre `059ac13`**, manteniendo sus
 limitaciones. **No procede declarar cierre integral sin reservas** de la
 conversión real ni de las variantes concretas aún sin evidencia señaladas abajo.
 No se presume autorización para excluirlas de la aceptación.
@@ -50,7 +50,7 @@ ejecuciones distintas y checks solapados no se suman como casos únicos.
 | Familia / perfiles acreditados | Evidencia y commits | Límite de la afirmación |
 | --- | --- | --- |
 | Nueve buscadores: locales, rubros, socios, promociones, clientes/conceptos facturados y tipos/destinos/movimientos de soles | L: `7ced8d9`; selección, filtros independientes, retirada/reincorporación, estado por sesión tras recorte, reset/aislamiento y reelección hasta `047c361`; despliegue PR #37 `ef9bff4` | Catálogos autorizados y cohortes ensayadas; no todas las coincidencias lingüísticas ni empates reales. |
-| Ventas, comparaciones temporales y campañas | H `b315ff9`; N `7762f35`: tres períodos de campaña, límites, filtros y SQL independiente; Q/I para sus perfiles de ventas | No todas las combinaciones ni campañas excepcionales. |
+| Ventas, comparaciones temporales y campañas | H `b315ff9`; N `7762f35`: tres períodos, límites/filtros; `c0eabb6`: 18/18 controladas; `ff937d8`: 17/17 de perfil PYG; `059ac13`: 17/17 desplegadas contra SELECT, porcentajes y presentación; Q/I para sus perfiles de ventas | Perfil PYG cerrado, no todas las campañas. Cuatro reservas F3 reales; monedas inválidas y casos excepcionales controlados no sustituyen muestras. |
 | Ventas por m² | Q `e317a8f`, despliegue `68847db`: superficie histórica, límites, ambigüedad y cálculo/filtros | Superficie cero/cambiante real ausente; FX real positivo no se acredita mediante tasas controladas. |
 | Ficha y vehículos del socio | N `7762f35`: ficha/ausencia, vehículos por documento y débito; `cafc5f1`: chapa única/ausente contra SELECT | Chapa compartida y todos los patrones de campos nulos no acreditados en muestras reales. |
 | Compras individuales | T `d529cfd`: dos socios, importes mensuales por moneda, local/rubro y conteo inicial contra SQL; P: recorrido HTTP completo histórico | P no tiene SHA propio; no afirmar recorrido atribuido al head ni socio real multimoneda. |
@@ -64,12 +64,43 @@ ejecuciones distintas y checks solapados no se suman como casos únicos.
 | Gráficos HTTP | `ad0ef01`: negativos etiqueta/serie/ejes; `d59d1f2`, 27/27: horizontal/circular/multiserie con fuente Oracle; despliegue `84fd67c`, 21/21 | Modelo/historial preparados; un perfil mensual PYG. Puntos/leyendas por serie, moneda y período conciliados; no todas las fuentes/divisas. |
 | Seguridad, ciclo y exportación | D `b315ff9`: 21/21, usuarios Oracle distintos, rechazo sin datos/cierre; Q/I/R y seguimientos PR #37; XLSX real X `13e69ef` | Identidad resuelta por `sessionId`, Oracle autoridad de permisos. Estado conversacional de proceso; sin promesa de ejecución distribuida. |
 
-El despliegue `84fd67c` acredita 187 archivos coincidentes, salud/arranque,
+El despliegue histórico `84fd67c` acredita 187 archivos coincidentes, salud/arranque,
 dependencias según lockfile, cero reinicios y el gráfico HTTP anterior contra
 SELECT independientes. No hubo petición al proveedor; cierre/logout aprobados.
 Reportes locales ignorados `deployed-pr40-startup.json`, `deployed-pr40-chart.json`
 y `deployed-pr40-result.json`. SHA-256 del reporte del gráfico:
 `bfbd551d3af1f5584775e274efd204e9e7f22582931797f2ce1f43a1feaba71d`.
+
+El despliegue actual **`059ac13`** acredita **191 archivos coincidentes**,
+dependencias con lockfile, salud development, PM2 online, mismo arranque y cero
+reinicios, sin errores detectados. **17/17 verificaciones de un perfil real PYG
+de campaña** (06/11/2026 17:29:16–17:29:23 UTC): tres períodos, importes por
+moneda, registros/métrica de facturas, promedios, diferencias, porcentajes y
+presentación contra SELECT independientes. Cierre por bloque/global y logout
+aprobados. Dispatch/presentación de `/app`, no una conversación HTTP nueva.
+Logs compactos: chatbot cero líneas, ERP dos; sin alertas técnicas/sensibles.
+Sin proveedor ni suites completas adicionales.
+
+Reportes locales ignorados: `deployed-pr41-startup.json`,
+`deployed-pr41-campaign-059ac13.json` y `deployed-pr41-result.json`. SHA-256 del
+reporte de campaña:
+`87e63a1c476165349297774f45489b72e7742559b42ef2fd1704b05daf5c2614`.
+Las pruebas de moneda ausente/desconocida/contradictoria, inversión y ausencia
+son **controladas** (`c0eabb6`), distintas de esta muestra real PYG. La evidencia
+de otros perfiles se reutiliza: no se declara una suite nueva sobre el merge.
+
+Las **seis reservas acotadas** conservan sus códigos y siguen sin acreditar:
+
+- `F3_EMPTY_NOT_FOUND_IN_10_CAMPAIGNS`.
+- `F3_REFERENCE_ZERO_NOT_FOUND_IN_10_CAMPAIGNS`.
+- `F3_MIXED_NOT_FOUND_IN_10_CAMPAIGNS`.
+- `F3_RECORDED_ZERO_NOT_FOUND_IN_10_CAMPAIGNS`.
+- `F4_MULTICURRENCY_NOT_FOUND_IN_1000_ROWS_JAN_MAY_2023`.
+- `M7_SHARED_ACTIVE_PLATE_NOT_FOUND_IN_1000_ROWS`.
+
+No son ausencia global. `coverageComplete=true` del control desplegado solo
+cierra su perfil PYG; no elimina estas reservas, F5/T1, las muestras M1–M10 ni
+E1. Integración frontend/ERP permanece fuera de este balance.
 
 ## Cotización real positiva: pendiente externo separado
 
@@ -90,8 +121,8 @@ de F3/F4/M7 conservan reservas de muestra, no verificaciones olvidadas.
 | --- | --- | --- |
 | F1. `search_invoice_customers`: fuzzy positivo y coincidencias específicas por RUC/matrícula | **No, positivos específicos acreditados**; no exige todas las erratas o identificadores compartidos. | `6ac06bc`: tres positivos aprobados contra SELECT independiente; RUC/matrícula con identidades/período/seguridad, fuzzy con cero coincidencias fuertes y orden/umbral Oracle. Cohorte de 20 filas, hasta seis candidatos fuzzy. La errata es controlada sobre catálogo real, no nuevo HTTP. L y selección anteriores se reutilizan. |
 | F2. `search_soles_types`: positivo fuzzy específico | **No, positivo específico acreditado**; no exhaustividad lingüística. | `6ac06bc`: cero directas, coincidencia positiva contra catálogo Oracle y distancia independiente. Hasta ocho tipos. L exacta/parcial/alias no se repite. |
-| F3. Campañas sin registros, referencia cero o monedas diferentes en otras campañas | **Condicional para las muestras reales**, no implementación faltante; revisión de corrección PR #41 pendiente. | `61c5c9f`: separación por pareja y registros, controles propios; `6ac06bc`: un perfil afectado de tres períodos conciliado contra SQL. Diez campañas de hasta 61 días inspeccionadas sin las cuatro muestras: ausencia, referencia cero, monedas distintas o suma cero registrada. Todas siguen `sample_missing`, con cobertura controlada propia. No ausencia global ni aprobación Oracle de esas ramas. |
-| F4. Compras individuales de un socio real con varias monedas | **Condicional** para la muestra real; no impide cerrar los perfiles T. Revisión de corrección PR #41 pendiente. | `61c5c9f`: cobertura propia SQL/DTO/presentación, `$` compartido conserva descripción e importes separados. `6ac06bc`: no apareció socio multimoneda en 1.000 filas enero–mayo 2023; no se ejecutó resumen/recorrido de esa muestra. T `d529cfd` se conserva, sin heredar CTE de R/G ni declarar ausencia global. |
+| F3. Campañas sin registros, referencia cero o monedas diferentes en otras campañas | **Condicional para las muestras reales**, no implementación faltante; perfil PYG cerrado en `059ac13`. | PR #41 revisada/fusionada/desplegada; cobertura controlada monetaria `c0eabb6` y 17/17 reales PYG en `059ac13`. Diez campañas de hasta 61 días inspeccionadas sin las cuatro muestras: ausencia, referencia cero, monedas distintas o suma cero registrada. Todas siguen `sample_missing`, sin ampliar la búsqueda. No ausencia global ni aprobación Oracle de esas ramas. |
+| F4. Compras individuales de un socio real con varias monedas | **Condicional** para la muestra real; no impide cerrar los perfiles T. Corrección PR #41 revisada y desplegada. | `61c5c9f`: cobertura propia SQL/DTO/presentación, `$` compartido conserva descripción e importes separados. `6ac06bc`: no apareció socio multimoneda en 1.000 filas enero–mayo 2023; no se ejecutó resumen/recorrido de esa muestra. T `d529cfd` se conserva, sin heredar CTE de R/G ni declarar ausencia global. |
 | F5. Gráficos con otras formas/fuentes, métricas o monedas | **Condicional**: falta un positivo específico de ruta de filas a un array anidado mediante índice; no bloquea los perfiles HTTP aprobados ni exige todas las fuentes. | [Contrato documentado](chart-result-contract.md). `data`, `results`, etiquetas y métricas anidadas tienen evidencia; `groups.0.rows` es forma contratada sin positivo específico identificado. Mínimo futuro: un positivo controlado de esa forma. No hay contrato de pivote de objetos o unión arbitraria de fuentes. |
 | F6. Todos los patrones de nulos de ficha o lectura de otro registro de socio | **No para el perfil de ficha N**; sí impide afirmar cobertura de cada patrón/registro. No inventar una regla usuario=socio. | N encontrado/ausente y campos de su muestra; D y proxy por `sessionId` cubren autorización según Oracle. D no enumera cada fila autorizada. Conservar límite, ampliar únicamente ante una política concreta o muestra relevante. |
 | F7. Todas las combinaciones de ventas/usos, lenguaje libre, ranking fuera de cohortes y cada alias/error ortográfico | **No**: es falta de exhaustividad, no un camino nuevo identificado ni una herramienta ausente. | H/Q/I/O/G/L y ciclo PR #37 cubren sus perfiles/filtros combinados. No repetirlos ni abrir campañas generales de combinaciones para declarar cierre. Un defecto reproducible nuevo sí requeriría corrección y evidencia afectada. |
@@ -110,7 +141,7 @@ faltante. Los límites de una búsqueda acotada no prueban ausencia global.
 | M5. Segmentación multimoneda real | **No**: G tiene cobertura controlada propia y perfiles Oracle aprobados. | Cohorte real; no extrapolarla a compras individuales F4. |
 | M6. Condiciones con contratos activos ambiguos | **No como implementación faltante**: tests de `contracts` cubren ausencia/ambigüedad; condiciones se incluyó en las pruebas enfocadas Node 22 de `e5868ea`. `cafc5f1` no halló cohorte de 2–20 CNT activos por cliente. | Resultado real de ese endpoint con todas sus opciones; no inferirlo de incidencia ni declarar inexistencia global. |
 | M7. Chapa activa compartida | **No para chapa única/ausente acreditadas**; test controlado histórico aprobado confirmado en los logs 263/277, sin vínculo suficiente al SHA del código. | `6ac06bc`: no encontrada entre 44 vehículos activos elegibles (tope 1.000, sin placas vacías/espacios interiores). Búsqueda acotada revisada; contraste de ambigüedad real reservado. No inventar atribución histórica ni ausencia global. |
-| M8. Empates exactos de catálogos, identificador compartido, tipos duplicados o destino SOCIO/LOCAL con igual código | **No**: L y pruebas controladas de resolución/selección, incluida conservación de ambigüedad. | Cada empate real y pareja real; los casos controlados no son muestras Oracle de negocio. F1/F2 separan los positivos funcionales que aún faltan. |
+| M8. Empates exactos de catálogos, identificador compartido, tipos duplicados o destino SOCIO/LOCAL con igual código | **No**: L y pruebas controladas de resolución/selección, incluida conservación de ambigüedad. | Cada empate real y pareja real; los casos controlados no son muestras Oracle de negocio. Los positivos específicos F1/F2 ya acreditados no certifican todos esos empates. |
 | M9. Tres ventanas históricas vacías de soles en V | **No**: V `a709b35` acredita ausencia para su socio/fechas y `cafc5f1` otras ventanas positivas en los tres estados. | No afirmar filas en las ventanas vacías ni ausencia global. Este pendiente no requiere otra ejecución para cerrar el mecanismo de ventanas. |
 | M10. Hoy/ayer/semana/mes vacíos en altas de vehículos | **No**: `cafc5f1` concilia límites/distintos, año positivo; T `d529cfd` aporta mes histórico con filas. | Positivos en cada rango relativo vacío. No cambiar fechas del sistema ni datos para obtenerlos. |
 
@@ -125,14 +156,11 @@ faltante. Los límites de una búsqueda acotada no prueban ausencia global.
 
 ## Trabajo mínimo restante
 
-1. Revisar las dos correcciones PR #41 y su evidencia, sin repetir los controles
-   aprobados. F1/F2 ya no requieren ejecución adicional para los positivos
-   identificados. Mantener las reservas por ID, sin «backend totalmente validado».
-   Incluir el P2 de moneda ausente/no reconocida: 18/18 pruebas controladas y
-   17/17 verificaciones de un perfil real PYG en `ff937d8` ya revisadas; falta la
-   revisión final del diff. Los casos inválidos son controlados, no muestras
-   Oracle. El control no reabre F1/F2, F5/T1 ni las búsquedas; su cobertura
-   completa se refiere solo al perfil, sin eliminar las seis reservas.
+1. Mantener cerrados los perfiles acreditados en `059ac13`: PR #41 revisada,
+   fusionada y desplegada, sin código pendiente de revisión de ese bloque.
+   No repetir F1/F2 ni el perfil PYG. El P2 conserva 18/18 pruebas controladas
+   y 17/17 verificaciones desplegadas del perfil real; monedas inválidas siguen
+   siendo casos controlados. El cierre no elimina las seis reservas ni F5/T1.
 2. La revisión de atribución F3/F4/M7 ya se realizó, conservando sus salvedades.
    El contraste `6ac06bc` ya se revisó: 26/26 checks sin fallos, cuatro positivos
    F1/F2 y un perfil afectado F3; seis reservas de muestra, cierre/logout
@@ -148,6 +176,6 @@ faltante. Los límites de una búsqueda acotada no prueban ausencia global.
    implementación con reserva, nunca certificar un caso real no ejecutado.
 
 No se proponen herramientas nuevas, despliegues ni suites completas.
-Las dos correcciones F3/F4 se mantienen en rama separada, PR #41 en borrador.
+Las correcciones F3/F4 y el P2 monetario de PR #41 ya están en `059ac13`.
 Integración frontend/ERP, sincronización, cambios de datos,
 permisos, contraseñas o expiraciones están fuera de este balance.
