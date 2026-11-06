@@ -54,7 +54,8 @@ y **11/11 en Node 22.23.4 de Docker DEV**, candidato
 modelo real, sesión ni Oracle en el preflight. Reporte ignorado
 `library-sales-final-focused.json`, SHA-256 de la salida enfocada:
 `99827a5d24b0415033a51fd04d12521e23494b67e4e84ef2d385057f9d39a816`.
-Contraste Oracle de la corrección aún pendiente de ejecución/revisión.
+Contraste Oracle afectado aprobado sobre `e5240d2`, según el resultado final
+descrito abajo; no es una repetición de las conversaciones con modelo real.
 
 ## Separación de evidencias
 
@@ -63,7 +64,41 @@ Contraste Oracle de la corrección aún pendiente de ejecución/revisión.
 | Conversación nueva real | `059ac13`, 06/11/2026 15:11:11–15:11:20 (Asunción); `library-sales-baseline-059ac13.json`, SHA-256 `b986706b3e89ec04d6eba02956b50f03befb78b7cedd90576331c42068a77b47`. 9/9 técnicos/conciliación, no prueba de la corrección posterior. |
 | Contexto real reproducido | `059ac13`, 06/11/2026 15:20:16–15:20:46 (Asunción); `library-sales-context-059ac13.json`, SHA-256 `03ed70b4b82aa406053f795ab76e077e9010ed30c7bd96cc88be2f8ccb806309`. 7/7 diagnósticos y vacío de la intersección confirmado; no conserva las preguntas/valores privados. |
 | Regresiones nuevas | Datos y propuestas controlados, repositorio/servicio/guard/presentador reales. No simulan una ejecución Oracle ni un modelo real. |
-| Control final preparado | `scripts/check-library-sales-context-dev.mjs`: modelo y estado de resolución controlados; IDs y filas Oracle legítimos, con SELECT independientes. No se afirma que el local reseleccionado sea el original. Comprueba vacío explicado y posterior retirada explícita con conciliación mensual completa. No repite las dos conversaciones reales. |
+| Control final aprobado | `e5240d2`, código idéntico a `94808df`: **19/19 verificaciones** de `scripts/check-library-sales-context-dev.mjs`. Modelo y estado de resolución controlados; IDs/filas Oracle legítimos y SELECT independientes. Vacío explicado y posterior retirada explícita con conciliación mensual completa. El local reseleccionado no se declara idéntico al original; no son conversaciones nuevas con modelo real. |
+
+## Resultado final de la corrección
+
+Ejecución del **06/11/2026, 15:54:10–15:54:14 (Asunción)** sobre
+`e5240d223aef4f0f9e5de3be28f6cdae459df508`: **19/19 verificaciones**,
+**262 archivos coincidentes** con Git. Desde `94808df` solo cambian dos
+documentos; código, pruebas, ejecutor y configuración son idénticos.
+
+Se comprobó en el candidato aislado:
+
+- La propuesta sin local conserva el local confirmado, el rubro, 2023 y el mes;
+  SQL efectivo con ambos filtros y vacío concordante con SELECT independiente.
+- Respuesta determinista con alcance activo, explicación de la intersección y
+  petición explícita para ampliar a todos los locales.
+- «Todos los locales» elimina exclusivamente el local aun si el modelo propone
+  el ID anterior; conserva rubro/fechas/mes. El SQL elimina solo ese filtro y
+  todos los grupos mensuales, importes y monedas coinciden con Oracle.
+- Presentación positiva del alcance ampliado; estado de local retirado y rubro
+  seleccionado. Sin alterar reglas de búsqueda, permisos o SQL de producción.
+- Identidad proxy por sesión, cierre de todas las conexiones y logout de la
+  sesión creada por el login DEV protegido aprobados. Sin llamadas a modelo real
+  ni proveedor de conversión en este control final.
+
+Las **11/11 pruebas Node 22** y los reportes de las dos reproducciones reales
+se reutilizaron por hash. Los 19 checks verifican dos turnos controlados y su
+infraestructura; no son 19 conversaciones o variantes distintas ni se suman
+a los 9/7 diagnósticos como cobertura única.
+
+Reporte congelado ignorado `logs/library-sales-final-e5240d2.json`, SHA-256
+`9a81aa7241107094969399e98c23bc85a2c1a22e05026ffeb284651e355407a3`.
+Esquema revisado sin claves sensibles ni UUID de sesión. Logs compactos del
+intervalo completo del helper: chatbot cero líneas, ERP dos, sin códigos
+Oracle/driver, marcadores sensibles o fatales detectados. No se publicaron
+filas, importes, preguntas, binds ni identidades.
 
 Reportes y helpers de `logs/` ignorados. Los logs compactos de cada reproducción:
 chatbot cero líneas, ERP dos, sin códigos técnicos, marcadores sensibles o
@@ -80,5 +115,6 @@ definición interna de la vista. Oracle conserva la autoridad de permisos por
 
 Las seis reservas F3/F4/M7, F5/T1, muestras históricas y cotización real positiva
 siguen documentadas. Sin proveedor de conversión, suites completas, datos,
-permisos, expiraciones ni integración frontend/ERP. PR prevista en borrador,
-pendiente del control final de la corrección.
+permisos, expiraciones ni integración frontend/ERP. **PR #42 en borrador**;
+control final revisado, pendiente de revisión final del diff antes de marcarla
+lista para revisión. Sin merge ni despliegue.

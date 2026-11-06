@@ -69,9 +69,18 @@ Corrección de presentación preparada: mostrar filtros efectivos y explicar el
 vacío de la combinación, sin retirarlos; «todos los locales» elimina únicamente
 el local ante petición explícita. Métrica escalar reconocida coherente con el
 servicio. **11/11 enfocadas Node 22.23.4** sobre `94808df`, preflight completo y
-262 archivos coincidentes; pruebas controladas nuevas. Contraste Oracle final
-pendiente. No atribuir las reproducciones reales a la versión
-corregida todavía. Los perfiles cerrados en `059ac13` y sus reservas no cambian.
+262 archivos coincidentes; pruebas controladas nuevas. **19/19 verificaciones
+Oracle afectadas sobre `e5240d2`**, código/pruebas/ejecutor idénticos a `94808df`:
+dos turnos con modelo/estado controlados y datos Oracle legítimos. Vacío con
+ambos filtros explicado; retirada explícita solo del local, conservación de
+rubro/año/mes y conciliación mensual completa por moneda con SELECT.
+Identidad proxy, cierres/logout y logs compactos aprobados. Reporte ignorado
+`library-sales-final-e5240d2.json`, SHA-256
+`9a81aa7241107094969399e98c23bc85a2c1a22e05026ffeb284651e355407a3`.
+Las 11 pruebas y las reproducciones con modelo real se reutilizan por hash,
+sin repetirlas ni presentar este control final como modelo real/HTTP nuevo o
+como el mismo local original. PR #42 en borrador para revisión del diff.
+Los perfiles cerrados en `059ac13` y sus reservas no cambian; sin despliegue.
 
 PR #39: despliegue `4428874`, resumen real 11/11 contra Oracle independiente.
 PR #40: despliegue `84fd67c`, gráfico HTTP horizontal multiserie **21/21** contra
