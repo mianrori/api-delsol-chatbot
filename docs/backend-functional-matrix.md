@@ -11,13 +11,16 @@ las tablas inferiores conservan los perfiles y SHA históricos, no ejecuciones n
 
 Las 25 herramientas originales están implementadas, 26 en el registro actual.
 Los perfiles acreditados pueden cerrarse con sus reservas; no procede afirmar
-cobertura integral de las ramas F1/F2, variantes financieras F3, extensiones
-condicionales F4/F5 o conversión real E1 sin la evidencia correspondiente.
+cobertura integral de variantes financieras F3, extensiones condicionales
+F4/F5 o conversión real E1 sin la evidencia correspondiente. Los positivos
+específicos pendientes F1/F2 ya tienen contraste independiente en `6ac06bc`.
 Las muestras ausentes con cobertura controlada no son implementación faltante.
 La revisión posterior F3/F4 identificó dos hallazgos: suma monetaria de campaña
 antes de separar monedas y etiqueta `$` indistinguible en compras individuales.
-Las correcciones están en la rama `test/backend-final-variants-dev`, pendientes
-de contraste Oracle; no forman parte del despliegue `84fd67c`.
+Las correcciones están en la rama `test/backend-final-variants-dev`, PR #41 en
+borrador. Pruebas controladas propias y consulta de campaña Oracle aprobadas;
+no forman parte del despliegue `84fd67c`. La muestra multimoneda real F4 sigue
+reservada, sin confundir su regresión controlada con Oracle.
 
 PR #39: despliegue `4428874`, resumen real 11/11 contra Oracle independiente.
 PR #40: despliegue `84fd67c`, gráfico HTTP horizontal multiserie **21/21** contra
@@ -35,20 +38,25 @@ auditoría previa y los hashes de los logs históricos: aprobaciones controladas
 de F3/F4/M7, sin atribuirles un SHA de código por fecha. La corrección candidata
 añade cuatro regresiones propias: candidato **`61c5c9f`**, **15/15** enfocadas
 en Node **22.23.4**, preflight completo y **257 archivos coincidentes** con Git.
-Contrastes Oracle aún pendientes de ejecución/revisión; ese preflight no hace
-login, consultas Oracle ni llamadas al proveedor.
+Contraste Oracle **`6ac06bc`**, código idéntico: **26/26 checks**, cinco bloques
+aprobados (cuatro positivos de buscadores y un perfil afectado de campaña),
+cero fallos y seis reservas de muestra. No sumar esos checks a las 15 pruebas
+como variantes únicas. `coverageComplete=false`; cierres y logout aprobados.
 
 | Pendiente | Estado de esta ampliación | Reserva conservada |
 | --- | --- | --- |
-| F1 RUC/matrícula y fuzzy positivos | Ejecutor preparado: identidades y período contra SELECT; fuzzy solo tras demostrar cero coincidencias fuertes. | Sin aprobación nueva hasta revisar reporte. Hasta 20 filas/seis candidatos. |
-| F2 fuzzy positivo | Ejecutor preparado con distancia independiente y catálogo real. | Hasta ocho tipos; alias/parcial aprobado no sustituye ese positivo. |
-| F3 ausencia/referencia cero/monedas distintas | Aprobación controlada histórica revisada; corrección por moneda dentro del período y `sourceRows`, pruebas afectadas. Oracle excepcional preparado. | Hasta diez campañas de hasta 61 días; cada variante sin muestra queda reservada. Suma de `CANTIDAD_FACTURAS` no significa facturas distintas. |
-| F4 compras individuales multimoneda | Cobertura controlada propia nueva de repositorio/DTO/presentación; dos descripciones con `$` siguen separadas. | Cohorte real de hasta 1.000 filas enero–mayo 2023; recorrido condicionado a muestra legítima y presupuesto de 100 detalles. No hereda CTE de R/G. |
-| M7 chapa activa compartida | Test histórico aprobado revisado, sin nuevo SHA de ejecución atribuible. Solo búsqueda/contraste real pendiente. | Hasta 1.000 vehículos; si no hay placa compartida, reserva sin ausencia global. |
+| F1 RUC/matrícula y fuzzy positivos | **Aprobados `6ac06bc`**: identidades y período contra SELECT; fuzzy positivo solo tras demostrar cero coincidencias fuertes, umbral y orden contra Oracle. | Cohorte de 20 filas, fuzzy hasta seis candidatos. Catálogo Oracle + errata controlada; no HTTP nuevo ni exhaustividad lingüística. |
+| F2 fuzzy positivo | **Aprobado `6ac06bc`**: distancia independiente, cero coincidencias directas y catálogo Oracle real. | Hasta ocho tipos. No se repitieron alias/parcial; no acredita todas las erratas. |
+| F3 ausencia/referencia cero/monedas distintas | Corrección y `sourceRows` cubiertos por pruebas propias; **un perfil real de tres períodos aprobado `6ac06bc`** por cambio de consulta. | Diez campañas de hasta 61 días sin las cuatro muestras excepcionales (ausencia, referencia cero, mezcla, suma cero registrada). Esas ramas **no** aprueban con Oracle. Suma de `CANTIDAD_FACTURAS` no significa facturas distintas. |
+| F4 compras individuales multimoneda | Cobertura controlada propia de repositorio/DTO/presentación; dos descripciones con `$` separadas. Búsqueda real ejecutada. | No encontrado en 1.000 filas enero–mayo 2023. No hubo resumen/recorrido multimoneda real. No hereda CTE de R/G ni declara ausencia global. |
+| M7 chapa activa compartida | Test histórico aprobado revisado sin SHA de código atribuible; búsqueda real ejecutada. | No encontrada entre 44 vehículos elegibles (tope 1.000, activos, sin placas vacías/espacios interiores). Ambigüedad real sigue reservada. |
 | F5 formas de gráficos | [Contrato y evidencia por forma](chart-result-contract.md): arrays `data`/`results`, rutas de etiqueta/métrica, series y unidades. | Positivo específico de `dataPath` a array anidado mediante índice no identificado. No se ejecuta F5 ni proveedor en este bloque. |
 
 T1 conserva S/P sin SHA propio: **no reconstruir hashes por fecha**. E1 sigue
 pendiente separado; ningún control nuevo de esta ampliación consulta proveedor.
+Reporte congelado local ignorado `backend-final-variants-6ac06bc.json`, SHA-256
+`1d2cef95e077cc79eb912500b94a68b30739f1e88ae2ed6e61beda5b89d0532e`.
+Dispatch real + SELECT independientes; no atribuir a HTTP estos contrastes.
 
 ### Trazabilidad histórica de las ampliaciones
 

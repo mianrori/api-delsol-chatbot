@@ -11,9 +11,12 @@ no altera la base desplegada ni convierte evidencia histórica en una ejecución
 Las **25 herramientas originales están implementadas**; el chatbot registra
 **26**, incluida ventas por m². No se identificó herramienta pendiente de migrar
 tras las correcciones de PR #40.
-La revisión posterior identificó dos fallos F3/F4; sus correcciones candidatas
-en `61c5c9f` pasan 15/15 enfocadas Node 22.23.4 y preflight (257 archivos);
-no se consideran aprobadas con Oracle hasta revisar el nuevo reporte.
+La revisión posterior identificó dos fallos F3/F4; sus correcciones en `61c5c9f`
+pasan 15/15 enfocadas Node 22.23.4 y preflight (257 archivos). La ejecución
+Oracle `6ac06bc`, con código idéntico, aprueba 26/26 checks: cuatro positivos
+F1/F2 y un perfil afectado F3. Conserva seis reservas reales F3/F4/M7;
+la separación de compras multimoneda F4 tiene cobertura propia controlada,
+sin afirmar una muestra real que no apareció. PR #41 permanece en borrador.
 Eso no equivale a acreditar todas las variantes de cada herramienta.
 
 Puede cerrarse el alcance de **los perfiles acreditados**, manteniendo sus
@@ -68,19 +71,20 @@ y `deployed-pr40-result.json`. SHA-256 del reporte del gráfico:
 | E1. Obtener y aplicar una cotización pública real inequívoca | **Sí, la conversión positiva real** de costo/ventas por m²/incidencia. No bloquea datos nativos, aritmética controlada ni gráficos sin FX. No se declara indisponibilidad permanente. | La llamada del 05/11/2026 del candidato `e5868ea` devolvió `EXCHANGE_PROVIDER_QUOTE_UNAVAILABLE`; antes hubo timeout. `ad0ef01`: formatos/tasas inválidas, HTTP/red/timeout y PYG/USD controlados; `92b5e11`: neto/área Oracle con tasa y fallo controlados. Falta una respuesta real válida, identificación independiente de venta y fecha de consulta, y una aplicación a neto/área Oracle con esa misma tasa. Solo cuando haya respuesta reconocible; no aumentar expiraciones ni elegir otro número/moneda. |
 | E2. Fecha de publicación del proveedor o cotización histórica | **No para el contrato actual**, que declara tasa de venta actual, `retrievedAt` y `quotedAt=null`. **Sí** impediría afirmar una fecha publicada o conversión histórica. | No hay tal evidencia ni contrato histórico acreditado. Conservar desconocido y distinguir fecha de factura/período de fecha de consulta; no añadir un proveedor histórico para cerrar este alcance. |
 
-## Variantes funcionales todavía no acreditadas
+## Variantes funcionales revisadas y reservas restantes
 
 Aquí «sin evidencia» no significa «muestra DEV inexistente». La auditoría
-posterior y sus contrastes preparados están en
-[variantes finales](backend-final-variants-validation.md). Hasta ejecutar y
-revisar ese reporte no se acredita ningún positivo Oracle nuevo.
+posterior y sus resultados están en
+[variantes finales](backend-final-variants-validation.md). F1/F2 ya están
+acreditados para sus positivos específicos; las búsquedas acotadas ejecutadas
+de F3/F4/M7 conservan reservas de muestra, no verificaciones olvidadas.
 
 | ID / variante | ¿Bloquea el cierre? / por qué | Evidencia actual y trabajo mínimo propuesto |
 | --- | --- | --- |
-| F1. `search_invoice_customers`: fuzzy positivo y coincidencias específicas por RUC/matrícula | **Sí, esas ramas si se incluyen en el cierre sin reservas**: resuelven identidad y período, y L no las acredita individualmente. No reabrir exacta/parcial/ausencia ya aprobadas. | L `7ced8d9`, selección controlada `c8525a6`. Futuro contraste acotado de una coincidencia positiva de cada mecanismo, identidades/conteo contra SELECT y selección sin arbitrariedad; si no existe muestra, registrar el alcance de búsqueda, no aprobarla. |
-| F2. `search_soles_types`: positivo fuzzy específico | **Sí para certificar esa variante**, no para exacta/parcial/alias normales ya acreditados. No exigir todos los errores de escritura. | L acredita tipos/alias, ambigüedad controlada y rechazo. Falta un positivo que identifique esa rama; un caso contrastado basta para el mecanismo, no todo el lenguaje. |
-| F3. Campañas sin registros, referencia cero o monedas diferentes en otras campañas | **Sí para esas variantes Oracle y la corrección candidata**, no reabre perfiles ajenos. | Logs históricos: tests controlados aprobados sin vínculo suficiente de SHA. Hallazgo: SUM antes de MAX(moneda); `61c5c9f` separa por pareja y distingue cero/ausencia mediante registros. Cuatro regresiones propias F3/F4, 15/15 enfocadas Node 22.23.4 y preflight. Falta contraste acotado de hasta diez campañas; cada muestra no encontrada conservará reserva. |
-| F4. Compras individuales de un socio real con varias monedas | **Condicional** para la muestra real; la corrección de presentación necesita su revisión. Ausencia DEV no demostrada globalmente. | T `d529cfd` intacta; test histórico propio de presentación aprobado sin SHA atribuible. Nueva cobertura propia de SQL/DTO/presentación: `$` compartido conserva descripción e importes separados. Falta cohorte real acotada de 1.000 filas enero–mayo 2023 y, si procede, resumen/recorrido de hasta 100 detalles. No hereda CTE de R/G. |
+| F1. `search_invoice_customers`: fuzzy positivo y coincidencias específicas por RUC/matrícula | **No, positivos específicos acreditados**; no exige todas las erratas o identificadores compartidos. | `6ac06bc`: tres positivos aprobados contra SELECT independiente; RUC/matrícula con identidades/período/seguridad, fuzzy con cero coincidencias fuertes y orden/umbral Oracle. Cohorte de 20 filas, hasta seis candidatos fuzzy. La errata es controlada sobre catálogo real, no nuevo HTTP. L y selección anteriores se reutilizan. |
+| F2. `search_soles_types`: positivo fuzzy específico | **No, positivo específico acreditado**; no exhaustividad lingüística. | `6ac06bc`: cero directas, coincidencia positiva contra catálogo Oracle y distancia independiente. Hasta ocho tipos. L exacta/parcial/alias no se repite. |
+| F3. Campañas sin registros, referencia cero o monedas diferentes en otras campañas | **Condicional para las muestras reales**, no implementación faltante; revisión de corrección PR #41 pendiente. | `61c5c9f`: separación por pareja y registros, controles propios; `6ac06bc`: un perfil afectado de tres períodos conciliado contra SQL. Diez campañas de hasta 61 días inspeccionadas sin las cuatro muestras: ausencia, referencia cero, monedas distintas o suma cero registrada. Todas siguen `sample_missing`, con cobertura controlada propia. No ausencia global ni aprobación Oracle de esas ramas. |
+| F4. Compras individuales de un socio real con varias monedas | **Condicional** para la muestra real; no impide cerrar los perfiles T. Revisión de corrección PR #41 pendiente. | `61c5c9f`: cobertura propia SQL/DTO/presentación, `$` compartido conserva descripción e importes separados. `6ac06bc`: no apareció socio multimoneda en 1.000 filas enero–mayo 2023; no se ejecutó resumen/recorrido de esa muestra. T `d529cfd` se conserva, sin heredar CTE de R/G ni declarar ausencia global. |
 | F5. Gráficos con otras formas/fuentes, métricas o monedas | **Condicional**: falta un positivo específico de ruta de filas a un array anidado mediante índice; no bloquea los perfiles HTTP aprobados ni exige todas las fuentes. | [Contrato documentado](chart-result-contract.md). `data`, `results`, etiquetas y métricas anidadas tienen evidencia; `groups.0.rows` es forma contratada sin positivo específico identificado. Mínimo futuro: un positivo controlado de esa forma. No hay contrato de pivote de objetos o unión arbitraria de fuentes. |
 | F6. Todos los patrones de nulos de ficha o lectura de otro registro de socio | **No para el perfil de ficha N**; sí impide afirmar cobertura de cada patrón/registro. No inventar una regla usuario=socio. | N encontrado/ausente y campos de su muestra; D y proxy por `sessionId` cubren autorización según Oracle. D no enumera cada fila autorizada. Conservar límite, ampliar únicamente ante una política concreta o muestra relevante. |
 | F7. Todas las combinaciones de ventas/usos, lenguaje libre, ranking fuera de cohortes y cada alias/error ortográfico | **No**: es falta de exhaustividad, no un camino nuevo identificado ni una herramienta ausente. | H/Q/I/O/G/L y ciclo PR #37 cubren sus perfiles/filtros combinados. No repetirlos ni abrir campañas generales de combinaciones para declarar cierre. Un defecto reproducible nuevo sí requeriría corrección y evidencia afectada. |
@@ -98,7 +102,7 @@ faltante. Los límites de una búsqueda acotada no prueban ausencia global.
 | M4. Socio promocional multimoneda — `MIXED_CURRENCY_REAL_MEMBER_FIXTURE_NOT_FOUND` | **No**: R `89a4e59`, grupos reconocidos/ambiguos controlados, sin USD por `$`; dos socios positivos en `cafc5f1`. | Socio real multimoneda, no dos socios monomoneda ni CTE. |
 | M5. Segmentación multimoneda real | **No**: G tiene cobertura controlada propia y perfiles Oracle aprobados. | Cohorte real; no extrapolarla a compras individuales F4. |
 | M6. Condiciones con contratos activos ambiguos | **No como implementación faltante**: tests de `contracts` cubren ausencia/ambigüedad; condiciones se incluyó en las pruebas enfocadas Node 22 de `e5868ea`. `cafc5f1` no halló cohorte de 2–20 CNT activos por cliente. | Resultado real de ese endpoint con todas sus opciones; no inferirlo de incidencia ni declarar inexistencia global. |
-| M7. Chapa activa compartida | **No para chapa única/ausente acreditadas**; test controlado histórico aprobado confirmado en los logs 263/277, sin vínculo suficiente al SHA del código. | Búsqueda de hasta 1.000 vehículos activos preparada; muestra y contraste aún pendientes. No inventar atribución histórica ni elegir arbitrariamente un dueño. |
+| M7. Chapa activa compartida | **No para chapa única/ausente acreditadas**; test controlado histórico aprobado confirmado en los logs 263/277, sin vínculo suficiente al SHA del código. | `6ac06bc`: no encontrada entre 44 vehículos activos elegibles (tope 1.000, sin placas vacías/espacios interiores). Búsqueda acotada revisada; contraste de ambigüedad real reservado. No inventar atribución histórica ni ausencia global. |
 | M8. Empates exactos de catálogos, identificador compartido, tipos duplicados o destino SOCIO/LOCAL con igual código | **No**: L y pruebas controladas de resolución/selección, incluida conservación de ambigüedad. | Cada empate real y pareja real; los casos controlados no son muestras Oracle de negocio. F1/F2 separan los positivos funcionales que aún faltan. |
 | M9. Tres ventanas históricas vacías de soles en V | **No**: V `a709b35` acredita ausencia para su socio/fechas y `cafc5f1` otras ventanas positivas en los tres estados. | No afirmar filas en las ventanas vacías ni ausencia global. Este pendiente no requiere otra ejecución para cerrar el mecanismo de ventanas. |
 | M10. Hoy/ayer/semana/mes vacíos en altas de vehículos | **No**: `cafc5f1` concilia límites/distintos, año positivo; T `d529cfd` aporta mes histórico con filas. | Positivos en cada rango relativo vacío. No cambiar fechas del sistema ni datos para obtenerlos. |
@@ -114,14 +118,15 @@ faltante. Los límites de una búsqueda acotada no prueban ausencia global.
 
 ## Trabajo mínimo restante
 
-1. Mantener cerrados los perfiles acreditados y sus pendientes por ID; acordar
-   explícitamente si la aceptación incluye F1/F2/F3/F4/F5 y el requisito de SHA
-   de T1. No ocultarlos bajo «backend totalmente validado».
+1. Revisar las dos correcciones PR #41 y su evidencia, sin repetir los controles
+   aprobados. F1/F2 ya no requieren ejecución adicional para los positivos
+   identificados. Mantener las reservas por ID, sin «backend totalmente validado».
 2. La revisión de atribución F3/F4/M7 ya se realizó, conservando sus salvedades.
-   Revisar los resultados del candidato de variantes finales: únicamente
-   F1/F2 y muestras/ramas F3/F4/M7 pendientes, sin repetir controles aprobados.
-   F5 queda concretado en la ruta de filas anidada, sin ejecutar gráficos nuevos
-   en este bloque. No exigir todas las instancias de datos.
+   El contraste `6ac06bc` ya se revisó: 26/26 checks sin fallos, cuatro positivos
+   F1/F2 y un perfil afectado F3; seis reservas de muestra, cierre/logout
+   aprobados. Conservar las búsquedas F3/F4/M7 como límites, sin repetirlas para
+   pretender ausencia exhaustiva. F5 queda concretado en un positivo controlado
+   de ruta de filas anidada; no se ejecutó en este bloque.
 3. E1 es una pista independiente: cuando exista respuesta pública reconocible,
    un contraste de venta/fecha y una aplicación a datos Oracle bastan para su
    perfil; mantener E2 desconocido. No sustituirlo con tasa fija, otro proveedor
@@ -131,6 +136,6 @@ faltante. Los límites de una búsqueda acotada no prueban ausencia global.
    implementación con reserva, nunca certificar un caso real no ejecutado.
 
 No se proponen herramientas nuevas, despliegues ni suites completas.
-Las dos correcciones F3/F4 se revisan y validan en rama separada.
+Las dos correcciones F3/F4 se mantienen en rama separada, PR #41 en borrador.
 Integración frontend/ERP, sincronización, cambios de datos,
 permisos, contraseñas o expiraciones están fuera de este balance.
