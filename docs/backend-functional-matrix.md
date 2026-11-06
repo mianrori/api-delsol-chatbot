@@ -88,8 +88,9 @@ los argumentos efectivos de sesión para una retirada exclusiva, también tras
 recortar el historial; fechas/agrupación adicionales reconocidas se derivan del
 texto explícito del usuario. Nuevas regresiones comparan argumentos/SQL y
 estado (2023/mes frente a propuesta 2024/año), cambios explícitos y ausencia de
-contexto. Solo pruebas/controles afectados, preparados; evidencia Docker/Oracle
-nueva pendiente. El control final nuevo es de modelo/historial controlados con
+contexto. **24/24 enfocadas Node 22.23.4** sobre `fb7516a`, preflight completo y
+264 archivos coincidentes. Contraste Oracle nuevo pendiente. El control final
+nuevo es de modelo/historial controlados con
 datos Oracle legítimos; no se repiten ni reatribuyen las reproducciones reales.
 
 PR #39: despliegue `4428874`, resumen real 11/11 contra Oracle independiente.

@@ -157,6 +157,14 @@ retirada 2023/mes antes y después del recorte real, propuesta indebida de
 propuesta de 2026/día. Verifica argumentos y SQL, estado y conciliación por
 moneda con SELECT independientes. No afirma reusar el local original. El
 reporte 19/19 y las dos reproducciones reales se preservan por hash, sin repetirlos.
-Pruebas Docker y control DEV del nuevo candidato todavía pendientes. PR #42
+**24/24 pruebas afectadas aprobadas en Node 22.23.4 de Docker DEV** sobre
+`fb7516a5338d4d96420fb5fa1d48493c1efefb03`; preflight completo y **264 archivos**
+src/scripts/test/config/packages coincidentes. Solo `salesLocalRemoval`,
+`librarySalesContext`, `searchResolutionState` y `searchFilterLifecycle`;
+sin repetir el presentador no modificado ni las reproducciones reales.
+Reporte ignorado `library-sales-removal-focused.json`, SHA-256 de la salida:
+`017d199c4a627948a470e28c850cdd3d49e28499815e00f0972869f05404fbed`.
+El control Oracle de la corrección aún está pendiente; no se atribuye al nuevo
+guard el 19/19 anterior como si detectara la propuesta contradictoria. PR #42
 permanece en borrador; las seis reservas y F5/T1 se conservan, sin cambios de
 datos, permisos, expiraciones, proveedor, merge o despliegue.
