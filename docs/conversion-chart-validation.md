@@ -131,5 +131,9 @@ nuevo. Conserva por hash los dos bloques de costo Oracle/controlado de
 `92b5e11`, sin repetirlos. No consulta el proveedor público; su cotización real
 positiva sigue pendiente. La sesión se introduce oculta y no se conserva.
 
-Estado: corrección P2 preparada; preflight Node 22 y contraste Oracle/HTTP del
-nuevo commit aún pendientes. Mantener PR #40 en borrador; no merge ni despliegue.
+Código P2: `ad0ef01e7dce8baa45b6c755efd819a820d9ec3b`.
+**13/13 pruebas afectadas y preflight completo aprobados en Node 22/Docker**.
+Son respuestas, fuente y autenticación controladas; no una nueva llamada al
+proveedor ni muestra Oracle. Contraste HTTP del nuevo comprobador con fuente
+Oracle real aún pendiente. El helper conserva estas pruebas por hash y no las
+repite. Mantener PR #40 en borrador; no merge ni despliegue.
