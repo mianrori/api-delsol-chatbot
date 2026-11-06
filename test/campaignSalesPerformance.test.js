@@ -16,8 +16,8 @@ const connectionFor = (input = args, options = {}) => {
     if (sql.includes("VW_BOT_PROMOCIONES")) return { rows: options.campaignRows ?? [campaign(input)] };
     const index = salesIndex++;
     options.onSales?.(index);
-    return { rows: [{ TOTAL_AMOUNT: (options.amounts ?? [1000, 2000, 1500])[index], TOTAL_INVOICES: (options.invoices ?? [10, 20, 15])[index],
-      CURRENCY_DESCRIPTION: "GUARANIES", CURRENCY_ABBREVIATION: (options.currencies ?? ["PYG", "PYG", "PYG"])[index] }] };
+    return { rows: options.emptyPeriods?.includes(index) ? [] : [{ TOTAL_AMOUNT: (options.amounts ?? [1000, 2000, 1500])[index], TOTAL_INVOICES: (options.invoices ?? [10, 20, 15])[index],
+      CURRENCY_DESCRIPTION: "GUARANIES", CURRENCY_ABBREVIATION: (options.currencies ?? ["PYG", "PYG", "PYG"])[index], SOURCE_ROWS: 1 }] };
   }, break: async () => {} };
 };
 const present = (result) => buildCampaignSalesPerformanceResponse([{ name: "analyze_campaign_sales_performance", result }]);
@@ -61,7 +61,7 @@ test("single-day leap-year campaigns and campaigns crossing the year use calenda
 });
 
 test("zero reference amounts have no invented percentages and empty periods remain visible", async () => {
-  const result = await getCampaignSalesPerformance(args, connectionFor(args, { amounts: [0, 2000, 0], invoices: [0, 20, 0] }));
+  const result = await getCampaignSalesPerformance(args, connectionFor(args, { amounts: [0, 2000, 0], invoices: [0, 20, 0], emptyPeriods: [0, 2] }));
   assert.equal(result.comparisons.duringVsBefore.totalAmount.percentageChange, null);
   assert.equal(result.comparisons.afterVsDuring.totalAmount.percentageChange, -100);
   const text = present(result);
@@ -73,12 +73,13 @@ test("zero reference amounts have no invented percentages and empty periods rema
 test("inconsistent currencies suppress monetary comparisons while invoice counts remain comparable", async () => {
   const result = await getCampaignSalesPerformance(args, connectionFor(args, { currencies: ["PYG", "USD", "PYG"] }));
   assert.equal(result.currency.consistent, false);
-  for (const comparison of Object.values(result.comparisons)) {
+  for (const comparison of [result.comparisons.duringVsBefore, result.comparisons.afterVsDuring]) {
     assert.equal(comparison.totalAmount, null);
     assert.equal(comparison.averageDailyAmount, null);
     assert.ok(comparison.totalInvoices);
   }
-  assert.match(present(result), /monedas difieren/);
+  assert.ok(result.comparisons.afterVsBefore.totalAmount);
+  assert.match(present(result), /monedas distintas/);
 });
 
 test("invalid dates, missing identities and malformed filters never query sales", async () => {

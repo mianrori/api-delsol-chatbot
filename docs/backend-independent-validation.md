@@ -1,5 +1,11 @@
 # Contrastes independientes restantes del backend
 
+> Evidencia histórica de PR #38, ya fusionada. Las frases «pendiente» o «en
+> borrador» de esta ficha describen su etapa, no el estado actual del proyecto.
+> PR #39 completó otros perfiles y PR #40 se desplegó en `84fd67c`.
+> Consultar el [balance actual](backend-scope-balance.md) y la
+> [matriz](backend-functional-matrix.md) para pendientes y criterio de cierre.
+
 Base: `ef9bff4`, PR #37 fusionada y desplegada. Rama separada:
 `test/backend-independent-controls-dev`. PR #38 en borrador. Evidencia anterior
 a la corrección monetaria `8ee5b14`: ocho bloques

@@ -1,5 +1,10 @@
 # Variantes pendientes: contraste acotado desde PR #38
 
+> Ficha histórica de PR #39, fusionada y desplegada en `4428874` (resumen real
+> 11/11). No se transforma en aprobación su ejecución inicial fallida. La
+> continuación de conversión/gráficos es PR #40, desplegada en `84fd67c`.
+> El [balance actual](backend-scope-balance.md) clasifica los pendientes por bloqueo.
+
 Base: `30ffab4328df3f40228c5ffc839b6f088122e495`, actualizada desde origin.
 Rama: `test/backend-pending-variants-dev`. No cambia aplicación, datos, permisos,
 expiraciones ni integración frontend/ERP. No se reconstruye ni despliega DEV.

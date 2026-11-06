@@ -1,5 +1,12 @@
 # Conversión y gráficos HTTP pendientes
 
+> PR #40 fusionada y desplegada en `84fd67c`. Verificación desplegada: **21/21**
+> en un gráfico HTTP horizontal multiserie, etiqueta/serie/valor/moneda/período
+> contra SELECT Oracle independientes; cierre/logout y salud/arranque aprobados,
+> sin consultar al proveedor. Los estados de borrador y bases de abajo son
+> históricos. Cotización real positiva y muestras DEV permanecen pendientes;
+> criterio de cierre en el [balance actual](backend-scope-balance.md).
+
 Base `4428874` (PR #39 desplegada), rama `fix/conversion-provider-chart-http`.
 No despliegue, merge, cambios de datos, permisos, expiraciones o integración.
 
