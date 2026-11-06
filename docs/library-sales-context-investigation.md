@@ -164,8 +164,9 @@ src/scripts/test/config/packages coincidentes. Solo `salesLocalRemoval`,
 sin repetir el presentador no modificado ni las reproducciones reales.
 Reporte ignorado `library-sales-removal-focused.json`, SHA-256 de la salida:
 `017d199c4a627948a470e28c850cdd3d49e28499815e00f0972869f05404fbed`.
-El control Oracle de la corrección aún está pendiente; no se atribuye al nuevo
-guard el 19/19 anterior como si detectara la propuesta contradictoria. PR #42
+El control Oracle nuevo se aprobó posteriormente en `7f61efa`, según el
+resultado siguiente; no se atribuye al nuevo guard el 19/19 anterior como si
+detectara la propuesta contradictoria. PR #42
 permanece en borrador; las seis reservas y F5/T1 se conservan, sin cambios de
 datos, permisos, expiraciones, proveedor, merge o despliegue.
 
@@ -175,7 +176,8 @@ El intento del **06/11/2026, 16:25:18–16:26:42 (Asunción)** terminó con
 `ERP_LOGIN_REJECTED`; el ERP registró el código técnico seguro
 `ORA-01017`. **El worker Oracle no se inició**: no hay controles de la
 corrección aprobados ni fallidos por ese intento, ni prueba nueva de permisos.
-Las 24/24 enfocadas de `fb7516a` permanecen vigentes; contraste DEV pendiente.
+Las 24/24 enfocadas de `fb7516a` permanecieron vigentes; el contraste DEV quedó
+pendiente en ese intento y se completó en la ejecución posterior.
 
 Reporte original ignorado `library-sales-removal-login-rejected.json`, SHA-256
 `86dfcff72cdc6b94eaeb4dc2399dc716ebf35886cf9547ad0ec2a9f52fd30867`.
@@ -190,6 +192,49 @@ sin credenciales ni nueva autenticación.
 Logs compactos: chatbot cero líneas, ERP tres; un código técnico de rechazo,
 sin marcadores sensibles ni fatales detectados. No se leyeron ni recuperaron
 los valores introducidos. Hace falta una sesión vigente o credenciales DEV
-válidas, exclusivamente en las entradas ocultas, para ejecutar solo el control
-pendiente. No se modifican cuentas, permisos, datos o expiraciones. La PR #42
+válidas, exclusivamente en las entradas ocultas, para ejecutar el control
+que entonces estaba pendiente. No se modifican cuentas, permisos, datos o expiraciones. La PR #42
 permanece en borrador y las reservas no cambian.
+
+### Resultado DEV del P2 de retirada exclusiva
+
+**29/29 verificaciones aprobadas**, ejecución del **06/11/2026,
+16:38:42–16:38:48 (Asunción)** sobre
+`7f61efaebcd2b5ba4230ea84947291f2d8f3e2fe`, **264 archivos coincidentes** con
+Git. `src`, pruebas, ejecutor y configuración son idénticos a `fb7516a`;
+los commits posteriores hasta esta ejecución solo cambiaron documentación.
+
+Se verificaron únicamente tres turnos afectados con modelo/historial
+**controlados** e IDs/filas **Oracle legítimos**:
+
+1. Retirada pura de local frente a una propuesta de 2024/año, otra métrica y
+   fines de semana: argumentos y SQL mantienen 2023/mes y las claves previas,
+   sin inyectar tipo de día. Rubro y estado persistente conservados, local
+   retirado, todos los grupos/importes/monedas mensuales contra SELECT.
+2. La misma transición después de que `trimConversation` expulse la llamada
+   original: contexto persistente y resultado siguen siendo 2023/mes. La
+   presentación refleja ese alcance, sin 2024 propuesto por el modelo.
+3. Petición explícita de 2024/año frente a propuesta de 2026/día: argumentos,
+   SQL, estado y presentación usan lo solicitado por el usuario. Conciliación
+   anual independiente de los resultados disponibles; no se infiere un positivo
+   de 2024 por el mero hecho de que la comprobación concuerde.
+
+Identidad proxy por sesión, cierres después de cada retirada y cierre global
+aprobados. En esta ejecución se creó una sesión mediante login DEV protegido;
+logout aprobado. El rechazo anterior no se cuenta como control ni prueba de
+denegación de herramientas.
+
+Las **24/24 pruebas Node 22** se reutilizaron por hash; también el 19/19 anterior
+y las dos reproducciones con modelo real, con sus tres hashes verificados.
+No se repitieron pruebas o reproducciones aprobadas. Los 29 checks son de esos
+tres turnos y sus controles técnicos, no 29 conversaciones independientes.
+No hay nueva evidencia de modelo real/HTTP ni identidad del local original.
+
+Reporte congelado ignorado `logs/library-sales-removal-7f61efa.json`, SHA-256
+`e7b794a3fd82de62c2c48cd2b6a38006b5bd186a6fe599c2a0860edd483cc522`.
+Esquema revisado sin claves sensibles ni UUID de sesión. Logs compactos del
+intervalo completo del helper: chatbot cero líneas, ERP dos, sin códigos
+Oracle/driver, marcadores sensibles o fatales detectados. Sin modelo real ni
+proveedor en este control final, merge, despliegue o cambios de datos/permisos/
+expiraciones. PR #42 sigue en borrador hasta la revisión final del diff y su
+evidencia; seis reservas, F5/T1 y demás muestras pendientes conservadas.

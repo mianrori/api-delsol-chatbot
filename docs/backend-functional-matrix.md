@@ -89,14 +89,23 @@ recortar el historial; fechas/agrupación adicionales reconocidas se derivan del
 texto explícito del usuario. Nuevas regresiones comparan argumentos/SQL y
 estado (2023/mes frente a propuesta 2024/año), cambios explícitos y ausencia de
 contexto. **24/24 enfocadas Node 22.23.4** sobre `fb7516a`, preflight completo y
-264 archivos coincidentes. Contraste Oracle nuevo pendiente. El control final
+264 archivos coincidentes. El control final
 nuevo es de modelo/historial controlados con
 datos Oracle legítimos; no se repiten ni reatribuyen las reproducciones reales.
-El intento DEV P2 posterior quedó bloqueado en `ERP_LOGIN_REJECTED` (código
+El primer intento DEV P2 quedó bloqueado en `ERP_LOGIN_REJECTED` (código
 seguro `ORA-01017`), antes de iniciar el worker Oracle. No acredita ni invalida
 la corrección ni prueba denegación de herramientas; sus 24/24 enfocadas siguen
-vigentes y el control nuevo permanece pendiente de sesión válida. Diagnóstico
-local del helper corregido sin cambiar la aplicación; PR #42 en borrador.
+vigentes. Diagnóstico local del helper corregido sin cambiar la aplicación.
+**Control P2 posterior: 29/29 aprobado sobre `7f61efa`**, código/pruebas/ejecutor
+idénticos a `fb7516a`: retirada ante propuestas contradictorias antes/después
+del recorte real mantiene rubro/2023/mes y demás argumentos; cambio explícito
+a 2024/año permitido. Argumentos/SQL/estado/presentación y totales por moneda
+contra SELECT independientes. Modelo e historial controlados, no reproducciones
+reales nuevas. 24 pruebas, reporte 19/19 y dos reproducciones reales reutilizados
+por hash; cierres/logout aprobados, sin alertas técnicas/sensibles en logs compactos.
+Reporte ignorado `library-sales-removal-7f61efa.json`, SHA-256
+`e7b794a3fd82de62c2c48cd2b6a38006b5bd186a6fe599c2a0860edd483cc522`.
+PR #42 permanece en borrador para revisar el diff; reservas conservadas.
 
 PR #39: despliegue `4428874`, resumen real 11/11 contra Oracle independiente.
 PR #40: despliegue `84fd67c`, gráfico HTTP horizontal multiserie **21/21** contra
