@@ -17,7 +17,9 @@ const deadline=Date.now()+8*60*1000;
 const budget=()=>{if(Date.now()>deadline)throw Object.assign(Error(),{blocked:'EIGHT_MINUTE_BUDGET_EXHAUSTED'});};
 const query=(sql,binds={})=>withOracleProxySession(sessionId,async({connection})=>{budget();if(!/^\s*(SELECT|WITH)\b/i.test(sql))throw Error();const r=(await connection.execute(sql,binds,{outFormat:4002,maxRows:10001})).rows;if(r.length>10000)throw Object.assign(Error(),{blocked:'CONTROL_ROW_LIMIT_EXCEEDED'});return r;});
 const tool=(name,args)=>{budget();return executeTool({name,arguments:args,context:{sessionId}});};
-async function run(code,fn){operation='DISCOVERY';const start=Date.now();try{await fn();report.cases.push({code,status:'passed',durationMs:Date.now()-start});}catch(e){report.cases.push({code,status:e.missing?'sample_missing':'failed',reason:e.missing??safeTechnicalCode(e),operation,durationMs:Date.now()-start});}check(opened===closed&&!closeErrors,'ORACLE_CONNECTIONS_CLOSED_AFTER_CASE');}
+const chartAssociationOnly=process.argv.includes('--chart-association-only');
+report.stage=chartAssociationOnly?'chart-association-only':'initial';
+async function run(code,fn){if(chartAssociationOnly&&code!=='CHART_HTTP_THREE_VARIANTS_REAL_ORACLE_SOURCE')return;operation='DISCOVERY';const start=Date.now();try{await fn();report.cases.push({code,status:'passed',durationMs:Date.now()-start});}catch(e){report.cases.push({code,status:e.missing?'sample_missing':'failed',reason:e.missing??safeTechnicalCode(e),operation,durationMs:Date.now()-start});}check(opened===closed&&!closeErrors,'ORACLE_CONNECTIONS_CLOSED_AFTER_CASE');}
 let costArgs;
 try{
  check(/^[a-f0-9]{40}$/.test(report.commit??''),'SOURCE_COMMIT_PRESENT');

@@ -4,6 +4,7 @@ import {createRequire} from 'node:module';
 import express from 'express';
 import {setConversation,clearConversation} from '../src/state/conversation.store.js';
 import {executeTool} from '../src/services/ai/toolExecutor.service.js';
+import {chartMatchesSource} from './chart-value-association.mjs';
 
 // HTTP is real; model calls are planned. Auth/source are explicitly controlled
 // by unit tests, or supplied by the DEV worker from a real authorized query.
@@ -31,9 +32,8 @@ export async function contrastChartHttp({sessionId,sourceName,sourceResult,sourc
    const body=await response.json(),chart=body.actions?.chart;
    check(response.status===200&&body.success===true&&Boolean(chart?.available)&&captured?.result.sourceToolUseId==='source-http','CHART_HTTP_SUCCESS_AND_EXACT_SOURCE');
    const svg=Buffer.from(chart.url.split(',')[1],'base64').toString('utf8');
-   const fmt=v=>new Intl.NumberFormat('es-PY',{maximumFractionDigits:6}).format(v);
    check(chart.pointCount===sourceRows.length&&chart.datasetCount===(multi?2:1),'CHART_HTTP_POINT_AND_SERIES_COUNTS');
-   check(sourceRows.every(r=>svg.includes(field(r,labelPath))&&svg.includes(fmt(field(r,amountPath)))&&(!multi||svg.includes(fmt(field(r,secondPath))))),'CHART_HTTP_LABELS_VALUES_MATCH_SOURCE');
+   check(chartMatchesSource({chart,labels:sourceRows.map(r=>field(r,labelPath)),series:[{label:'Ventas',values:sourceRows.map(r=>field(r,amountPath))},...(multi?[{label:'Otro importe',values:sourceRows.map(r=>field(r,secondPath))}]:[])]}),'CHART_HTTP_LABEL_SERIES_VALUE_ASSOCIATION_MATCHES_SOURCE');
    check(chart.valuePrefix==='₲'&&svg.includes('₲'),'CHART_HTTP_CURRENCY_MATCHES_SOURCE');
    check(chart.subtitle===`Período: ${sourceArgs.dateFrom} a ${sourceArgs.dateTo}`&&svg.includes(sourceArgs.dateFrom)&&svg.includes(sourceArgs.dateTo),'CHART_HTTP_PERIOD_MATCHES_SOURCE_QUERY');
    check(JSON.stringify(result)===original,'CHART_HTTP_SOURCE_NOT_MUTATED');

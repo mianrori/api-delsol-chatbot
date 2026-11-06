@@ -101,3 +101,35 @@ Se conservan las muestras DEV ausentes y todas las pruebas
 anteriores con su SHA; no se suman ejecuciones como casos únicos. PR en borrador
 hasta revisar resultados y correcciones; sin despliegue ni merge. El commit
 posterior únicamente actualiza documentación, sin repetir controles aprobados.
+
+## Corrección de los dos P2 de revisión
+
+La evidencia de `92b5e11` conserva su SHA y sus perfiles, pero el control antiguo
+de gráficos solo buscaba presencia de textos; no acreditaba la asociación de
+cada valor con etiqueta y serie. Tampoco cubría tasas como `0x10`.
+
+- El parser valida el token decimal completo antes de `Number`: enteros sin
+  agrupación, puntos de miles en grupos exactos de tres y coma decimal opcional.
+  Admite `7100`, `7.100`, `7100,50` y `7.100,50`; rechaza hexadecimal/binario,
+  exponentes, signos, punto decimal, agrupaciones defectuosas, números partidos
+  por espacios, cero, negativos y desbordamiento a infinito. No intenta reparar
+  separadores. Las fechas y el carácter actual/no histórico no cambian.
+- `chart-value-association.mjs` compara, por serie, la secuencia exacta de
+  títulos etiqueta/valor de los puntos renderizados con la fuente; identifica
+  cada serie por su leyenda/color. En circular comprueba cada pareja exacta de
+  la leyenda. Los ejes y otros textos no sustituyen puntos. Se respeta la
+  precisión visual de seis decimales del render, sin recalcular la fuente.
+- Regresiones con gráficos renderizados: correcto, valores intercambiados entre
+  etiquetas, valores intercambiados entre series y puntos ausentes aunque los
+  números permanezcan en ejes/textos. Los tres negativos deben fallar.
+
+Solo se ejecutan los archivos afectados `conversionProvider`,
+`chartValueAssociation` y `chartHttpVariants` (13 pruebas); no las seis suites
+previas. El helper nuevo `logs/run-conversion-chart-p2-dev.ps1` ejecutará solo
+los tres gráficos HTTP con autenticación y fuente Oracle reales y el comprobador
+nuevo. Conserva por hash los dos bloques de costo Oracle/controlado de
+`92b5e11`, sin repetirlos. No consulta el proveedor público; su cotización real
+positiva sigue pendiente. La sesión se introduce oculta y no se conserva.
+
+Estado: corrección P2 preparada; preflight Node 22 y contraste Oracle/HTTP del
+nuevo commit aún pendientes. Mantener PR #40 en borrador; no merge ni despliegue.

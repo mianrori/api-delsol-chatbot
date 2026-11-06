@@ -62,6 +62,12 @@ conciliados. 184 archivos coinciden, cierre/logout aprobados; unitarias previas
 reutilizadas por hash. Cotización real positiva sigue pendiente. No se confunden
 pruebas controladas con tasa real ni muestra Oracle. Ver
 [alcance y validación](conversion-chart-validation.md).
+Revisión P2: los 32 controles anteriores no cubrían tasas hexadecimales ni la
+asociación estricta etiqueta/serie/valor. Se corrige el formato decimal completo
+y el comprobador de puntos/leyendas; regresiones negativas de intercambios y
+ejes. Nuevo contraste HTTP de asociación aún pendiente, sin repetir costos
+Oracle/controlados ni proveedor real; PR #40 en borrador. Los resultados
+históricos no se atribuyen automáticamente al comprobador nuevo.
 Ver [resultados y límites](backend-independent-validation.md).
 
 ### Evidencia histórica reutilizada

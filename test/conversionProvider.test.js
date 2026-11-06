@@ -16,6 +16,14 @@ test('provider HTTP/network/timeout errors expose safe codes without transport c
 test('provider missing, zero, negative or malformed rates never become valid quotes',async()=>{
  for(const body of ['Sin cotización','Dólar Compra 7000 Venta 0','Dólar Compra 7000 Venta -2','Dólar Compra 7000 Venta 7..100','Dólar Compra 7000 Venta 7100 Dólar Compra 7000 Venta 7200'])await assert.rejects(quote({fetchImpl:async()=>({ok:true,text:async()=>body})}));
 });
+test('provider decimal contract accepts only complete localized separators',async()=>{
+ for(const [token,expected]of [['7100',7100],['7.100',7100],['7100,50',7100.5],['7.100,50',7100.5],['1.234.567,89',1234567.89],['0,50',.5]]){
+  const r=await quote({fetchImpl:async()=>({ok:true,text:async()=>`Dolar Compra 7000 Venta ${token}`})});assert.equal(r.sellRate,expected);
+ }
+ for(const token of ['0x10','0b10','1e3','+7100','-7100','Infinity','NaN','0','0,00','01','7.10','71.00','7100.50','7,100.50','7,100,50','7.100.50','7..100','7100,','7100.','7_100','7 100','7.100 ,50','9'.repeat(400)]){
+  await assert.rejects(quote({fetchImpl:async()=>({ok:true,text:async()=>`Dolar Compra 7000 Venta ${token}`})}),undefined,token);
+ }
+});
 const connection=(currency='PYG',symbol=currency)=>({calls:0,async execute(sql){this.calls++;
  if(sql.includes('VW_BOT_CONTRATOS_CONCEPTOS'))return {rows:[{COD_CONCEPTO:'6',SIGLAS_MONEDA_FACTURA:currency,FEC_DESDE:new Date('2023-01-01Z')}]};
  if(sql.includes('VW_BOT_FACTURAS'))return {rows:[{COD_CONCEPTO:'6',IMPORTE:1100,IVA:100,IMPORTE_SIN_IVA:1000,SIMBOLO_MONEDA:symbol,FECHA_EMISION:new Date('2023-03-01Z')}]};

@@ -2,13 +2,13 @@ import { contractBusinessConfig } from "../../config/contractBusiness.config.js"
 import { getMaxicambiosQuote } from '../../repositories/exchange/maxicambios.repository.js';
 
 const parseRate = (value) => {
-  const normalized = String(value ?? "").trim().replace(/\s/g, "");
-  if (!normalized) return null;
-  if (/^\d{1,3}(?:\.\d{3})+$/.test(normalized)) {
-    return Number(normalized.replace(/\./g, ""));
-  }
-  const numeric = Number(normalized.replace(",", "."));
-  return Number.isFinite(numeric) ? numeric : null;
+  const normalized = String(value ?? "").trim();
+  // Provider convention: ungrouped integer, comma decimals, dot thousands.
+  // Dot-decimal / English grouping, signs, exponent and JS literals are not
+  // part of this contract. Validate the complete token before Number().
+  if (!/^(?:0|[1-9]\d*|[1-9]\d{0,2}(?:\.\d{3})+)(?:,\d+)?$/.test(normalized)) return null;
+  const numeric = Number(normalized.replace(/\./g, '').replace(',', '.'));
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
 };
 
 export const getCurrentUsdSellRateFromMaxicambios = async ({ fetchImpl, timeoutMs = contractBusinessConfig.maxicambios.timeoutMs } = {}) => {
@@ -19,7 +19,12 @@ export const getCurrentUsdSellRateFromMaxicambios = async ({ fetchImpl, timeoutM
       .replace(/\s+/g, " ");
 
     const matches = [...text.matchAll(/D[oó]lar\s+Compra\s+([\d.,]+)\s+Venta\s+([^\s]+)/gi)];
-    const rates = matches.map(match=>parseRate(match[2]));
+    const rates = matches.map(match=>{
+      // Do not accept a prefix of a split/malformed number such as "7 100"
+      // or "7.100 ,50" as a complete quote.
+      const remainder = text.slice(match.index + match[0].length);
+      return /^\s+[\d.,+-]/.test(remainder) ? null : parseRate(match[2]);
+    });
 
     if (!matches.length) {
       throw new Error(
