@@ -58,14 +58,21 @@ Reporte congelado local ignorado `backend-final-variants-6ac06bc.json`, SHA-256
 `1d2cef95e077cc79eb912500b94a68b30739f1e88ae2ed6e61beda5b89d0532e`.
 Dispatch real + SELECT independientes; no atribuir a HTTP estos contrastes.
 
-**Seguimiento P2 en curso:** el hallazgo de moneda nula con registros no está
+**Seguimiento P2:** el hallazgo de moneda nula con registros no está
 acreditado por el perfil real anterior. La corrección distingue período vacío
 de `missing`/`unrecognized`/`contradictory`, sin asignar PYG, y valida cada pareja
 por separado con motivo en resultado/presentación. Siete regresiones nuevas,
 **18/18 enfocadas Node 22.23.4**, candidato `c0eabb6`, preflight completo y
-**260 archivos coincidentes**; contraste Oracle nuevo pendiente. Solo se revalida
-un perfil de campaña afectado con importes/porcentajes/presentación; F1/F2 y
-las seis reservas previas se reutilizan por hash, sin repetirlas. Detalle y
+**260 archivos coincidentes**. **17/17 verificaciones DEV sobre `ff937d8`**,
+código y pruebas idénticos a `c0eabb6`: un perfil real PYG de campaña con tres
+períodos, importes/porcentajes/promedios/presentación contra SELECT independientes.
+Los casos de moneda inválida permanecen controlados; no son muestras Oracle.
+F1/F2 y las seis reservas previas se reutilizan por hash, sin repetirlas.
+`coverageComplete=true` solo para este perfil, no para las reservas/backend.
+Reporte congelado local `campaign-currency-ff937d8.json`, SHA-256
+`7a3a2eda0fd74fedad69e27508f7ddf971185b0fa4f5e4aadcc798e753fdb095`.
+Cierres/logout y logs compactos aprobados; PR #41 en borrador para revisión.
+Detalle y
 contrato en [variantes finales](backend-final-variants-validation.md).
 
 ### Trazabilidad histórica de las ampliaciones

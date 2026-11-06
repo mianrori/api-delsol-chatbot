@@ -160,8 +160,8 @@ afectada. **18/18 en Node 22.23.4 de Docker DEV** sobre
 sesión, Oracle ni proveedor en ese preflight. Reporte local ignorado
 `campaign-currency-focused.json`, SHA-256 de la salida enfocada:
 `f5d4dbe9b9a4ac9c6d1c54129e9ccc7649445a36de4842a237233074d7f84d1c`.
-Contraste Oracle nuevo todavía pendiente de ejecución/revisión; no se atribuye
-este preflight a una muestra Oracle con moneda inválida.
+El preflight no se atribuye a una muestra Oracle con moneda inválida; el
+contraste real posterior se delimita abajo.
 
 El ejecutor nuevo `scripts/check-campaign-currency-dev.mjs` solo revalida **un
 perfil real PYG de campaña** contra SELECT independientes, incluidas diferencias,
@@ -171,6 +171,42 @@ F1/F2 y las seis reservas del reporte `6ac06bc`; no los repite ni vuelve a busca
 las muestras. F5/T1 y E1 permanecen sin cambios.
 
 Entrada oculta local: `logs/run-campaign-currency-dev.ps1`, sesión vigente o
-login DEV protegido si se deja vacía. Reporte sanitizado esperado:
+login DEV protegido si se deja vacía. Reporte sanitizado:
 `logs/campaign-currency.json`. PR #41 continúa en borrador hasta revisar la
 corrección y la evidencia nueva; no merge ni despliegue.
+
+### Resultado DEV de la corrección P2
+
+**17/17 verificaciones aprobadas**, 06/11/2026 **17:10:16–17:10:24 UTC**, sobre
+`ff937d8888694bf945176f16f9737291b8ce7cb1`, con **260 archivos coincidentes**.
+Desde `c0eabb6` solo cambian tres documentos y la admisión explícita de siglas
+PYG/GS en el control independiente; `src`, pruebas, config y dependencias son
+idénticos. Las **18/18 enfocadas** se reutilizaron por hash, sin repetirlas.
+
+Una campaña legítima identificada en el primer candidato: sus tres períodos
+con registros PYG, parejas monetarias exactas, cantidades de facturas, totales,
+promedios diarios, diferencias y porcentajes conciliados con SELECT
+independientes. La presentación conserva valores, moneda y fechas del resultado
+fuente. No son 17 variantes distintas, sino un perfil y sus verificaciones.
+Dispatch y presentación reales, **sin conversación HTTP nueva**.
+
+Moneda faltante/no reconocida/contradictoria, ausencia y divisas incompatibles
+siguen siendo **casos controlados** de las pruebas nuevas, no muestras Oracle
+reales. `coverageComplete=true` del reporte se limita a este único perfil;
+**no elimina las seis reservas** preservadas en `reusedEvidence` ni amplía la
+búsqueda acotada previa. F1/F2 y el reporte `6ac06bc` se reutilizan con su hash
+verificado; no se ejecutaron otra vez.
+
+Identidad proxy por sesión, cierres por bloque/global y logout de la sesión
+creada por login DEV protegido aprobados. Sin proveedor/HTTP externo. Reporte
+congelado ignorado `logs/campaign-currency-ff937d8.json`, SHA-256:
+`7a3a2eda0fd74fedad69e27508f7ddf971185b0fa4f5e4aadcc798e753fdb095`.
+Esquema sanitizado revisado, sin claves sensibles ni UUID de sesión. Logs
+compactos del intervalo completo del helper 15:32:25–17:10:50 UTC: chatbot cero
+líneas, ERP dos; sin códigos Oracle/driver, marcadores sensibles o fatales
+detectados. No se publicaron líneas crudas, importes o identidades.
+
+La evidencia pendiente de este P2 ya fue revisada; queda la revisión final del
+diff y su correspondencia antes de sacar la PR #41 de borrador. F5/T1, E1 y
+las seis reservas se conservan. Sin nuevas pruebas, proveedor, merge o despliegue
+durante esta revisión del reporte.
