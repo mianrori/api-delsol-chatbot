@@ -125,7 +125,7 @@ cada valor con etiqueta y serie. Tampoco cubría tasas como `0x10`.
 
 Solo se ejecutan los archivos afectados `conversionProvider`,
 `chartValueAssociation` y `chartHttpVariants` (13 pruebas); no las seis suites
-previas. El helper nuevo `logs/run-conversion-chart-p2-dev.ps1` ejecutará solo
+previas. El helper nuevo `logs/run-conversion-chart-p2-dev.ps1` ejecutó solo
 los tres gráficos HTTP con autenticación y fuente Oracle reales y el comprobador
 nuevo. Conserva por hash los dos bloques de costo Oracle/controlado de
 `92b5e11`, sin repetirlos. No consulta el proveedor público; su cotización real
@@ -134,6 +134,31 @@ positiva sigue pendiente. La sesión se introduce oculta y no se conserva.
 Código P2: `ad0ef01e7dce8baa45b6c755efd819a820d9ec3b`.
 **13/13 pruebas afectadas y preflight completo aprobados en Node 22/Docker**.
 Son respuestas, fuente y autenticación controladas; no una nueva llamada al
-proveedor ni muestra Oracle. Contraste HTTP del nuevo comprobador con fuente
-Oracle real aún pendiente. El helper conserva estas pruebas por hash y no las
-repite. Mantener PR #40 en borrador; no merge ni despliegue.
+proveedor ni muestra Oracle. El helper conserva estas pruebas por hash y no las
+repitió durante la ejecución siguiente.
+
+### Contraste final de asociación `d59d1f2`
+
+**27/27 controles aprobados** sobre
+`d59d1f2bb6575fa8025546e9e3cda25bf0ba2dca`, código idéntico a `ad0ef01`.
+06/11/2026 13:11:37–13:11:43 UTC; bloque HTTP de 4.948 ms y 185 archivos
+candidatos coincidentes. Etapa `chart-association-only`: un único bloque, tres
+peticiones de gráfico (horizontal/circular/multiserie), autenticación real,
+fuente mensual PYG Oracle y modelo planificado. Asociación etiqueta/serie/valor
+de puntos o leyenda, moneda, período, conteos y fuente no mutada aprobados.
+
+Los casos de costo no se ejecutaron: se reutilizan los dos bloques de
+`92b5e11` por su hash. La descripción genérica del ejecutor y sus metadatos
+heredados no acreditan una nueva ejecución de costo; la etapa y `cases`
+identifican el alcance real. Las 13 pruebas controladas de `ad0ef01` también
+se reutilizaron por hash. No sumar estos 27 controles a los 32 como casos únicos.
+
+Identidad proxy, cierre por caso/global y logout de la sesión creada aprobados.
+Logs compactos incluyendo login/logout: chatbot cero líneas, ERP dos; sin
+códigos Oracle/driver ni marcadores de campos sensibles detectados. Reporte
+local congelado `logs/conversion-chart-p2-d59d1f2.json`, SHA-256
+`13e0ac63cce9cfdc10004fed909f1aaa8bce252b65a71eb05dec42c4eb01c926`.
+`coverageComplete` solo describe esta etapa. Proveedor real no consultado;
+cotización real positiva, fecha de publicación y muestras DEV ausentes siguen
+pendientes. Mantener PR #40 en borrador para revisión; no merge ni despliegue.
+El commit posterior solo documenta estos resultados, sin cambios de código.

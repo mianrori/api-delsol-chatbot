@@ -66,9 +66,12 @@ Revisión P2: los 32 controles anteriores no cubrían tasas hexadecimales ni la
 asociación estricta etiqueta/serie/valor. Se corrige el formato decimal completo
 y el comprobador de puntos/leyendas en `ad0ef01`: **13/13 pruebas afectadas y
 preflight Node 22/Docker aprobados**, con regresiones negativas de intercambios
-y ejes. Nuevo contraste HTTP de asociación aún pendiente, sin repetir costos
-Oracle/controlados ni proveedor real; PR #40 en borrador. Los resultados
-históricos no se atribuyen automáticamente al comprobador nuevo.
+y ejes. **27/27 controles sobre `d59d1f2`** (código de `ad0ef01`) acreditan el
+nuevo comprobador en los tres gráficos HTTP con autenticación y fuente Oracle
+reales; 185 archivos coinciden, cierre/logout aprobados. Costos Oracle/controlados
+y 13 pruebas reutilizados por hash, sin proveedor real ni suites repetidas.
+PR #40 en borrador; cotización real positiva y muestras ausentes pendientes.
+Los 27 y los 32 controles conservan su alcance y no se suman como casos únicos.
 Ver [resultados y límites](backend-independent-validation.md).
 
 ### Evidencia histórica reutilizada
@@ -304,7 +307,7 @@ dentro de `test/`. **Sin acreditar** indica falta de evidencia, no fallo probado
 | `get_member_vehicles` — vehículos del socio/chapa | `members/memberVehicle.service.js` | `vehicleRegistrations`, PII y ciclo | N: documento, activos y débito sí/no contra Oracle independiente; `cafc5f1`: chapa única/ausente, dueño/vehículo contra SELECT | `7762f35`; `cafc5f1` | Chapa activa compartida no encontrada; única/ausencia acreditadas. No confundir H de altas agregadas con búsqueda de dueño. |
 | `analyze_members` — segmentación/ranking | `members/memberAnalysis.service.js` | Suites existentes de segmentación; 46/46 previas. Corrección del contrato orderBy: 17/17 enfocadas (5 nuevas; conteos solapados) | G: 50/50 finales Oracle/HTTP y cierre reutilizados; baseline y 40 controles/denegación previos. Null rechazado antes de SQL: 5/5 nuevos tests controlados en Docker DEV, sin nuevas lecturas Oracle | `345827f` validación orderBy; `7c34c14` Oracle/HTTP; `6b1303e` baseline; `82e72ba` parcial | Muestra real con varias monedas pendiente; CTE multimoneda aprobadas. Lenguaje inicial y carga general no exhaustivos. P2 orderBy:null corregido conforme al esquema no nullable; PR #36 fusionada y desplegada `00a1acb` (10/10 controles puntuales). |
 | `compare_member_purchases_vs_sales` — canjes/ventas | `members/memberPurchasesVsSales.service.js` | `memberPurchasesVsSales`, `chatLifecycle`; corrección P2 con 15/15 enfocadas y 2/2 del ejecutor monetario | W: 86/86 en Oracle independiente PYG real total/mes/filtros; CTE monetarias y presentación en ambos órdenes; un HTTP afectado. N conserva su SHA histórico | `8ee5b14` código; `7bebb3d` Oracle/HTTP, sin cambios de código | Porcentaje solo con identificación inequívoca y contraparte compatible por pareja exacta. Ambigüedad, contradicción, incompatibilidad y alias distintos producen nulo con motivo. No convierte ni suma distintos. CTE no acredita socio real multimoneda; pendientes anteriores conservados. |
-| `generate_chart` — gráficos | `charts/chart.service.js` | `charts`, `chatLifecycle`, nuevas `chartHttpVariants` | H reutilizado; `92b5e11`: horizontal/circular/multiserie HTTP contra etiquetas/valores/moneda/período del resultado mensual PYG Oracle de canjes/ventas, auth real y modelo planificado | `b315ff9`; `e5868ea` código; `92b5e11` Oracle/HTTP | Fuente única aplicable y perfil ensayado aprobados; no todas las herramientas fuente ni divisas. No acredita muestra multimoneda o combinación arbitraria de fuentes. No nueva lectura Oracle al renderizar. Frontend excluido. |
+| `generate_chart` — gráficos | `charts/chart.service.js` | `charts`, `chatLifecycle`, `chartHttpVariants`, `chartValueAssociation`; negativos de etiquetas/series/ejes | H y `92b5e11` históricos; `d59d1f2`: 27/27 de horizontal/circular/multiserie HTTP, asociación exacta etiqueta/valor por serie y moneda/período contra fuente mensual PYG Oracle, auth real/modelo planificado | `ad0ef01` comprobador; `d59d1f2` Oracle/HTTP; históricos con su SHA | Fuente única y perfil ensayado; no todas las herramientas, divisas o fuentes combinadas. No muestra multimoneda ni frontend. No se repite la auditoría de negocio de la fuente. |
 | `analyze_campaign_sales_performance` — antes/durante/después | `sales/campaignSalesPerformance.service.js` | `campaignSalesPerformance`, `chatLifecycle` | H reutilizado; N: SQL independiente de tres períodos, límites, filtros local/rubro, importes/facturas/moneda | `b315ff9` HTTP histórico; `7762f35` independiente | Perfil ensayado aprobado; ausencia/base cero/monedas diferentes en otras campañas no acreditadas individualmente. |
 | `search_invoice_concepts` — conceptos facturados | `invoices/searchInvoiceConcepts.service.js` | Nuevas: searchResolvers/searchSelection y chatLifecycle; 68/68 enfocadas del bloque (conteos solapados) | L: exacta/parcial/ausencia y límite; denegación/cierre. Selección/contexto: controlados. | `7ced8d9` Oracle; `c8525a6` controladas | Sin paginación en contrato: opciones limitadas y refinamiento. Conversación inicial libre no exhaustiva. |
 | `search_invoice_customers` — clientes facturados | `invoices/searchInvoiceCustomers.service.js` | Nuevas: searchResolvers/searchSelection y chatLifecycle; 68/68 enfocadas del bloque (conteos solapados) | L: exacta/parcial/ausencia, clientes distintos, período aislado y denegación/cierre; selección con período controlada. | `7ced8d9` Oracle; `c8525a6` controladas | Fallback fuzzy positivo y otras coincidencias de RUC/matrícula no acreditados individualmente. Opciones limitadas; no prometer catálogo completo. |
@@ -364,8 +367,9 @@ pendiente de evidencia; no declararlas aprobadas como casos reales.
    los pendientes cuando estén disponibles sus dependencias/muestras. N/T/W y el
    despliegue de PR #38 ya acreditan los perfiles de compras individuales,
    canjes/ventas, campañas y los tres endpoints financieros: no repetirlos.
-5. Gráficos horizontal/circular/multiserie: perfil mensual PYG acreditado por HTTP
-   en `92b5e11`, contra su fuente Oracle, sin UI ni repetir auditoría de negocio.
+5. Gráficos horizontal/circular/multiserie: asociación estricta del perfil mensual
+   PYG acreditada por HTTP en `d59d1f2`, contra su fuente Oracle, sin UI ni repetir
+   auditoría de negocio. `92b5e11` conserva el control histórico de presencia.
    Otras fuentes/divisas no exhaustivas siguen como limitación; no reabrir este
    perfil. Proveedor: acreditar una cotización real válida cuando esté disponible,
    sin confundir el dato controlado del nuevo contraste con tasa pública.
