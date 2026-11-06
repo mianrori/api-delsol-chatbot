@@ -33,8 +33,10 @@ El seguimiento acotado F1/F2/F3/F4/M7 se distingue a continuación.
 El [registro de variantes](backend-final-variants-validation.md) conserva la
 auditoría previa y los hashes de los logs históricos: aprobaciones controladas
 de F3/F4/M7, sin atribuirles un SHA de código por fecha. La corrección candidata
-añade cuatro regresiones propias y pasa 15/15 pruebas enfocadas locales;
-preflight Node 22 y contrastes Oracle aún pendientes de ejecución/revisión.
+añade cuatro regresiones propias: candidato **`61c5c9f`**, **15/15** enfocadas
+en Node **22.23.4**, preflight completo y **257 archivos coincidentes** con Git.
+Contrastes Oracle aún pendientes de ejecución/revisión; ese preflight no hace
+login, consultas Oracle ni llamadas al proveedor.
 
 | Pendiente | Estado de esta ampliación | Reserva conservada |
 | --- | --- | --- |

@@ -40,9 +40,14 @@ compras individuales; tampoco hereda CTE de promociones o segmentación.
    descripción junto al símbolo; no infiere USD ni convierte importes.
 
 Cuatro regresiones nuevas en `finalVariantGaps`, junto con las pruebas de
-campaña y presentación afectadas: **15/15 locales**. El preflight del candidato
-ejecutará estos mismos archivos en Node 22 del contenedor y conservará su SHA;
-no reutiliza esta ejecución local como si fuera una ejecución Docker/Oracle.
+campaña y presentación afectadas: **15/15 locales** y **15/15 en Node 22.23.4**
+del contenedor DEV, candidato `61c5c9fa9066f31010cb757fef2129abb95b2314`.
+Preflight completo aprobado: **257 archivos** src/scripts/test/config/packages
+del archivo Git coinciden. No hubo sesión, consulta Oracle ni proveedor.
+Reporte local ignorado `backend-final-variants-focused.json`; SHA-256 de la
+salida de las pruebas:
+`c2b62a886ee336b17b20976d5a7e48658ac0bab72a300aff1d5c3d0ebaf111b3`.
+El hash de salida identifica esas pruebas, no un reporte Oracle.
 
 ## Contrastes independientes pendientes de ejecutar
 
