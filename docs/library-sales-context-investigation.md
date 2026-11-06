@@ -47,8 +47,14 @@ Solo cambia `salesSeriesPresentation.service.js`:
 conservación de IDs confirmados, binds/fechas, texto y ausencia de mutaciones
 en argumentos/historial. También prueba retirada explícita solo del local,
 conservando rubro, período, agrupación y tipo de día, y equivalencia de métricas
-escalar/array. Con las regresiones existentes del presentador: **11/11 locales**.
-Docker y contraste afectado nuevos aún pendientes.
+escalar/array. Con las regresiones existentes del presentador: **11/11 locales**
+y **11/11 en Node 22.23.4 de Docker DEV**, candidato
+`94808dfe9e95dc0a0670fc0edc28528539b9ed34`. Preflight completo aprobado y
+**262 archivos** src/scripts/test/config/packages coincidentes con Git. No
+modelo real, sesión ni Oracle en el preflight. Reporte ignorado
+`library-sales-final-focused.json`, SHA-256 de la salida enfocada:
+`99827a5d24b0415033a51fd04d12521e23494b67e4e84ef2d385057f9d39a816`.
+Contraste Oracle de la corrección aún pendiente de ejecución/revisión.
 
 ## Separación de evidencias
 

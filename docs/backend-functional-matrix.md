@@ -68,8 +68,9 @@ segundo caso, que usó una métrica escalar y una respuesta final del modelo.
 Corrección de presentación preparada: mostrar filtros efectivos y explicar el
 vacío de la combinación, sin retirarlos; «todos los locales» elimina únicamente
 el local ante petición explícita. Métrica escalar reconocida coherente con el
-servicio. **11/11 enfocadas locales**, nuevas pruebas controladas; Docker y
-contraste final pendientes. No atribuir las reproducciones reales a la versión
+servicio. **11/11 enfocadas Node 22.23.4** sobre `94808df`, preflight completo y
+262 archivos coincidentes; pruebas controladas nuevas. Contraste Oracle final
+pendiente. No atribuir las reproducciones reales a la versión
 corregida todavía. Los perfiles cerrados en `059ac13` y sus reservas no cambian.
 
 PR #39: despliegue `4428874`, resumen real 11/11 contra Oracle independiente.
