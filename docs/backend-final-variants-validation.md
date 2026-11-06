@@ -154,7 +154,14 @@ ausencia real de filas, campos desconocidos/contradictorios, `$` solo y monedas
 reconocidas compatibles/incompatibles. Las expectativas anteriores se ajustan
 al bloqueo **por pareja**, sin eliminar cobertura de filtros, fechas, identidad
 o cancelación. **18/18 enfocadas locales**; se excluye la regresión F4 no
-afectada. Evidencia Docker y contraste nuevo aún pendientes.
+afectada. **18/18 en Node 22.23.4 de Docker DEV** sobre
+`c0eabb603f858d3f8d4789d7254c753737ca6872`, preflight completo aprobado y
+**260 archivos** src/scripts/test/config/packages coincidentes con Git. No
+sesión, Oracle ni proveedor en ese preflight. Reporte local ignorado
+`campaign-currency-focused.json`, SHA-256 de la salida enfocada:
+`f5d4dbe9b9a4ac9c6d1c54129e9ccc7649445a36de4842a237233074d7f84d1c`.
+Contraste Oracle nuevo todavía pendiente de ejecución/revisión; no se atribuye
+este preflight a una muestra Oracle con moneda inválida.
 
 El ejecutor nuevo `scripts/check-campaign-currency-dev.mjs` solo revalida **un
 perfil real PYG de campaña** contra SELECT independientes, incluidas diferencias,

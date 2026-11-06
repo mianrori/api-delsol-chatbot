@@ -19,7 +19,8 @@ la separación de compras multimoneda F4 tiene cobertura propia controlada,
 sin afirmar una muestra real que no apareció. PR #41 permanece en borrador.
 La revisión final abrió un P2 adicional de código: moneda nula con registros
 permitía comparación frente a PYG. Su corrección por pareja está preparada,
-con 18/18 enfocadas locales; falta revisar evidencia Docker/Oracle nueva. No
+en `c0eabb6`, con 18/18 enfocadas Node 22.23.4, preflight completo y 260 archivos
+coincidentes; falta revisar el contraste Oracle nuevo. No
 se presenta como otra muestra DEV ausente ni sustituye las seis reservas.
 Eso no equivale a acreditar todas las variantes de cada herramienta.
 

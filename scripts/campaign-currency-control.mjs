@@ -18,7 +18,7 @@ export async function campaignCurrencyControl({query,tool,check,run,missing,mark
    for(const[from,to]of bounds)groups.push(await query("SELECT DES_MONEDA D,SIGLAS_MONEDA S,SUM(NVL(MONTO_TOTAL,0)) A,SUM(NVL(CANTIDAD_FACTURAS,0)) I,COUNT(*) N FROM VW_BOT_VENTAS_LOCALES WHERE FECHA>=TO_DATE(:f,'DD/MM/YYYY') AND FECHA<TO_DATE(:t,'DD/MM/YYYY')+1 GROUP BY DES_MONEDA,SIGLAS_MONEDA",{f:format(from),t:format(to)}));
    // A deliberately narrow, independently identifiable PYG profile. Do not
    // infer the identity of other metadata or claim invalid fixtures are real.
-   if(!groups.every(g=>g.length===1&&String(g[0].D).trim().toUpperCase()==='GUARANIES'&&String(g[0].S).trim().toUpperCase()==='PYG'))continue;
+   if(!groups.every(g=>g.length===1&&String(g[0].D).trim().toUpperCase()==='GUARANIES'&&['PYG','GS','GS.','₲'].includes(String(g[0].S).trim().toUpperCase())))continue;
    discover('CAMPAIGN_CURRENCY_PROFILE',{candidateLimit:10,inspectedCandidates:inspected,periodCount:3});mark('REAL_CAMPAIGN_DISPATCH');
    const got=await tool('analyze_campaign_sales_performance',{promotionId:String(campaign.P),campaignId:String(campaign.C),campaignDateFrom:campaign.F,campaignDateTo:campaign.T});
    check(got.currency.consistent,'CAMPAIGN_REAL_CURRENCY_CONSISTENT');
