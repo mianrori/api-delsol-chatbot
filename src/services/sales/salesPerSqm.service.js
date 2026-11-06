@@ -518,6 +518,8 @@ export const getSalesPerSqm = async (
         rateType: "sell",
         sellRate: exchangeRate.sellRate,
         currentRate: true,
+        retrievedAt: exchangeRate.retrievedAt, quotedAt: exchangeRate.quotedAt,
+        dateBasis: exchangeRate.dateBasis,
       }
     : rows.some(rowNeedsUsdConversion)
       ? {

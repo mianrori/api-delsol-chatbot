@@ -11,11 +11,12 @@ const historyRow=(month='01/2023',fields={})=>({PERIOD_MONTH:month,COD_CLIENTE:'
 const concept=(fields={})=>({COD_CONCEPTO:'6',DES_CONCEPTO:'Synthetic cost',FEC_DESDE:new Date('2023-01-01T00:00:00Z'),...fields});
 const invoice=(fields={})=>({PERIOD_MONTH:'01/2023',COD_CONCEPTO:'6',FECHA_EMISION:new Date('2023-01-31T23:59:59Z'),NRO_FACTURA:'2',SIMBOLO_MONEDA:'PYG',IMPORTE_SIN_IVA:100,...fields});
 const sale=(month='01/2023',amount=1000,fields={})=>({PERIOD_MONTH:month,TOTAL_AMOUNT:amount,CURRENCY_CODE:'PYG',CURRENCY_DESCRIPTION:'GUARANIES',SALES_ROWS:1,INVALID_ROWS:0,...fields});
-const fx={getUsdSellRate:async()=>({sellRate:2,source:'Synthetic'})};
+const fx={getUsdSellRate:async()=>({sellRate:2,source:'Synthetic',retrievedAt:'2026-11-05T12:00:00Z',quotedAt:null,dateBasis:'CURRENT_QUOTE_AT_RETRIEVAL_NOT_HISTORICAL'})};
 const db=(options={})=>({queries:[],async execute(sql,binds){this.queries.push({sql,binds});return {rows:sql.includes('VW_BOT_CONTRATOS_LOCALES')?options.history??[historyRow(),historyRow('02/2023')]:sql.includes('VW_BOT_CONTRATOS_CONCEPTOS')?options.concepts??[concept()]:sql.includes('VW_BOT_FACTURAS')?options.invoices??[invoice(),invoice({PERIOD_MONTH:'02/2023',FECHA_EMISION:new Date('2023-02-28T23:59:59Z'),IMPORTE_SIN_IVA:200})]:options.sales??[sale(),sale('02/2023',4000)]};}});
 
 test('monthly and summary incidence use the same exact dates, weighted totals and current FX only for display',async()=>{
  const connection=db();const monthly=await analyzeContractCostIncidence(input,connection,fx);
+ assert.equal(monthly.exchange.retrievedAt,'2026-11-05T12:00:00Z');assert.equal(monthly.exchange.quotedAt,null);assert.equal(monthly.exchange.dateBasis,'CURRENT_QUOTE_AT_RETRIEVAL_NOT_HISTORICAL');
  assert.deepEqual(monthly.data.map(r=>r.incidencePercentage),[10,5]);
  const summary=await analyzeContractCostIncidence({...input,groupBy:'summary'},db(),fx);
  assert.equal(summary.incidencePercentage,6);assert.equal(summary.shoppingCost.amount,300);assert.equal(summary.sales.amount,5000);

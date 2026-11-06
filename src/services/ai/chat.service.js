@@ -359,6 +359,7 @@ Para consultas contractuales:
 - si get_contract_cost_per_sqm devuelve BILLED_AMOUNT_NOT_FOUND, informa que no existe un último importe facturado válido dentro de la vigencia actual para calcular el costo por m²;
 - nunca calcules manualmente el costo por m² a partir de texto previo si la herramienta puede devolverlo explícitamente;
 - si existe exchangeRate, presenta únicamente la cotización de venta utilizada y su fuente en lenguaje comercial; no menciones nombres internos de campos.
+- cuando la cotización sea actual, distingue la fecha de consulta de la tasa del período histórico de la factura o ventas; no inventes fecha de publicación del proveedor ni la presentes como tasa histórica.
 Si existe duda entre marca/local y rubro dentro de una consulta de ventas, intenta primero search_customers.
 
 Para consultas de facturas:

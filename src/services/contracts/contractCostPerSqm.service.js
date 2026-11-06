@@ -2,10 +2,10 @@ import { getContractConditions } from "./contractConditions.service.js";
 import { getCurrentUsdSellRateFromMaxicambios } from "../exchange/maxicambios.service.js";
 
 const normalizeCurrencyCode = (value) => {
-  const normalized = String(value ?? "").trim().toUpperCase();
+  const normalized = String(value ?? "").trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ');
 
-  if (["PYG", "GS", "GS.", "₲"].includes(normalized)) return "PYG";
-  if (["USD", "$", "US$"].includes(normalized)) return "USD";
+  if (["PYG", "GS", "GS.", "₲", "GUARANI", "GUARANIES", "GUARANI PARAGUAYO", "GUARANIES PARAGUAYOS"].includes(normalized)) return "PYG";
+  if (["USD", "US$", "U$S", "DOLAR", "DOLARES", "DOLAR AMERICANO", "DOLARES AMERICANOS", "DOLAR ESTADOUNIDENSE", "DOLARES ESTADOUNIDENSES"].includes(normalized)) return "USD";
 
   return normalized || null;
 };
@@ -46,6 +46,8 @@ export const getContractCostPerSqm = async (
   },
   connection,
 ) => {
+  // The tool schema admits only these two canonical target currencies.
+  if (!["PYG", "USD"].includes(targetCurrency)) throw new Error('Moneda de destino no admitida.');
   const result = await getContractConditions(
     {
       customerId,
@@ -113,12 +115,11 @@ export const getContractCostPerSqm = async (
     };
   }
 
-  const sourceCurrency = normalizeCurrencyCode(
-    concept.invoiceCurrency?.code ??
-      concept.contractCurrency?.code ??
-      lastBilled.currencySymbol,
-  );
-
+  const invoice = concept.invoiceCurrency ?? {};
+  const configured = [invoice.code, invoice.description].some(v=>String(v??'').trim())
+    ? [invoice.code,invoice.description] : [concept.contractCurrency?.code,concept.contractCurrency?.description];
+  const evidence = [...configured,lastBilled.currencySymbol].filter(v=>String(v??'').trim() && String(v).trim()!=='$').map(normalizeCurrencyCode);
+  const sourceCurrency = evidence.length && evidence.every(v=>v===evidence[0]) ? evidence[0] : null;
   const normalizedTarget = normalizeCurrencyCode(targetCurrency);
 
   if (!["PYG", "USD"].includes(normalizedTarget)) {
@@ -135,6 +136,7 @@ export const getContractCostPerSqm = async (
       },
       sourceCurrency,
       targetCurrency: normalizedTarget,
+      reason: 'Moneda ambigua, contradictoria o no admitida; conversión sin calcular.',
     };
   }
 
@@ -186,6 +188,8 @@ export const getContractCostPerSqm = async (
       ? {
           source: exchangeRate.source,
           sellRate: exchangeRate.sellRate,
+          currentRate: true, rateType: 'sell', retrievedAt: exchangeRate.retrievedAt,
+          quotedAt: exchangeRate.quotedAt, dateBasis: exchangeRate.dateBasis,
         }
       : null,
     lastInvoice: {
