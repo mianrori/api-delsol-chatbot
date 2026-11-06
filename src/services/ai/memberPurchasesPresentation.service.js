@@ -52,7 +52,8 @@ export const buildMemberPurchasesResponse = (calls = [], { restoreValue = (value
   if (!result || !Array.isArray(result.data) || !["summary", "detail"].includes(result.mode)) return null;
   const lines = ["**Compras del socio**", "", `Documento: ${cell(result.documentNumber)}.`];
   if (input.dateFrom && input.dateTo) lines.push(`Período: ${cell(input.dateFrom)} a ${cell(input.dateTo)}.`);
-  const currency = (row) => cell(row.currency?.symbol || row.currency?.description);
+  const currency = (row) => cell(row.currency?.symbol === '$' && row.currency?.description
+    ? `${row.currency.description} ($)` : row.currency?.symbol || row.currency?.description);
   if (result.mode === "detail") {
     lines.push("", `Página ${result.page} de ${result.totalPages}; ${result.totalRows} compras en total.`);
     if (result.data.length) lines.push("", ...table(["Fecha", "Local", "Rubro", "Moneda", "Importe"], result.data.map((row) => [cell(row.purchaseDate), cell(row.customer?.name), cell(row.category?.name), currency(row), number(row.amount)])));

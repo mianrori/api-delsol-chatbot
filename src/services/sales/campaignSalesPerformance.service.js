@@ -1,8 +1,7 @@
-import { getCampaignForSalesAnalysis } from "../../repositories/sales/campaignSalesPerformance.repository.js";
+import { getCampaignForSalesAnalysis, getCampaignPeriodSales } from "../../repositories/sales/campaignSalesPerformance.repository.js";
 import { throwIfRequestAborted } from "../requestContext.service.js";
 // src/services/sales/campaignSalesPerformance.service.js
 
-import { getSalesRepository } from "../../repositories/sales/sales.repository.js";
 
 /*
 |--------------------------------------------------------------------------
@@ -43,8 +42,6 @@ import { getSalesRepository } from "../../repositories/sales/sales.repository.js
 |
 |--------------------------------------------------------------------------
 */
-
-const DEFAULT_METRICS = ["totalAmount", "totalInvoices"];
 
 const parseDate = (value, fieldName) => {
   if (typeof value !== "string" || !/^\d{2}\/\d{2}\/\d{4}$/.test(value)) {
@@ -156,12 +153,13 @@ const compareMetric = (previousValue, currentValue) => {
 };
 
 const normalizeSalesResult = (result, durationDays) => {
-  const totalAmount = Number(result?.totalAmount ?? 0);
-
-  const totalInvoices = Number(result?.totalInvoices ?? 0);
+  const groups = result.data;
+  const mixed = groups.length > 1;
+  const totalAmount = mixed ? null : groups[0]?.totalAmount ?? 0;
+  const totalInvoices = groups.reduce((n, row) => n + row.totalInvoices, 0);
 
   return {
-    currency: result?.currency ?? {
+    currency: (!mixed && groups[0]?.currency) || {
       description: null,
       abbreviation: null,
     },
@@ -171,15 +169,21 @@ const normalizeSalesResult = (result, durationDays) => {
     totalInvoices,
 
     averageDailyAmount:
-      durationDays > 0 ? round(totalAmount / durationDays) : null,
+      !mixed && durationDays > 0 ? round(totalAmount / durationDays) : null,
 
     averageDailyInvoices:
       durationDays > 0 ? round(totalInvoices / durationDays) : null,
+    sourceRows: groups.reduce((n, row) => n + row.sourceRows, 0),
+    currencyGroups: groups,
+    calculationReason: mixed ? "Varias monedas en el período; importes separados, total monetario sin calcular." : null,
   };
 };
 
-const getCurrencyKey = (period) =>
-  period?.currency?.abbreviation ?? period?.currency?.description ?? null;
+const getCurrencyKey = period => {
+  const currency = period?.currency;
+  return currency?.description == null && currency?.abbreviation == null ? null
+    : JSON.stringify([currency?.description ?? null, currency?.abbreviation ?? null]);
+};
 
 const validateCurrencyConsistency = (periods) => {
   const keys = [
@@ -191,7 +195,7 @@ const validateCurrencyConsistency = (periods) => {
   const distinct = [...new Set(keys)];
 
   return {
-    consistent: distinct.length <= 1,
+    consistent: distinct.length <= 1 && Object.values(periods).every(period => period.currencyGroups.length <= 1),
 
     values: distinct,
   };
@@ -300,9 +304,6 @@ export const getCampaignSalesPerformance = async (
 
     categoryIds: normalizedCategoryIds,
 
-    groupBy: [],
-
-    metrics: DEFAULT_METRICS,
   };
 
   /*
@@ -315,7 +316,7 @@ export const getCampaignSalesPerformance = async (
    * -------------------------------------------------------------
    */
 
-  const beforeResult = await getSalesRepository({
+  const beforeResult = await getCampaignPeriodSales({
     connection,
 
     ...commonArgs,
@@ -325,7 +326,7 @@ export const getCampaignSalesPerformance = async (
     dateTo: formatDate(beforeDateTo),
   });
 
-  const duringResult = await getSalesRepository({
+  const duringResult = await getCampaignPeriodSales({
     connection,
 
     ...commonArgs,
@@ -335,7 +336,7 @@ export const getCampaignSalesPerformance = async (
     dateTo: formatDate(campaignToDate),
   });
 
-  const afterResult = await getSalesRepository({
+  const afterResult = await getCampaignPeriodSales({
     connection,
 
     ...commonArgs,

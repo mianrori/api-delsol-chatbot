@@ -25,12 +25,16 @@ export const buildCampaignSalesPerformanceResponse = (calls = []) => {
   for (const comparison of Object.values(result.comparisons)) {
     lines.push(`| ${LABELS[comparison.currentPeriod]} frente a ${LABELS[comparison.previousPeriod]} | ${money(comparison.totalAmount?.absoluteChange, result.periods[comparison.currentPeriod].currency)} | ${pct(comparison.totalAmount?.percentageChange)} | ${number(comparison.totalInvoices.absoluteChange)} | ${pct(comparison.totalInvoices.percentageChange)} |`);
   }
-  if (!result.currency.consistent) lines.push("", "Las monedas difieren entre períodos; no se comparan sus importes.");
+  if (!result.currency.consistent) lines.push("", "Las monedas difieren entre períodos o dentro de ellos; no se comparan sus importes.");
+  for(const [key,period]of Object.entries(result.periods))if(period.currencyGroups?.length>1){
+    lines.push('',`**${LABELS[key]}: ${period.calculationReason}**`,'| Moneda | Ventas | Cantidad de facturas |','| --- | --- | --- |');
+    for(const group of period.currencyGroups)lines.push(`| ${cell(group.currency.description??group.currency.abbreviation)} | ${money(group.totalAmount,group.currency)} | ${number(group.totalInvoices)} |`);
+  }
   if (Object.values(result.comparisons).some((item) => item.totalAmount?.percentageChange == null || item.totalInvoices.percentageChange == null)) {
     lines.push("", "La variación porcentual no se calcula cuando el valor del período de referencia es cero o los importes no son comparables.");
   }
-  if (Object.values(result.periods).some((period) => period.totalInvoices === 0 && period.totalAmount === 0)) {
-    lines.push("", "Los períodos con cero ventas y cero facturas no tienen registros de ventas en los datos consultados.");
+  if (Object.values(result.periods).some((period) => period.sourceRows === 0)) {
+    lines.push("", "Los períodos con conteo de registros cero no tienen registros de ventas en los datos consultados.");
   }
   lines.push("", "Estas variaciones describen las ventas observadas; no demuestran que la campaña haya causado los cambios.");
   return lines.join("\n");

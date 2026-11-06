@@ -1,6 +1,55 @@
 # Alcance y evidencia del backend del chatbot
 
-Corte actualizado: **05/11/2026**, base desplegada `4428874` (PR #39 fusionada).
+Corte actualizado: **06/11/2026**, base desplegada `84fd67c` (PR #40 fusionada).
+
+## Balance actual del cierre
+
+El [balance final del backend](backend-scope-balance.md) clasifica **cada pendiente
+por su efecto sobre el cierre**, separando variantes funcionales, muestras DEV,
+trazabilidad y cotización real positiva. Es la referencia para priorizar trabajo;
+las tablas inferiores conservan los perfiles y SHA históricos, no ejecuciones nuevas.
+
+Las 25 herramientas originales están implementadas, 26 en el registro actual.
+Los perfiles acreditados pueden cerrarse con sus reservas; no procede afirmar
+cobertura integral de las ramas F1/F2, variantes financieras F3, extensiones
+condicionales F4/F5 o conversión real E1 sin la evidencia correspondiente.
+Las muestras ausentes con cobertura controlada no son implementación faltante.
+La revisión posterior F3/F4 identificó dos hallazgos: suma monetaria de campaña
+antes de separar monedas y etiqueta `$` indistinguible en compras individuales.
+Las correcciones están en la rama `test/backend-final-variants-dev`, pendientes
+de contraste Oracle; no forman parte del despliegue `84fd67c`.
+
+PR #39: despliegue `4428874`, resumen real 11/11 contra Oracle independiente.
+PR #40: despliegue `84fd67c`, gráfico HTTP horizontal multiserie **21/21** contra
+SELECT independientes, etiqueta/serie/valor/moneda/período; 187 archivos
+coincidentes, salud/arranque, cierre/logout y cero reinicios aprobados. Modelo e
+historial preparados. **Proveedor no consultado**; cotización real positiva y
+fecha de publicación no acreditadas, muestras DEV ausentes conservadas.
+La revisión documental inicial no ejecutó pruebas ni llamadas externas.
+El seguimiento acotado F1/F2/F3/F4/M7 se distingue a continuación.
+
+### Seguimiento acotado de variantes finales
+
+El [registro de variantes](backend-final-variants-validation.md) conserva la
+auditoría previa y los hashes de los logs históricos: aprobaciones controladas
+de F3/F4/M7, sin atribuirles un SHA de código por fecha. La corrección candidata
+añade cuatro regresiones propias y pasa 15/15 pruebas enfocadas locales;
+preflight Node 22 y contrastes Oracle aún pendientes de ejecución/revisión.
+
+| Pendiente | Estado de esta ampliación | Reserva conservada |
+| --- | --- | --- |
+| F1 RUC/matrícula y fuzzy positivos | Ejecutor preparado: identidades y período contra SELECT; fuzzy solo tras demostrar cero coincidencias fuertes. | Sin aprobación nueva hasta revisar reporte. Hasta 20 filas/seis candidatos. |
+| F2 fuzzy positivo | Ejecutor preparado con distancia independiente y catálogo real. | Hasta ocho tipos; alias/parcial aprobado no sustituye ese positivo. |
+| F3 ausencia/referencia cero/monedas distintas | Aprobación controlada histórica revisada; corrección por moneda dentro del período y `sourceRows`, pruebas afectadas. Oracle excepcional preparado. | Hasta diez campañas de hasta 61 días; cada variante sin muestra queda reservada. Suma de `CANTIDAD_FACTURAS` no significa facturas distintas. |
+| F4 compras individuales multimoneda | Cobertura controlada propia nueva de repositorio/DTO/presentación; dos descripciones con `$` siguen separadas. | Cohorte real de hasta 1.000 filas enero–mayo 2023; recorrido condicionado a muestra legítima y presupuesto de 100 detalles. No hereda CTE de R/G. |
+| M7 chapa activa compartida | Test histórico aprobado revisado, sin nuevo SHA de ejecución atribuible. Solo búsqueda/contraste real pendiente. | Hasta 1.000 vehículos; si no hay placa compartida, reserva sin ausencia global. |
+| F5 formas de gráficos | [Contrato y evidencia por forma](chart-result-contract.md): arrays `data`/`results`, rutas de etiqueta/métrica, series y unidades. | Positivo específico de `dataPath` a array anidado mediante índice no identificado. No se ejecuta F5 ni proveedor en este bloque. |
+
+T1 conserva S/P sin SHA propio: **no reconstruir hashes por fecha**. E1 sigue
+pendiente separado; ningún control nuevo de esta ampliación consulta proveedor.
+
+### Trazabilidad histórica de las ampliaciones
+
 PR #38 — corrección monetaria `8ee5b14`: identificación inequívoca PYG/USD/CAD,
 contradicción/ambigüedad y compatibilidad de contraparte comprobadas antes del
 porcentaje; motivos por fila, parejas exactas separadas, sin conversión ni unión
@@ -70,14 +119,15 @@ y ejes. **27/27 controles sobre `d59d1f2`** (código de `ad0ef01`) acreditan el
 nuevo comprobador en los tres gráficos HTTP con autenticación y fuente Oracle
 reales; 185 archivos coinciden, cierre/logout aprobados. Costos Oracle/controlados
 y 13 pruebas reutilizados por hash, sin proveedor real ni suites repetidas.
-PR #40 en borrador; cotización real positiva y muestras ausentes pendientes.
+PR #40 fusionada y desplegada en `84fd67c`; cotización real positiva y muestras
+ausentes pendientes, sin convertir los controles de tasas sintéticas en reales.
 Los 27 y los 32 controles conservan su alcance y no se suman como casos únicos.
 Ver [resultados y límites](backend-independent-validation.md).
 
 ### Evidencia histórica reutilizada
 
 Los estados de borrador que aparecen a continuación describen cada revisión
-histórica; la PR #37 ya está fusionada. Sus controles no se repiten ni se suman
+histórica; las PR #37–#40 ya están fusionadas. Sus controles no se repiten ni se suman
 como casos únicos.
 
 Segmentación: 50/50 Oracle/HTTP en `7c34c14`; corrección orderBy en `345827f`
@@ -307,7 +357,7 @@ dentro de `test/`. **Sin acreditar** indica falta de evidencia, no fallo probado
 | `get_member_vehicles` — vehículos del socio/chapa | `members/memberVehicle.service.js` | `vehicleRegistrations`, PII y ciclo | N: documento, activos y débito sí/no contra Oracle independiente; `cafc5f1`: chapa única/ausente, dueño/vehículo contra SELECT | `7762f35`; `cafc5f1` | Chapa activa compartida no encontrada; única/ausencia acreditadas. No confundir H de altas agregadas con búsqueda de dueño. |
 | `analyze_members` — segmentación/ranking | `members/memberAnalysis.service.js` | Suites existentes de segmentación; 46/46 previas. Corrección del contrato orderBy: 17/17 enfocadas (5 nuevas; conteos solapados) | G: 50/50 finales Oracle/HTTP y cierre reutilizados; baseline y 40 controles/denegación previos. Null rechazado antes de SQL: 5/5 nuevos tests controlados en Docker DEV, sin nuevas lecturas Oracle | `345827f` validación orderBy; `7c34c14` Oracle/HTTP; `6b1303e` baseline; `82e72ba` parcial | Muestra real con varias monedas pendiente; CTE multimoneda aprobadas. Lenguaje inicial y carga general no exhaustivos. P2 orderBy:null corregido conforme al esquema no nullable; PR #36 fusionada y desplegada `00a1acb` (10/10 controles puntuales). |
 | `compare_member_purchases_vs_sales` — canjes/ventas | `members/memberPurchasesVsSales.service.js` | `memberPurchasesVsSales`, `chatLifecycle`; corrección P2 con 15/15 enfocadas y 2/2 del ejecutor monetario | W: 86/86 en Oracle independiente PYG real total/mes/filtros; CTE monetarias y presentación en ambos órdenes; un HTTP afectado. N conserva su SHA histórico | `8ee5b14` código; `7bebb3d` Oracle/HTTP, sin cambios de código | Porcentaje solo con identificación inequívoca y contraparte compatible por pareja exacta. Ambigüedad, contradicción, incompatibilidad y alias distintos producen nulo con motivo. No convierte ni suma distintos. CTE no acredita socio real multimoneda; pendientes anteriores conservados. |
-| `generate_chart` — gráficos | `charts/chart.service.js` | `charts`, `chatLifecycle`, `chartHttpVariants`, `chartValueAssociation`; negativos de etiquetas/series/ejes | H y `92b5e11` históricos; `d59d1f2`: 27/27 de horizontal/circular/multiserie HTTP, asociación exacta etiqueta/valor por serie y moneda/período contra fuente mensual PYG Oracle, auth real/modelo planificado | `ad0ef01` comprobador; `d59d1f2` Oracle/HTTP; históricos con su SHA | Fuente única y perfil ensayado; no todas las herramientas, divisas o fuentes combinadas. No muestra multimoneda ni frontend. No se repite la auditoría de negocio de la fuente. |
+| `generate_chart` — gráficos | `charts/chart.service.js` | `charts`, `chatLifecycle`, `chartHttpVariants`, `chartValueAssociation`; negativos de etiquetas/series/ejes | H y `92b5e11` históricos; `d59d1f2`: 27/27 de tres variantes con fuente Oracle; despliegue `84fd67c`: 21/21 de un horizontal multiserie con etiqueta/serie/valor/moneda/período contra SELECT independientes | `ad0ef01` comprobador; `d59d1f2` Oracle/HTTP; `84fd67c` desplegado | Fuente única y perfil PYG; no todas las herramientas, divisas o fuentes combinadas (F5 del balance). No muestra multimoneda ni frontend; proveedor no consultado. |
 | `analyze_campaign_sales_performance` — antes/durante/después | `sales/campaignSalesPerformance.service.js` | `campaignSalesPerformance`, `chatLifecycle` | H reutilizado; N: SQL independiente de tres períodos, límites, filtros local/rubro, importes/facturas/moneda | `b315ff9` HTTP histórico; `7762f35` independiente | Perfil ensayado aprobado; ausencia/base cero/monedas diferentes en otras campañas no acreditadas individualmente. |
 | `search_invoice_concepts` — conceptos facturados | `invoices/searchInvoiceConcepts.service.js` | Nuevas: searchResolvers/searchSelection y chatLifecycle; 68/68 enfocadas del bloque (conteos solapados) | L: exacta/parcial/ausencia y límite; denegación/cierre. Selección/contexto: controlados. | `7ced8d9` Oracle; `c8525a6` controladas | Sin paginación en contrato: opciones limitadas y refinamiento. Conversación inicial libre no exhaustiva. |
 | `search_invoice_customers` — clientes facturados | `invoices/searchInvoiceCustomers.service.js` | Nuevas: searchResolvers/searchSelection y chatLifecycle; 68/68 enfocadas del bloque (conteos solapados) | L: exacta/parcial/ausencia, clientes distintos, período aislado y denegación/cierre; selección con período controlada. | `7ced8d9` Oracle; `c8525a6` controladas | Fallback fuzzy positivo y otras coincidencias de RUC/matrícula no acreditados individualmente. Opciones limitadas; no prometer catálogo completo. |
@@ -331,6 +381,11 @@ dentro de `test/`. **Sin acreditar** indica falta de evidencia, no fallo probado
 | Autorización/cierre/logs | PostgreSQL → proxy Oracle; `oracleSessionClose`, dispatcher/ciclo | D/Q/I/R: usuarios distintos, rechazo sin datos y cierre. R: fallos simulados después del cierre real y códigos seguros; no equivale a fallo real de driver observado. No autentica al usuario ni modifica expiraciones. |
 
 ## Pendientes clasificados y trabajo mínimo de cierre
+
+El [balance final](backend-scope-balance.md) contiene el dictamen de bloqueo por
+pendiente: E1/E2 proveedor, F1–F7 variantes, M1–M10 muestras y T1–T4 trazabilidad/
+límites. Esta sección conserva el inventario y su evidencia. No se deben ejecutar
+de nuevo los perfiles aprobados por aparecer en la tabla histórica.
 
 **Implementación ausente:** ninguna herramienta del registro original identificada.
 No hay base para planificar una nueva migración completa. Un comportamiento no
