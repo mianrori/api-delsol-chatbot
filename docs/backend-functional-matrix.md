@@ -614,3 +614,20 @@ aprobados. Etiquetas ausentes/contradictorias tienen cobertura controlada; no se
 afirma muestra Oracle real. La evidencia histórica de PR #43 y sus reservas se
 conservan; no acredita estos cambios nuevos. Sin suite completa, proveedor,
 cambios de datos/permisos/expiraciones, merge o despliegue de esta rama.
+
+### Corrección P2 de «no solo» en PR #44
+
+| Caso nuevo | Resultado requerido | Evidencia nueva |
+| --- | --- | --- |
+| Solo importe → «No solo enero, también febrero» | Conserva importe único y amplía a enero–febrero | Argumentos, preferencia persistente, contexto, SQL y presentación antes/después del recorte |
+| Sobre enero–febrero → «No solo el importe, también las facturas» | Ambas métricas sin perder período, filtros, mes ni tipo de día | Los mismos perfiles antes/después del recorte; propuesta del modelo de solo importe |
+| «No solo» referido a local, período o agrupación | No se interpreta como cambio de métricas | Regresión de intención; referencias explícitas a métricas siguen reconocidas |
+
+**7/7 pruebas afectadas Node 22.23.4 en `300bec0`** (cinco regresiones nuevas y
+dos checks existentes de política), 282 archivos verificados. Hash de salida
+`218982f2408a131fa4c6589a9156a189e9a5dc04d8e5abdb95d09edd7bab2d5e`.
+Chat/servicio/repositorios reales con modelo y Oracle controlados; sin nuevas
+consultas Oracle, Bedrock o proveedor. Las 82 pruebas de `3d31d63` y los 260
+controles de `43d7292` se mantienen como evidencia previa, no cubren el P2 ni se
+repitieron. Reservas conservadas; PR #44 en borrador hasta revisión de la
+corrección. Sin merge, despliegue o cambios de datos/permisos/expiraciones.

@@ -121,3 +121,52 @@ cantidad/número de facturas; no se afirma cobertura lingüística exhaustiva.
 Los controles anteriores de PR #43 no se atribuyen a estos cambios nuevos.
 Se conservan sus reservas, muestras pendientes y límites, sin proveedor ni
 cambios de datos/permisos/expiraciones. Sin merge ni despliegue de esta rama.
+
+## P2: «no solo» debe nombrar una métrica
+
+La revisión de `74227ca` encontró que la regla trataba cualquier «no solo» como
+petición de ambas métricas. Tras «Muestra solo el importe», el seguimiento
+«No solo enero, también febrero» añadía facturas y sobrescribía la preferencia
+persistente, incluso después del recorte. Las 82 pruebas y los 260 controles
+anteriores no cubrían este caso; sus resultados no se atribuyen a la corrección.
+
+La regla ahora exige una referencia inmediata a importe/monto/ventas totales
+o facturas/cantidad/número de facturas, con el artículo opcional. Sin esa
+referencia no cambia la preferencia de métricas. «No solo el importe, también
+las facturas» sigue habilitando ambas. Las peticiones explícitas de ambas y las
+reglas existentes de una métrica se conservan. No se modifican fechas, filtros,
+agrupaciones, SQL, repositorios ni servicios Oracle.
+
+**Commit validado `300bec0f1905a9f40b7b640ec8e0030fe86cede1`: 7/7 pruebas
+afectadas en Node 22.23.4**, 282 archivos verificados contra Git. Son cinco
+regresiones nuevas (una de intención y cuatro perfiles de chat) y dos checks
+existentes de política de métricas, seleccionados con `--test-name-pattern`.
+No se ejecutaron las otras pruebas de los archivos seleccionados ni las suites
+anteriores. Comando reproducible:
+
+```powershell
+node --test '--test-name-pattern=no-solo|default metric policy|explicit single metric' test/salesMetricsNoSolo.test.js test/salesScopeMetrics.test.js
+```
+
+Los cuatro perfiles comprueban, antes y después del recorte real del historial:
+
+- «No solo enero, también febrero» amplía enero a enero–febrero y conserva solo
+  el importe, tanto en los argumentos finales como en la preferencia persistente,
+  el contexto efectivo, las columnas SQL y la presentación de los dos meses.
+- Sobre ese período ampliado, «No solo el importe, también las facturas» habilita
+  ambas sin perder febrero, el local, el rubro, la agrupación mensual ni el tipo
+  de día. Se verifica también que la preferencia y el contexto persisten.
+
+Los perfiles usan el chat, los guards, el servicio y los repositorios reales con
+modelo y conexión Oracle controlados. Son pruebas de interpretación/argumentos/
+presentación con datos sintéticos, **sin nuevas llamadas a Oracle, Bedrock ni
+proveedor**. La conciliación anterior de importes y cantidades sigue acreditada
+solo sobre `43d7292`; no se repitió ni se presenta como prueba de estos casos.
+
+Reporte ignorado `logs/pr44-no-solo-focused.json`; salida congelada
+`logs/pr44-no-solo-focused-node22.txt`, SHA-256
+`218982f2408a131fa4c6589a9156a189e9a5dc04d8e5abdb95d09edd7bab2d5e`.
+Manifest de la copia aislada, SHA-256
+`f8e92866f5b96380b1ee3d64fd00f1a176211a6dd56ebb83ab8b6fe272c66052`.
+Las reservas anteriores permanecen. PR #44 continúa en borrador hasta revisar
+esta corrección; sin merge, despliegue o cambios de datos/permisos/expiraciones.
