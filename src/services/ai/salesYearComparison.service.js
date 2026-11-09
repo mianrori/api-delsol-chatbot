@@ -1,3 +1,5 @@
+import {getMonthlySalesComparisonIntent} from './salesComparisonIntent.service.js';
+import {buildSalesScope} from './salesScopePresentation.service.js';
 const months = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 const finite = (value) => typeof value === "number" && Number.isFinite(value);
 const text = (value) => String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[¿?¡!,;:]/g, " ").replace(/\s+/g, " ").trim();
@@ -27,7 +29,9 @@ const compatible = (calls) => {
 };
 const rangeDates = (year, from, to) => ({ dateFrom: `01/${String(from).padStart(2, "0")}/${year}`, dateTo: `${new Date(Date.UTC(year, to, 0)).getUTCDate()}/${String(to).padStart(2, "0")}/${year}` });
 
-export const resolveSalesYearComparison = ({ message, history = [] }) => {
+export const resolveSalesYearComparison = ({ message, history = [], comparison, resolutionState }) => {
+  const intent=comparison??getMonthlySalesComparisonIntent(message,resolutionState);
+  if(intent)return intent;
   const request = text(message);
   // Anchor the complete request so unsupported local/category filters are not discarded.
   const initial = /^(?:compara(?: las)? |comparar(?: las)? )?ventas (?:de|del) ((?:19|20)\d{2}) (?:contra|vs\.?|versus|frente a) ((?:19|20)\d{2}) (?:mes a mes|por mes)(?: con (?:monto total|importe total)(?: y (?:cantidad de )?facturas)?)?\.?$/.exec(request);
@@ -46,7 +50,9 @@ export const resolveSalesYearComparison = ({ message, history = [] }) => {
   return { inputs: calls.map((call, index) => ({ ...structuredClone(call.input), ...rangeDates(ranges[index].year, from, to) })) };
 };
 
-export const buildSalesYearComparisonResponse = (calls = []) => {
+export const buildSalesYearComparisonResponse = (calls = [], {restoreValue=v=>v}={}) => {
+  if(calls.some(c=>!["get_sales","search_categories","search_customers"].includes(c.name)))return null;
+  calls=calls.filter(c=>c.name==="get_sales");
   const ranges = compatible(calls);
   if (!ranges || calls.some((call) => !Array.isArray(call.result?.data) || call.result.resultSet?.truncated || call.result.resultSet?.analysisPolicy === "NO_ANALYSIS" || call.result.hasMore)) return null;
   const metrics = calls[0].input.metrics, years = ranges.map((range) => range.year);
@@ -67,6 +73,7 @@ export const buildSalesYearComparisonResponse = (calls = []) => {
     }
   }
   const lines = [`**Comparación mensual de ventas: ${years[0]} vs. ${years[1]}**`, "",
+    buildSalesScope(calls[0].input,calls[0].result.scope,restoreValue), "",
     ...calls.map((call, index) => `${years[index]}: ${cell(call.input.dateFrom)} a ${cell(call.input.dateTo)}.`), ""];
   if (!currencies.size) return [...lines, "No se encontraron registros para ninguno de los dos períodos consultados. No hay valores disponibles para comparar."].join("\n");
   for (const { currency, rows } of currencies.values()) {

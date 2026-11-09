@@ -35,6 +35,7 @@ import {
   getConversation,
   setConversation,
   getSearchResolutions,
+  setSearchResolutions,
   getSearchSelectionTurn,
 } from "../../state/conversation.store.js";
 import {
@@ -300,6 +301,7 @@ Para ventas por metro cuadrado:
 - en get_sales, interpreta totalAmount y totalInvoices por separado: una subida de ventas no implica una subida de facturas;
 - en get_sales incluye por defecto totalAmount y totalInvoices. Muestra una sola métrica únicamente si el usuario lo pide explícitamente; conserva esa preferencia en seguimientos. Para identificar el alcance usa solo los nombres de result.scope obtenidos del catálogo autorizado y asociados a los identificadores efectivos; no inventes nombres ni recuperes etiquetas de filtros retirados;
 - para responder una nueva consulta de ventas, ejecuta get_sales aunque exista un resultado histórico con los mismos filtros; reutiliza los identificadores y filtros resueltos, no una muestra ni una supuesta exportación antigua. Esto incluye preguntas equivalentes y cambios de filtros o desglose. Para un gráfico solicitado sobre un resultado completo, conserva las reglas específicas de gráficos;
+- Una comparación autónoma como "Compara las ventas mensuales de 2022 con las de 2023" consulta todos los locales y rubros, sin exigir filtros ni heredar los anteriores. Compara ambos años completos, agrupados por mes, con importe y facturas salvo métrica única explícita. Si nombra un rubro, resuélvelo con search_categories y distingue NOT_FOUND de AMBIGUOUS y de un rubro resuelto sin registros. "Compara ese mismo rubro con 2022" conserva filtros y preferencia de métricas.
 - distingue una consulta autónoma con sujeto y período propios («Ventas del rubro librería durante 2023, por mes») de un seguimiento aditivo («filtra también por librería»). La primera busca el rubro solicitado y consulta todos los locales del período indicado, sin heredar el local, rubro ni tipo de día anteriores. La segunda resuelve el rubro y conserva el local, período y desglose confirmados. La omisión de un filtro en los argumentos no significa por sí sola retirarlo;
 - una pendiente de regresión positiva o un aumento entre el primer y último período no demuestra crecimiento sostenido: revisa todas las variaciones consecutivas de esa métrica;
 - si alguna variación es negativa, no afirmes crecimiento sostenido ni aumentos en todos los períodos; describe las subidas y bajadas observadas;
@@ -1646,7 +1648,7 @@ export const chatService = async ({ message, sessionId }) => {
     message,
     history: protectedHistory,
   });
-  const salesYearComparison = resolveSalesYearComparison({ message, history: protectedHistory });
+  const salesYearComparison = resolveSalesYearComparison({ message:messages.at(-1).content[0].text, history: protectedHistory, comparison:getSearchSelectionTurn(sessionId).salesComparison });
   const salesRefreshRequest = { message: messages.at(-1).content[0].text, history: protectedHistory };
   const salesRefreshInput = resolveSalesCategoryRemoval(salesRefreshRequest)
     ?? resolveSalesBreakdown(salesRefreshRequest)
@@ -1663,7 +1665,18 @@ export const chatService = async ({ message, sessionId }) => {
     ?? resolveMemberSolesPage({ message, history: protectedHistory })
     ?? resolveMemberSolesBreakdown({ message, history: protectedHistory })
     ?? resolveMemberSolesBalance({ message: messages.at(-1).content[0].text });
-  if (salesYearComparison) {
+  if (salesYearComparison?.autonomous&&salesYearComparison.search) {
+    const content=[{toolUse:{toolUseId:'comparison_category_'+randomUUID(),name:'search_categories',input:{search:salesYearComparison.search}}}];
+    messages.push({role:'assistant',content});
+    const lookup=await executeToolRequests({content,sessionId,sourceMessages:messages});
+    messages.push({role:'user',content:lookup.toolResults});
+    conversationInternalContext=lookup.internalContext;
+    const result=lookup.internalContext.presentationCalls[0]?.result;
+    if(result?.status==='NOT_FOUND')followupAnswer='No se encontró un rubro coincidente en el catálogo autorizado. No se consultaron ventas; esto no significa ventas cero.';
+    else if(result?.status==='AMBIGUOUS')followupAnswer=['Hay varias coincidencias en el catálogo autorizado. Selecciona un rubro para comparar ambos años por mes:',...(result.options??[]).map(o=>o.optionId+'. '+o.name),...(result.hasMore?['La lista está limitada; puedes precisar el nombre.']:[])].join('\n');
+    else if(result?.status!=='RESOLVED')followupAnswer='No fue posible resolver el rubro autorizado. No se consultaron ventas.';
+  }
+  if (salesYearComparison && !followupAnswer) {
     const content = salesYearComparison.inputs.map((input) => ({ toolUse: {
       toolUseId: `sales_comparison_${randomUUID()}`, name: "get_sales", input,
     } }));
@@ -1671,9 +1684,12 @@ export const chatService = async ({ message, sessionId }) => {
     const executed = await executeToolRequests({ content, sessionId });
     messages.push({ role: "user", content: executed.toolResults });
     conversationActions = executed.actions;
-    conversationInternalContext = executed.internalContext;
+    conversationInternalContext = {...executed.internalContext,presentationCalls:[...(conversationInternalContext.presentationCalls??[]),...executed.internalContext.presentationCalls]};
+    if(executed.internalContext.presentationCalls.length===2&&executed.internalContext.presentationCalls.every(c=>c.result?.success!==false&&Array.isArray(c.result?.data))){
+      const state=getSearchResolutions(sessionId);state.salesComparison={inputs:executed.internalContext.presentationCalls.map(c=>structuredClone(c.input)),pending:false};setSearchResolutions(sessionId,state);
+    }
     toolIterations = 1;
-    followupAnswer = buildSalesYearComparisonResponse(executed.internalContext.presentationCalls)
+    followupAnswer = buildSalesYearComparisonResponse(executed.internalContext.presentationCalls,{restoreValue:value=>restorePiiDeep(sessionId,value)})
       ?? "No fue posible completar la comparación de ambos años. Vuelve a intentarlo.";
   } else if (salesRefreshInput) {
     const content = [{ toolUse: {
@@ -1887,7 +1903,7 @@ export const chatService = async ({ message, sessionId }) => {
       followupAnswer = buildMemberPromoResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) })
         ?? buildContractIncidenceResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) })
         ?? buildSalesPerSqmResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) })
-        ?? buildSalesYearComparisonResponse(conversationInternalContext.presentationCalls)
+        ?? buildSalesYearComparisonResponse(conversationInternalContext.presentationCalls,{restoreValue:value=>restorePiiDeep(sessionId,value)})
         ?? buildSalesSampleResponse(conversationInternalContext.presentationCalls, { exportAvailable: Boolean(conversationActions.salesExport?.available) })
         ?? buildSalesSeriesResponse(conversationInternalContext.presentationCalls, { message, restoreValue: (value) => restorePiiDeep(sessionId, value) })
         ?? buildVehicleResponse(conversationInternalContext.presentationCalls)
@@ -1950,7 +1966,7 @@ export const chatService = async ({ message, sessionId }) => {
       ? "Aquí tienes el gráfico solicitado."
       : buildMemberPromoResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) }) ?? buildContractIncidenceResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) }) ?? monthlyIncidenceText ??
       buildSalesPerSqmResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) }) ??
-      buildSalesYearComparisonResponse(conversationInternalContext.presentationCalls) ??
+      buildSalesYearComparisonResponse(conversationInternalContext.presentationCalls,{restoreValue:value=>restorePiiDeep(sessionId,value)}) ??
       buildSalesSampleResponse(conversationInternalContext.presentationCalls, { exportAvailable: Boolean(conversationActions.salesExport?.available) }) ??
       buildSalesSeriesResponse(conversationInternalContext.presentationCalls, { message, restoreValue: (value) => restorePiiDeep(sessionId, value) }) ??
       buildVehicleResponse(conversationInternalContext.presentationCalls) ??

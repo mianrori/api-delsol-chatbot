@@ -1,3 +1,4 @@
+import {getMonthlySalesComparisonIntent} from './salesComparisonIntent.service.js';
 const normalize=value=>String(value??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
 const domain=word=>word.startsWith('local')?'search_customers':'search_categories';
 const removeVerbs=new Set(['quita','quitar','elimina','eliminar','retira','retirar','saca','sacar','desactiva','desactivar']);
@@ -62,6 +63,8 @@ export function getSearchFilterActions(message){
 }
 
 export function isExplicitSearchRequest(message,search,input={}){
+ const comparison=search==='search_categories'?getMonthlySalesComparisonIntent(message):null;
+ if(comparison?.search)return input.search==null||normalize(input.search)===comparison.search;
  const autonomous=search==='search_categories'?getAutonomousCategorySalesIntent(message):null;
  if(autonomous)return input.search==null||normalize(input.search)===autonomous.search;
  const text=normalize(message),action=getSearchFilterActions(message).filter(a=>a.search===search).at(-1);
