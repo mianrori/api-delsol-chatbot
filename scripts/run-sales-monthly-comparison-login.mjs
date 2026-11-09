@@ -43,7 +43,7 @@ try{
   if(!count||count!==passed||!/^# fail 0$/m.test(out))throw Error('FOCUSED_TESTS_FAILED');
   writeFileSync(outputPath,out);report.focused={commit,node:version,tests:count,passed,failed:0,outputSha256:hash(out)};
  }
- report.phase='MODULE_PREFLIGHT';const pre=JSON.parse(dock('exec',bot,'node','--experimental-vm-modules',candidate+'/scripts/check-sales-monthly-comparison-dev.mjs',commit,'--preflight'));if(!pre.success)throw Error();
+ report.phase='MODULE_PREFLIGHT';const pre=JSON.parse(dock('exec',bot,'node','--experimental-vm-modules',candidate+'/scripts/check-sales-monthly-comparison-dev.mjs',commit,'--preflight'));if(!pre.success||pre.suite!=='sales-monthly-comparison-real'||pre.commit!==commit)throw Error();
  if(process.argv.includes('--preflight')){report.success=true;report.phase='PREFLIGHT_COMPLETE';}
  else{
   report.phase='HIDDEN_INPUT';let input='';for await(const c of process.stdin){input+=c;if(input.length>16384)throw Error();}payload=JSON.parse(input);input='';
@@ -51,7 +51,7 @@ try{
   report.phase='REAL_MODEL_PLANNING_AND_ORACLE';report.worker=await new Promise((resolveWorker,reject)=>{
    const child=spawn(docker,['exec','-i','-e','NODE_DEBUG=','-e','NODE_OPTIONS=','-e','NODE_V8_COVERAGE=',bot,'node','--experimental-vm-modules',candidate+'/scripts/check-sales-monthly-comparison-dev.mjs',commit],{stdio:['pipe','pipe','pipe'],windowsHide:true});
    let raw='',size=0;child.stdout.on('data',c=>{size+=c.length;if(size<131072)raw+=c;});child.stderr.on('data',()=>{});child.on('error',()=>reject(Error('WORKER_FAILED')));child.stdin.on('error',()=>{});
-   child.on('close',()=>{try{const r=JSON.parse(raw);raw='';if(size>=131072||r.suite!=='sales-monthly-comparison-dev'||r.commit!==commit)throw Error();resolveWorker(r);}catch{reject(Error('WORKER_FAILED'));}});child.stdin.end(JSON.stringify({sessionId:ownedSession}));
+   child.on('close',()=>{try{const r=JSON.parse(raw);raw='';if(size>=131072||r.suite!=='sales-monthly-comparison-real'||r.commit!==commit)throw Error();resolveWorker(r);}catch{reject(Error('WORKER_FAILED'));}});child.stdin.end(JSON.stringify({sessionId:ownedSession}));
   });
   report.success=report.worker.success;report.phase='COMPLETE';
  }
@@ -59,7 +59,7 @@ try{
 finally{
  payload=null;
  if(ownedSession){try{await logoutDev(ownedSession);report.logout=true;}catch{report.logout=false;report.success=false;}ownedSession=null;}
- if(report.worker){
+ if(report.worker||report.phase==='REAL_MODEL_PLANNING_AND_ORACLE'){
   report.logAudit=[];
   for(const container of [bot,erp])try{
    const result=spawnSync(docker,['logs','--since',report.startedAt,container],{encoding:'utf8',windowsHide:true,maxBuffer:2097152});if(result.status!==0||result.error)throw Error();

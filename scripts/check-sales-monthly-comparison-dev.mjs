@@ -1,6 +1,6 @@
 ﻿// Read-only contrast. Catalog identities, binds, business rows and model text stay in memory.
 import vm from 'node:vm';
-import {readFile} from 'node:fs/promises';
+import {readFile,writeFile} from 'node:fs/promises';
 import {createRequire} from 'node:module';
 const emit=process.stdout.write.bind(process.stdout);
 for(const k of ['log','info','warn','error','debug','trace','dir','table'])console[k]=()=>{};
@@ -68,7 +68,7 @@ async function verify(sales,{categoryIds=[],customerIds=[],years=['2022','2023']
 const crop=()=>{let h=store.getConversation(sessionId);for(let i=0;i<14;i++)h=trimConversation([...h,{role:'user',content:[{text:'Tema neutral'}]},{role:'assistant',content:[{text:'Respuesta'}]}],10);check(!h.some(m=>m.content?.some(b=>b.toolUse)),'ACTUAL_TRIM_EVICTS_TOOLS');store.setConversation(sessionId,h);};
 try{
  check(config.env==='development'&&!config.piiDebugShowRaw&&!config.bedrockDebugPayloads&&/^[a-f0-9]{40}$/.test(report.commit??''),'SAFE_COMMITTED_DEV');
- if(process.argv.includes('--preflight')){emit(JSON.stringify({success:true}));process.exit(0);}
+ if(process.argv.includes('--preflight')){emit(JSON.stringify({suite:report.suite,commit:report.commit,success:true}));process.exit(0);}
  let input='';for await(const c of process.stdin){input+=c;if(input.length>4096)throw Error();}sessionId=JSON.parse(input).sessionId;input='';if(!/^[a-f0-9-]{36}$/i.test(sessionId??''))throw Error();
  const valid=await getValidOracleSession(sessionId);await withOracleProxySession(sessionId,async({connection})=>{const r=(await connection.execute("SELECT USER U,SYS_CONTEXT('USERENV','PROXY_USER') P FROM DUAL",{},{outFormat:4002})).rows[0];check(String(r.U).toUpperCase()===valid.username&&Boolean(r.P),'SESSION_PROXY_IDENTITY');});
  const catalog=await query("SELECT COD_RUBRO R,DESCRIPCION N,UTL_MATCH.JARO_WINKLER_SIMILARITY(UPPER(REGEXP_REPLACE(TRANSLATE(DESCRIPCION,'\u00c1\u00c9\u00cd\u00d3\u00da\u00dc\u00d1\u00e1\u00e9\u00ed\u00f3\u00fa\u00fc\u00f1','AEIOUUNAEIOUUN'),'[^A-Za-z0-9]','')),:q) S FROM VW_BOT_RUBROS_LOCALES",{q:'ROPAFEMENINA'});
@@ -95,4 +95,4 @@ try{
  check(modelCalls===2,'EXACT_CHAT_PATHS_DETERMINISTIC_NO_EXTRA_BEDROCK');report.success=true;
 }catch(e){report.error={code:/^(?:ORA-\d{5}|NJS-\d{3}|DPI-\d{4})$/.test(e?.code??'')?e.code:'MONTHLY_COMPARISON_CONTROL_FAILED'};}
 finally{if(timer)clearTimeout(timer);if(sessionId)store.clearConversation(sessionId);sessionId=null;report.connectionsClosed=opened===closed&&!closeErrors;if(!report.connectionsClosed)report.success=false;}
-report.realModelCalls=modelCalls;report.providerCalls=0;report.finishedAt=new Date().toISOString();emit(JSON.stringify(report));process.exitCode=report.success?0:1;
+report.realModelCalls=modelCalls;report.providerCalls=0;report.finishedAt=new Date().toISOString();await writeFile(new URL('monthly-comparison-sanitized-report.json',root),JSON.stringify(report));emit(JSON.stringify(report));process.exitCode=report.success?0:1;
