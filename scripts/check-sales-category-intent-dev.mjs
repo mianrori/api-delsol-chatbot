@@ -11,7 +11,6 @@ const {executeTool}=await app('src/services/ai/toolExecutor.service.js');
 const store=await app('src/state/conversation.store.js');
 const {trimConversation}=await app('src/services/ai/conversation.service.js');
 const {restorePiiDeep}=await app('src/services/ai/pii.service.js');
-const {beginSearchSelectionTurn}=await app('src/services/ai/searchSelection.service.js');
 const {runWithRequestSignal}=await app('src/services/requestContext.service.js');
 const {default:driver}=await import('oracledb');
 const sdk=await import('@aws-sdk/client-bedrock-runtime');
@@ -81,16 +80,14 @@ try{
   const matchedOptions=(pending?.result?.options??[]).filter(o=>customerIds.has(String(o.codCliente)));
   report.catalog.resolverOptions=pending?.result?.options?.length??0;report.catalog.independentlyMatchedOptions=matchedOptions.length;
   check(pending?.kind==='pending'&&matchedOptions.length===customerIds.size&&new Set(matchedOptions.map(o=>String(o.codCliente))).size===customerIds.size,'NIKE_AMBIGUITY_CONTAINS_ENTIRE_INDEPENDENT_COHORT');
-  report.catalogSelection='controlled numeric selection of every independently matched Nike candidate; original sales questions use real Bedrock; selected-Nike profiles include a repeated explicit Nike question after selection';
+  report.catalogSelection='controlled numeric user choices for every independently matched Nike candidate; real Bedrock interprets the choices and all sales questions; no arbitrary single candidate chosen';
   const literalThird=await turn('Ventas del rubro librería durante 2023, por mes');await verify(literalThird,{dateFrom:'01/01/2023',dateTo:'31/12/2023',categoryIds:[r]},'LITERAL_THIRD_AFTER_PENDING_NIKE');
   check(store.getSearchResolutions(sessionId).domains.search_customers.kind==='cleared','LITERAL_THIRD_CLEARS_PENDING_NIKE');
   for(const option of matchedOptions){
    store.setSearchResolutions(sessionId,pendingState);store.setConversation(sessionId,structuredClone(pendingHistory));
-   const choice=String(option.optionId??option.option);beginSearchSelectionTurn(sessionId,choice);
+   const choice=String(option.optionId??option.option),selected=await turn(choice);
    check(String(restorePiiDeep(sessionId,store.getSearchResolutions(sessionId).domains.search_customers).selected?.codCliente)===String(option.codCliente),'CONTROLLED_CHOICE_SELECTS_ONLY_ITS_LEGITIMATE_NIKE');
-   // Explicitly repeat the requested period after the controlled catalog choice.
-   // No raw catalog label or guessed period is inserted into the model context.
-   const selected=await turn(nikeQuestion);await verify(selected,{dateFrom:'01/01/2023',dateTo:'30/04/2023',customerIds:[String(option.codCliente)]},'SELECTED_NIKE');saveProfile(String(option.codCliente));
+   await verify(selected,{dateFrom:'01/01/2023',dateTo:'30/04/2023',customerIds:[String(option.codCliente)]},'SELECTED_NIKE');saveProfile(String(option.codCliente));
   }
  }
  report.selectedNikeProfiles=profiles.length;

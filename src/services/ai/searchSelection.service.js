@@ -1,4 +1,4 @@
-import {getSearchFilterActions,isExplicitSearchRequest,getSalesLocalRemovalChange,getAutonomousCategorySalesIntent} from './searchFilterIntent.service.js';
+import {getSearchFilterActions,isExplicitSearchRequest,getSalesLocalRemovalChange,getAutonomousCategorySalesIntent,getExplicitSalesRange} from './searchFilterIntent.service.js';
 import {getSearchResolutions,setSearchResolutions,getSearchSelectionTurn,setSearchSelectionTurn} from '../../state/conversation.store.js';
 const specs={
  search_customers:{consumers:['get_sales','get_sales_per_sqm','analyze_members','get_member_purchases','get_member_promo_purchases','compare_member_purchases_vs_sales','analyze_campaign_sales_performance','get_contract_conditions','get_contract_cost_per_sqm','analyze_contract_cost_incidence'],fields:o=>({customerIds:[o.codCliente],customerId:o.codCliente})},
@@ -40,6 +40,8 @@ export function beginSearchSelectionTurn(sessionId,message){
   delete state.choiceFocus;
   turn.requestedDomains.push('search_categories');changed=true;
  }
+ turn.salesExplicitRange=getExplicitSalesRange(message);
+ if(turn.salesExplicitRange){state.contexts.get_sales={...state.contexts.get_sales,...turn.salesExplicitRange};changed=true;}
  const normalized=String(message??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();
  const newLookup=/^(?:(?:realiza|haz) (?:una )?)?nueva busqueda\b|^busca (?:de nuevo|opciones)\b/.test(normalized);
  turn.allowLookup=Object.fromEntries(persistentSearches.map(name=>[name,isExplicitSearchRequest(message,name)||newLookup]));
@@ -90,6 +92,7 @@ export function captureSearchQueryContext(sessionId,name,input){
  const state=getSearchResolutions(sessionId);
  const autonomous=name==='get_sales'?turn.autonomousCategorySales:null;
  const captured={...state.contexts[name],...input};
+ if(name==='get_sales'&&turn.salesExplicitRange)Object.assign(captured,turn.salesExplicitRange);
  if(autonomous){
   const {search,...scope}=autonomous;Object.assign(captured,scope);
   delete captured.customerId;delete captured.customerIds;delete captured.dayType;
@@ -179,6 +182,7 @@ export function preserveSearchSelection({name,input,history=[],currentCalls=[],r
  }else if(removalChange)result={...structuredClone(original),...removalChange};
  else if(selectingNow)result=name==='get_sales'&&resolutionState?.contexts[name]?structuredClone(original):{...input,...original};
  else result={...original,...input};
+ if(name==='get_sales'&&selectionTurn.salesExplicitRange)Object.assign(result,selectionTurn.salesExplicitRange);
  const identifiers={};
  // A confirmed lookup may have left the bounded history, while its executed
  // arguments remain. Those IDs still outrank an unsolicited model proposal.

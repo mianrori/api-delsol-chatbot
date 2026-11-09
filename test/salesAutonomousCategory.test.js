@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {getAutonomousCategorySalesIntent} from '../src/services/ai/searchFilterIntent.service.js';
+import {getAutonomousCategorySalesIntent,getExplicitSalesRange} from '../src/services/ai/searchFilterIntent.service.js';
 import {beginSearchSelectionTurn,recordSearchToolResult,preserveSearchSelection,captureSearchQueryContext} from '../src/services/ai/searchSelection.service.js';
 import {getSearchResolutions,getSearchSelectionTurn,clearConversation} from '../src/state/conversation.store.js';
 import {trimConversation} from '../src/services/ai/conversation.service.js';
@@ -53,6 +53,24 @@ for(const trimmed of [false,true])for(const intent of ['autonomous','additive'])
 test('autonomous grammar requires its own sales subject and complete period',()=>{
  assert.deepEqual(getAutonomousCategorySalesIntent(autonomous),{search:'libreria',dateFrom:'01/01/2023',dateTo:'31/12/2023',groupBy:['month']});
  for(const text of [followup,'Ahora por mes','Ventas del rubro librería','Filtra también por librería durante 2023, por mes','Todos los locales','2'])assert.equal(getAutonomousCategorySalesIntent(text),null,text);
+ assert.deepEqual(getExplicitSalesRange('Ventas de Nike de enero a abril de 2023'),{dateFrom:'01/01/2023',dateTo:'30/04/2023'});
+ assert.equal(getExplicitSalesRange('Filtra también por librería'),null);
+ assert.equal(getExplicitSalesRange('Ventas de Nike de mayo a enero de 2023'),null);
+});
+
+for(const trimmed of [false,true])test(`explicit Nike period survives lookup-only ambiguity without a proposed sales call; trimmed=${trimmed}`,()=>{
+ const s=`SYNTHETIC-PENDING-PERIOD-${trimmed}`;clearConversation(s);
+ try{
+  recordSearchToolResult(s,'get_sales',first,{data:[]});let history=append([user('Ventas anteriores')],'first',first);
+  const question='Ventas de Nike de enero a abril de 2023';history.push(user(question));beginSearchSelectionTurn(s,question);
+  guard(s,'search_customers',{search:'Nike'},history);
+  recordSearchToolResult(s,'search_customers',{}, {status:'AMBIGUOUS',options:[{optionId:'1',codCliente:'SYNTHETIC-NIKE-1'},{optionId:'2',codCliente:'SYNTHETIC-NIKE-2'}]});
+  assert.deepEqual(getSearchResolutions(s).contexts.get_sales,{...first,dateTo:'30/04/2023'});
+  if(trimmed)for(let i=0;i<14;i++)history=trimConversation([...history,user(`Tema ${i}`),assistant('Respuesta')],10);
+  history.push(user('2'));beginSearchSelectionTurn(s,'2');
+  const args=guard(s,'get_sales',{...first,customerIds:['MODEL-WRONG'],groupBy:['year'],dayType:'weekend'},history);
+  assert.deepEqual(args,{...nike,customerIds:['SYNTHETIC-NIKE-2']});recordSearchToolResult(s,'get_sales',args,{data:[]});assert.deepEqual(getSearchResolutions(s).contexts.get_sales,args);
+ }finally{clearConversation(s);}
 });
 
 for(const trimmed of [false,true])test(`new category replaces stale category and day type through ambiguity and selection; trimmed=${trimmed}`,()=>{
