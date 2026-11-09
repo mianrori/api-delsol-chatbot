@@ -27,7 +27,7 @@ try{
  dock('exec',bot,'ln','-sfn','/app/node_modules',candidate+'/node_modules');
  const files=git('ls-tree','-r','--name-only',commit).trim().split('\n').filter(p=>/^(src\/|scripts\/|test\/|config\.js$|package(?:-lock)?\.json$)/.test(p));
  const normalize=s=>s.replaceAll('\r\n','\n');
- const expected=files.map(p=>[p,hash(normalize(git('show',commit+':'+p)))]);
+ const expected=files.map(p=>[p,hash(normalize(readFileSync(resolve(root,p),'utf8')))]);
  const remote=JSON.parse(run(docker,['exec','-i',bot,'node','--input-type=module'],{input:"import fs from 'node:fs';import crypto from 'node:crypto';const {candidate,files}="+JSON.stringify({candidate,files})+";console.log(JSON.stringify(files.map(p=>[p,crypto.createHash('sha256').update(fs.readFileSync(candidate+'/'+p,'utf8').replaceAll('\\r\\n','\\n')).digest('hex')])));"}));
  if(JSON.stringify(expected)!==JSON.stringify(remote))throw Error('SOURCE_MISMATCH');report.verifiedSourceFiles=files.length;report.manifestSha256=hash(JSON.stringify(expected));
  report.phase='FOCUSED_NODE22';const version=dock('exec',bot,'node','--version').trim();if(!/^v22\./.test(version))throw Error('NODE22_REQUIRED');
