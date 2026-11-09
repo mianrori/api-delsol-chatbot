@@ -16,8 +16,9 @@ try{
  if(process.argv.slice(2).some(a=>!['--preflight','--run'].includes(a)))throw Error();
  commit=git('rev-parse','HEAD').trim();report.commit=commit;
  if(!/^[a-f0-9]{40}$/.test(commit)||git('status','--porcelain').trim())throw Error('CLEAN_COMMIT_REQUIRED');
- await probeLoginDev();
+ report.phase='DEV_HEALTH_LOG_GUARD';await probeLoginDev();
  const probe="import config from '/app/config.js';import fs from 'node:fs';import crypto from 'node:crypto';const h=v=>crypto.createHash('sha256').update(v).digest('hex');console.log(JSON.stringify({dev:config.env==='development',safe:!config.bedrockDebugPayloads&&!config.piiDebugShowRaw,oracle:h(JSON.stringify([config.dbHost,config.dbPort,config.dbSid])),pg:h(JSON.stringify([config.pgOracleSessionsHost,config.pgOracleSessionsPort,config.pgOracleSessionsDatabase])),guard:fs.existsSync('/app/src/utils/devAuthTestLogging.js')?h(fs.readFileSync('/app/src/utils/devAuthTestLogging.js','utf8').replaceAll('\\r\\n','\\n')):null,enabled:process.env.ERP_DEV_SAFE_AUTH_TEST_LOGS==='1'}));";
+ report.phase='DEV_SOURCE_CONFIGURATION';
  const a=JSON.parse(dock('exec',erp,'node','--input-type=module','-e',probe)),b=JSON.parse(dock('exec',bot,'node','--input-type=module','-e',probe));
  if(!a.dev||!b.dev||!b.safe||a.oracle!==b.oracle||a.pg!==b.pg||!a.enabled||a.guard!=='8b134e363d1ffd906676824f668c0dd50900a155c0360b254c9e228500deae33')throw Error('SAFE_DEV_REQUIRED');
  candidate='/tmp/sales-category-intent-'+commit;dock('exec',bot,'mkdir','-p',candidate);
@@ -45,7 +46,7 @@ try{
   });
   report.success=report.worker.success;report.phase='COMPLETE';
  }
-}catch(e){report.error={code:['CLEAN_COMMIT_REQUIRED','SAFE_DEV_REQUIRED','SOURCE_MISMATCH','NODE22_REQUIRED','FOCUSED_TESTS_FAILED','ERP_LOGIN_REJECTED','ERP_DEV_GUARD_REQUIRED'].includes(e?.message)?e.message:['ERP_LOGIN_REJECTED','ERP_DEV_GUARD_REQUIRED'].includes(e?.code)?e.code:'DEV_CONTROL_FAILED'};}
+}catch(e){report.error={code:['CLEAN_COMMIT_REQUIRED','SAFE_DEV_REQUIRED','SOURCE_MISMATCH','NODE22_REQUIRED','FOCUSED_TESTS_FAILED','ERP_LOGIN_REJECTED','ERP_DEV_GUARD_REQUIRED'].includes(e?.message)?e.message:['ERP_LOGIN_REJECTED','ERP_DEV_GUARD_REQUIRED'].includes(e?.code)?e.code:'DEV_CONTROL_FAILED'};if(/^[A-Z0-9_]+$/.test(e?.code??''))report.error.technicalCode=e.code;if(Number.isInteger(e?.status))report.error.childExitCode=e.status;}
 finally{
  payload=null;
  if(ownedSession){try{await logoutDev(ownedSession);report.logout=true;}catch{report.logout=false;report.success=false;}ownedSession=null;}
