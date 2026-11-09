@@ -19,7 +19,8 @@ try{
  report.phase='DEV_HEALTH_LOG_GUARD';await probeLoginDev();
  const probe="import config from '/app/config.js';import fs from 'node:fs';import crypto from 'node:crypto';const h=v=>crypto.createHash('sha256').update(v).digest('hex');console.log(JSON.stringify({dev:config.env==='development',safe:!config.bedrockDebugPayloads&&!config.piiDebugShowRaw,oracle:h(JSON.stringify([config.dbHost,config.dbPort,config.dbSid])),pg:h(JSON.stringify([config.pgOracleSessionsHost,config.pgOracleSessionsPort,config.pgOracleSessionsDatabase])),guard:fs.existsSync('/app/src/utils/devAuthTestLogging.js')?h(fs.readFileSync('/app/src/utils/devAuthTestLogging.js','utf8').replaceAll('\\r\\n','\\n')):null,enabled:process.env.ERP_DEV_SAFE_AUTH_TEST_LOGS==='1'}));";
  report.phase='DEV_SOURCE_CONFIGURATION';
- const a=JSON.parse(dock('exec',erp,'node','--input-type=module','-e',probe)),b=JSON.parse(dock('exec',bot,'node','--input-type=module','-e',probe));
+ const probeContainer=container=>JSON.parse(run(docker,['exec','-i',container,'node','--input-type=module'],{input:probe}));
+ const a=probeContainer(erp),b=probeContainer(bot);
  if(!a.dev||!b.dev||!b.safe||a.oracle!==b.oracle||a.pg!==b.pg||!a.enabled||a.guard!=='8b134e363d1ffd906676824f668c0dd50900a155c0360b254c9e228500deae33')throw Error('SAFE_DEV_REQUIRED');
  candidate='/tmp/sales-category-intent-'+commit;dock('exec',bot,'mkdir','-p',candidate);
  run(docker,['exec','-i',bot,'tar','-x','-C',candidate],{input:run('git',['archive','--format=tar',commit],{encoding:'buffer'})});
@@ -27,7 +28,7 @@ try{
  const files=git('ls-tree','-r','--name-only',commit).trim().split('\n').filter(p=>/^(src\/|scripts\/|test\/|config\.js$|package(?:-lock)?\.json$)/.test(p));
  const normalize=s=>s.replaceAll('\r\n','\n');
  const expected=files.map(p=>[p,hash(normalize(git('show',commit+':'+p)))]);
- const remote=JSON.parse(run(docker,['exec','-i',bot,'node','--input-type=module','-e',"import fs from 'node:fs';import crypto from 'node:crypto';let s='';for await(const c of process.stdin)s+=c;const {candidate,files}=JSON.parse(s);console.log(JSON.stringify(files.map(p=>[p,crypto.createHash('sha256').update(fs.readFileSync(candidate+'/'+p,'utf8').replaceAll('\\r\\n','\\n')).digest('hex')])));"],{input:JSON.stringify({candidate,files})}));
+ const remote=JSON.parse(run(docker,['exec','-i',bot,'node','--input-type=module'],{input:"import fs from 'node:fs';import crypto from 'node:crypto';const {candidate,files}="+JSON.stringify({candidate,files})+";console.log(JSON.stringify(files.map(p=>[p,crypto.createHash('sha256').update(fs.readFileSync(candidate+'/'+p,'utf8').replaceAll('\\r\\n','\\n')).digest('hex')])));"}));
  if(JSON.stringify(expected)!==JSON.stringify(remote))throw Error('SOURCE_MISMATCH');report.verifiedSourceFiles=files.length;
  report.phase='FOCUSED_NODE22';const version=dock('exec',bot,'node','--version').trim();if(!/^v22\./.test(version))throw Error('NODE22_REQUIRED');
  const tests=['salesAutonomousCategory','salesLocalRemoval','librarySalesContext','searchResolutionState','searchFilterLifecycle','searchSelection','searchResolutionStateHttp','searchFilterLifecycleHttp'];
