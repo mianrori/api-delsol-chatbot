@@ -1611,9 +1611,21 @@ export const chatService = async ({ message, sessionId }) => {
   ];
 
   beginSearchSelectionTurn(sessionId,messages.at(-1).content[0].text);
+  // Resolver IDs and arguments here are protected, session-scoped metadata.
+  // The model needs this scope even after the originating tool call is trimmed.
+  const salesResolutionState = getSearchResolutions(sessionId);
+  const salesScopePrompt = "\nEstado de filtros de ventas de esta sesión (metadatos protegidos, no resultados): "
+    + JSON.stringify({
+      customers: salesResolutionState.domains.search_customers ?? null,
+      categories: salesResolutionState.domains.search_categories ?? null,
+      context: salesResolutionState.contexts.get_sales ?? null,
+    })
+    + "\nUsa este estado para los seguimientos aunque no exista la llamada original en el historial. "
+    + "Los dominios pending requieren búsqueda/selección; cleared no debe reactivarse sin petición explícita. "
+    + "Para una consulta autónoma usa su nuevo período y resuelve su rubro; para un seguimiento aditivo conserva el contexto confirmado.";
   const systemPrompt = getSystemPrompt({
     currentDate: getCurrentDateParaguay(),
-  }) + "\n" + chartsPrompt;
+  }) + "\n" + chartsPrompt + salesScopePrompt;
   const chartRequested = isChartRequest(message);
 
   let toolIterations = 0;

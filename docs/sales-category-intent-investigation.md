@@ -41,8 +41,8 @@ Verifica argumentos completos, SQL/binds, estado final e inmutabilidad. Añade
 selección ambigua con rubro/tipo de día antiguos y propuestas contradictorias.
 Los datos son sintéticos; no se atribuyen a Oracle ni a un modelo real.
 
-**63/63 pruebas enfocadas aprobadas localmente en Node 24.21.0**:
-`salesAutonomousCategory`, `salesLocalRemoval`, `librarySalesContext`,
+**64/64 pruebas enfocadas aprobadas localmente en Node 24.21.0**:
+`salesAutonomousCategory`, `salesCategoryIntentChat`, `salesLocalRemoval`, `librarySalesContext`,
 `searchResolutionState`, `searchFilterLifecycle`, `searchSelection`,
 `searchResolutionStateHttp`, `searchFilterLifecycleHttp`.
 No se ejecutó la suite completa.
