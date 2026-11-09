@@ -8,7 +8,7 @@ import {loginDev,logoutDev,probeLoginDev} from './dev-protected-login.mjs';
 const root=fileURLToPath(new URL('../',import.meta.url));
 const docker=process.env.SALES_INTENT_DOCKER||'docker',bot='api-delsol-chatbot-dev',erp='api-delsol-erp-dev';
 const report={suite:'sales-category-intent-helper',success:false,startedAt:new Date().toISOString(),phase:'PREFLIGHT'};
-const run=(command,args,options={})=>execFileSync(command,args,{cwd:root,encoding:'utf8',stdio:['ignore','pipe','pipe'],maxBuffer:20971520,windowsHide:true,...options});
+const run=(command,args,options={})=>execFileSync(command,args,{cwd:root,encoding:'utf8',stdio:['pipe','pipe','pipe'],maxBuffer:20971520,windowsHide:true,...options});
 const dock=(...args)=>run(docker,args),git=(...args)=>run('git',args);
 const hash=b=>createHash('sha256').update(b).digest('hex');
 let ownedSession,commit,candidate,payload;
