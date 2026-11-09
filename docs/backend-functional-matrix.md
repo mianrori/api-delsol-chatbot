@@ -566,3 +566,27 @@ atribuida, aislamiento/denegación/cierre cubiertos en cada nuevo flujo, sin bug
 abiertos; variantes y muestras no disponibles registradas con límites explícitos.
 No se incluyen conexión del frontend al servicio, login ERP, cambios de permisos,
 expiraciones, sincronización de datos ni despliegues adicionales.
+
+## Ventas: consulta autónoma de rubro (09/11/2026)
+
+Base `92c1ff0`, rama `fix/sales-autonomous-category-intent`.
+[Diagnóstico, comandos y evidencia](sales-category-intent-investigation.md).
+
+| Variante afectada | Argumentos y estado esperados | Evidencia actual |
+| --- | --- | --- |
+| Enero–mayo global → Nike enero–abril → librería anual mensual | Sin Nike; librería resuelta; 2023 completo/mes; local retirado y contexto nuevo | Regresión antes y después del recorte real aprobada |
+| Mismos antecedentes → «filtra también por librería» | Conserva Nike/enero–abril/mes; añade librería; ambos dominios seleccionados | Regresión antes y después del recorte real aprobada |
+| Nuevo rubro ambiguo → selección, con rubro/tipo de día anteriores | No reaparecen local/rubro/tipo de día anteriores; contexto nuevo conservado | Regresión antes y después del recorte aprobada |
+| Nike ambiguo, sin propuesta de ventas → selección | Enero–abril persiste desde el texto, sin volver a enero–mayo | Regresiones antes/después del recorte y selección por chat aprobadas |
+| Modelo real y Oracle independiente | Argumentos/SQL, todos los grupos/importes/monedas, estado, proxy, cierres y logout | **92/92 aprobados `fb913e2`**, 23 llamadas reales; secuencia literal con Nike pendiente y ocho ramas sobre ambos Nike legítimos, dos intenciones antes/después del recorte |
+
+66/66 pruebas enfocadas Node 22.23.4 DEV en `fb913e2`, 271 archivos
+verificados. Reporte real congelado y revisado:
+SHA-256 `a5d0b2343730820c1572c8c3c45e76ff4827c81a2285bb6af3cadc0a1f285bd8`.
+Login protegido, cierre de todas las conexiones y logout aprobados. Logs:
+chatbot cero líneas, ERP dos, esquema sanitizado reconocido. Los dos controles
+detenidos en catálogo y el parcial anterior se conservan con sus límites en la
+investigación; no son aprobaciones globales. PR #43 en borrador. La evidencia previa de PR #42
+se conserva con sus límites; no acredita esta intención nueva. Las reservas
+históricas, muestras no disponibles y proveedor real pendiente siguen vigentes.
+Sin suite completa, cambios de datos/permisos/expiraciones, merge o despliegue.

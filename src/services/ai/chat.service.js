@@ -298,6 +298,7 @@ Para ventas por metro cuadrado:
 - una disminución de ventas o ventas por m² puede describirse como una caída del indicador; no la conviertas automáticamente en una afirmación sobre disminución de actividad comercial, flujo de clientes, demanda, eficiencia comercial u otra causa no demostrada por los datos;
 - en get_sales, interpreta totalAmount y totalInvoices por separado: una subida de ventas no implica una subida de facturas;
 - para responder una nueva consulta de ventas, ejecuta get_sales aunque exista un resultado histórico con los mismos filtros; reutiliza los identificadores y filtros resueltos, no una muestra ni una supuesta exportación antigua. Esto incluye preguntas equivalentes y cambios de filtros o desglose. Para un gráfico solicitado sobre un resultado completo, conserva las reglas específicas de gráficos;
+- distingue una consulta autónoma con sujeto y período propios («Ventas del rubro librería durante 2023, por mes») de un seguimiento aditivo («filtra también por librería»). La primera busca el rubro solicitado y consulta todos los locales del período indicado, sin heredar el local, rubro ni tipo de día anteriores. La segunda resuelve el rubro y conserva el local, período y desglose confirmados. La omisión de un filtro en los argumentos no significa por sí sola retirarlo;
 - una pendiente de regresión positiva o un aumento entre el primer y último período no demuestra crecimiento sostenido: revisa todas las variaciones consecutivas de esa métrica;
 - si alguna variación es negativa, no afirmes crecimiento sostenido ni aumentos en todos los períodos; describe las subidas y bajadas observadas;
 - no describas una serie como "incremento sostenido", "caída sostenida", "tendencia ascendente" o "tendencia descendente" si existen observaciones intermedias que contradigan esa dirección; si no existe una tendencia monotónica clara, limita el análisis a máximos, mínimos y variaciones observadas;
@@ -1610,9 +1611,21 @@ export const chatService = async ({ message, sessionId }) => {
   ];
 
   beginSearchSelectionTurn(sessionId,messages.at(-1).content[0].text);
+  // Resolver IDs and arguments here are protected, session-scoped metadata.
+  // The model needs this scope even after the originating tool call is trimmed.
+  const salesResolutionState = getSearchResolutions(sessionId);
+  const salesScopePrompt = "\nEstado de filtros de ventas de esta sesión (metadatos protegidos, no resultados): "
+    + JSON.stringify({
+      customers: salesResolutionState.domains.search_customers ?? null,
+      categories: salesResolutionState.domains.search_categories ?? null,
+      context: salesResolutionState.contexts.get_sales ?? null,
+    })
+    + "\nUsa este estado para los seguimientos aunque no exista la llamada original en el historial. "
+    + "Los dominios pending requieren búsqueda/selección; cleared no debe reactivarse sin petición explícita. "
+    + "Para una consulta autónoma usa su nuevo período y resuelve su rubro; para un seguimiento aditivo conserva el contexto confirmado.";
   const systemPrompt = getSystemPrompt({
     currentDate: getCurrentDateParaguay(),
-  }) + "\n" + chartsPrompt;
+  }) + "\n" + chartsPrompt + salesScopePrompt;
   const chartRequested = isChartRequest(message);
 
   let toolIterations = 0;

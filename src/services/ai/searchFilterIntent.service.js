@@ -3,6 +3,29 @@ const domain=word=>word.startsWith('local')?'search_customers':'search_categorie
 const removeVerbs=new Set(['quita','quitar','elimina','eliminar','retira','retirar','saca','sacar','desactiva','desactivar']);
 const verbs='quita|quitar|elimina|eliminar|retira|retirar|saca|sacar|desactiva|desactivar|anade|anadir|agrega|agregar|incluye|incluir|activa|activar|busca|buscar|cambia|cambiar|selecciona|seleccionar|filtra';
 
+// An explicit subject and complete period make this a new sales question.
+// Imperatives such as “filtra también por …” deliberately stay incremental.
+// Return text-derived scope, never infer removal from missing model arguments.
+export function getAutonomousCategorySalesIntent(message){
+ const match=/^(?:consulta (?:las )?)?ventas del rubro (.+?) (?:durante|en|para)(?: el ano)? ((?:19|20)\d{2})(?:,? por (mes|ano|dia|local|rubro))?[.!?]*$/.exec(normalize(message));
+ if(!match)return null;
+ return {search:match[1],dateFrom:`01/01/${match[2]}`,dateTo:`31/12/${match[2]}`,
+  ...(match[3]?{groupBy:[{mes:'month',ano:'year',dia:'day',local:'customer',rubro:'category'}[match[3]]]}:{})};
+}
+
+// Preserve an explicit sales period even when a lookup returns ambiguity and
+// the model has not yet proposed a consumer call to capture its arguments.
+export function getExplicitSalesRange(message){
+ const months=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+ const month=months.join('|');
+ const match=new RegExp(`^ventas\\b.+?\\bde (${month}) a (${month}) de ((?:19|20)\\d{2})(?:,? por (mes|ano|dia|local|rubro))?[.!?]*$`).exec(normalize(message));
+ if(!match)return null;
+ const from=months.indexOf(match[1])+1,to=months.indexOf(match[2])+1,year=Number(match[3]);if(from>to)return null;
+ const last=new Date(Date.UTC(year,to,0)).getUTCDate(),pad=n=>String(n).padStart(2,'0');
+ return {dateFrom:`01/${pad(from)}/${year}`,dateTo:`${last}/${pad(to)}/${year}`,
+  ...(match[4]?{groupBy:[{mes:'month',ano:'year',dia:'day',local:'customer',rubro:'category'}[match[4]]]}:{})};
+}
+
 // Match the whole instruction. Additional dates/groupings are not pure removals
 // and must not be discarded by this shortcut.
 export const isExclusiveLocalRemoval=message=>/^(?:ahora )?(?:todos los locales|(?:quita|quitar|elimina|eliminar|retira|retirar|saca|sacar|desactiva|desactivar) (?:el )?filtro de local)(?: (?:manteniendo|conservando) (?:el mismo periodo|los demas filtros))?$/.test(normalize(message).replace(/[.!?]+$/,''));
@@ -39,9 +62,12 @@ export function getSearchFilterActions(message){
 }
 
 export function isExplicitSearchRequest(message,search,input={}){
+ const autonomous=search==='search_categories'?getAutonomousCategorySalesIntent(message):null;
+ if(autonomous)return input.search==null||normalize(input.search)===autonomous.search;
  const text=normalize(message),action=getSearchFilterActions(message).filter(a=>a.search===search).at(-1);
  if(action)return action.action==='add';
  const query=normalize(input.search);
+ if(search==='search_categories'&&query&&/^filtra(?: tambien)? por (?:el rubro )?(.+?)[.!?]*$/.exec(text)?.[1]===query)return true;
  // A positive, directly named lookup also counts, including protected tokens.
  // Merely mentioning a former label (or asking not to use it) cannot revive it.
  const named=/^(?:ahora )?(?:busca|buscar|consulta|consultar|selecciona|seleccionar)\s+(?:(?:el|la|al)\s+)?(.+)$/.exec(text)?.[1];
