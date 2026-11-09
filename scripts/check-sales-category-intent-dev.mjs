@@ -60,8 +60,12 @@ try{
  const valid=await getValidOracleSession(sessionId);
  await withOracleProxySession(sessionId,async({connection})=>{const r=(await connection.execute("SELECT USER U,SYS_CONTEXT('USERENV','PROXY_USER') P FROM DUAL",{},{outFormat:4002})).rows[0];check(String(r.U).toUpperCase()===valid.username&&Boolean(r.P),'PROXY_IDENTITY_MATCHES_SESSION');});
  const categories=await query("SELECT COD_RUBRO R FROM VW_BOT_RUBROS_LOCALES WHERE REGEXP_REPLACE(TRANSLATE(UPPER(DESCRIPCION),'ÁÉÍÓÚÜÑ','AEIOUUN'),'[^A-Z0-9]','')='LIBRERIA'");
- const customers=await query("SELECT C.COD_CLIENTE C FROM VW_BOT_CLIENTES C WHERE UPPER(TRIM(C.NOMBRE_FANTASIA))='NIKE' AND EXISTS(SELECT 1 FROM VW_BOT_CONTRATOS_LOCALES L WHERE L.COD_CLIENTE=C.COD_CLIENTE AND L.TIP_CONTRATO='CNT' AND L.ESTADO='A')");
- check(categories.length===1&&customers.length===1,'INDEPENDENT_UNIQUE_REQUESTED_CATALOG_IDENTITIES');const r=String(categories[0].R),c=String(customers[0].C);
+ // Match the requested brand independently, allowing catalog punctuation and
+ // suffixes. An exact match outranks partial matches; never choose among peers.
+ const customers=await query("SELECT C.COD_CLIENTE C,CASE WHEN REGEXP_REPLACE(UPPER(C.NOMBRE_FANTASIA),'[^A-Z0-9]','')='NIKE' THEN 1 ELSE 0 END E FROM VW_BOT_CLIENTES C WHERE INSTR(REGEXP_REPLACE(UPPER(C.NOMBRE_FANTASIA),'[^A-Z0-9]',''),'NIKE')>0 AND EXISTS(SELECT 1 FROM VW_BOT_CONTRATOS_LOCALES L WHERE L.COD_CLIENTE=C.COD_CLIENTE AND L.TIP_CONTRATO='CNT' AND L.ESTADO='A')");
+ const exact=customers.filter(row=>row.E===1),eligible=exact.length?exact:customers;
+ report.catalog={categoryExactMatches:categories.length,customerExactMatches:exact.length,customerPartialMatches:customers.length,eligibleCustomerMatches:eligible.length};
+ check(categories.length===1&&eligible.length===1,'INDEPENDENT_UNIQUE_REQUESTED_CATALOG_IDENTITIES');const r=String(categories[0].R),c=String(eligible[0].C);
  store.clearConversation(sessionId);
  const first=await turn('¿Cuánto vendieron los locales de enero a mayo de 2023, por mes?');await verify(first,{dateFrom:'01/01/2023',dateTo:'31/05/2023'},'ALL_LOCALS');
  const nike=await turn('Ventas de Nike de enero a abril de 2023');await verify(nike,{dateFrom:'01/01/2023',dateTo:'30/04/2023',customerIds:[c]},'NIKE');

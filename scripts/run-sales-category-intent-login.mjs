@@ -33,12 +33,13 @@ try{
  report.phase='FOCUSED_NODE22';const version=dock('exec',bot,'node','--version').trim();if(!/^v22\./.test(version))throw Error('NODE22_REQUIRED');
  const cachedPath=resolve(root,'logs/sales-category-intent-preflight.json');
  const cached=existsSync(cachedPath)?JSON.parse(readFileSync(cachedPath,'utf8')):null;
- if(cached?.success&&cached.commit===commit&&cached.focused?.tests===64&&cached.focused.passed===64&&cached.focused.node===version)report.focused={...cached.focused,reused:true};
+ const sameTestedSource=cached?.success&&/^[a-f0-9]{40}$/.test(cached.commit??'')&&!git('diff',cached.commit,commit,'--','src','test','config.js','package.json','package-lock.json').trim();
+ if(sameTestedSource&&cached.focused?.tests===64&&cached.focused.passed===64&&cached.focused.node===version)report.focused={...cached.focused,commit:cached.focused.commit??cached.commit,reused:true};
  else{
   const tests=['salesAutonomousCategory','salesCategoryIntentChat','salesLocalRemoval','librarySalesContext','searchResolutionState','searchFilterLifecycle','searchSelection','searchResolutionStateHttp','searchFilterLifecycleHttp'];
   const out=dock('exec','-w',candidate,bot,'node','--test',...tests.map(t=>'test/'+t+'.test.js'));
   if(!/pass 64\b/.test(out)||!/fail 0\b/.test(out))throw Error('FOCUSED_TESTS_FAILED');
-  report.focused={node:version,tests:64,passed:64,outputSha256:hash(out)};
+  report.focused={commit,node:version,tests:64,passed:64,outputSha256:hash(out)};
  }
  report.phase='MODULE_PREFLIGHT';const pre=JSON.parse(dock('exec',bot,'node','--experimental-vm-modules',candidate+'/scripts/check-sales-category-intent-dev.mjs',commit,'--preflight'));if(!pre.success)throw Error();
  if(process.argv.includes('--preflight')){report.success=true;report.phase='PREFLIGHT_COMPLETE';}

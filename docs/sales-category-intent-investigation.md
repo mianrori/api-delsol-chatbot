@@ -41,11 +41,20 @@ Verifica argumentos completos, SQL/binds, estado final e inmutabilidad. Añade
 selección ambigua con rubro/tipo de día antiguos y propuestas contradictorias.
 Los datos son sintéticos; no se atribuyen a Oracle ni a un modelo real.
 
-**64/64 pruebas enfocadas aprobadas localmente en Node 24.21.0**:
+**64/64 pruebas enfocadas aprobadas en Node 22.23.4 del DEV aislado**
+en `4b3d2f1cce528e21b6dd4ed8fa9c5536112e1761`, con 271 archivos de código,
+pruebas y ejecutores verificados contra Git. SHA-256 de la salida enfocada:
+`03bbed791c53a2d384cf5610a98cf1b9edb90a6fb44b62c4aeab99e71c4ded57`.
+Se verificaron:
 `salesAutonomousCategory`, `salesCategoryIntentChat`, `salesLocalRemoval`, `librarySalesContext`,
 `searchResolutionState`, `searchFilterLifecycle`, `searchSelection`,
 `searchResolutionStateHttp`, `searchFilterLifecycleHttp`.
 No se ejecutó la suite completa.
+
+El flujo completo `salesCategoryIntentChat` comprueba las dos intenciones y
+el estado protegido que recibe el modelo después del recorte. El prompt
+incluye únicamente las resoluciones y argumentos protegidos de ventas de
+esa sesión, nunca filas de negocio ni identidad Oracle.
 
 El ejecutor `scripts/run-sales-category-intent-dev.ps1` reutiliza el transporte
 de login DEV protegido existente, ahora versionado como
@@ -80,3 +89,17 @@ del helper y publica solo conteos y reconocimiento del esquema sanitizado.
 **Contraste real pendiente de ejecución y revisión del reporte sanitizado.**
 Los reportes de PR #42 son históricos y no acreditan esta nueva intención.
 Se mantienen las reservas anteriores de la matriz, sin merge ni despliegue.
+
+Primer intento DEV en `4b3d2f1`, 09/11/2026, 12:00:51–12:01:55 (Asunción):
+login, identidad proxy, cierres y logout aprobados; el control se detuvo en la
+precondición de catálogo literal. **Cero llamadas al modelo**, sin evidencia
+nueva sobre la intención. Logs del intervalo completo: chatbot cero líneas,
+ERP dos, ambas reconocidas por el esquema sanitizado. Reporte congelado
+ignorado `sales-category-intent-catalog-precondition-4b3d2f1.json`, SHA-256
+`174411e4cfad47edb68a1526618792ee06144e2a65e36890e8b9f60973ea9214`.
+El ejecutor ahora considera puntuación/sufijos legítimos del nombre comercial,
+prioriza coincidencia exacta normalizada y exige un único candidato elegible;
+no elige arbitrariamente ni cambia datos para obtenerlo. Los conteos de
+catálogo se incluyen en el reporte sanitizado siguiente.
+
+PR [#43](https://github.com/mianrori/api-delsol-chatbot/pull/43) en borrador.

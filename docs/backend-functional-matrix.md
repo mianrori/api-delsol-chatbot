@@ -579,7 +579,11 @@ Base `92c1ff0`, rama `fix/sales-autonomous-category-intent`.
 | Nuevo rubro ambiguo → selección, con rubro/tipo de día anteriores | No reaparecen local/rubro/tipo de día anteriores; contexto nuevo conservado | Regresión antes y después del recorte aprobada |
 | Modelo real y Oracle independiente, cuatro ramas | Argumentos/SQL, todos los grupos/importes/monedas, estado, proxy, cierres y logout | Pendiente de ejecución y revisión del reporte sanitizado; ejecutor protegido preparado |
 
-64/64 pruebas enfocadas locales Node 24.21.0. La evidencia previa de PR #42
+64/64 pruebas enfocadas Node 22.23.4 DEV en `4b3d2f1`, 271 archivos
+verificados; hash de salida en la investigación. Primer login real aprobado,
+pero detenido en precondición literal de catálogo, cero llamadas al modelo;
+no acredita intención. Ejecutor ajustado y contraste pendiente. PR #43 en
+borrador. La evidencia previa de PR #42
 se conserva con sus límites; no acredita esta intención nueva. Las reservas
 históricas, muestras no disponibles y proveedor real pendiente siguen vigentes.
 Sin suite completa, cambios de datos/permisos/expiraciones, merge o despliegue.
