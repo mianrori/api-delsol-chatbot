@@ -1,6 +1,7 @@
 import {getSearchFilterActions,isExplicitSearchRequest,getSalesLocalRemovalChange,getAutonomousCategorySalesIntent,getExplicitSalesRange} from './searchFilterIntent.service.js';
 import {getSearchResolutions,setSearchResolutions,getSearchSelectionTurn,setSearchSelectionTurn} from '../../state/conversation.store.js';
 import {getSalesMetricIntent,defaultSalesMetrics} from './salesMetrics.service.js';
+import {getMonthlySalesComparisonIntent} from './salesComparisonIntent.service.js';
 const specs={
  search_customers:{consumers:['get_sales','get_sales_per_sqm','analyze_members','get_member_purchases','get_member_promo_purchases','compare_member_purchases_vs_sales','analyze_campaign_sales_performance','get_contract_conditions','get_contract_cost_per_sqm','analyze_contract_cost_incidence'],fields:o=>({customerIds:[o.codCliente],customerId:o.codCliente})},
  search_categories:{consumers:['get_sales','get_sales_per_sqm','analyze_members','get_member_purchases','get_member_promo_purchases','get_soles_usage','compare_member_purchases_vs_sales','analyze_campaign_sales_performance'],fields:o=>({categoryIds:[o.codRubro]})},
@@ -32,6 +33,19 @@ const lookupShape=(name,result)=>{
 // Applied once to the protected user message, never by replaying bounded history.
 export function beginSearchSelectionTurn(sessionId,message){
  const state=getSearchResolutions(sessionId),turn={selectedThisTurn:[],validLookups:[],capturedConsumers:[],requestedDomains:[],salesLocalRemovalChange:getSalesLocalRemovalChange(message)};let changed=false;
+ const comparison=getMonthlySalesComparisonIntent(message,state);
+ if(comparison?.autonomous){
+  delete state.salesMetrics;
+  state.domains.search_customers={kind:'cleared'};
+  state.domains.search_categories=comparison.search?{kind:'pending',result:{options:[]}}:{kind:'cleared'};
+  state.contexts.get_sales=structuredClone(comparison.inputs[0]);
+  delete state.choiceFocus;
+  if(comparison.search)turn.requestedDomains.push('search_categories');
+  state.salesComparison={...structuredClone(comparison),pending:Boolean(comparison.search)};changed=true;
+ }else if(state.salesComparison?.pending&&!/^(?:(?:la )?(?:opci[oó]n|n[uú]mero)\s*)?\d+[.!]?$/.test(String(message).trim())){
+  delete state.salesComparison;changed=true;
+ }
+ turn.salesComparison=comparison;
  turn.autonomousCategorySales=getAutonomousCategorySalesIntent(message);
  if(turn.autonomousCategorySales){
   delete state.salesMetrics;
@@ -66,6 +80,7 @@ export function beginSearchSelectionTurn(sessionId,message){
   if(selected){state.domains[name]={...s,kind:'selected',selected};turn.selectedThisTurn.push(name);changed=true;}
  }
  turn.selectionRejected=Boolean(choice)&&turn.selectedThisTurn.length===0&&(!state.choiceFocus||persistentSearches.includes(state.choiceFocus));
+ if(choice&&turn.selectedThisTurn.includes('search_categories')&&state.salesComparison?.pending)turn.salesComparison={...structuredClone(state.salesComparison),autonomous:false};
  if(changed)setSearchResolutions(sessionId,state);
  setSearchSelectionTurn(sessionId,turn);
 }
@@ -181,7 +196,9 @@ export function preserveSearchSelection({name,input,history=[],currentCalls=[],r
  // grouping or previously absent keys. The successful context survives trimming.
  const autonomous=name==='get_sales'?selectionTurn.autonomousCategorySales:null;
  let result;
- if(autonomous){
+ if(name==='get_sales'&&selectionTurn.salesComparison){
+  result={...input};
+ }else if(autonomous){
   result={...input,dateFrom:autonomous.dateFrom,dateTo:autonomous.dateTo,...(autonomous.groupBy?{groupBy:autonomous.groupBy}:{})};
   delete result.dayType;
  }else if(removalChange)result={...structuredClone(original),...removalChange};
