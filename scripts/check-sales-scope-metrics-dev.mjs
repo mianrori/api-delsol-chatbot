@@ -135,6 +135,7 @@ try{
   crop();const result=await turn(message);await verify(result,{dateFrom:'01/01/2023',dateTo:'31/12/2023',categoryIds:[r],metrics},label);
  }
  const profile=profiles[0];store.setSearchResolutions(sessionId,profile.state);store.setConversation(sessionId,profile.history);crop();
+ const beforeRemoval=await turn('Filtra tambi\u00e9n por librer\u00eda');await verify(beforeRemoval,{dateFrom:'01/01/2023',dateTo:'30/04/2023',customerIds:[profile.c],categoryIds:[r]},'REMOVAL_PRECONDITION_CONFIRMS_LOCAL_CATEGORY_PERIOD');
  const removed=await turn('Todos los locales');await verify(removed,{dateFrom:'01/01/2023',dateTo:'30/04/2023',categoryIds:[r]},'EXPLICIT_LOCAL_REMOVAL_KEEPS_CATEGORY_PERIOD_GROUP');
  const alternate=await query("SELECT C.COD_RUBRO R,C.DESCRIPCION N FROM VW_BOT_RUBROS_LOCALES C WHERE C.COD_RUBRO<>:r AND NOT EXISTS(SELECT 1 FROM VW_BOT_RUBROS_LOCALES X WHERE UPPER(TRIM(X.DESCRIPCION))=UPPER(TRIM(C.DESCRIPCION)) AND X.COD_RUBRO<>C.COD_RUBRO) ORDER BY C.COD_RUBRO FETCH FIRST 1 ROWS ONLY",{r});
  check(alternate.length===1,'ALTERNATE_LEGITIMATE_CATEGORY_AVAILABLE');alternateCategoryId=String(alternate[0].R);alternateCategoryName=alternate[0].N;crop();
