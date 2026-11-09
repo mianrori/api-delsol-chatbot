@@ -11,6 +11,7 @@ const {executeTool}=await app('src/services/ai/toolExecutor.service.js');
 const store=await app('src/state/conversation.store.js');
 const {trimConversation}=await app('src/services/ai/conversation.service.js');
 const {restorePiiDeep}=await app('src/services/ai/pii.service.js');
+const {beginSearchSelectionTurn}=await app('src/services/ai/searchSelection.service.js');
 const {runWithRequestSignal}=await app('src/services/requestContext.service.js');
 const {default:driver}=await import('oracledb');
 const sdk=await import('@aws-sdk/client-bedrock-runtime');
@@ -29,17 +30,17 @@ const query=(sql,binds={})=>withOracleProxySession(sessionId,async({connection})
 });
 const context=vm.createContext({console,process,structuredClone,Intl,Date,Map,Set,Number,String,Array,JSON,Math,RegExp,Object,Boolean,Error,AbortController});
 const synthetic=exports=>new vm.SyntheticModule(Object.keys(exports),function(){for(const[k,v]of Object.entries(exports))this.setExport(k,v);},{context});
-const wrapped={...sdk,BedrockRuntimeClient:class extends sdk.BedrockRuntimeClient{async send(...args){modelCalls++;if(++turnCalls>6||modelCalls>40)throw Error('MODEL_LIMIT');return super.send(...args);}}};
+const wrapped={...sdk,BedrockRuntimeClient:class extends sdk.BedrockRuntimeClient{async send(...args){modelCalls++;if(++turnCalls>6||modelCalls>80)throw Error('MODEL_LIMIT');return super.send(...args);}}};
 const url=new URL('src/services/ai/chat.service.js',root),chat=new vm.SourceTextModule(await readFile(url,'utf8'),{context});
 await chat.link(async spec=>synthetic(spec==='@aws-sdk/client-bedrock-runtime'?wrapped:spec==='./toolExecutor.service.js'?{executeTool:async request=>{
  if(!['search_customers','search_categories','get_sales'].includes(request.name))throw Error('TOOL_OUT_OF_SCOPE');
  active=true;try{const result=await executeTool(request);captured.push({name:request.name,args:structuredClone(request.arguments),result});return result;}finally{active=false;}
 }}:await import(spec.startsWith('.')?new URL(spec,url).href:spec.startsWith('node:')?spec:new URL('file://'+createRequire(url).resolve(spec)).href)));
 await chat.evaluate();
-async function turn(message){
+async function turn(message,{allowPending=false}={}){
  captured=[];statements=[];turnCalls=0;const abort=new AbortController();timer=setTimeout(()=>abort.abort(),120000);
  try{await runWithRequestSignal(abort.signal,()=>chat.namespace.chatService({sessionId,message}));}finally{clearTimeout(timer);timer=null;}
- const sales=captured.filter(c=>c.name==='get_sales');check(sales.length===1,'ONE_FRESH_SALES_QUERY_PER_TURN');return sales[0];
+ const sales=captured.filter(c=>c.name==='get_sales');check(sales.length===1||allowPending&&sales.length===0,'FRESH_SALES_QUERY_OR_EXPLICIT_PENDING_LOOKUP');return sales[0];
 }
 async function verify(sales,expected,label){
  const a=sales.args;check(a.dateFrom===expected.dateFrom&&a.dateTo===expected.dateTo&&same(a.groupBy,['month'])&&!a.dayType&&same(a.customerIds??[],expected.customerIds??[])&&same(a.categoryIds??[],expected.categoryIds??[]),label+'_FINAL_ARGUMENTS');
@@ -65,16 +66,39 @@ try{
  const customers=await query("SELECT C.COD_CLIENTE C,CASE WHEN REGEXP_REPLACE(UPPER(C.NOMBRE_FANTASIA),'[^A-Z0-9]','')='NIKE' THEN 1 ELSE 0 END E FROM VW_BOT_CLIENTES C WHERE INSTR(REGEXP_REPLACE(UPPER(C.NOMBRE_FANTASIA),'[^A-Z0-9]',''),'NIKE')>0 AND EXISTS(SELECT 1 FROM VW_BOT_CONTRATOS_LOCALES L WHERE L.COD_CLIENTE=C.COD_CLIENTE AND L.TIP_CONTRATO='CNT' AND L.ESTADO='A')");
  const exact=customers.filter(row=>row.E===1),eligible=exact.length?exact:customers;
  report.catalog={categoryExactMatches:categories.length,customerExactMatches:exact.length,customerPartialMatches:customers.length,eligibleCustomerMatches:eligible.length};
- check(categories.length===1&&eligible.length===1,'INDEPENDENT_UNIQUE_REQUESTED_CATALOG_IDENTITIES');const r=String(categories[0].R),c=String(eligible[0].C);
+ check(categories.length===1&&eligible.length>=1&&eligible.length<=5,'INDEPENDENT_REQUESTED_CATALOG_COHORTS');const r=String(categories[0].R),customerIds=new Set(eligible.map(row=>String(row.C)));
  store.clearConversation(sessionId);
  const first=await turn('¿Cuánto vendieron los locales de enero a mayo de 2023, por mes?');await verify(first,{dateFrom:'01/01/2023',dateTo:'31/05/2023'},'ALL_LOCALS');
- const nike=await turn('Ventas de Nike de enero a abril de 2023');await verify(nike,{dateFrom:'01/01/2023',dateTo:'30/04/2023',customerIds:[c]},'NIKE');
- const history=structuredClone(store.getConversation(sessionId)),state=store.getSearchResolutions(sessionId);
- for(const trimmed of [false,true])for(const autonomous of [true,false]){
+ const nikeQuestion='Ventas de Nike de enero a abril de 2023',nike=await turn(nikeQuestion,{allowPending:true});
+ const profiles=[];
+ const saveProfile=c=>profiles.push({c,history:structuredClone(store.getConversation(sessionId)),state:store.getSearchResolutions(sessionId)});
+ if(nike){
+  check(nike.args.customerIds?.length===1&&customerIds.has(String(nike.args.customerIds[0])),'NIKE_RESOLUTION_BELONGS_TO_INDEPENDENT_CATALOG');
+  await verify(nike,{dateFrom:'01/01/2023',dateTo:'30/04/2023',customerIds:nike.args.customerIds},'NIKE');saveProfile(nike.args.customerIds[0]);
+ }else{
+  const pendingState=store.getSearchResolutions(sessionId),pendingHistory=structuredClone(store.getConversation(sessionId));
+  const pending=restorePiiDeep(sessionId,pendingState.domains.search_customers);
+  const matchedOptions=(pending?.result?.options??[]).filter(o=>customerIds.has(String(o.codCliente)));
+  report.catalog.resolverOptions=pending?.result?.options?.length??0;report.catalog.independentlyMatchedOptions=matchedOptions.length;
+  check(pending?.kind==='pending'&&matchedOptions.length===customerIds.size&&new Set(matchedOptions.map(o=>String(o.codCliente))).size===customerIds.size,'NIKE_AMBIGUITY_CONTAINS_ENTIRE_INDEPENDENT_COHORT');
+  report.catalogSelection='controlled numeric selection of every independently matched Nike candidate; original sales questions use real Bedrock; selected-Nike profiles include a repeated explicit Nike question after selection';
+  const literalThird=await turn('Ventas del rubro librería durante 2023, por mes');await verify(literalThird,{dateFrom:'01/01/2023',dateTo:'31/12/2023',categoryIds:[r]},'LITERAL_THIRD_AFTER_PENDING_NIKE');
+  check(store.getSearchResolutions(sessionId).domains.search_customers.kind==='cleared','LITERAL_THIRD_CLEARS_PENDING_NIKE');
+  for(const option of matchedOptions){
+   store.setSearchResolutions(sessionId,pendingState);store.setConversation(sessionId,structuredClone(pendingHistory));
+   const choice=String(option.optionId??option.option);beginSearchSelectionTurn(sessionId,choice);
+   check(String(restorePiiDeep(sessionId,store.getSearchResolutions(sessionId).domains.search_customers).selected?.codCliente)===String(option.codCliente),'CONTROLLED_CHOICE_SELECTS_ONLY_ITS_LEGITIMATE_NIKE');
+   // Explicitly repeat the requested period after the controlled catalog choice.
+   // No raw catalog label or guessed period is inserted into the model context.
+   const selected=await turn(nikeQuestion);await verify(selected,{dateFrom:'01/01/2023',dateTo:'30/04/2023',customerIds:[String(option.codCliente)]},'SELECTED_NIKE');saveProfile(String(option.codCliente));
+  }
+ }
+ report.selectedNikeProfiles=profiles.length;
+ for(const [profileIndex,{c,history,state}] of profiles.entries())for(const trimmed of [false,true])for(const autonomous of [true,false]){
   store.setSearchResolutions(sessionId,state);let messages=structuredClone(history);
   if(trimmed){for(let i=0;i<14;i++)messages=trimConversation([...messages,{role:'user',content:[{text:`Tema de control ${i}`}]},{role:'assistant',content:[{text:'Respuesta de control'}]}],10);check(!messages.some(m=>m.content?.some(b=>b.toolUse)),'ACTUAL_TRIM_EVICTS_PRIOR_TOOL_CALLS');}
   store.setConversation(sessionId,messages);
-  const label=(autonomous?'AUTONOMOUS':'ADDITIVE')+(trimmed?'_TRIMMED':'_FULL');
+  const label=`NIKE_PROFILE_${profileIndex+1}_`+(autonomous?'AUTONOMOUS':'ADDITIVE')+(trimmed?'_TRIMMED':'_FULL');
   const sales=await turn(autonomous?'Ventas del rubro librería durante 2023, por mes':'Filtra también por librería');
   await verify(sales,{dateFrom:'01/01/2023',dateTo:autonomous?'31/12/2023':'30/04/2023',categoryIds:[r],...(autonomous?{}:{customerIds:[c]})},label);
   const final=store.getSearchResolutions(sessionId);check(final.domains.search_customers.kind===(autonomous?'cleared':'selected')&&final.domains.search_categories.kind==='selected',label+'_RESOLUTION_STATE');

@@ -46,4 +46,3 @@ export async function logoutDev(sessionId,request=devRequest){
  const r=await request('erp','/delsolerp/api/auth/logout',{sessionId});
  if(r.status!==200||r.json?.env!=='development'||r.json?.success!==true)throw safeFailure('ERP_LOGOUT_FAILED');
 }
-
