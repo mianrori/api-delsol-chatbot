@@ -73,7 +73,8 @@ async function verify(sales,expected,label){
  check(same(sales.result.scope,expectedScope),label+'_SCOPE_NAMES_MATCH_INDEPENDENT_AUTHORIZED_IDS');
  const escaped=value=>String(value).replace(/([\\\x60*_[\]<>|])/g,'\\$1').replace(/[\r\n]+/g,' ');
  check([...expectedScope.customers.map(x=>x.customerName),...expectedScope.categories.map(x=>x.categoryName)].every(name=>lastAnswer.includes(escaped(name)))&&!/locales seleccionados|rubros seleccionados|\[PII_/.test(lastAnswer),label+'_PRESENTATION_USES_AUTHORIZED_NAMES_NO_STALE_PLACEHOLDERS');
- check((lastAnswer.includes('Ventas totales')===metrics.includes('totalAmount'))&&(lastAnswer.includes('Cantidad de facturas')===metrics.includes('totalInvoices')),label+'_PRESENTATION_HAS_ONLY_EFFECTIVE_METRIC_COLUMNS');
+ check(!rows.length||(lastAnswer.includes('Ventas totales')===metrics.includes('totalAmount'))&&(lastAnswer.includes('Cantidad de facturas')===metrics.includes('totalInvoices')),label+'_PRESENTATION_METRIC_COLUMNS_OR_EMPTY_RESULT');
+ report.positiveAmountAndInvoiceGroups=(report.positiveAmountAndInvoiceGroups??0)+rows.filter(row=>Number(row.totalAmount)>0&&Number(row.totalInvoices)>0).length;
  const state=store.getSearchResolutions(sessionId),persisted=restorePiiDeep(sessionId,state.contexts.get_sales);
  check(same(persisted,a),label+'_PERSISTENT_ARGUMENTS');
  check(opened===closed&&!closeErrors,label+'_CONNECTIONS_CLOSED');
@@ -139,7 +140,7 @@ try{
  check(alternate.length===1,'ALTERNATE_LEGITIMATE_CATEGORY_AVAILABLE');alternateCategoryId=String(alternate[0].R);alternateCategoryName=alternate[0].N;crop();
  const changed=await turn('Cambia el rubro');await verify(changed,{dateFrom:'01/01/2023',dateTo:'30/04/2023',categoryIds:[alternateCategoryId]},'CATEGORY_CHANGE_REPLACES_ONLY_ITS_AUTHORIZED_LABEL');
  const cleared=await turn('Todos los rubros');await verify(cleared,{dateFrom:'01/01/2023',dateTo:'30/04/2023'},'CATEGORY_REMOVAL_HAS_NO_OLD_CATEGORY_LABEL');
- check(external===0,'NO_REAL_MODEL_OR_PROVIDER_HTTP_CALL');report.success=true;
+ check(report.positiveAmountAndInvoiceGroups>0,'POSITIVE_AMOUNT_AND_INVOICE_GROUPS_RECONCILED');check(external===0,'NO_REAL_MODEL_OR_PROVIDER_HTTP_CALL');report.success=true;
 }catch(e){report.error={code:/^(?:ORA-\d{5}|NJS-\d{3}|DPI-\d{4}|SEARCH_[A-Z_]+)$/.test(e?.code??'')?e.code:'SALES_CATEGORY_CONTROL_FAILED'};}
 finally{globalThis.fetch=nativeFetch;if(timer)clearTimeout(timer);if(sessionId)store.clearConversation(sessionId);sessionId=null;report.connectionsClosed=opened===closed&&!closeErrors;if(!report.connectionsClosed)report.success=false;}
 report.controlledModelCalls=modelCalls;report.realModelCalls=0;report.providerCalls=external;report.finishedAt=new Date().toISOString();emit(JSON.stringify(report));process.exitCode=report.success?0:1;
