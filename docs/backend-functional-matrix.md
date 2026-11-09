@@ -631,3 +631,29 @@ consultas Oracle, Bedrock o proveedor. Las 82 pruebas de `3d31d63` y los 260
 controles de `43d7292` se mantienen como evidencia previa, no cubren el P2 ni se
 repitieron. Reservas conservadas; PR #44 en borrador hasta revisión de la
 corrección. Sin merge, despliegue o cambios de datos/permisos/expiraciones.
+
+### Comparaciones mensuales autónomas y seguimiento explícito
+
+| Caso | Resultado y evidencia nueva | Límite |
+| --- | --- | --- |
+| «Compara las ventas mensuales del rubro ropa femenina de 2022 con las de 2023» | Resuelve el catálogo autorizado y ejecuta ambos años completos por mes con importe y facturas. Oracle independiente confirma una coincidencia exacta, RESOLVED. Alcance por nombres asociados a IDs efectivos. | Ambigüedad, rubro no encontrado y rubro resuelto sin filas tienen regresiones sintéticas; no fueron los estados observados del rubro real. |
+| Misma comparación sin local ni rubro | Todos los locales y rubros, sin pedir filtro adicional ni heredar los anteriores, también tras recorte. Argumentos, SQL, estado y presentación conciliados con Oracle. | Intención anclada a las frases documentadas y gramática anual existente; no exhaustividad lingüística. |
+| «Compara ese mismo rubro con 2022» | Conserva filtros, ventana de meses y preferencia de métricas; agrupa por mes. Regresiones con local/rubro/tipo de día y métrica única antes/después del recorte. | Los dos perfiles Oracle del seguimiento parten del rubro resuelto sin local; conservación de local/tipo de día/métrica única verificada sintéticamente. |
+| Mes sin registros frente a cero | Ausencia de filas se muestra como «Sin registros», nunca cero ni comparación inventada. | Ausencia observada con Oracle; valor cero real solo en fixtures sintéticos de esta entrega. |
+| Modelo real y ruta del producto | Dos sondas Bedrock iniciales sin stubs: búsqueda del rubro y consulta general. Rutas literales deterministas verificadas contra Oracle independiente. | No se presenta como conversación HTTP ni como ciclo completo remoto de ambas consultas anuales. |
+
+**44/44 pruebas afectadas Node 22.23.4 en `4a8ead7`**, incluidas 16 regresiones
+nuevas; **227/227 aserciones DEV en `0d1f799`**, con 288 archivos verificados,
+cierres/logout y logs sanitizados aprobados. `d11d0bd` y `0d1f799` solo corrigen el
+ ejecutor; aplicación y pruebas idénticas al commit probado. Reporte SHA-256
+`f95d4948ed0db574a2420b44123cf8ab3e7cf61eb22eb59d6d154946bf1dcb9e`.
+El primer wrapper `d11d0bd` descartó el reporte por nombre de suite y no acredita
+resultados; solo se conserva su logout. Detalles y hashes en
+[sales-monthly-comparison-investigation.md](sales-monthly-comparison-investigation.md).
+
+La evidencia de PR #44 sigue siendo previa y no se presenta como cobertura de
+esta corrección. Las seis reservas F3/F4/M7, F5/T1, las muestras pendientes y los
+límites del balance se conservan. Docker DEV sigue en `7d29892`, sin reconstruir
+ni sustituir `/app`; PR en borrador, sin merge, despliegue o cambios de datos,
+permisos o expiraciones. Los commits posteriores a `0d1f799` de esta entrega son
+documentales.
