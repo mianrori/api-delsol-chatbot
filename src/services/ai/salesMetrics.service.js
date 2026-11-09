@@ -3,8 +3,11 @@ export const defaultSalesMetrics=['totalAmount','totalInvoices'];
 
 export function getSalesMetricIntent(message){
  const text=normalize(message);
- if(/\b(?:ambas (?:las )?metricas|las dos metricas|no (?:(?:muestres|mostrar|quiero) )?(?:solo|solamente|unicamente))\b/.test(text))return [...defaultSalesMetrics];
  const amount='(?:importe|monto|ventas totales)(?: total)?',invoices='(?:(?:cantidad|numero) de )?facturas';
+ // "No solo" can expand a period or filter. Only a directly named metric
+ // authorizes changing the persistent metric preference.
+ const notOnlyMetric=new RegExp(`\\bno (?:(?:muestres|mostrar|quiero) )?(?:solo|solamente|unicamente) (?:el |la |las )?(?:${amount}|${invoices})\\b`);
+ if(/\b(?:ambas (?:las )?metricas|las dos metricas)\b/.test(text)||notOnlyMetric.test(text))return [...defaultSalesMetrics];
  if(new RegExp(`\\b${amount}\\s+(?:y|e)\\s+(?:la )?${invoices}\\b|\\b${invoices}\\s+y\\s+(?:el )?${amount}\\b`).test(text))return [...defaultSalesMetrics];
  const only='\\b(?:solo|solamente|unicamente) (?:mostrar |muestra |el |la |las )?';
  if(new RegExp(only+amount+'\\b').test(text)||new RegExp('\\bsin (?:la |las )?'+invoices+'\\b').test(text))return ['totalAmount'];
