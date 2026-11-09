@@ -1,5 +1,11 @@
 # Librería 2023: diagnóstico de filtros y alcance de la respuesta
 
+Actualización 09/11/2026: el tratamiento de la pregunta autónoma frente al
+seguimiento aditivo se corrige por separado en
+[sales-category-intent-investigation.md](sales-category-intent-investigation.md).
+Las ejecuciones y conclusiones siguientes describen PR #42; no acreditan
+esa nueva corrección de intención.
+
 Base `059ac13`, rama `fix/library-category-sales-2023`. Sin merge ni despliegue.
 Pregunta: **Ventas del rubro librería durante 2023, por mes**.
 

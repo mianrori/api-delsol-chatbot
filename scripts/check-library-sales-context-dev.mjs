@@ -38,7 +38,7 @@ try{
  const count=await query("SELECT COUNT(*) N FROM VW_BOT_VENTAS_LOCALES WHERE COD_RUBRO=:r AND COD_CLIENTE=:c AND FECHA>=DATE '2023-01-01' AND FECHA<DATE '2024-01-01'",{r,c});check(Number(count[0].N)===0,'INDEPENDENT_COMBINED_FILTERS_HAVE_NO_RECORDS');
  const args={categoryIds:[r],dateFrom:'01/01/2023',dateTo:'31/12/2023',groupBy:['month'],metrics:'totalAmount'};clearConversation(sessionId);
  recordSearchToolResult(sessionId,'search_customers',{},protectPiiDeep(sessionId,{status:'RESOLVED',customer:{codCliente:c}}));recordSearchToolResult(sessionId,'search_categories',{},protectPiiDeep(sessionId,{status:'RESOLVED',category:{codRubro:r}}));recordSearchToolResult(sessionId,'get_sales',protectPiiDeep(sessionId,{...args,customerIds:[c]}),{data:[]});
- next=args;const first=await chat.namespace.chatService({sessionId,message:'Ventas del rubro librería durante 2023, por mes'});
+ next=args;const first=await chat.namespace.chatService({sessionId,message:'Filtra también por librería'});
  check(same(captured.args.customerIds,[c])&&same(captured.args.categoryIds,[r])&&captured.args.dateFrom===args.dateFrom&&captured.args.dateTo===args.dateTo&&same(captured.args.groupBy,['month']),'FINAL_FILTERS_RETAIN_LOCAL_CATEGORY_YEAR_MONTH');check(captured.result.data.length===0,'EMPTY_TOOL_RESULT_AGREES_WITH_ORACLE');
  check(/locales seleccionados; rubros seleccionados/.test(first.answer)&&/combina el local y el rubro/.test(first.answer)&&/no describe las ventas del rubro en todos los locales/.test(first.answer)&&/todos los locales/.test(first.answer),'EMPTY_PRESENTATION_EXPLAINS_SCOPE_AND_EXPLICIT_REMOVAL');
  check(statements.length===1&&/COD_CLIENTE\s+IN/i.test(statements[0].sql)&&/COD_RUBRO\s+IN/i.test(statements[0].sql),'EFFECTIVE_SQL_RETAINS_BOTH_FILTERS');

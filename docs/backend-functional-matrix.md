@@ -566,3 +566,20 @@ atribuida, aislamiento/denegación/cierre cubiertos en cada nuevo flujo, sin bug
 abiertos; variantes y muestras no disponibles registradas con límites explícitos.
 No se incluyen conexión del frontend al servicio, login ERP, cambios de permisos,
 expiraciones, sincronización de datos ni despliegues adicionales.
+
+## Ventas: consulta autónoma de rubro (09/11/2026)
+
+Base `92c1ff0`, rama `fix/sales-autonomous-category-intent`.
+[Diagnóstico, comandos y evidencia](sales-category-intent-investigation.md).
+
+| Variante afectada | Argumentos y estado esperados | Evidencia actual |
+| --- | --- | --- |
+| Enero–mayo global → Nike enero–abril → librería anual mensual | Sin Nike; librería resuelta; 2023 completo/mes; local retirado y contexto nuevo | Regresión antes y después del recorte real aprobada |
+| Mismos antecedentes → «filtra también por librería» | Conserva Nike/enero–abril/mes; añade librería; ambos dominios seleccionados | Regresión antes y después del recorte real aprobada |
+| Nuevo rubro ambiguo → selección, con rubro/tipo de día anteriores | No reaparecen local/rubro/tipo de día anteriores; contexto nuevo conservado | Regresión antes y después del recorte aprobada |
+| Modelo real y Oracle independiente, cuatro ramas | Argumentos/SQL, todos los grupos/importes/monedas, estado, proxy, cierres y logout | Pendiente de ejecución y revisión del reporte sanitizado; ejecutor protegido preparado |
+
+63/63 pruebas enfocadas locales Node 24.21.0. La evidencia previa de PR #42
+se conserva con sus límites; no acredita esta intención nueva. Las reservas
+históricas, muestras no disponibles y proveedor real pendiente siguen vigentes.
+Sin suite completa, cambios de datos/permisos/expiraciones, merge o despliegue.

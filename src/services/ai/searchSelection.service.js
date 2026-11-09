@@ -1,4 +1,4 @@
-import {getSearchFilterActions,isExplicitSearchRequest,getSalesLocalRemovalChange} from './searchFilterIntent.service.js';
+import {getSearchFilterActions,isExplicitSearchRequest,getSalesLocalRemovalChange,getAutonomousCategorySalesIntent} from './searchFilterIntent.service.js';
 import {getSearchResolutions,setSearchResolutions,getSearchSelectionTurn,setSearchSelectionTurn} from '../../state/conversation.store.js';
 const specs={
  search_customers:{consumers:['get_sales','get_sales_per_sqm','analyze_members','get_member_purchases','get_member_promo_purchases','compare_member_purchases_vs_sales','analyze_campaign_sales_performance','get_contract_conditions','get_contract_cost_per_sqm','analyze_contract_cost_incidence'],fields:o=>({customerIds:[o.codCliente],customerId:o.codCliente})},
@@ -31,6 +31,15 @@ const lookupShape=(name,result)=>{
 // Applied once to the protected user message, never by replaying bounded history.
 export function beginSearchSelectionTurn(sessionId,message){
  const state=getSearchResolutions(sessionId),turn={selectedThisTurn:[],validLookups:[],capturedConsumers:[],requestedDomains:[],salesLocalRemovalChange:getSalesLocalRemovalChange(message)};let changed=false;
+ turn.autonomousCategorySales=getAutonomousCategorySalesIntent(message);
+ if(turn.autonomousCategorySales){
+  state.domains.search_customers={kind:'cleared'};
+  state.domains.search_categories={kind:'pending',result:{options:[]}};
+  const {search,...scope}=turn.autonomousCategorySales;
+  state.contexts.get_sales=scope;
+  delete state.choiceFocus;
+  turn.requestedDomains.push('search_categories');changed=true;
+ }
  const normalized=String(message??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();
  const newLookup=/^(?:(?:realiza|haz) (?:una )?)?nueva busqueda\b|^busca (?:de nuevo|opciones)\b/.test(normalized);
  turn.allowLookup=Object.fromEntries(persistentSearches.map(name=>[name,isExplicitSearchRequest(message,name)||newLookup]));
@@ -79,7 +88,13 @@ export function captureSearchQueryContext(sessionId,name,input){
  const turn=getSearchSelectionTurn(sessionId);
  if(!turn.validLookups?.some(search=>specs[search].consumers.includes(name))||turn.capturedConsumers?.includes(name))return;
  const state=getSearchResolutions(sessionId);
- state.contexts[name]=structuredClone({...state.contexts[name],...input});setSearchResolutions(sessionId,state);
+ const autonomous=name==='get_sales'?turn.autonomousCategorySales:null;
+ const captured={...state.contexts[name],...input};
+ if(autonomous){
+  const {search,...scope}=autonomous;Object.assign(captured,scope);
+  delete captured.customerId;delete captured.customerIds;delete captured.dayType;
+ }
+ state.contexts[name]=structuredClone(captured);setSearchResolutions(sessionId,state);
  turn.capturedConsumers=[...(turn.capturedConsumers??[]),name];setSearchSelectionTurn(sessionId,turn);
 }
 
@@ -124,6 +139,7 @@ export function preserveSearchSelection({name,input,history=[],currentCalls=[],r
  for(const call of currentCalls)if(specs[call.name])update({...call,turn},call.result);
  if(persistent(name)){
   if(typeof input?.search!=='string'||Object.keys(input).some(key=>key!=='search'))throw Object.assign(Error('Los argumentos del buscador no son válidos.'),{code:'SEARCH_ARGUMENTS_INVALID'});
+  if(name==='search_categories'&&selectionTurn.autonomousCategorySales&&!isExplicitSearchRequest(currentText,name,input))fail();
   const state=states.get(name);
   if(state?.kind==='cleared'&&!selectionTurn.requestedDomains?.includes(name)&&!isExplicitSearchRequest(currentText,name,input))throw Object.assign(Error('El filtro fue retirado. Solicita volver a añadirlo antes de buscarlo.'),{code:'SEARCH_FILTER_REMOVED'});
   if(state&&!selectionTurn.allowLookup?.[name]&&!isExplicitSearchRequest(currentText,name,input))fail();
@@ -145,13 +161,24 @@ export function preserveSearchSelection({name,input,history=[],currentCalls=[],r
  const origins=new Set(resolutions.map(r=>r.state.originTurn));
  const origin=queries.filter(c=>c.name===name&&origins.has(c.turn)).sort((a,b)=>a.turn-b.turn)[0];
  const successful=queries.filter(c=>c.name===name&&c.turn<turn&&c.resultStatus==='success').at(-1);
- const original={...(successful?.input??{}),...((successful&&successful.turn>=(origin?.turn??-1)?successful:origin)?.input??{}),...(resolutionState?.contexts[name]??{})};
+ // Persisted sales context is a complete scope, including absent keys. Merging
+ // older history back into it would resurrect filters removed by a new query.
+ const original=name==='get_sales'&&resolutionState?.contexts[name]
+  ?structuredClone(resolutionState.contexts[name])
+  :{...(successful?.input??{}),...((successful&&successful.turn>=(origin?.turn??-1)?successful:origin)?.input??{}),...(resolutionState?.contexts[name]??{})};
  const selectingNow=Boolean(selection(currentText))&&resolutions.some(r=>r.state.selectedTurn===turn||persistent(r.search)&&selectionTurn.selectedThisTurn?.includes(r.search));
  const removalChange=name==='get_sales'?(selectionTurn.salesLocalRemovalChange??getSalesLocalRemovalChange(currentText)):null;
  if(removalChange&&!(original.dateFrom&&original.dateTo)&&!(removalChange.dateFrom&&removalChange.dateTo))throw Object.assign(Error('No hay una consulta anterior con período confirmado. Indica el período para consultar todos los locales.'),{code:'SEARCH_QUERY_CONTEXT_REQUIRED'});
  // A pure removal changes one domain, not arbitrary proposed dates, metrics,
  // grouping or previously absent keys. The successful context survives trimming.
- const result=removalChange?{...structuredClone(original),...removalChange}:selectingNow?{...input,...original}:{...original,...input};
+ const autonomous=name==='get_sales'?selectionTurn.autonomousCategorySales:null;
+ let result;
+ if(autonomous){
+  result={...input,dateFrom:autonomous.dateFrom,dateTo:autonomous.dateTo,...(autonomous.groupBy?{groupBy:autonomous.groupBy}:{})};
+  delete result.dayType;
+ }else if(removalChange)result={...structuredClone(original),...removalChange};
+ else if(selectingNow)result=name==='get_sales'&&resolutionState?.contexts[name]?structuredClone(original):{...input,...original};
+ else result={...original,...input};
  const identifiers={};
  // A confirmed lookup may have left the bounded history, while its executed
  // arguments remain. Those IDs still outrank an unsolicited model proposal.

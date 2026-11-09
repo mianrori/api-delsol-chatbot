@@ -4,7 +4,7 @@ import {beginSearchSelectionTurn,recordSearchToolResult,preserveSearchSelection}
 import {getSearchResolutions,getSearchSelectionTurn,clearConversation} from '../src/state/conversation.store.js';
 import {getSales} from '../src/services/sales/sales.service.js';
 import {buildSalesSeriesResponse} from '../src/services/ai/salesSeriesPresentation.service.js';
-const question='Ventas del rubro librería durante 2023, por mes';
+const question='Filtra también por librería';
 const original={customerIds:['SYNTHETIC-LOCAL'],categoryIds:['SYNTHETIC-LIBRARY'],dateFrom:'01/01/2023',dateTo:'31/12/2023',groupBy:['month'],metrics:['totalAmount']};
 const guard=(session,input,history=[])=>preserveSearchSelection({name:'get_sales',input,history,resolutionState:getSearchResolutions(session),selectionTurn:getSearchSelectionTurn(session)});
 const seed=session=>{
