@@ -58,7 +58,66 @@ Nike legítimos, ambos modos de intención y recorte, métricas únicas/restaura
 cambio de rubro y retirada de filtros. Los nombres, IDs, binds y resultados no se
 publican en el reporte. Los logs se revisan en todo el intervalo del helper.
 
-**Evidencia Oracle y Node 22 pendiente de ejecución y revisión.** Los controles
-anteriores de PR #43 no se atribuyen a estos cambios. Se conservan sus reservas,
-muestras pendientes y límites, sin proveedor ni cambios de datos/permisos/
-expiraciones.
+## Evidencia revisada
+
+**82/82 pruebas afectadas en Node 22.23.4**, sobre
+`3d31d63c37fd3c396ba790749916622977c81c7e`; 280 archivos verificados contra Git.
+SHA-256 de salida enfocada:
+`d1dee16c1aa29b7fba6a13c1df92788fab1a0dc64f943800b805424ed314c60d`.
+Solo `salesScopeMetrics`, `salesScopeMetricsChat`, `salesSeriesPresentation`,
+`librarySalesContext`, `salesCategoryIntentChat`, `salesAutonomousCategory`,
+`searchResolutionState`, `salesExportFollowup`, `salesHistory`,
+`salesYearComparison`, `searchFilterLifecycle`, `salesLocalRemoval`,
+`chatLifecycle` y `oracleSessionClose`. Las dos últimas conservan los contratos
+de cancelación y cierre; no se ejecutó la suite completa.
+
+**260/260 verificaciones Oracle aprobadas**, candidato aislado
+`43d72926b686b0ce7be9bcf6be6b3d6b0f3169ea`, 09/11/2026,
+15:07:22–15:08:47 (Asunción). Código de aplicación/pruebas idéntico a `3d31d63`;
+`b6a8cbf` y `43d7292` cambian exclusivamente el ejecutor Oracle. Se reutilizaron
+las 82 pruebas por identidad del código y hash; no se repitieron suites.
+
+Modelo controlado: 31 iteraciones, **cero Bedrock y cero proveedor**. Se probaron
+ambos Nike legítimos entre cinco opciones autorizadas, ambos tipos de intención
+antes/después del recorte y la pregunta literal desde Nike pendiente. También
+una métrica por vez y su restauración después del recorte, cambio de rubro y
+retirada de local/rubro conservando período y agrupación. Se verificaron:
+
+- Importes, cantidades, monedas y todos los grupos mensuales contra SELECT
+  independientes. Se conciliaron 53 grupos positivos con ambas magnitudes a lo
+  largo de las consultas; no se presentan como 53 muestras únicas.
+- Nombres de cada local/rubro contra lecturas independientes por ID en los
+  catálogos autorizados, más su presencia en el alcance mostrado. Sin etiquetas
+  inventadas, referencias a filtros retirados o tokens internos en la respuesta.
+- Argumentos efectivos, columnas SQL, presentación y estado persistente:
+  defecto de dos métricas frente a propuestas de solo importe; excepción del
+  usuario para importe/facturas y posterior restauración de ambas.
+- Identidad proxy desde la sesión, cierre de todas las conexiones y logout de
+  la única sesión creada por el helper. La sesión no se almacenó en archivos.
+
+Los 260 checks son comprobaciones de estos flujos y su infraestructura, no 260
+conversaciones independientes ni una suma con las 82 pruebas como cobertura única.
+Reporte congelado ignorado `logs/sales-scope-metrics-oracle-43d7292.json`, SHA-256
+`478fc660db60d8a96c565e84beb0b5c0853f11993c613ad855d1a75cb475a621`.
+Esquema revisado sin claves sensibles ni UUID de sesión. Logs del intervalo
+completo: chatbot cero líneas, ERP dos, esquema sanitizado reconocido. Nombres,
+IDs, binds, resultados e importes permanecieron en memoria.
+
+El intento previo `b6a8cbf` aprobó 210 verificaciones pero falló la precondición
+del caso adicional de retirada: su instantánea tenía un local sin rubro y el
+control esperaba conservar librería. La corrección establece explícitamente
+ambos filtros antes de retirarlo; no cambia implementación ni datos. Se conserva
+el reporte parcial `logs/sales-scope-metrics-partial-b6a8cbf.json`, SHA-256
+`7c698455c1541af0c3463279b7ad4444394cc67bda1aff6980a13d1933bc97ce`.
+Ese intento no es una aprobación global ni se suma al resultado final; sus
+conexiones/logout/logs aprobaron.
+
+La lectura de etiquetas añade hasta dos SELECT de catálogo por operación
+filtrada, dentro de la misma conexión. Etiquetas ausentes/contradictorias se
+cubren con datos controlados, sin afirmar muestras reales de esos casos. Las
+reglas de una sola métrica reconocen importe/monto/ventas totales y facturas/
+cantidad/número de facturas; no se afirma cobertura lingüística exhaustiva.
+
+Los controles anteriores de PR #43 no se atribuyen a estos cambios nuevos.
+Se conservan sus reservas, muestras pendientes y límites, sin proveedor ni
+cambios de datos/permisos/expiraciones. Sin merge ni despliegue de esta rama.

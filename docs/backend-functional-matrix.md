@@ -598,12 +598,19 @@ Base `d6ca3ae`; rama `feat/sales-resolved-scope-default-metrics`.
 
 | Variante | Resultado requerido | Evidencia |
 | --- | --- | --- |
-| Local/rubro resueltos, antes/después del recorte | Nombres del catálogo asociados a los IDs efectivos; sin etiquetas del modelo | Regresiones enfocadas preparadas y aprobadas localmente |
-| Cambio, reselección o retirada | Solo nombres de los filtros efectivos; período, desglose y tipo de día conservados | Flujo completo con catálogos sintéticos y repositorios/servicio reales aprobado |
-| Modelo propone solo importe | `totalAmount` y `totalInvoices` por defecto | Política de argumentos y columnas verificada localmente |
-| Usuario pide una métrica | Solo esa métrica; preferencia persiste tras recorte y permite volver a ambas | Regresiones enfocadas aprobadas localmente |
-| Oracle independiente | Importes/cantidades/monedas y nombres por ID, cierre y logout | Pendiente; ejecutor protegido aislado preparado, sin despliegue |
+| Local/rubro resueltos, antes/después del recorte | Nombres del catálogo asociados a los IDs efectivos; sin etiquetas del modelo | Regresiones y contraste Oracle aprobados sobre ambos Nike legítimos |
+| Cambio, reselección o retirada | Solo nombres de los filtros efectivos; período, desglose y tipo de día conservados | Flujo completo y contraste independiente; sin etiquetas antiguas |
+| Modelo propone solo importe | `totalAmount` y `totalInvoices` por defecto | Argumentos, columnas SQL y ambas magnitudes conciliadas |
+| Usuario pide una métrica | Solo esa métrica; preferencia persiste tras recorte y permite volver a ambas | Importe/facturas por separado y restauración aprobados, también con Oracle |
+| Oracle independiente | Importes/cantidades/monedas y nombres por ID, cierre y logout | **260/260 aprobados `43d7292`**, modelo controlado; cero Bedrock/proveedor; candidato aislado |
 
-La evidencia histórica de PR #43 y sus reservas se conservan; no acredita estos
-cambios nuevos. Sin suite completa, proveedor, cambios de datos/permisos/
-expiraciones, merge o despliegue de esta rama.
+**82/82 pruebas enfocadas Node 22.23.4 en `3d31d63`**, reutilizadas por identidad
+del código de aplicación/pruebas; los commits posteriores hasta `43d7292`
+solo ajustan el ejecutor Oracle. 280 archivos verificados. Reporte final revisado:
+SHA-256 `478fc660db60d8a96c565e84beb0b5c0853f11993c613ad855d1a75cb475a621`.
+El parcial anterior falló una preparación del control de retirada y se conserva
+con su límite; no es aprobación global. Cierres, logout y logs sanitizados
+aprobados. Etiquetas ausentes/contradictorias tienen cobertura controlada; no se
+afirma muestra Oracle real. La evidencia histórica de PR #43 y sus reservas se
+conservan; no acredita estos cambios nuevos. Sin suite completa, proveedor,
+cambios de datos/permisos/expiraciones, merge o despliegue de esta rama.
