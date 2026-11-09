@@ -590,3 +590,44 @@ investigación; no son aprobaciones globales. PR #43 en borrador. La evidencia p
 se conserva con sus límites; no acredita esta intención nueva. Las reservas
 históricas, muestras no disponibles y proveedor real pendiente siguen vigentes.
 Sin suite completa, cambios de datos/permisos/expiraciones, merge o despliegue.
+
+## Ventas: nombres del alcance y métricas predeterminadas
+
+Base `d6ca3ae`; rama `feat/sales-resolved-scope-default-metrics`.
+[Diseño y evidencia](sales-scope-metrics-investigation.md).
+
+| Variante | Resultado requerido | Evidencia |
+| --- | --- | --- |
+| Local/rubro resueltos, antes/después del recorte | Nombres del catálogo asociados a los IDs efectivos; sin etiquetas del modelo | Regresiones y contraste Oracle aprobados sobre ambos Nike legítimos |
+| Cambio, reselección o retirada | Solo nombres de los filtros efectivos; período, desglose y tipo de día conservados | Flujo completo y contraste independiente; sin etiquetas antiguas |
+| Modelo propone solo importe | `totalAmount` y `totalInvoices` por defecto | Argumentos, columnas SQL y ambas magnitudes conciliadas |
+| Usuario pide una métrica | Solo esa métrica; preferencia persiste tras recorte y permite volver a ambas | Importe/facturas por separado y restauración aprobados, también con Oracle |
+| Oracle independiente | Importes/cantidades/monedas y nombres por ID, cierre y logout | **260/260 aprobados `43d7292`**, modelo controlado; cero Bedrock/proveedor; candidato aislado |
+
+**82/82 pruebas enfocadas Node 22.23.4 en `3d31d63`**, reutilizadas por identidad
+del código de aplicación/pruebas; los commits posteriores hasta `43d7292`
+solo ajustan el ejecutor Oracle. 280 archivos verificados. Reporte final revisado:
+SHA-256 `478fc660db60d8a96c565e84beb0b5c0853f11993c613ad855d1a75cb475a621`.
+El parcial anterior falló una preparación del control de retirada y se conserva
+con su límite; no es aprobación global. Cierres, logout y logs sanitizados
+aprobados. Etiquetas ausentes/contradictorias tienen cobertura controlada; no se
+afirma muestra Oracle real. La evidencia histórica de PR #43 y sus reservas se
+conservan; no acredita estos cambios nuevos. Sin suite completa, proveedor,
+cambios de datos/permisos/expiraciones, merge o despliegue de esta rama.
+
+### Corrección P2 de «no solo» en PR #44
+
+| Caso nuevo | Resultado requerido | Evidencia nueva |
+| --- | --- | --- |
+| Solo importe → «No solo enero, también febrero» | Conserva importe único y amplía a enero–febrero | Argumentos, preferencia persistente, contexto, SQL y presentación antes/después del recorte |
+| Sobre enero–febrero → «No solo el importe, también las facturas» | Ambas métricas sin perder período, filtros, mes ni tipo de día | Los mismos perfiles antes/después del recorte; propuesta del modelo de solo importe |
+| «No solo» referido a local, período o agrupación | No se interpreta como cambio de métricas | Regresión de intención; referencias explícitas a métricas siguen reconocidas |
+
+**7/7 pruebas afectadas Node 22.23.4 en `300bec0`** (cinco regresiones nuevas y
+dos checks existentes de política), 282 archivos verificados. Hash de salida
+`218982f2408a131fa4c6589a9156a189e9a5dc04d8e5abdb95d09edd7bab2d5e`.
+Chat/servicio/repositorios reales con modelo y Oracle controlados; sin nuevas
+consultas Oracle, Bedrock o proveedor. Las 82 pruebas de `3d31d63` y los 260
+controles de `43d7292` se mantienen como evidencia previa, no cubren el P2 ni se
+repitieron. Reservas conservadas; PR #44 en borrador hasta revisión de la
+corrección. Sin merge, despliegue o cambios de datos/permisos/expiraciones.

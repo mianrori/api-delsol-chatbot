@@ -6,7 +6,7 @@ import * as store from '../../src/state/conversation.store.js';
 import {trimConversation} from '../../src/services/ai/conversation.service.js';
 import {protectPiiDeep,restorePiiDeep} from '../../src/services/ai/pii.service.js';
 const originals=Object.fromEntries(['log','info','warn','error','debug'].map(k=>[k,console[k]]));for(const k of Object.keys(originals))console[k]=()=>{};
-const s='SYNTHETIC-CHAT-INTENT',first={dateFrom:'01/01/2023',dateTo:'31/05/2023',groupBy:['month'],metrics:['totalAmount']};
+const s='SYNTHETIC-CHAT-INTENT',first={dateFrom:'01/01/2023',dateTo:'31/05/2023',groupBy:['month'],metrics:['totalAmount','totalInvoices']};
 const nike={...first,dateTo:'30/04/2023',customerIds:['SYNTHETIC-NIKE']};
 let plans=[],calls=[],prompts=[],ambiguousCustomers=false;
 const context=vm.createContext({console,process,structuredClone,Intl,Date,Map,Set,Number,String,Array,JSON,Math,RegExp,Object,Boolean,Error,AbortController});

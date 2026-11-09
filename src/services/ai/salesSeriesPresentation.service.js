@@ -1,3 +1,4 @@
+import {buildSalesScope} from './salesScopePresentation.service.js';
 const finite = (value) => typeof value === "number" && Number.isFinite(value);
 const cell = (value) => String(value ?? "Sin datos").replace(/\|/g, "\\|").replace(/[\r\n]+/g, " ");
 const number = (value) => finite(value) ? new Intl.NumberFormat("es-PY", { maximumFractionDigits: 6 }).format(value) : "Sin datos";
@@ -36,7 +37,7 @@ const observation = (rows, metric, value) => {
   return `${subject} ${metric === "totalAmount" ? "presentaron" : "presentó"} subidas y bajadas. La mayor caída absoluta fue de ${value(drop.from[metric])} a ${value(drop.to[metric])}, entre ${drop.from.period.label} y ${drop.to.period.label} (${value(drop.difference)}${percentText}).`;
 };
 
-export const buildSalesSeriesResponse = (calls = [], { message = "" } = {}) => {
+export const buildSalesSeriesResponse = (calls = [], { message = "", restoreValue=v=>v } = {}) => {
   // Leave explicitly requested statistical/comparative analyses to their existing flow.
   const request = String(message).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   if (/\b(anomal\w*|desviacion|mediana|promedio|ticket|estadistic\w*|compara\w*)\b/.test(request)) return null;
@@ -55,7 +56,7 @@ export const buildSalesSeriesResponse = (calls = [], { message = "" } = {}) => {
   if (input.dateFrom || input.dateTo) lines.push(`Período: ${cell(input.dateFrom)} a ${cell(input.dateTo)}.`, "");
   const hasLocal = Array.isArray(input.customerIds) ? input.customerIds.length > 0 : Boolean(input.customerIds);
   const hasCategory = Array.isArray(input.categoryIds) ? input.categoryIds.length > 0 : Boolean(input.categoryIds);
-  lines.push(`Alcance: ${hasLocal ? "locales seleccionados" : "todos los locales"}; ${hasCategory ? "rubros seleccionados" : "todos los rubros"}${input.dayType === "weekend" ? "; fines de semana" : input.dayType === "weekday" ? "; días hábiles" : ""}.`, "");
+  lines.push(buildSalesScope(input,result.scope,restoreValue), "");
   if (!result.data.length) {
     lines.push("No se encontraron ventas para los filtros consultados.");
     if (hasLocal && hasCategory) lines.push("", "La consulta combina el local y el rubro seleccionados; este resultado no describe las ventas del rubro en todos los locales.", "Para retirar solo el filtro de local, indica «todos los locales». Se conservarán el rubro y los demás filtros.");

@@ -1,5 +1,6 @@
 import {getSearchFilterActions,isExplicitSearchRequest,getSalesLocalRemovalChange,getAutonomousCategorySalesIntent,getExplicitSalesRange} from './searchFilterIntent.service.js';
 import {getSearchResolutions,setSearchResolutions,getSearchSelectionTurn,setSearchSelectionTurn} from '../../state/conversation.store.js';
+import {getSalesMetricIntent,defaultSalesMetrics} from './salesMetrics.service.js';
 const specs={
  search_customers:{consumers:['get_sales','get_sales_per_sqm','analyze_members','get_member_purchases','get_member_promo_purchases','compare_member_purchases_vs_sales','analyze_campaign_sales_performance','get_contract_conditions','get_contract_cost_per_sqm','analyze_contract_cost_incidence'],fields:o=>({customerIds:[o.codCliente],customerId:o.codCliente})},
  search_categories:{consumers:['get_sales','get_sales_per_sqm','analyze_members','get_member_purchases','get_member_promo_purchases','get_soles_usage','compare_member_purchases_vs_sales','analyze_campaign_sales_performance'],fields:o=>({categoryIds:[o.codRubro]})},
@@ -33,6 +34,7 @@ export function beginSearchSelectionTurn(sessionId,message){
  const state=getSearchResolutions(sessionId),turn={selectedThisTurn:[],validLookups:[],capturedConsumers:[],requestedDomains:[],salesLocalRemovalChange:getSalesLocalRemovalChange(message)};let changed=false;
  turn.autonomousCategorySales=getAutonomousCategorySalesIntent(message);
  if(turn.autonomousCategorySales){
+  delete state.salesMetrics;
   state.domains.search_customers={kind:'cleared'};
   state.domains.search_categories={kind:'pending',result:{options:[]}};
   const {search,...scope}=turn.autonomousCategorySales;
@@ -40,6 +42,9 @@ export function beginSearchSelectionTurn(sessionId,message){
   delete state.choiceFocus;
   turn.requestedDomains.push('search_categories');changed=true;
  }
+ const metricIntent=getSalesMetricIntent(message);
+ if(metricIntent){state.salesMetrics=metricIntent;changed=true;}
+ turn.salesMetrics=state.salesMetrics??[...defaultSalesMetrics];
  turn.salesExplicitRange=getExplicitSalesRange(message);
  if(turn.salesExplicitRange){state.contexts.get_sales={...state.contexts.get_sales,...turn.salesExplicitRange};changed=true;}
  const normalized=String(message??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();

@@ -32,6 +32,7 @@ const load = async (path, stubs) => {
   await main.link(async (spec) => {
     if(spec==='./searchFilterIntent.service.js')return new vm.SourceTextModule(await readFile(new URL('../../src/services/ai/searchFilterIntent.service.js',import.meta.url),'utf8'),{context});
     if(spec==='./searchSelection.service.js')return new vm.SourceTextModule(await readFile(new URL('../../src/services/ai/searchSelection.service.js',import.meta.url),'utf8'),{context});
+    if(['./salesMetrics.service.js','./salesScopePresentation.service.js'].includes(spec))return new vm.SourceTextModule(await readFile(new URL('../../src/services/ai/'+spec.slice(2),import.meta.url),'utf8'),{context});
     if (["./memberPromoPurchasesPresentation.service.js", "./contractIncidenceFollowup.service.js", "./contractIncidencePresentation.service.js", "./salesHistory.service.js", "./salesSamplePresentation.service.js", "./salesPerSqmFollowup.service.js", "./salesPerSqmPresentation.service.js"].includes(spec)) {
       return new vm.SourceTextModule(await readFile(new URL("../../src/services/ai/" + spec.slice(2), import.meta.url), "utf8"), { context });
     }
@@ -240,7 +241,7 @@ const chat = await load("../../src/services/ai/chat.service.js", {
     if(mode==='search-guard'||mode==='search-selected'){
       toolCalls++;
       if(mode==='search-guard'){assert.equal(call.name,'search_categories','An ambiguous search must prevent the business query');return {status:'AMBIGUOUS',options:[{optionId:'1',codRubro:'SYNTHETIC-A'},{optionId:'2',codRubro:'SYNTHETIC-B'}]};}
-      assert.equal(call.name,'get_sales');assert.deepEqual(JSON.parse(JSON.stringify(call.arguments)),{dateFrom:'01/01/2023',dateTo:'31/01/2023',customerIds:['SYNTHETIC-C'],categoryIds:['SYNTHETIC-B'],groupBy:['month'],metrics:['totalAmount']});
+      assert.equal(call.name,'get_sales');assert.deepEqual(JSON.parse(JSON.stringify(call.arguments)),{dateFrom:'01/01/2023',dateTo:'31/01/2023',customerIds:['SYNTHETIC-C'],categoryIds:['SYNTHETIC-B'],groupBy:['month'],metrics:['totalAmount','totalInvoices']});
       return {data:[{month:'2023-01',totalAmount:10,currency:{symbol:'₲'}}]};
     }
     if (mode.startsWith("promo-")) {

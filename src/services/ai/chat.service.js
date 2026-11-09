@@ -1,3 +1,4 @@
+import {applySalesMetrics} from './salesMetrics.service.js';
 import { buildMemberPurchasesResponse, resolveMemberPurchasesPage } from "./memberPurchasesPresentation.service.js";
 import {preserveSearchSelection,beginSearchSelectionTurn,recordSearchToolResult,captureSearchQueryContext} from './searchSelection.service.js';
 import { buildMemberPromoResponse, resolveMemberPromoPage, resolveMemberPromoSelection, preserveMemberPromoFollowup } from "./memberPromoPurchasesPresentation.service.js";
@@ -297,6 +298,7 @@ Para ventas por metro cuadrado:
 - evita expresiones ambiguas como "la superficie contractual no estaba disponible" cuando puedan interpretarse como ausencia de dato en el contrato; utiliza preferentemente "no se dispone de una superficie contractual aplicable para ese período";
 - una disminución de ventas o ventas por m² puede describirse como una caída del indicador; no la conviertas automáticamente en una afirmación sobre disminución de actividad comercial, flujo de clientes, demanda, eficiencia comercial u otra causa no demostrada por los datos;
 - en get_sales, interpreta totalAmount y totalInvoices por separado: una subida de ventas no implica una subida de facturas;
+- en get_sales incluye por defecto totalAmount y totalInvoices. Muestra una sola métrica únicamente si el usuario lo pide explícitamente; conserva esa preferencia en seguimientos. Para identificar el alcance usa solo los nombres de result.scope obtenidos del catálogo autorizado y asociados a los identificadores efectivos; no inventes nombres ni recuperes etiquetas de filtros retirados;
 - para responder una nueva consulta de ventas, ejecuta get_sales aunque exista un resultado histórico con los mismos filtros; reutiliza los identificadores y filtros resueltos, no una muestra ni una supuesta exportación antigua. Esto incluye preguntas equivalentes y cambios de filtros o desglose. Para un gráfico solicitado sobre un resultado completo, conserva las reglas específicas de gráficos;
 - distingue una consulta autónoma con sujeto y período propios («Ventas del rubro librería durante 2023, por mes») de un seguimiento aditivo («filtra también por librería»). La primera busca el rubro solicitado y consulta todos los locales del período indicado, sin heredar el local, rubro ni tipo de día anteriores. La segunda resuelve el rubro y conserva el local, período y desglose confirmados. La omisión de un filtro en los argumentos no significa por sí sola retirarlo;
 - una pendiente de regresión positiva o un aumento entre el primer y último período no demuestra crecimiento sostenido: revisa todas las variaciones consecutivas de esa métrica;
@@ -1416,6 +1418,7 @@ const executeToolRequests = async ({ content, sessionId, sourceMessages = [], ch
     try {
       captureSearchQueryContext(sessionId,name,protectPiiDeep(sessionId,input));
       input=preserveSearchSelection({name,input,history:sourceMessages,currentCalls:internalContext.presentationCalls,resolutionState:getSearchResolutions(sessionId),selectionTurn:getSearchSelectionTurn(sessionId)});
+      if(name==='get_sales')input=applySalesMetrics(input,getSearchSelectionTurn(sessionId).salesMetrics);
       block.toolUse.input=input;presentationCall.input=input;
       validateProtectedToolInput({ name, input });
 
@@ -1684,7 +1687,8 @@ export const chatService = async ({ message, sessionId }) => {
     toolIterations = 1;
     // The fresh tool result, rather than the previous narrative/sample, is the
     // source for the answer. The standard executor rechecks Oracle permissions.
-    followupAnswer = buildSalesSampleResponse(executed.internalContext.presentationCalls, { exportAvailable: Boolean(conversationActions.salesExport?.available) });
+    followupAnswer = buildSalesSampleResponse(executed.internalContext.presentationCalls, { exportAvailable: Boolean(conversationActions.salesExport?.available) })
+      ?? buildSalesSeriesResponse(executed.internalContext.presentationCalls, {message,restoreValue:value=>restorePiiDeep(sessionId,value)});
   } else if (promoFollowup) {
     if (promoFollowup.answer) followupAnswer = promoFollowup.answer;
     else {
@@ -1885,7 +1889,7 @@ export const chatService = async ({ message, sessionId }) => {
         ?? buildSalesPerSqmResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) })
         ?? buildSalesYearComparisonResponse(conversationInternalContext.presentationCalls)
         ?? buildSalesSampleResponse(conversationInternalContext.presentationCalls, { exportAvailable: Boolean(conversationActions.salesExport?.available) })
-        ?? buildSalesSeriesResponse(conversationInternalContext.presentationCalls, { message })
+        ?? buildSalesSeriesResponse(conversationInternalContext.presentationCalls, { message, restoreValue: (value) => restorePiiDeep(sessionId, value) })
         ?? buildVehicleResponse(conversationInternalContext.presentationCalls)
         ?? buildSolesUsageResponse(conversationInternalContext.presentationCalls)
         ?? buildMemberSolesResponse(conversationInternalContext.presentationCalls)
@@ -1948,7 +1952,7 @@ export const chatService = async ({ message, sessionId }) => {
       buildSalesPerSqmResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) }) ??
       buildSalesYearComparisonResponse(conversationInternalContext.presentationCalls) ??
       buildSalesSampleResponse(conversationInternalContext.presentationCalls, { exportAvailable: Boolean(conversationActions.salesExport?.available) }) ??
-      buildSalesSeriesResponse(conversationInternalContext.presentationCalls, { message }) ??
+      buildSalesSeriesResponse(conversationInternalContext.presentationCalls, { message, restoreValue: (value) => restorePiiDeep(sessionId, value) }) ??
       buildVehicleResponse(conversationInternalContext.presentationCalls) ??
       buildSolesUsageResponse(conversationInternalContext.presentationCalls) ??
       buildMemberSolesResponse(conversationInternalContext.presentationCalls) ??

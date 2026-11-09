@@ -1,4 +1,5 @@
 import { getSalesRepository } from "../../repositories/sales/sales.repository.js";
+import {getSalesScopeRepository} from '../../repositories/sales/salesScope.repository.js';
 import { createSalesExport } from "../exports/salesExport.service.js";
 import { buildSalesInsights } from "./salesInsights.service.js";
 
@@ -86,7 +87,8 @@ export const getSales = async (
     ...args,
   });
 
-  const result = ensureSalesCurrency(repositoryResult);
+  const scope = await getSalesScopeRepository(connection,args);
+  const result = {...ensureSalesCurrency(repositoryResult),scope};
 
   const insights = buildSalesInsights({
     salesResult: result,
