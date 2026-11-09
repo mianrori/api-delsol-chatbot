@@ -30,7 +30,7 @@ y despues de recortar el historial. Argumentos finales, SQL, estado y alcance;
 importe y facturas; cero real, meses ausentes y periodos verificados.
 
 Ejecutor protegido: `scripts/run-sales-monthly-comparison-dev.ps1`.
-Comando desde PowerShell local: 
+Comando desde PowerShell local:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-sales-monthly-comparison-dev.ps1
@@ -99,12 +99,12 @@ los limites de cobertura. No cambios de datos, permisos o expiraciones.
 Reporte congelado ignorado `logs/sales-monthly-comparison-0d1f799.json`, SHA-256
 `f95d4948ed0db574a2420b44123cf8ab3e7cf61eb22eb59d6d154946bf1dcb9e`.
 El primer intento `d11d0bd` descartó el reporte por incompatibilidad del nombre
- de suite. Su wrapper acredita logout, pero no conserva resultados del worker;
+de suite. Su wrapper acredita logout, pero no conserva resultados del worker;
 no se cuentan sus consultas, llamadas al modelo ni cierres como aprobados.
 Se conserva como `logs/sales-monthly-comparison-d11d0bd-unaccepted.json`.
 
 Comprobación final: `/app` conserva los 286 archivos de `7d29892`, la misma imagen
- e instancia DEV de PR #44, salud correcta y cero reinicios. El candidato no se
+e instancia DEV de PR #44, salud correcta y cero reinicios. El candidato no se
 ha desplegado. Evidencia local `logs/sales-monthly-comparison-final.json`.
 Los commits posteriores a `0d1f799` de esta entrega solo documentan resultados.
 Todas las reservas del balance permanecen; esta muestra no acredita cobertura
