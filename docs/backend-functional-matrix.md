@@ -590,3 +590,20 @@ investigación; no son aprobaciones globales. PR #43 en borrador. La evidencia p
 se conserva con sus límites; no acredita esta intención nueva. Las reservas
 históricas, muestras no disponibles y proveedor real pendiente siguen vigentes.
 Sin suite completa, cambios de datos/permisos/expiraciones, merge o despliegue.
+
+## Ventas: nombres del alcance y métricas predeterminadas
+
+Base `d6ca3ae`; rama `feat/sales-resolved-scope-default-metrics`.
+[Diseño y evidencia](sales-scope-metrics-investigation.md).
+
+| Variante | Resultado requerido | Evidencia |
+| --- | --- | --- |
+| Local/rubro resueltos, antes/después del recorte | Nombres del catálogo asociados a los IDs efectivos; sin etiquetas del modelo | Regresiones enfocadas preparadas y aprobadas localmente |
+| Cambio, reselección o retirada | Solo nombres de los filtros efectivos; período, desglose y tipo de día conservados | Flujo completo con catálogos sintéticos y repositorios/servicio reales aprobado |
+| Modelo propone solo importe | `totalAmount` y `totalInvoices` por defecto | Política de argumentos y columnas verificada localmente |
+| Usuario pide una métrica | Solo esa métrica; preferencia persiste tras recorte y permite volver a ambas | Regresiones enfocadas aprobadas localmente |
+| Oracle independiente | Importes/cantidades/monedas y nombres por ID, cierre y logout | Pendiente; ejecutor protegido aislado preparado, sin despliegue |
+
+La evidencia histórica de PR #43 y sus reservas se conservan; no acredita estos
+cambios nuevos. Sin suite completa, proveedor, cambios de datos/permisos/
+expiraciones, merge o despliegue de esta rama.
