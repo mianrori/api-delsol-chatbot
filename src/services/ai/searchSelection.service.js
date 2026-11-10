@@ -2,6 +2,7 @@ import {getSearchFilterActions,isExplicitSearchRequest,getSalesLocalRemovalChang
 import {getSearchResolutions,setSearchResolutions,getSearchSelectionTurn,setSearchSelectionTurn} from '../../state/conversation.store.js';
 import {getSalesMetricIntent,defaultSalesMetrics} from './salesMetrics.service.js';
 import {getMonthlySalesComparisonIntent} from './salesComparisonIntent.service.js';
+import {getInvoicePlateRequest} from './invoicePlateRequest.service.js';
 const specs={
  search_customers:{consumers:['get_sales','get_sales_per_sqm','analyze_members','get_member_purchases','get_member_promo_purchases','compare_member_purchases_vs_sales','analyze_campaign_sales_performance','get_contract_conditions','get_contract_cost_per_sqm','analyze_contract_cost_incidence'],fields:o=>({customerIds:[o.codCliente],customerId:o.codCliente})},
  search_categories:{consumers:['get_sales','get_sales_per_sqm','analyze_members','get_member_purchases','get_member_promo_purchases','get_soles_usage','compare_member_purchases_vs_sales','analyze_campaign_sales_performance'],fields:o=>({categoryIds:[o.codRubro]})},
@@ -33,6 +34,14 @@ const lookupShape=(name,result)=>{
 // Applied once to the protected user message, never by replaying bounded history.
 export function beginSearchSelectionTurn(sessionId,message){
  const state=getSearchResolutions(sessionId),turn={selectedThisTurn:[],validLookups:[],capturedConsumers:[],requestedDomains:[],salesLocalRemovalChange:getSalesLocalRemovalChange(message)};let changed=false;
+ turn.invoicePlateRequest=getInvoicePlateRequest(message);
+ if(turn.invoicePlateRequest?.autonomous){
+  state.contexts.get_invoices=structuredClone(turn.invoicePlateRequest.input);
+  delete state.invoiceNamedRequest;
+  delete state.domains.search_invoice_customers;delete state.domains.search_invoice_concepts;
+  if(['search_invoice_customers','search_invoice_concepts'].includes(state.choiceFocus))delete state.choiceFocus;
+  changed=true;
+ }
  const comparison=getMonthlySalesComparisonIntent(message,state);
  if(comparison?.autonomous){
   delete state.salesMetrics;
@@ -121,6 +130,13 @@ export function captureSearchQueryContext(sessionId,name,input){
  turn.capturedConsumers=[...(turn.capturedConsumers??[]),name];setSearchSelectionTurn(sessionId,turn);
 }
 
+// Called after the selection guard and input validation, even when Oracle denies
+// execution. Persist only protected scope metadata, never invoice rows.
+export function recordInvoiceQueryContext(sessionId,name,input){
+ if(name!=='get_invoices')return;
+ const state=getSearchResolutions(sessionId);state.contexts.get_invoices=structuredClone(input);setSearchResolutions(sessionId,state);
+}
+
 // Reconstruct resolution state across turns and tool iterations. A failed query
 // or a non-selection message must not erase an unresolved lookup.
 export function preserveSearchSelection({name,input,history=[],currentCalls=[],removedFilters=[],resolutionState,selectionTurn={}}){
@@ -141,6 +157,10 @@ export function preserveSearchSelection({name,input,history=[],currentCalls=[],r
   if(text!=null){
    currentText=text;
    turn++;turnTexts.set(turn,text);
+   if(getInvoicePlateRequest(text)?.autonomous){
+    states.delete('search_invoice_customers');states.delete('search_invoice_concepts');
+    for(let i=queries.length-1;i>=0;i--)if(queries[i].name==='get_invoices')queries.splice(i,1);
+   }
    for(const {search,action} of getSearchFilterActions(text)){
     if(persistent(search))continue;
     const prior=states.get(search),originTurn=prior?.originTurn??turn;
@@ -186,7 +206,7 @@ export function preserveSearchSelection({name,input,history=[],currentCalls=[],r
  const successful=queries.filter(c=>c.name===name&&c.turn<turn&&c.resultStatus==='success').at(-1);
  // Persisted sales context is a complete scope, including absent keys. Merging
  // older history back into it would resurrect filters removed by a new query.
- const original=name==='get_sales'&&resolutionState?.contexts[name]
+ const original=['get_sales','get_invoices'].includes(name)&&resolutionState?.contexts[name]
   ?structuredClone(resolutionState.contexts[name])
   :{...(successful?.input??{}),...((successful&&successful.turn>=(origin?.turn??-1)?successful:origin)?.input??{}),...(resolutionState?.contexts[name]??{})};
  const selectingNow=Boolean(selection(currentText))&&resolutions.some(r=>r.state.selectedTurn===turn||persistent(r.search)&&selectionTurn.selectedThisTurn?.includes(r.search));
@@ -196,7 +216,9 @@ export function preserveSearchSelection({name,input,history=[],currentCalls=[],r
  // grouping or previously absent keys. The successful context survives trimming.
  const autonomous=name==='get_sales'?selectionTurn.autonomousCategorySales:null;
  let result;
- if(name==='get_invoices'&&selectionTurn.invoiceNamedRequest){
+ if(name==='get_invoices'&&selectionTurn.invoicePlateRequest?.autonomous){
+  result={...selectionTurn.invoicePlateRequest.input};
+ }else if(name==='get_invoices'&&selectionTurn.invoiceNamedRequest){
   result={...input};
  }else if(name==='get_sales'&&selectionTurn.salesComparison){
   result={...input};
