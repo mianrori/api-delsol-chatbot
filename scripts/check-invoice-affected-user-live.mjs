@@ -4,6 +4,7 @@ import config from '/app/config.js';import driver from '/app/node_modules/oracle
 import {withOracleProxySession,getValidOracleSession} from '/app/src/services/sessions/oracleSession.service.js';
 import {normalizeInvoicePlate} from '/app/src/utils/invoicePlate.js';
 import {openInspector,verifyLoadedSource} from './inspector.mjs';
+import {extractViewProjection,publicProjectionShape} from './projection.mjs';
 const emit=process.stdout.write.bind(process.stdout);for(const k of ['log','info','warn','error','debug','trace','dir','table'])console[k]=()=>{};
 const report={suite:'affected-user-live-5400',baseCommit:process.argv[2],success:false,status:'running',checks:[],startedAt:new Date().toISOString(),modelSubstituted:false,accountSubstituted:false,httpChatRequests:0,conversationResets:0};
 const check=(ok,code)=>{report.checks.push({code,passed:Boolean(ok)});if(!ok)throw Error(code);},h=(nonce,v)=>crypto.createHmac('sha256',nonce).update(String(v)).digest('hex');
@@ -44,6 +45,20 @@ async function auditNormalization(){
  return {scope:'same affected identity, Oracle view only, no HTTP rerun',sqlExact:{anyAuthorized:sqlAuthorized,anyRestricted:sqlRestricted},independentUnicodeNormalization:{anyAuthorized:independentAuthorized,anyRestricted:independentRestricted,candidateScanComplete:true,anyCandidates:candidates.length>0,asciiExactButDifferentUnicodeNormalization:otherAsciiExact.length>0,nonAlphanumericCodePoints:chars},normalizationDiscrepancy:sqlAuthorized!==independentAuthorized||sqlRestricted!==independentRestricted,restrictedRowsWithNullPlate:Number(restrictedShapes.Z)===1,restrictedRowsWithNonNullPlate:Number(restrictedShapes.V)===1,viewDefinition:definition,noRowsOrPlateValuesExported:true};
 }
 
+async function auditViewProjection(){
+ const roots=await query('SELECT OWNER,VIEW_NAME,TEXT FROM ALL_VIEWS WHERE VIEW_NAME=:v',{v:'VW_BOT_FACTURAS'});
+ if(roots.length!==1)return {status:'definition_ambiguous_or_unavailable',uniqueVisibleDefinition:false,caseResolved:false};
+ const pending=[{row:roots[0],depth:0}],seen=new Set(),views=[];let incomplete=false;
+ while(pending.length&&views.length<6){const {row,depth}=pending.shift(),key=row.OWNER+'.'+row.VIEW_NAME;if(seen.has(key))continue;seen.add(key);
+  if(typeof row.TEXT!=='string'){incomplete=true;continue;}const p=extractViewProjection(row.TEXT),functions=x=>new Set((String(x??'').match(/\b[A-Z_][A-Z0-9_$#]*(?=\s*\()/gi)??[]).map(x=>x.toUpperCase()).filter(x=>!['SELECT','NVL','DECODE','COALESCE','CASE','MAX','MIN','COUNT','SUM','UPPER','LOWER','TO_CHAR','TO_NUMBER'].includes(x)));
+  const pf=functions(p.plate),uf=functions(p.permission);
+  views.push({label:depth===0?'requested_view':'dependency_'+views.length,depth,definitionOpaque:h(nonce,row.TEXT),parsed:p.parsed,plateProjection:publicProjectionShape(p.plate),permissionProjection:publicProjectionShape(p.permission),plateExplicitlyReferencesPermissionField:/\bUSER_CAN_CONSULT\b/i.test(p.plate??''),plateContainsSubquery:/\bSELECT\b/i.test(p.plate??''),plateContainsConditional:/\b(?:CASE|DECODE)\b/i.test(p.plate??''),plateExpressionHasNullBranch:/\bNULL\b/i.test(p.plate??''),explicitNConditionNullsPlate:/\bUSER_CAN_CONSULT\s*=\s*'N'\s+THEN\s+NULL\b/i.test(p.plate??'')||/DECODE\s*\(\s*USER_CAN_CONSULT\s*,\s*'N'\s*,\s*NULL\b/i.test(p.plate??''),sharedNontrivialPermissionFunction:!![...pf].find(x=>uf.has(x)),projectionOnlyNoUnderlyingDataQueries:true});
+  if(depth>=2)continue;
+  try{const deps=await query("SELECT REFERENCED_OWNER O,REFERENCED_NAME N FROM ALL_DEPENDENCIES WHERE OWNER=:o AND NAME=:n AND REFERENCED_TYPE='VIEW'",{o:row.OWNER,n:row.VIEW_NAME});for(const dep of deps){if(seen.has(dep.O+'.'+dep.N))continue;const definitions=await query('SELECT OWNER,VIEW_NAME,TEXT FROM ALL_VIEWS WHERE OWNER=:o AND VIEW_NAME=:n',{o:dep.O,n:dep.N});if(definitions.length===1)pending.push({row:definitions[0],depth:depth+1});else incomplete=true;}}catch{incomplete=true;}
+ }
+ return {status:'metadata_inspected',views,dependencyInspectionCapped:pending.length>0,metadataUnavailableForSomeDependencies:incomplete,depthLimit:2,noBaseTableDataRead:true,noRawDefinitionOrOwnersExported:true,applicationCauseNotPresumed:true};
+}
+
 try{
  check(config.env==='development'&&!config.piiDebugShowRaw&&!config.bedrockDebugPayloads&&report.baseCommit==='22f4b02c98003312bc1558746740cfc511e2dedd','SAFE_BASELINE_DEV');
  inspector=await openInspector();const expected=JSON.parse(fs.readFileSync(new URL('./expected.json',import.meta.url),'utf8'));report.loadedModules=await verifyLoadedSource(inspector,expected);report.loadedCodeMatchesBaseline=true;
@@ -53,7 +68,7 @@ try{
   let input='';for await(const c of process.stdin){input+=c;if(input.length>4096)throw Error('INPUT_TOO_LARGE');}sessionId=JSON.parse(input).sessionId;input='';check(/^[a-f0-9-]{36}$/i.test(sessionId??''),'OWNED_LOGIN_SESSION_REQUIRED');nonce=crypto.randomBytes(32).toString('hex');
   const identity=await getValidOracleSession(sessionId),oracle=(await query("SELECT USER U,SYS_CONTEXT('USERENV','SESSION_USER') S,SYS_CONTEXT('USERENV','PROXY_USER') P FROM DUAL"))[0],normalize=v=>String(v??'').trim().toUpperCase();
   check(normalize(oracle.U)===normalize(identity.username)&&normalize(oracle.S)===normalize(identity.username)&&Boolean(oracle.P),'INDEPENDENT_ORACLE_USES_SAME_POSTGRES_SESSION_IDENTITY');report.identity={targetOpaque:h(nonce,normalize(identity.username)),oracleSessionMatches:true,proxyPresent:true};
-  if(process.argv.includes('--normalization-audit')){report.normalization=await auditNormalization();report.status='normalization_complete';report.caseResolved=false;report.success=true;}else{
+  if(process.argv.includes('--projection-audit')){report.viewProjection=await auditViewProjection();report.status='projection_complete';report.caseResolved=false;report.success=true;}else if(process.argv.includes('--normalization-audit')){report.normalization=await auditNormalization();report.status='normalization_complete';report.caseResolved=false;report.success=true;}else{
   const installedInfo=await evaluate("process.getBuiltinModule('module').createRequire('/app/index.js')('/tmp/invoice-affected-live-trace/runtime.mjs').install("+JSON.stringify({sessionId,nonce,expectedPlate:'anx123'})+")");installed=true;check(installedInfo.installed&&installedInfo.targetIdentityOpaque===report.identity.targetOpaque,'TRACE_ATTACHED_TO_SAME_IDENTITY');
   const before=await evaluate(trace+'.snapshot()');check(before.calls.length===0,'NEW_OWNED_CONVERSATION_BEFORE_INITIAL');
   const initial=await postChat('facturas de arrendamiento m\u00ednimo del 2023 del local impacto','INITIAL');report.initial={httpStatus:initial.httpStatus,responseClass:initial.responseClass,trace:initial.snapshot};

@@ -1,4 +1,4 @@
-param([switch]$Preflight,[switch]$NormalizationAudit)
+param([switch]$Preflight,[switch]$NormalizationAudit,[switch]$ProjectionAudit)
 $ErrorActionPreference='Stop'
 $root=Split-Path -Parent $PSScriptRoot
 $docker=Get-Command docker -ErrorAction SilentlyContinue
@@ -22,7 +22,7 @@ function Invoke-Control($mode,$payload){
   return $result
  }finally{$process.Dispose()}
 }
-$extraMode=if($NormalizationAudit){' --normalization-audit'}else{''}
+$extraMode=if($ProjectionAudit){' --projection-audit'}elseif($NormalizationAudit){' --normalization-audit'}else{''}
 $result=Invoke-Control ('--preflight'+$extraMode) $null
 if(-not $result.success){Write-Output 'INVOICE_PLATE_SCOPE_HTTP_PREFLIGHT_FAILED: revisar logs/invoice-affected-user-preflight.json';exit 1}
 if($Preflight){Write-Output 'INVOICE_PLATE_SCOPE_HTTP_PREFLIGHT_PASS';exit 0}

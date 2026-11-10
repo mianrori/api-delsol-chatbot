@@ -22,3 +22,11 @@ Ejecutor caed886; codigo de aplicacion **22f4b02**, confirmado en 319 archivos d
 El usuario confirmo que ANX123 es literal. Queda preparada una auditoria adicional de normalizacion Unicode independiente y de la proyeccion de la vista cuando el usuario pueda leer su definicion. Esta comprobacion no repetira HTTP ni supondra que hay una factura positiva. La ausencia observada en la vista no prueba inexistencia global o ausencia en fuentes que esta identidad no pueda consultar.
 
 Traza diagnostica completada; driver restaurado, cuatro conexiones trazadas cerradas y todas las conexiones independientes cerradas. Inspector propio cerrado, logout y logs sanitizados aprobados. Cero eventos Bedrock y cero descargas PDF. HMAC efimero para identidad/IDs; no se publica su clave. [Reporte sanitizado](invoice-affected-user-caed886.json), SHA-256 **d97cb76388f15c9fd0162c4775ebed16a41adf56eca85b288bcbdd6cf4e60065**. No se modifico la aplicacion ni se propone una correccion sin causa demostrada.
+
+## Auditoria adicional de normalizacion
+
+Ejecutor b96353a con el login afectado; cero preguntas HTTP y cero resets. El predicado SQL no encuentra filas permitidas ni restringidas para ANX123. La busqueda diagnostica de candidatas, separada del predicado productivo y seguida de normalizacion Unicode en memoria, tampoco encontro candidatas. No se observa discrepancia de normalizacion para esta matricula; no se ampliaron las coincidencias de produccion ni se fabricaron datos.
+
+La vista contiene filas restringidas con matricula nula y con matricula no nula; esto **no prueba que ANX123 este oculta**. La definicion de la vista fue legible y tiene expresiones condicionales, pero el control recogido no concluye si afectan a MATRICULA. Queda preparada una inspeccion de las expresiones y dependencias de vistas (solo metadatos, maximo dos niveles/seis definiciones), sin leer datos de tablas base ni exportar definiciones/propietarios sin sanitizar.
+
+Conexiones e inspector cerrados, logout y logs sanitizados aprobados. Codigo cargado sigue en 22f4b02. [Reporte sanitizado de normalizacion](invoice-affected-user-normalization-b96353a.json), SHA-256 **94e8efbacdf9b26528972451117fe7d873cf8c8eaadc370190e4696335222b33**. El caso permanece abierto, sin correccion de aplicacion ni conclusion sobre datos no visibles en la vista.
