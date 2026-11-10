@@ -683,3 +683,31 @@ una muestra real y mantiene la reserva del archivo ausente. Las seis reservas
 F3/F4/M7, F5/T1, muestras pendientes y demás límites del balance se conservan.
 PR #46 en borrador hasta revisar el diagnóstico; sin merge, despliegue o cambios
 de datos, configuración, permisos o expiraciones.
+
+### Facturas: concepto y cliente/local explícitos
+
+| Caso | Evidencia | Límite |
+| --- | --- | --- |
+| «facturas de arrendamiento mínimo del 2023 del local impacto» | Concepto y cliente en resolvers separados, período 01/01/2023–31/12/2023 y ambos IDs efectivos en get_invoices. | Gramática acotada, sin IDs/nombres hardcodeados ni evaluación lingüística remota exhaustiva. |
+| Tildes, ambigüedad y selección | 13 regresiones nuevas: descripción sin sensibilidad a tildes, código literal preservado, NOT_FOUND por dominio, selección válida/incorrecta y recorte del historial. | No se atribuyen las ambigüedades sintéticas a la muestra real, que fue RESOLVED en ambos dominios. |
+| Oracle autorizado | **15/15 en 5816a8b**, mediante chatService, buscadores, servicios y repositorios. Facturas 2023 y detalle conciliados; cierres/logout aprobados. | **No incluye router/controller HTTP.** Modelo controlado que rechaza llamadas, cero Bedrock/proveedor. |
+| Pregunta literal completa por HTTP | **Un POST, HTTP 200, 17/17 aserciones sobre e60df5d**. Router/controller/chat/resolvers/repositorios reales del candidato y Oracle independiente; argumentos finales, filas, paginación y enlaces PDF conciliados. | SDK controlado no invocado; no modelo real. HTTP loopback aislado, no DEV desplegado. Cero descargas PDF; 28/15 controles reutilizados sin repetir. |
+
+**28/28 pruebas afectadas Node 22.23.4 sobre `5816a8b`**; resultado Oracle previo
+congelado SHA-256 `b536329c7945f41ecc49e4447f0c73c79403565b390654af6553d33f4a9b77d2`.
+No se suman pruebas y aserciones como cobertura única. Alcances y futura evidencia
+HTTP en [invoice-named-request-investigation.md](invoice-named-request-investigation.md).
+Permisos por sesión, paginación y enlaces PDF conservados. Reservas históricas
+(incluido el archivo ausente con 404 y su muestra positiva separada) sin cambios.
+PR en borrador; sin merge, despliegue ni cambios de datos/configuración/permisos/
+expiraciones.
+
+El único caso HTTP se completó en `e60df5d`: **HTTP 200, 17/17 aserciones**,
+304 archivos verificados y reporte SHA-256
+`94276b1d04100c5085dc843b0bc5ccea66db8f060d2642d0141164863f871287`.
+Se verificaron los IDs de cliente/concepto y 2023 en argumentos/binds reales,
+filas, conteos, respuesta, paginación, enlaces PDF y metadatos persistentes.
+Conexiones, servidor efímero, logout y logs sanitizados aprobados. SDK controlado
+no invocado: cero Bedrock/modelo real/proveedor; no se acredita lenguaje libre
+remoto. El candidato sigue sin desplegarse; los cambios posteriores a `e60df5d`
+solo documentan resultados. PR #47 en borrador con las reservas conservadas.
