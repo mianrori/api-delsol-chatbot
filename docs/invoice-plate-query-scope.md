@@ -22,3 +22,23 @@ Las conexiones y los resultados Oracle son simulados; no se acredita disponibili
 20/20 controles afectados Node 22 aprobados, incluidos cuatro casos HTTP nuevos (consulta autonoma/seguimiento tras denegacion en resolucion, antes/despues del recorte). SHA-256 e35e3bd9b52c92412e18e2f1050c11fbbeb9bf664f018947954fd2d31b412ebf. No se repitieron los 56/6 controles originales al preparar el ejecutor Oracle; se reutilizan para las partes no modificadas. El codigo alterado de denegacion se acredita por estos 20 controles, no por el resultado antiguo.
 
 El ejecutor Oracle/HTTP queda preparado para ambas secuencias con sesion protegida, cuatro POST y SDK que rechaza invocaciones. Clasificara la muestra real sin presuponer un positivo para la matricula. Evidencia Oracle y matriz pendientes de revisar la ejecucion; sin merge ni despliegue.
+
+## Resultado Oracle DEV y HTTP
+
+**48/48 comprobaciones, cuatro POST HTTP 200 sobre 7d05971**, con aplicacion/pruebas identicas a **5f94216**. La correccion autonoma original procede de **73e1eef**; los cambios posteriores de denegacion en resolucion se cubren por los 20 controles afectados, no por atribucion retroactiva a las 56/6 pruebas originales. Se reutilizaron los tres resultados por hash sin repetirlos durante Oracle.
+
+| Alcance real | Resultado | Evidencia y limite |
+| --- | --- | --- |
+| Consulta inicial de concepto, Impacto y 2023 | AUTHORIZED en esta sesion | Catalogos e IDs efectivos, cliente/concepto/01-01-2023 a 31-12-2023, filas/importes, conteos, pagina y enlaces conciliados con SELECT independientes. No hubo denegacion inicial real. |
+| Consulta autonoma por matricula | ABSENT en esta sesion | Tras retirar del historial las llamadas originales, una sola llamada get_invoices con plate, mode detail, page 1, rows 20; sin cliente, concepto o periodo heredados. Normalizacion contrastada con la consulta independiente y el servicio probado. Oracle no encontro filas permitidas ni restringidas para el filtro de matricula en esta sesion. Respuesta de ausencia correcta, sin denegacion falsa. |
+| Seguimiento aditivo por matricula | ABSENT en esta sesion | Tras el recorte, conserva los IDs efectivos de cliente y concepto, y 01/01/2023-31/12/2023. Solo agrega la matricula y reinicia la pagina. Misma clasificacion independiente; estado protegido coincide con argumentos finales. |
+| Denegacion inicial real y siguiente consulta | Muestra faltante | No se acredita esta secuencia como positiva Oracle real. Cobertura sintetica de denegacion en get_invoices y en resolucion del cliente, ambas intenciones y recorte. |
+| Matricula con facturas autorizadas o restringidas | Muestras faltantes para la matricula solicitada | No se presupone positivo. Las ramas de mostrar filas o informar falta de permisos tienen cobertura sintetica; este contraste acredita ausencia para esta sesion. |
+
+La clasificacion ABSENT no demuestra inexistencia global en Oracle ni en otras sesiones. Se mantuvieron identidad por sessionId y proxy Oracle: el frontend no pudo elegir username. La verificacion real compara los argumentos efectivos antes de servicios, la normalizacion del servicio ya probada, y los SELECT independientes con matricula normalizada; no se exportaron binds o identificadores de negocio.
+
+SDK controlado que rechaza invocaciones: **cero llamadas**, cero modelo real/Bedrock/proveedor y cero descargas PDF. No se atribuye evidencia de interpretacion libre a este recorrido determinista. HTTP loopback del candidato aislado con router/controller/chat/services/repositories reales; no es el listener desplegado de 5400. Conexiones Oracle, servidor y logout cerrados; logs sanitizados aprobados. DEV conserva la imagen y arranque de PR48, con salud 200 y sin reinicios.
+
+[Reporte sanitizado](invoice-plate-scope-oracle-http-7d05971.json), SHA-256 **5ce138983586a094e2f013308ab1d9c246b3eb3cab0e73d500fe99633708ff3f**. 315 archivos verificados; manifiesto **16d0fc86dfb5515563e68f89fabdbef1752a9a7fa352f946c82cb6b971824fde**. Solo metadatos y aserciones: no filas, importes, nombres de resultados, identificadores de negocio, credenciales, sesiones o URLs reales. No se suman aserciones y pruebas como cobertura unica.
+
+PR #49 en borrador. Se mantienen las reservas de muestras Oracle restringidas, mixtas y segunda pagina mixta, y el PDF positivo y 404 separados. Sin merge, despliegue o cambios de configuracion, datos, permisos o expiraciones.
