@@ -1,0 +1,56 @@
+﻿// Existing process and real user only. No model replacement or isolated app.
+import fs from 'node:fs';import crypto from 'node:crypto';
+import config from '/app/config.js';import driver from '/app/node_modules/oracledb/index.js';
+import {withOracleProxySession,getValidOracleSession} from '/app/src/services/sessions/oracleSession.service.js';
+import {normalizeInvoicePlate} from '/app/src/utils/invoicePlate.js';
+import {openInspector,verifyLoadedSource} from './inspector.mjs';
+const emit=process.stdout.write.bind(process.stdout);for(const k of ['log','info','warn','error','debug','trace','dir','table'])console[k]=()=>{};
+const report={suite:'affected-user-live-5400',baseCommit:process.argv[2],success:false,status:'running',checks:[],startedAt:new Date().toISOString(),modelSubstituted:false,accountSubstituted:false,httpChatRequests:0,conversationResets:0};
+const check=(ok,code)=>{report.checks.push({code,passed:Boolean(ok)});if(!ok)throw Error(code);},h=(nonce,v)=>crypto.createHmac('sha256',nonce).update(String(v)).digest('hex');
+let inspector,installed=false,sessionId,nonce,opened=0,closed=0,closeErrors=0;
+const original=driver.getConnection.bind(driver);driver.getConnection=async(...a)=>{const c=await original(...a);opened++;c.callTimeout=60000;const close=c.close.bind(c);let done=false;c.close=async()=>{try{const r=await close();if(!done){done=true;closed++;}return r;}catch(e){closeErrors++;throw e;}};return c;};
+const query=(sql,binds={})=>withOracleProxySession(sessionId,async({connection})=>{if(!/^\s*SELECT\b/.test(sql))throw Error('SELECT_ONLY');const rows=(await connection.execute(sql,binds,{outFormat:4002,maxRows:1001})).rows;if(rows.length>1000)throw Error('BOUNDED_ROWS_REQUIRED');return rows;});
+const evaluate=expression=>inspector.evaluate(expression),trace='globalThis.__codexInvoiceAffectedTrace';
+const responseClass=body=>/no tiene permisos|no est[a\u00e1] autorizado/i.test(body.response??'')&&!body.actions?.invoicePagination?'DENIED':body.actions?.invoicePagination?.totalRows===0?'ABSENT':body.actions?.invoicePagination?.totalRows>0?'AUTHORIZED':'OTHER';
+async function postChat(message,step){await evaluate(trace+'.setStep('+JSON.stringify(step)+')');const response=await fetch('http://127.0.0.1:5400/chatbot/api/bot/chat',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({sessionId,message}),signal:AbortSignal.timeout(120000)});report.httpChatRequests++;const body=await response.json();check(response.status===200&&body.env==='development'&&body.success===true,step+'_REAL_HTTP_CONTRACT');const snapshot=await evaluate(trace+'.snapshot()');return {body,snapshot,responseClass:responseClass(body),httpStatus:response.status};}
+async function reset(){const response=await fetch('http://127.0.0.1:5400/chatbot/api/bot/chat/reset',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({sessionId}),signal:AbortSignal.timeout(30000)});report.conversationResets++;const body=await response.json();check(response.status===200&&body.success===true,'OWNED_CONVERSATION_RESET');}
+async function independentPlate(body){
+ const binds={p:normalizeInvoicePlate('anx123')},filter="REGEXP_REPLACE(UPPER(MATRICULA),'[-[:space:]]','')=:p",allowed="NVL(USER_CAN_CONSULT,'S')<>'N' AND "+filter;
+ const counts=(await query('SELECT COUNT(*) R,COUNT(DISTINCT NRO_FACTURA) I FROM VW_BOT_FACTURAS WHERE '+allowed,binds))[0],restricted=Number((await query("SELECT CASE WHEN EXISTS(SELECT 1 FROM VW_BOT_FACTURAS WHERE USER_CAN_CONSULT='N' AND "+filter+") THEN 1 ELSE 0 END D FROM DUAL",binds))[0].D)===1;
+ const classification=Number(counts.R)>0?(restricted?'MIXED':'AUTHORIZED'):(restricted?'RESTRICTED':'ABSENT');let agrees;
+ if(classification==='RESTRICTED')agrees=responseClass(body)==='DENIED'&&Object.keys(body.actions??{}).length===0&&!/Ver PDF/.test(body.response);
+ else{const p=body.actions?.invoicePagination;agrees=p?.totalRows===Number(counts.R)&&p?.totalInvoices===Number(counts.I);if(classification==='ABSENT')agrees&&=responseClass(body)==='ABSENT'&&/No se encontraron registros/.test(body.response);else{
+  const expected=await query('SELECT * FROM (SELECT NRO_FACTURA N,NOM_CLIENTE C,DES_CONCEPTO K,IMPORTE A,PDF D FROM VW_BOT_FACTURAS WHERE '+allowed+' ORDER BY FECHA_EMISION DESC,NRO_FACTURA DESC,COD_CONCEPTO) WHERE ROWNUM<=20',binds),cell=v=>String(v??'Sin datos').replace(/([\\`*_[\]<>|])/g,'\\$1').replace(/[\r\n]+/g,' '),lines=body.response.split('\n').filter(l=>l.startsWith('| '));
+  agrees&&=lines.length===expected.length+2&&expected.every((r,i)=>lines[i+2].includes('| '+cell(r.N)+' |')&&lines[i+2].includes('| '+cell(r.C)+' |')&&lines[i+2].includes('| '+cell(r.K)+' |'));
+ }}
+ return {classification,httpAgreesWithIndependentOracle:Boolean(agrees),plateOpaque:h(nonce,binds.p),identitySameAsOwnedSession:true};
+}
+try{
+ check(config.env==='development'&&!config.piiDebugShowRaw&&!config.bedrockDebugPayloads&&report.baseCommit==='22f4b02c98003312bc1558746740cfc511e2dedd','SAFE_BASELINE_DEV');
+ inspector=await openInspector();const expected=JSON.parse(fs.readFileSync(new URL('./expected.json',import.meta.url),'utf8'));report.loadedModules=await verifyLoadedSource(inspector,expected);report.loadedCodeMatchesBaseline=true;
+ if(process.argv.includes('--preflight')){report.status='preflight';report.success=true;}
+ else{
+  let input='';for await(const c of process.stdin){input+=c;if(input.length>4096)throw Error('INPUT_TOO_LARGE');}sessionId=JSON.parse(input).sessionId;input='';check(/^[a-f0-9-]{36}$/i.test(sessionId??''),'OWNED_LOGIN_SESSION_REQUIRED');nonce=crypto.randomBytes(32).toString('hex');
+  const identity=await getValidOracleSession(sessionId),oracle=(await query("SELECT USER U,SYS_CONTEXT('USERENV','SESSION_USER') S,SYS_CONTEXT('USERENV','PROXY_USER') P FROM DUAL"))[0],normalize=v=>String(v??'').trim().toUpperCase();
+  check(normalize(oracle.U)===normalize(identity.username)&&normalize(oracle.S)===normalize(identity.username)&&Boolean(oracle.P),'INDEPENDENT_ORACLE_USES_SAME_POSTGRES_SESSION_IDENTITY');report.identity={targetOpaque:h(nonce,normalize(identity.username)),oracleSessionMatches:true,proxyPresent:true};
+  const installedInfo=await evaluate("import('file:///tmp/invoice-affected-live-trace/runtime.mjs').then(m=>m.install("+JSON.stringify({sessionId,nonce,expectedPlate:'anx123'})+"))");installed=true;check(installedInfo.installed&&installedInfo.targetIdentityOpaque===report.identity.targetOpaque,'TRACE_ATTACHED_TO_SAME_IDENTITY');
+  const before=await evaluate(trace+'.snapshot()');check(before.calls.length===0,'NEW_OWNED_CONVERSATION_BEFORE_INITIAL');
+  const initial=await postChat('facturas de arrendamiento m\u00ednimo del 2023 del local impacto','INITIAL');report.initial={httpStatus:initial.httpStatus,responseClass:initial.responseClass,trace:initial.snapshot};
+  if(initial.responseClass!=='DENIED'){report.status='blocked';report.blocker='AFFECTED_INITIAL_DENIAL_NOT_REPRODUCED';report.caseResolved=false;}
+  else{
+   const sequential=await postChat('facturas de la matr\u00edcula anx123','SEQUENTIAL_PLATE');report.sequential={httpStatus:sequential.httpStatus,responseClass:sequential.responseClass,trace:sequential.snapshot,independentOracle:await independentPlate(sequential.body)};
+   await reset();const fresh=await postChat('facturas de la matr\u00edcula anx123','FRESH_PLATE');report.fresh={httpStatus:fresh.httpStatus,responseClass:fresh.responseClass,trace:fresh.snapshot,independentOracle:await independentPlate(fresh.body)};
+   const last=sequential.snapshot.currentCalls.find(c=>c.name==='get_invoices'),keys=Object.keys(last?.args??{});
+   report.observations={inheritedFilterKeys:keys.filter(k=>['customerIds','conceptIds','dateFrom','dateTo','period','cancelled'].includes(k)),routeTools:sequential.snapshot.currentCalls.map(c=>c.name),sequentialAndFreshSameClass:sequential.responseClass===fresh.responseClass,restrictedSignalLost:report.sequential.independentOracle.classification==='RESTRICTED'&&sequential.responseClass==='ABSENT',sequentialAgreesWithOracle:report.sequential.independentOracle.httpAgreesWithIndependentOracle,freshAgreesWithOracle:report.fresh.independentOracle.httpAgreesWithIndependentOracle};
+   report.exactBugReproduced=initial.responseClass==='DENIED'&&sequential.responseClass==='ABSENT'&&(!report.observations.sequentialAgreesWithOracle||!report.observations.sequentialAndFreshSameClass);
+   report.status=report.exactBugReproduced?'reproduced':'not_reproduced';report.caseResolved=false;report.success=true;
+  }
+ }
+}catch(e){report.status='failed';report.error={code:/^[A-Z][A-Z0-9_]+$/.test(e?.message??'')?e.message:/^(?:ORA-\d{5}|NJS-\d{3}|DPI-\d{4})$/.test(e?.code??'')?e.code:'AFFECTED_USER_CONTROL_FAILED'};report.caseResolved=false;}
+finally{
+ if(installed){try{report.runtimeCleanup=await evaluate(trace+'.dispose()');if(!report.runtimeCleanup.driverRestored||!report.runtimeCleanup.connectionsClosed)report.success=false;}catch{report.runtimeCleanup={failed:true};report.success=false;}}
+ if(sessionId){try{await reset();}catch{report.conversationCleanupFailed=true;report.success=false;}}
+ if(inspector){try{report.inspectorClosedOrPreviousStatePreserved=await inspector.close();if(!report.inspectorClosedOrPreviousStatePreserved)report.success=false;}catch{report.inspectorCleanupFailed=true;report.success=false;}}
+ report.independentConnectionsClosed=opened===closed&&!closeErrors;if(!report.independentConnectionsClosed)report.success=false;sessionId=null;nonce=null;
+}
+report.finishedAt=new Date().toISOString();report.pdfDownloads=0;emit(JSON.stringify(report));process.exitCode=report.success?0:1;
