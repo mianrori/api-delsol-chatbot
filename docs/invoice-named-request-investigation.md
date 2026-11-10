@@ -1,4 +1,4 @@
-﻿# Facturas: concepto de facturación frente a cliente/local
+# Facturas: concepto de facturación frente a cliente/local
 
 Caso reportado: «facturas de arrendamiento mínimo del 2023 del local impacto».
 La respuesta que presenta «arrendamiento mínimo» como cliente es incorrecta.
@@ -27,5 +27,41 @@ sessionId/PostgreSQL/proxy y USER_CAN_CONSULT sin cambios.
 Pruebas enfocadas: roles, otras descripciones de concepto, sintaxis no aplicable,
 tildes, códigos literales, nombres no encontrados, opciones válidas/incorrectas,
 ambigüedad individual/doble antes y después del recorte, argumentos finales,
-2023, filtros anteriores y presentación. Verificación Oracle autorizada pendiente
-hasta revisar el reporte sanitizado de la copia aislada. No merge ni despliegue.
+2023, filtros anteriores y presentación. Verificación Oracle autorizada revisada en una copia aislada. No merge ni despliegue.
+
+## Resultado verificado
+
+Commit de aplicación y pruebas: `5816a8bd0d173319038aad14eb30e22e1280e346`.
+**28/28 pruebas afectadas Node 22.23.4**: 13 nuevas y 15 existentes de facturas y
+PDF, sin suite completa. Salida SHA-256
+`481b1e089946db3502027dc19f4649097ecaf684afe9bcecfbd24a6d62ec864b`.
+
+**15/15 comprobaciones Oracle independientes** en el mismo commit:
+
+- Catálogo autorizado: una coincidencia del concepto solicitado, `RESOLVED`.
+- Cliente/local de facturación «impacto»: `RESOLVED` dentro de 2023. El nombre se
+  contrastó también de forma independiente en las filas fiscales autorizadas.
+- La frase literal hizo primero `search_invoice_concepts` con el concepto y luego
+  `search_invoice_customers` únicamente con el local y el rango 2023; no hubo
+  elecciones numéricas controladas porque ambos resolvers dieron unicidad.
+- `get_invoices` recibió los dos IDs efectivos y 01/01/2023–31/12/2023. Hubo
+  facturas; conteos y página de detalle/cliente/concepto/importes se conciliaron
+  con SELECT independientes, sin publicar valores ni documentos.
+- Estado final con metadatos de solicitud, sin filas de facturas; cierres, logout
+  y auditoría de logs sanitizados aprobados. Cero Bedrock/proveedor y sin GET de
+  PDF. No se reproduce una conversación completa con modelo remoto: el caso
+  literal se resuelve por la ruta tipada y el modelo del control rechaza llamadas.
+
+301 archivos del candidato verificados en la copia aislada, manifiesto SHA-256
+`96661b009576482045eb7c7172fc1550d2b3cad9236cdfd4002ee7d1c7e382b2`.
+Reporte congelado ignorado `logs/invoice-named-5816a8b.json`, SHA-256
+`b536329c7945f41ecc49e4447f0c73c79403565b390654af6553d33f4a9b77d2`.
+Revisión local sanitizada: `logs/invoice-named-evidence-review.json`.
+
+DEV sigue con el código desplegado de `9addbef`; la nueva interpretación no está
+en `/app`. Esta entrega está en la rama local
+`fix/invoice-concept-customer-intent`, sin publicar PR, merge ni despliegue.
+No se modificaron datos, configuración, permisos o expiraciones. La gramática
+es acotada; no se acredita interpretación remota exhaustiva ni otras muestras
+fiscales. Las reservas previas, incluida la del PDF ausente, no se modifican.
+Los cambios posteriores a `5816a8b` de esta entrega solo documentan resultados.
