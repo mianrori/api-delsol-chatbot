@@ -4,7 +4,7 @@ export function auditAffectedLogs(raw,service){
  if(service==='erp'){const safe=lines.every(l=>{try{const v=JSON.parse(l);return v.event==='ERP_DEV_SAFE_AUTH_TEST_LOG'&&Object.keys(v).every(k=>['event','correlationId','level','code'].includes(k));}catch{return false;}});return {lines:lines.length,safe,recognized:'ERP protected auth metadata'};}
  let inspectorLines=0,permissionLines=0,unknown=0,calls=0,results=0,permissionErrors=0,bedrockRequests=0,bedrockResponses=0;const retained=[];
  for(const line of lines){const t=line.trim();
-  if(/^Debugger (?:listening|ending) on ws:\/\/127\.0\.0\.1:9229\/[a-f0-9-]+$/.test(t)||t==='Debugger attached.'||t==='For help, see: https://nodejs.org/en/docs/inspector'){inspectorLines++;continue;}
+  if(/^Debugger (?:listening|ending) on ws:\/\/127\.0\.0\.1:9229\/[a-f0-9-]+$/.test(t)||t==='Debugger attached.'||['For help, see: https://nodejs.org/en/docs/inspector','For help, see: https://nodejs.org/learn/getting-started/debugging'].includes(t)){inspectorLines++;continue;}
   if(/^Error ejecutando tool "(?:search_invoice_concepts|search_invoice_customers|get_invoices)": El usuario no tiene permisos para consultar esta informaci\u00f3n\.$/.test(t)){permissionLines++;continue;}
   retained.push(line);
  }
