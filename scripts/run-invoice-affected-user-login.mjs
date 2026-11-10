@@ -1,6 +1,7 @@
 ﻿// Protected account input is shared with the established DEV login helper.
 import fs from 'node:fs';import {execFileSync,spawn,spawnSync} from 'node:child_process';import crypto from 'node:crypto';import {fileURLToPath} from 'node:url';import {resolve} from 'node:path';
 import {loginDev,logoutDev,probeLoginDev} from './dev-protected-login.mjs';
+import {auditAffectedLogs} from './invoice-affected-log-audit.mjs';
 const root=fileURLToPath(new URL('../',import.meta.url)),base='22f4b02c98003312bc1558746740cfc511e2dedd',docker=process.env.INVOICE_AFFECTED_DOCKER||'docker',bot='api-delsol-chatbot-dev',erp='api-delsol-erp-dev',candidate='/tmp/invoice-affected-live-trace';
 const run=(cmd,args,opt={})=>execFileSync(cmd,args,{cwd:root,encoding:'utf8',windowsHide:true,stdio:['pipe','pipe','pipe'],maxBuffer:20971520,...opt}),dock=(...args)=>run(docker,args),git=(...args)=>run('git',args),hash=x=>crypto.createHash('sha256').update(x).digest('hex');
 const report={suite:'affected-user-live-helper',success:false,status:'preflight',baseCommit:base,startedAt:new Date().toISOString(),accountPolicy:'only the affected DEV user entered in the hidden login; no fallback account',modelPolicy:'existing 5400 process; no SDK substitution'};let ownedSession,payload;
@@ -19,5 +20,7 @@ try{
 }catch(e){report.error={code:/^[A-Z][A-Z0-9_]+$/.test(e?.message??'')?e.message:/^[A-Z][A-Z0-9_]+$/.test(e?.code??'')?e.code:'AFFECTED_USER_HELPER_FAILED'};report.success=false;report.caseResolved=false;}
 finally{
  payload=null;if(ownedSession){try{await logoutDev(ownedSession);report.logout=true;}catch{report.logout=false;report.success=false;}ownedSession=null;}
- report.finishedAt=new Date().toISOString();const target=resolve(root,'logs/invoice-affected-user'+(process.argv.includes('--preflight')?'-preflight':'-real')+'.json');fs.writeFileSync(target,JSON.stringify(report,null,2));process.stdout.write(JSON.stringify(report)+'\n');process.exitCode=report.success?0:1;
+ report.finishedAt=new Date().toISOString();report.logAudit=[];
+ for(const container of [bot,erp])try{const v=spawnSync(docker,['logs','--since',report.startedAt,'--until',report.finishedAt,container],{encoding:'utf8',windowsHide:true,maxBuffer:2097152});if(v.status!==0||v.error)throw Error();const audit=auditAffectedLogs(v.stdout+'\n'+v.stderr,container===bot?'chatbot':'erp');report.logAudit.push({service:container===bot?'chatbot':'erp',...audit});if(!audit.safe)report.success=false;}catch{report.logAudit.push({service:container===bot?'chatbot':'erp',auditFailed:true});report.success=false;}
+ const target=resolve(root,'logs/invoice-affected-user'+(process.argv.includes('--preflight')?'-preflight':'-real')+'.json');fs.writeFileSync(target,JSON.stringify(report,null,2));process.stdout.write(JSON.stringify(report)+'\n');process.exitCode=report.success?0:1;
 }
