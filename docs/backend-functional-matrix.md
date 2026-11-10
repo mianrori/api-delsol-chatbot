@@ -711,3 +711,15 @@ Conexiones, servidor efímero, logout y logs sanitizados aprobados. SDK controla
 no invocado: cero Bedrock/modelo real/proveedor; no se acredita lenguaje libre
 remoto. El candidato sigue sin desplegarse; los cambios posteriores a `e60df5d`
 solo documentan resultados. PR #47 en borrador con las reservas conservadas.
+
+
+### Facturas: mensaje de autorizacion USER_CAN_CONSULT
+
+| Caso | Evidencia | Limite |
+| --- | --- | --- |
+| Denegacion total y cliente restringido | 38/38 pruebas enfocadas Node 22 sobre 6b85edd, incluidos flujos de servicio/chat y HTTP sinteticos; sin datos/enlaces y mensaje de permisos. | No hubo muestra Oracle real en los alcances cliente/concepto/dia explorados; no se acredita este positivo real. |
+| Solo permitidos | Detalle y resumen HTTP 200; filas, conteos, paginacion, enlaces y totales por moneda conciliados con SELECT independientes. | Primera pagina autorizada; no todas las paginas. |
+| Mixto | Cobertura sintetica de aviso parcial, conteos/paginacion permitidos y enlaces autorizados. | No hubo anio con ambas clases en la busqueda DEV; pendiente Oracle real, incluida segunda pagina mixta. |
+| Ausencia real | HTTP 200 vacio, SELECT confirma ausencia de ambas clases y no se muestra denegacion. | No equivale a denegacion; filtro sin datos, sin crear registros. |
+
+**ea812b4: 25/25 aserciones, 3 POST HTTP**, aplicacion y pruebas identicas a **6b85edd**. Las 38 pruebas se reutilizaron por hash, sin repetir. Candidato aislado, sesion/proxy Oracle reales; **4 invocaciones SDK controladas, cero modelo real/Bedrock/proveedor y cero descargas PDF**. Cierres, logout y logs sanitizados aprobados. Reporte SHA-256 9605fcaa58da48138d39c318988488ed97633cdbea93f3ec5f93b4ae478a7097; alcance y muestras faltantes en [invoice-access-authorization.md](invoice-access-authorization.md). PR #48 en borrador, DEV sin cambios, reservas previas conservadas. No se suman aserciones y pruebas como cobertura unica; no se modificaron datos, configuracion, permisos o expiraciones.
