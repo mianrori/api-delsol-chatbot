@@ -1,4 +1,4 @@
-﻿# Facturas por matrícula y enlaces PDF
+# Facturas por matrícula y enlaces PDF
 
 Base del chatbot: PR #45 desplegada en `883805c`. Rama separada
 `feat/invoice-plate-pdf-links`; sin merge ni despliegue de esta entrega.
@@ -61,7 +61,76 @@ independiente de filas/conteos y URLs base+PDF en dos páginas; GET de un PDF so
 en el origen configurado (sin redirecciones), estado/tipo/firma PDF sin guardar
 el documento. Cierres de conexiones y servidor, logout y logs sanitizados.
 
-Resultados Node 22 y Oracle/HTTP pendientes de revisar. No se llama a Bedrock ni
+Resultados Node 22 y Oracle/HTTP revisados abajo; descarga con reserva HTTP 404. No se llama a Bedrock ni
 al proveedor externo. No se publica DEV, ni se alteran datos, permisos o
 expiraciones. Se conservan las reservas y evidencias anteriores; no se atribuye
 cobertura real a archivos/casos ausentes de la cohorte observada.
+
+## Resultado revisado y reserva de disponibilidad PDF
+
+**Aplicación y pruebas: `2826a4d8a0cc09e90bb53c2a6a9708d11968ea55`.**
+13/13 pruebas afectadas en Node 22.23.4 (dos archivos: `invoices` e
+`invoicePlatePdf`), sin suite completa. Salida congelada ignorada
+`logs/invoice-plate-pdf-focused-node22.txt`, SHA-256
+`8714175107362226ca77bbfbf4959c8a9b7edc968298f7684c93baf20d80c5c0`.
+
+El contraste inicial sobre ese commit aprobó **23 de 24 aserciones**: identidad
+proxy desde sesión, HTTP, filtros, búsqueda con espacios/tabuladores, conteos,
+importes, paginación de dos filas/páginas y ausencia correcta de enlaces donde
+`PDF` era nulo. Falló la condición final de descargar un PDF: esas dos páginas
+no tenían archivo aunque había otras filas de la cohorte con `PDF`. **No hizo
+GET de un documento y no fue una aprobación global.** Cierres y logout aprobados.
+Reporte congelado `logs/invoice-plate-pdf-2826a4d-partial.json`, SHA-256
+`dbf28115d3b3ecbfd85bd62d5280d76a7873552cc0f53912c1ba0e7888395d79`.
+
+**Ejecutor ajustado: `3cfc59f44330dcc6c79ba5b1c7277b6c4d9cdc67`.** Solo modifica
+los dos scripts de control: encuentra la página que efectivamente contiene PDF,
+conserva la evidencia de las dos páginas aprobadas y las 13 pruebas mediante
+hash/identidad de código, y comprueba únicamente esa página restante. No cambia
+aplicación ni pruebas. Se verificaron 295 archivos de la copia aislada; manifiesto
+SHA-256 `749dafc5c3bae091928b1d3acb507bcc8fdafc633f6fff9200ac2d576e255622`.
+
+Este control adicional aprobó **17 de 18 aserciones**: la fila y los conteos
+coinciden con Oracle independiente; `pdfUrl` coincide exactamente con base +
+`PDF` autorizado y el HTTP conversacional ofrece «Ver PDF» con ese destino.
+El GET al origen configurado devolvió **404**, sin tipo ni firma PDF válidos.
+La descarga **no está aprobada**. Este resultado no se suma a las 23 aserciones
+anteriores como cobertura única ni se transforma en un control global verde.
+Reporte congelado `logs/invoice-plate-pdf-3cfc59f-http404.json`, SHA-256
+`c9ae5550b28884e7a91811062a529b0ac851cc99555c547264085ca33998e8cb`.
+
+La revisión de la ruta del ERP añadió estas referencias (2026-11-10):
+
+- [src/routes/base.route.js](https://github.com/mianrori/api-delsol-erp/blob/main/src/routes/base.route.js),
+  blob `af7fae9c5b3205cf49fc349fc799a5d39c3ba292`: `/factura/pdf/:cdc`.
+- [src/controllers/base/download-de.controller.js](https://github.com/mianrori/api-delsol-erp/blob/main/src/controllers/base/download-de.controller.js),
+  blob `bccaa88ee4caee1c77a3e051a8b862be8a643668`: añade `.pdf` al parámetro y devuelve
+  404 si no encuentra el archivo en el directorio configurado.
+
+La configuración observada apunta a esa forma de ruta. No se publicaron URL,
+parámetro, matrícula, cliente ni contenido del documento. La evidencia acredita
+la misma construcción de URL que el servicio ERP, pero no determina si el 404
+se debe al archivo disponible o a una diferencia entre `PDF` y el parámetro
+esperado por esa ruta. No se quitó/agregó una extensión al dato Oracle, ni se
+cambió `URL_ENDPOINT_DE_PDF`, ni se copió/generó un archivo para hacer pasar el
+control. **Queda pendiente verificar la disponibilidad del documento en el
+endpoint; mantener la PR en borrador.**
+
+Cierres y logout aprobados en ambos intentos. Logs: cero líneas del chatbot y
+solo eventos ERP con esquema sanitizado reconocido (dos en el primero y tres en
+el segundo). Modelo controlado: dos llamadas en el primer intento y una en el
+adicional; cero Bedrock/proveedor. HTTP del candidato en loopback efímero,
+router/controller/servicio/repositorio reales y Oracle proxy autorizado. Sin
+valores sensibles ni documentos en reportes versionados.
+
+DEV conserva los 292 archivos comprobados de `883805c`; el candidato no está en
+`/app` y la salud es correcta. La instancia cambió respecto del reporte histórico
+de arranque de PR #45: no se afirma que sea la misma instancia. No se ejecutó
+merge, reconstrucción ni despliegue durante esta tarea. Revisión sanitizada
+local: `logs/invoice-plate-pdf-evidence-review.json`.
+
+Los commits posteriores a `3cfc59f` de esta entrega solo documentan resultados.
+Las reservas históricas, muestras pendientes y límites del balance permanecen.
+No se acredita HTTP 200/PDF descargable, cobertura lingüística remota, todas las
+matrículas o documentos, ni controles reales de base/archivo ausentes: estos
+últimos tienen cobertura sintética.

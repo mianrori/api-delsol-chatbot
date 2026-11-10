@@ -657,3 +657,26 @@ límites del balance se conservan. Docker DEV sigue en `7d29892`, sin reconstrui
 ni sustituir `/app`; PR en borrador, sin merge, despliegue o cambios de datos,
 permisos o expiraciones. Los commits posteriores a `0d1f799` de esta entrega son
 documentales.
+
+### Facturas: matrícula sin espacios y «Ver PDF» desde el dato autorizado
+
+| Caso | Evidencia nueva | Reserva/límite |
+| --- | --- | --- |
+| Matrícula con espacios/tabuladores y guiones | Normalización de entrada y filtro Oracle; mismos binds, `USER_CAN_CONSULT`, cliente/concepto, fechas y anulación en conteo y detalle. Dos páginas HTTP conciliadas con Oracle independiente. | Se conserva `LIKE` por contenido del repositorio ERP; no se lo presenta como igualdad ni fuzzy. |
+| `PDF` con valor | Construcción idéntica al servicio ERP: `URL_ENDPOINT_DE_PDF` + campo `PDF`; «Ver PDF» en la respuesta HTTP de la fila autorizada. | GET real devolvió **404**: archivo descargable no aprobado; no se altera endpoint, dato ni extensión para ocultarlo. |
+| `PDF` ausente y cambio de página | Sin enlace inventado; todas las filas visibles, sin enlaces de la página anterior. Paginación y filtros preservados. | Dos primeras páginas reales sin PDF; enlace positivo verificado en una página posterior. |
+| Contrato y permisos | Router/controller/chat/servicio/repositorio en HTTP aislado; identidad por `sessionId` y proxy, cuerpo `username` ignorado, cierres/logout y logs sanitizados. | Modelo controlado; sin Bedrock ni nuevas conversaciones remotas. Sesión inválida y base/archivo ausentes tienen además cobertura sintética. |
+
+**13/13 pruebas afectadas Node 22.23.4 sobre `2826a4d`.** Contraste inicial
+**23/24 aserciones**, incompleto por no haber PDF en las dos páginas elegidas.
+`3cfc59f` solo ajusta el ejecutor, reutiliza código/pruebas y páginas aprobadas;
+control de la página con PDF **17/18**, con reserva explícita **HTTP 404**.
+No sumar los conteos como cobertura única ni declarar una aprobación global.
+Aplicación y pruebas no cambian tras `2826a4d`; commits posteriores a `3cfc59f`
+solo documentan resultados. Referencias ERP, hashes y detalle en
+[invoice-plate-pdf-investigation.md](invoice-plate-pdf-investigation.md).
+
+PR en borrador; descarga PDF pendiente de revisar contra el recurso configurado.
+Sin merge, despliegue, cambios de datos, permisos o expiraciones. Se conservan
+las seis reservas F3/F4/M7, F5/T1, las muestras pendientes y las demás salvedades
+del balance y de las PR anteriores; DEV conserva el código `883805c`.
