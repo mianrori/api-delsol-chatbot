@@ -735,3 +735,15 @@ solo documentan resultados. PR #47 en borrador con las reservas conservadas.
 | Denegacion al consultar facturas; nueva matricula permitida/restringida/ausente | Cobertura sintetica inicial, chat y HTTP, ambas intenciones y recorte. | Consulta inicial real AUTHORIZED; no se presenta como Oracle real denegacion seguida de matricula. |
 
 **7d05971: 48/48 comprobaciones en cuatro POST HTTP 200**, aplicacion/pruebas identicas a 5f94216. Las 56/6 pruebas de 73e1eef se reutilizan para partes no modificadas; 20 controles cubren el ajuste adicional. SDK controlado no invocado: cero Bedrock/modelo real/proveedor y descargas PDF. Cierres, logout y logs sanitizados aprobados. Reporte SHA-256 5ce138983586a094e2f013308ab1d9c246b3eb3cab0e73d500fe99633708ff3f; 315 archivos, manifiesto 16d0fc86dfb5515563e68f89fabdbef1752a9a7fa352f946c82cb6b971824fde. [Alcance y muestras faltantes](invoice-plate-query-scope.md). PR #49 en borrador, DEV sin cambios. Reservas restringidas/mixtas/segunda pagina mixta y positivo PDF/404 separados conservadas. Sin merge, despliegue o cambios de datos, configuracion, permisos o expiraciones.
+
+
+### Reapertura con usuario afectado sobre 22f4b02
+
+| Evidencia real | Resultado | Reserva |
+| --- | --- | --- |
+| Codigo de 5400 | 319 archivos y diez modulos realmente cargados coinciden con 22f4b02. | No se sustituye por candidato ni por modelo controlado. |
+| Denegacion inicial de cliente/concepto/2023 | Reproducida al resolver cliente: N recibido y ACCESS_DENIED, sin cliente confirmado. | Esta evidencia acredita la denegacion real para ese login; no cambia retroactivamente controles de cuentas autorizadas. |
+| Matricula autonoma despues de denegacion | Argumentos y SQL reales sin cliente, concepto o periodo; autorizacion conservada, conteo cero y flag restringido falso. | No se demuestra la incorreccion reportada. |
+| Oracle independiente y conversacion nueva | ABSENT para la misma identidad; respuesta coincide. | ANX123 literal, no positiva. Pendiente auditoria Unicode/proyeccion de vista; no hay correccion demostrada. |
+
+Ejecutor caed886, tres preguntas HTTP reales y dos resets de conversacion propia; no SDK controlado, cero eventos Bedrock, conexiones/driver/inspector/logout cerrados y logs sanitizados. Reporte SHA-256 d97cb76388f15c9fd0162c4775ebed16a41adf56eca85b288bcbdd6cf4e60065. [Investigacion abierta](invoice-affected-user-investigation.md). PR #50 en borrador, sin merge, despliegue o cambios de datos/permisos/expiraciones. Reservas de facturas restringidas por esa matricula, mixtos, segunda pagina mixta y PDF positivo/404 separados conservadas.

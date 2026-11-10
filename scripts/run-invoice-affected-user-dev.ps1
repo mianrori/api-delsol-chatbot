@@ -1,4 +1,4 @@
-param([switch]$Preflight)
+param([switch]$Preflight,[switch]$NormalizationAudit)
 $ErrorActionPreference='Stop'
 $root=Split-Path -Parent $PSScriptRoot
 $docker=Get-Command docker -ErrorAction SilentlyContinue
@@ -22,7 +22,8 @@ function Invoke-Control($mode,$payload){
   return $result
  }finally{$process.Dispose()}
 }
-$result=Invoke-Control '--preflight' $null
+$extraMode=if($NormalizationAudit){' --normalization-audit'}else{''}
+$result=Invoke-Control ('--preflight'+$extraMode) $null
 if(-not $result.success){Write-Output 'INVOICE_PLATE_SCOPE_HTTP_PREFLIGHT_FAILED: revisar logs/invoice-affected-user-preflight.json';exit 1}
 if($Preflight){Write-Output 'INVOICE_PLATE_SCOPE_HTTP_PREFLIGHT_PASS';exit 0}
 $account=@{};$payload=$null
@@ -33,6 +34,6 @@ try{
  }
  $payload=@{authorized=$account}|ConvertTo-Json -Compress
  $payload=[regex]::Replace($payload,'[^\x00-\x7F]',{param($m) '\u'+([int][char]$m.Value).ToString('x4')})
- $result=Invoke-Control '--run' $payload
+ $result=Invoke-Control ('--run'+$extraMode) $payload
  if($result.status -eq 'blocked'){Write-Output 'AFFECTED_USER_BLOCKED: denegacion inicial no reproducida; revisar logs/invoice-affected-user-real.json';exit 1};if($result.success){Write-Output 'AFFECTED_USER_TRACE_COMPLETE'}else{Write-Output 'INVOICE_PLATE_SCOPE_HTTP_REAL_FAILED: revisar logs/invoice-affected-user-real.json';exit 1}
 }finally{$payload=$null;$account.Clear()}

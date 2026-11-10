@@ -25,6 +25,25 @@ async function independentPlate(body){
  }}
  return {classification,httpAgreesWithIndependentOracle:Boolean(agrees),plateOpaque:h(nonce,binds.p),identitySameAsOwnedSession:true};
 }
+async function auditNormalization(){
+ const p='ANX123',where="REGEXP_REPLACE(UPPER(MATRICULA),'[-[:space:]]','')=:p";
+ const exact=(await query("SELECT CASE WHEN EXISTS(SELECT 1 FROM VW_BOT_FACTURAS WHERE NVL(USER_CAN_CONSULT,'S')<>'N' AND "+where+") THEN 1 ELSE 0 END A,CASE WHEN EXISTS(SELECT 1 FROM VW_BOT_FACTURAS WHERE USER_CAN_CONSULT='N' AND "+where+") THEN 1 ELSE 0 END N FROM DUAL",{p}))[0];
+ const candidates=await query("SELECT DISTINCT MATRICULA M,NVL(USER_CAN_CONSULT,'S') P FROM VW_BOT_FACTURAS WHERE MATRICULA IS NOT NULL AND INSTR(REGEXP_REPLACE(UPPER(MATRICULA),'[^A-Z0-9]',''),:p)>0",{p});
+ const independent=value=>Array.from(String(value).toUpperCase()).filter(c=>c!=='-'&&c!=='\uFEFF'&&!/\p{White_Space}/u.test(c)).join('');
+ const matches=candidates.filter(r=>independent(r.M)===p),otherAsciiExact=candidates.filter(r=>String(r.M).toUpperCase().replace(/[^A-Z0-9]/g,'')===p&&independent(r.M)!==p);
+ const chars=[...new Set([...matches,...otherAsciiExact].flatMap(r=>Array.from(String(r.M)).filter(c=>!/^[A-Za-z0-9]$/.test(c)).map(c=>'U+'+c.codePointAt(0).toString(16).toUpperCase().padStart(4,'0'))))];
+ const restrictedShapes=(await query("SELECT CASE WHEN EXISTS(SELECT 1 FROM VW_BOT_FACTURAS WHERE USER_CAN_CONSULT='N' AND MATRICULA IS NULL) THEN 1 ELSE 0 END Z,CASE WHEN EXISTS(SELECT 1 FROM VW_BOT_FACTURAS WHERE USER_CAN_CONSULT='N' AND MATRICULA IS NOT NULL) THEN 1 ELSE 0 END V FROM DUAL"))[0];
+ let definition={readable:false};try{
+  const textRows=await query("SELECT TEXT FROM ALL_VIEWS WHERE VIEW_NAME=:v",{v:'VW_BOT_FACTURAS'});
+  if(textRows.length===1&&typeof textRows[0].TEXT==='string'){
+   const text=textRows[0].TEXT.toUpperCase(),beforeFrom=text.split(/\bFROM\b/)[0],simple=beforeFrom.split(',').some(x=>/^\s*(?:SELECT\s+)?(?:[A-Z0-9_$#]+\.)?MATRICULA(?:\s+(?:AS\s+)?MATRICULA)?\s*$/.test(x));
+   definition={readable:true,uniqueVisibleDefinition:true,mentionsMatricula:/\bMATRICULA\b/.test(text),mentionsUserCanConsult:/\bUSER_CAN_CONSULT\b/.test(text),simpleDirectPlateProjection:simple,containsConditionalExpressions:/\b(?:CASE|DECODE)\b/.test(text),conditionalMaskingNotConcluded:true};
+  }else definition={readable:textRows.length>0,uniqueVisibleDefinition:textRows.length===1,projectionNotConcluded:true};
+ }catch(e){definition={readable:false,technicalCode:/^(?:ORA-\d{5}|NJS-\d{3}|DPI-\d{4})$/.test(e?.code??'')?e.code:'METADATA_UNAVAILABLE'};}
+ const sqlAuthorized=Number(exact.A)===1,sqlRestricted=Number(exact.N)===1,independentAuthorized=matches.some(r=>r.P!=='N'),independentRestricted=matches.some(r=>r.P==='N');
+ return {scope:'same affected identity, Oracle view only, no HTTP rerun',sqlExact:{anyAuthorized:sqlAuthorized,anyRestricted:sqlRestricted},independentUnicodeNormalization:{anyAuthorized:independentAuthorized,anyRestricted:independentRestricted,candidateScanComplete:true,anyCandidates:candidates.length>0,asciiExactButDifferentUnicodeNormalization:otherAsciiExact.length>0,nonAlphanumericCodePoints:chars},normalizationDiscrepancy:sqlAuthorized!==independentAuthorized||sqlRestricted!==independentRestricted,restrictedRowsWithNullPlate:Number(restrictedShapes.Z)===1,restrictedRowsWithNonNullPlate:Number(restrictedShapes.V)===1,viewDefinition:definition,noRowsOrPlateValuesExported:true};
+}
+
 try{
  check(config.env==='development'&&!config.piiDebugShowRaw&&!config.bedrockDebugPayloads&&report.baseCommit==='22f4b02c98003312bc1558746740cfc511e2dedd','SAFE_BASELINE_DEV');
  inspector=await openInspector();const expected=JSON.parse(fs.readFileSync(new URL('./expected.json',import.meta.url),'utf8'));report.loadedModules=await verifyLoadedSource(inspector,expected);report.loadedCodeMatchesBaseline=true;
@@ -34,6 +53,7 @@ try{
   let input='';for await(const c of process.stdin){input+=c;if(input.length>4096)throw Error('INPUT_TOO_LARGE');}sessionId=JSON.parse(input).sessionId;input='';check(/^[a-f0-9-]{36}$/i.test(sessionId??''),'OWNED_LOGIN_SESSION_REQUIRED');nonce=crypto.randomBytes(32).toString('hex');
   const identity=await getValidOracleSession(sessionId),oracle=(await query("SELECT USER U,SYS_CONTEXT('USERENV','SESSION_USER') S,SYS_CONTEXT('USERENV','PROXY_USER') P FROM DUAL"))[0],normalize=v=>String(v??'').trim().toUpperCase();
   check(normalize(oracle.U)===normalize(identity.username)&&normalize(oracle.S)===normalize(identity.username)&&Boolean(oracle.P),'INDEPENDENT_ORACLE_USES_SAME_POSTGRES_SESSION_IDENTITY');report.identity={targetOpaque:h(nonce,normalize(identity.username)),oracleSessionMatches:true,proxyPresent:true};
+  if(process.argv.includes('--normalization-audit')){report.normalization=await auditNormalization();report.status='normalization_complete';report.caseResolved=false;report.success=true;}else{
   const installedInfo=await evaluate("process.getBuiltinModule('module').createRequire('/app/index.js')('/tmp/invoice-affected-live-trace/runtime.mjs').install("+JSON.stringify({sessionId,nonce,expectedPlate:'anx123'})+")");installed=true;check(installedInfo.installed&&installedInfo.targetIdentityOpaque===report.identity.targetOpaque,'TRACE_ATTACHED_TO_SAME_IDENTITY');
   const before=await evaluate(trace+'.snapshot()');check(before.calls.length===0,'NEW_OWNED_CONVERSATION_BEFORE_INITIAL');
   const initial=await postChat('facturas de arrendamiento m\u00ednimo del 2023 del local impacto','INITIAL');report.initial={httpStatus:initial.httpStatus,responseClass:initial.responseClass,trace:initial.snapshot};
@@ -46,11 +66,12 @@ try{
    report.exactBugReproduced=initial.responseClass==='DENIED'&&sequential.responseClass==='ABSENT'&&(!report.observations.sequentialAgreesWithOracle||!report.observations.sequentialAndFreshSameClass);
    report.status=report.exactBugReproduced?'reproduced':'not_reproduced';report.caseResolved=false;report.success=true;
   }
+  }
  }
 }catch(e){report.status='failed';report.error={code:/^[A-Z][A-Z0-9_]+$/.test(e?.message??'')?e.message:/^(?:ORA-\d{5}|NJS-\d{3}|DPI-\d{4})$/.test(e?.code??'')?e.code:'AFFECTED_USER_CONTROL_FAILED'};report.caseResolved=false;}
 finally{
  if(installed){try{report.runtimeCleanup=await evaluate(trace+'.dispose()');if(!report.runtimeCleanup.driverRestored||!report.runtimeCleanup.connectionsClosed)report.success=false;}catch{report.runtimeCleanup={failed:true};report.success=false;}}
- if(sessionId){try{await reset();}catch{report.conversationCleanupFailed=true;report.success=false;}}
+ if(sessionId&&report.httpChatRequests>0){try{await reset();}catch{report.conversationCleanupFailed=true;report.success=false;}}
  if(inspector){try{report.inspectorClosedOrPreviousStatePreserved=await inspector.close();if(!report.inspectorClosedOrPreviousStatePreserved)report.success=false;}catch{report.inspectorCleanupFailed=true;report.success=false;}}
  report.independentConnectionsClosed=opened===closed&&!closeErrors;if(!report.independentConnectionsClosed)report.success=false;sessionId=null;nonce=null;
 }
