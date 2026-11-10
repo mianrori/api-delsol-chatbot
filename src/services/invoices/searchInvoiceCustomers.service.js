@@ -1,4 +1,5 @@
-import { searchInvoiceCustomersRepository } from "../../repositories/invoices/invoiceCustomers.repository.js";
+import { searchInvoiceCustomersRepository, hasRestrictedInvoiceCustomerRepository } from "../../repositories/invoices/invoiceCustomers.repository.js";
+import {invoiceAccessDeniedError} from '../../utils/invoiceAccess.js';
 
 const normalizeCustomerId = (value) =>
   String(value ?? "").trim();
@@ -51,6 +52,9 @@ export const searchInvoiceCustomers = async (
   const uniqueResults = deduplicateCustomers(rawResults);
 
   if (uniqueResults.length === 0) {
+    if (await hasRestrictedInvoiceCustomerRepository({connection, query, dateFrom, dateTo})) {
+      throw invoiceAccessDeniedError();
+    }
     return {
       status: "NOT_FOUND",
       query,

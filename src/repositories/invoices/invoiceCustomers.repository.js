@@ -58,6 +58,23 @@ const mapRow = (row) => ({
   strongMatch: Number(row.MATCH_PRIORITY ?? 99) <= 7,
 });
 
+// A denied lookup must not be reported as a missing customer. Read only an
+// existence bit for strong matches; never return restricted customer metadata.
+export const hasRestrictedInvoiceCustomerRepository = async ({connection, query, dateFrom, dateTo}) => {
+  const queryNormalized = normalizeText(query);
+  if (!queryNormalized) return false;
+  const binds = {queryNormalized};
+  const where = buildBaseFilter({dateFrom, dateTo, binds});
+  where[0] = "USER_CAN_CONSULT = 'N'";
+  const exact = ['COD_CLIENTE', 'RUC', 'MATRICULA'].map(c => `${normalizeOracleText(c)} = :queryNormalized`);
+  const names = ['NOM_CLIENTE', 'RAZON_SOCIAL'].map(c => `INSTR(${normalizeOracleText(c)}, :queryNormalized) > 0`);
+  where.push(`(${[...exact, ...names].join(' OR ')})`);
+  const result = await connection.execute(`SELECT CASE WHEN EXISTS (
+    SELECT 1 FROM VW_BOT_FACTURAS WHERE ${where.join(' AND ')}
+  ) THEN 1 ELSE 0 END AS HAS_RESTRICTED_DATA FROM DUAL`, binds, {outFormat: 4002});
+  return Number(result.rows?.[0]?.HAS_RESTRICTED_DATA) === 1;
+};
+
 // Limit identities, not invoice/plate rows belonging to the same customer.
 const uniqueCustomerSql=sql=>`SELECT * FROM (
   SELECT source_rows.*, ROW_NUMBER() OVER (

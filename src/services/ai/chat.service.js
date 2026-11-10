@@ -1,5 +1,5 @@
 import {executeNamedInvoiceRequest} from './invoiceNamedRequest.service.js';
-import {buildInvoiceDetailResponse} from './invoiceDetailPresentation.service.js';
+import {buildInvoiceDetailResponse, appendInvoiceAccessWarning} from './invoiceDetailPresentation.service.js';
 import {applySalesMetrics} from './salesMetrics.service.js';
 import { buildMemberPurchasesResponse, resolveMemberPurchasesPage } from "./memberPurchasesPresentation.service.js";
 import {preserveSearchSelection,beginSearchSelectionTurn,recordSearchToolResult,captureSearchQueryContext} from './searchSelection.service.js';
@@ -1975,7 +1975,7 @@ export const chatService = async ({ message, sessionId }) => {
       conversationInternalContext.monthlyIncidenceResult,
     );
 
-    const completedAssistantText = conversationInternalContext.accessDenied
+    const completedAssistantBaseText = conversationInternalContext.accessDenied
       ? ACCESS_DENIED_MESSAGE
       : conversationActions.chart?.available
       ? "Aquí tienes el gráfico solicitado."
@@ -1998,6 +1998,9 @@ export const chatService = async ({ message, sessionId }) => {
         text: safeAssistantText,
         internalContext: conversationInternalContext,
       });
+
+    const completedAssistantText = conversationInternalContext.accessDenied ? completedAssistantBaseText
+      : appendInvoiceAccessWarning(completedAssistantBaseText, conversationInternalContext.presentationCalls);
 
     const answer = restorePiiTextForUser(
       sessionId,

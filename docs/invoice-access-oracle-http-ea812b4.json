@@ -1,0 +1,161 @@
+{
+  "suite": "invoice-access-http-helper",
+  "success": true,
+  "startedAt": "2026-11-10T18:05:32.442Z",
+  "phase": "COMPLETE",
+  "commit": "ea812b42688096afac3b4558d899d396444d1bc9",
+  "verifiedSourceFiles": 309,
+  "manifestSha256": "4cfedf65ad2b808b29301983ccf57e568f79af84dfc3cfe41bddc980a786bf46",
+  "validatedApplicationCommit": "6b85edd4b7a32fdc3e4fc9ac7bbab3baf0deef42",
+  "reusedEvidence": {
+    "focused38": {
+      "commit": "6b85edd4b7a32fdc3e4fc9ac7bbab3baf0deef42",
+      "outputSha256": "b99f784dfce3e9cc3b2622ef47b6787c326cd1ecdad8efaa6b9c9ed672e864f8",
+      "notReexecuted": true
+    }
+  },
+  "worker": {
+    "suite": "invoice-access-http-dev",
+    "commit": "ea812b42688096afac3b4558d899d396444d1bc9",
+    "success": true,
+    "checks": [
+      {
+        "code": "SAFE_COMMITTED_DEV",
+        "passed": true
+      },
+      {
+        "code": "permitted_INDEPENDENT_SCOPE_CLASSIFICATION",
+        "passed": true
+      },
+      {
+        "code": "permitted_detail_HTTP_CONTRACT",
+        "passed": true
+      },
+      {
+        "code": "permitted_detail_FINAL_ARGUMENTS_SESSION_SCOPED",
+        "passed": true
+      },
+      {
+        "code": "permitted_detail_PERMISSION_BIT_MATCHES_ORACLE",
+        "passed": true
+      },
+      {
+        "code": "permitted_detail_PARTIAL_WARNING_OR_TRUE_ABSENCE",
+        "passed": true
+      },
+      {
+        "code": "permitted_DETAIL_ROWS_AND_COUNTS_AUTHORIZED_ONLY",
+        "passed": true
+      },
+      {
+        "code": "permitted_PAGINATION_EXCLUDES_RESTRICTED",
+        "passed": true
+      },
+      {
+        "code": "permitted_ONLY_AUTHORIZED_ROWS_AND_PDF_LINKS_RENDERED",
+        "passed": true
+      },
+      {
+        "code": "permitted_INDEPENDENT_SCOPE_CLASSIFICATION",
+        "passed": true
+      },
+      {
+        "code": "permitted_summary_HTTP_CONTRACT",
+        "passed": true
+      },
+      {
+        "code": "permitted_summary_FINAL_ARGUMENTS_SESSION_SCOPED",
+        "passed": true
+      },
+      {
+        "code": "permitted_summary_PERMISSION_BIT_MATCHES_ORACLE",
+        "passed": true
+      },
+      {
+        "code": "permitted_summary_PARTIAL_WARNING_OR_TRUE_ABSENCE",
+        "passed": true
+      },
+      {
+        "code": "permitted_SUMMARY_TOTALS_AND_DISTINCT_INVOICES_AUTHORIZED_ONLY",
+        "passed": true
+      },
+      {
+        "code": "absent_INDEPENDENT_SCOPE_CLASSIFICATION",
+        "passed": true
+      },
+      {
+        "code": "absent_detail_HTTP_CONTRACT",
+        "passed": true
+      },
+      {
+        "code": "absent_detail_FINAL_ARGUMENTS_SESSION_SCOPED",
+        "passed": true
+      },
+      {
+        "code": "absent_detail_PERMISSION_BIT_MATCHES_ORACLE",
+        "passed": true
+      },
+      {
+        "code": "absent_detail_PARTIAL_WARNING_OR_TRUE_ABSENCE",
+        "passed": true
+      },
+      {
+        "code": "absent_DETAIL_ROWS_AND_COUNTS_AUTHORIZED_ONLY",
+        "passed": true
+      },
+      {
+        "code": "absent_PAGINATION_EXCLUDES_RESTRICTED",
+        "passed": true
+      },
+      {
+        "code": "absent_ONLY_AUTHORIZED_ROWS_AND_PDF_LINKS_RENDERED",
+        "passed": true
+      },
+      {
+        "code": "ABSENCE_IS_NOT_DENIAL",
+        "passed": true
+      },
+      {
+        "code": "ALL_ORACLE_CONNECTIONS_CLOSED",
+        "passed": true
+      }
+    ],
+    "startedAt": "2026-11-10T18:05:35.724Z",
+    "scope": "bounded HTTP controls with real candidate router/controller/chat/services/repositories and independent Oracle SELECTs; controlled SDK supplies tool arguments; not model-real or deployed-5400 evidence",
+    "samples": {
+      "restricted": {
+        "available": false,
+        "discovery": "customer/concept/day scopes with no authorized rows"
+      },
+      "permitted": {
+        "available": true
+      },
+      "mixed": {
+        "available": false,
+        "discovery": "year scopes with both permission classes"
+      }
+    },
+    "serverClosed": true,
+    "connectionsClosed": true,
+    "httpConversationRequests": 3,
+    "controlledModelCalls": 4,
+    "realModelCalls": 0,
+    "providerCalls": 0,
+    "pdfDownloads": 0,
+    "finishedAt": "2026-11-10T18:05:39.824Z"
+  },
+  "logout": true,
+  "logAudit": [
+    {
+      "service": "chatbot",
+      "lines": 0,
+      "recognizedSanitizedOnly": true
+    },
+    {
+      "service": "erp",
+      "lines": 2,
+      "recognizedSanitizedOnly": true
+    }
+  ],
+  "finishedAt": "2026-11-10T18:06:10.075Z"
+}
