@@ -28,12 +28,13 @@ async function independentPlate(body){
 try{
  check(config.env==='development'&&!config.piiDebugShowRaw&&!config.bedrockDebugPayloads&&report.baseCommit==='22f4b02c98003312bc1558746740cfc511e2dedd','SAFE_BASELINE_DEV');
  inspector=await openInspector();const expected=JSON.parse(fs.readFileSync(new URL('./expected.json',import.meta.url),'utf8'));report.loadedModules=await verifyLoadedSource(inspector,expected);report.loadedCodeMatchesBaseline=true;
+ check(await evaluate("typeof process.getBuiltinModule('module').createRequire('/app/index.js')('/tmp/invoice-affected-live-trace/runtime.mjs').install === 'function'"),'RUNTIME_TRACE_MODULE_AVAILABLE');
  if(process.argv.includes('--preflight')){report.status='preflight';report.success=true;}
  else{
   let input='';for await(const c of process.stdin){input+=c;if(input.length>4096)throw Error('INPUT_TOO_LARGE');}sessionId=JSON.parse(input).sessionId;input='';check(/^[a-f0-9-]{36}$/i.test(sessionId??''),'OWNED_LOGIN_SESSION_REQUIRED');nonce=crypto.randomBytes(32).toString('hex');
   const identity=await getValidOracleSession(sessionId),oracle=(await query("SELECT USER U,SYS_CONTEXT('USERENV','SESSION_USER') S,SYS_CONTEXT('USERENV','PROXY_USER') P FROM DUAL"))[0],normalize=v=>String(v??'').trim().toUpperCase();
   check(normalize(oracle.U)===normalize(identity.username)&&normalize(oracle.S)===normalize(identity.username)&&Boolean(oracle.P),'INDEPENDENT_ORACLE_USES_SAME_POSTGRES_SESSION_IDENTITY');report.identity={targetOpaque:h(nonce,normalize(identity.username)),oracleSessionMatches:true,proxyPresent:true};
-  const installedInfo=await evaluate("import('file:///tmp/invoice-affected-live-trace/runtime.mjs').then(m=>m.install("+JSON.stringify({sessionId,nonce,expectedPlate:'anx123'})+"))");installed=true;check(installedInfo.installed&&installedInfo.targetIdentityOpaque===report.identity.targetOpaque,'TRACE_ATTACHED_TO_SAME_IDENTITY');
+  const installedInfo=await evaluate("process.getBuiltinModule('module').createRequire('/app/index.js')('/tmp/invoice-affected-live-trace/runtime.mjs').install("+JSON.stringify({sessionId,nonce,expectedPlate:'anx123'})+")");installed=true;check(installedInfo.installed&&installedInfo.targetIdentityOpaque===report.identity.targetOpaque,'TRACE_ATTACHED_TO_SAME_IDENTITY');
   const before=await evaluate(trace+'.snapshot()');check(before.calls.length===0,'NEW_OWNED_CONVERSATION_BEFORE_INITIAL');
   const initial=await postChat('facturas de arrendamiento m\u00ednimo del 2023 del local impacto','INITIAL');report.initial={httpStatus:initial.httpStatus,responseClass:initial.responseClass,trace:initial.snapshot};
   if(initial.responseClass!=='DENIED'){report.status='blocked';report.blocker='AFFECTED_INITIAL_DENIAL_NOT_REPRODUCED';report.caseResolved=false;}
