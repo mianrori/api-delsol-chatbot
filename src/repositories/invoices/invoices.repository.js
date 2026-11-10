@@ -1,3 +1,4 @@
+import {normalizeInvoicePlate} from '../../utils/invoicePlate.js';
 // src/repositories/invoices.repository.js
 
 const VALID_GROUP_BY = ["invoice", "customer", "concept", "month", "year"];
@@ -135,22 +136,12 @@ export const getInvoicesRepository = async ({
     where.push("UPPER(PERIODO) = :period");
   }
 
-  if (plate) {
-    binds.plate = `%${String(plate)
-      .trim()
-      .toUpperCase()
-      .replace(/[-\s]/g, "")}%`;
+  const normalizedPlate=normalizeInvoicePlate(plate);
+  if (normalizedPlate!==undefined) {
+    binds.plate = normalizedPlate;
 
     where.push(`
-      REPLACE(
-        REPLACE(
-          UPPER(MATRICULA),
-          '-',
-          ''
-        ),
-        ' ',
-        ''
-      ) LIKE :plate
+      REGEXP_REPLACE(UPPER(MATRICULA), '[-[:space:]]', '') = :plate
     `);
   }
 

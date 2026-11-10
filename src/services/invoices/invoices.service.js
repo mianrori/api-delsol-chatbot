@@ -1,3 +1,4 @@
+import {normalizeInvoicePlate} from '../../utils/invoicePlate.js';
 import config from "../../../config.js";
 import { getInvoicesRepository } from "../../repositories/invoices/invoices.repository.js";
 
@@ -37,6 +38,7 @@ export const getInvoices = async (args, connection) => {
   const result = await getInvoicesRepository({
     connection,
     ...args,
+    plate: normalizeInvoicePlate(args.plate),
   });
 
   if (!Array.isArray(result?.data)) {

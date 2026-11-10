@@ -28,7 +28,7 @@ test("invoice detail binds all filters and distinguishes concept rows from disti
     assert.equal(binds.customerId0, "SYNTHETIC'CUSTOMER");
     assert.equal(binds.conceptId0, "C1");
     assert.equal(binds.cancelled, "N");
-    assert.equal(binds.plate, "%AB123%");
+    assert.equal(binds.plate, "AB123");
   }
   assert.match(connection.queries[0].sql, /COUNT\(DISTINCT NRO_FACTURA\)/);
   assert.equal(connection.queries[1].binds.offset, 2);

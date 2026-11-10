@@ -657,3 +657,29 @@ límites del balance se conservan. Docker DEV sigue en `7d29892`, sin reconstrui
 ni sustituir `/app`; PR en borrador, sin merge, despliegue o cambios de datos,
 permisos o expiraciones. Los commits posteriores a `0d1f799` de esta entrega son
 documentales.
+
+### Facturas: diagnóstico de PR #46 y matrícula completa normalizada
+
+| Caso | Evidencia vigente | Reserva/límite |
+| --- | --- | --- |
+| Espacios y guiones | Se conservan como diferencias de presentación según el ERP; igualdad completa normalizada en count/detail y binds. Oracle probó el predicado real con variantes equivalentes y casos de prefijo/sufijo/comodín. | No fuzzy, búsqueda parcial ni separación inventada de varias matrículas. La cohorte comercial no presentó una colisión por substring; los casos adversos son de solo lectura en `DUAL`. |
+| Filtros, sesiones y paginación | Dos páginas de factura conciliadas con Oracle, mismos filtros y permisos por `sessionId`/proxy. Respuesta y `actions.invoicePagination` conservadas. | Modelo controlado; no se presenta como conversación con modelo remoto. |
+| `PDF` → `/:cdc` | Parámetro igual al `PDF` autorizado, sin extensión en ambas muestras; el ERP añade una sola `.pdf`. Variable coincidente entre `.env`/bot/ERP y montaje de ruta verificado. | No se cambió URL base ni el valor Oracle para obtener un positivo. |
+| Archivo ausente | Muestra reconstruida: 404 con «Archivo no encontrado», ruta reconocida; archivo también ausente en auditoría local. | No se retuvo identidad del archivo histórico: no atribuir el CDC reconstruido al intento antiguo. El destino configurado es remoto; auditoría local y HTTP remoto se distinguen. |
+| Muestra legítima disponible | Misma base, fila Oracle autorizada y archivo existente; **HTTP 200, application/pdf y firma %PDF-**, con «Ver PDF» conciliado en HTTP conversacional. | Una muestra; no acredita todos los documentos ni resuelve el archivo ausente. Dos GETs efectuados, sin fabricar/copiar archivos. |
+
+**15/15 pruebas afectadas Node 22.23.4 en `cfb5f50`** y **40/40 controles nuevos
+Oracle/HTTP en `a7112a6`**, con 298 archivos verificados. Aplicación y pruebas
+idénticas entre ambos; `c52a77e` solo delega ejecutores antiguos al diagnóstico
+actual y pasó preflight sin repetir controles. Reporte SHA-256
+`1a4045afba9a36d9dff26ac725e0dc1de44f8dbcf5f77a38add002f2638fdeff`.
+Cierres, logout y logs sanitizados aprobados; cero Bedrock/proveedor. Referencias
+ERP y cobertura por commit en
+[invoice-plate-pdf-investigation.md](invoice-plate-pdf-investigation.md).
+
+La evidencia 13/13, 23/24 y 17/18 de la versión previa se conserva como histórica;
+no cubre el nuevo predicado ni se suma como cobertura única. El positivo descarga
+una muestra real y mantiene la reserva del archivo ausente. Las seis reservas
+F3/F4/M7, F5/T1, muestras pendientes y demás límites del balance se conservan.
+PR #46 en borrador hasta revisar el diagnóstico; sin merge, despliegue o cambios
+de datos, configuración, permisos o expiraciones.

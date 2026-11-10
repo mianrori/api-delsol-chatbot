@@ -1,3 +1,4 @@
+import {buildInvoiceDetailResponse} from './invoiceDetailPresentation.service.js';
 import {applySalesMetrics} from './salesMetrics.service.js';
 import { buildMemberPurchasesResponse, resolveMemberPurchasesPage } from "./memberPurchasesPresentation.service.js";
 import {preserveSearchSelection,beginSearchSelectionTurn,recordSearchToolResult,captureSearchQueryContext} from './searchSelection.service.js';
@@ -368,11 +369,13 @@ Para consultas contractuales:
 Si existe duda entre marca/local y rubro dentro de una consulta de ventas, intenta primero search_customers.
 
 Para consultas de facturas:
-- usa search_invoice_customers cuando el usuario mencione un cliente de facturación por nombre, razón social, RUC, matrícula o texto identificador y todavía no tengas un customerId resuelto;
+- usa search_invoice_customers cuando el usuario mencione un cliente de facturación por nombre, razón social, RUC o texto identificador y todavía no tengas un customerId resuelto;
 - si la consulta de facturas incluye un período explícito, pasa ese mismo dateFrom/dateTo también a search_invoice_customers; la resolución del cliente debe hacerse dentro del mismo período que luego utilizará get_invoices;
 - no resuelvas globalmente un cliente de facturación y luego filtres otro período si el usuario ya proporcionó fechas;
 - usa search_invoice_concepts cuando el usuario mencione un concepto de factura por texto y todavía no tengas un conceptId resuelto;
 - usa get_invoices para obtener detalle o resumen de facturas;
+- para buscar facturas de una matrícula usa directamente get_invoices con plate, eliminando espacios en blanco y guiones. No resuelvas un cliente por matrícula salvo que el usuario pida identificar al cliente; conserva los filtros previamente confirmados en seguimientos;
+- si una fila autorizada tiene pdfUrl, ofrece [Ver PDF](pdfUrl) usando exactamente ese enlace. No inventes enlaces ni uses archivos de otras filas o páginas;
 - si el usuario solicita importes agregados o cantidad de facturas, prefiere mode="summary";
 - si solicita facturas específicas, conceptos, vencimientos, matrícula, contrato asociado o detalle de una factura, prefiere mode="detail";
 - nunca inventes customerIds, conceptIds, números de factura, matrículas ni referencias de contrato;
@@ -1503,7 +1506,7 @@ const executeToolRequests = async ({ content, sessionId, sourceMessages = [], ch
       if (isChartSourceTool(name) && protectedResultForModel && typeof protectedResultForModel === "object" && !Array.isArray(protectedResultForModel)) {
         protectedResultForModel.chartSourceId = toolUseId;
       }
-      if (["get_sales_per_sqm", "get_member_purchases", "get_sales", "analyze_members", "compare_member_purchases_vs_sales", "analyze_campaign_sales_performance", "search_promotions", "get_member_soles", "get_soles_usage", "search_soles_usage_destinations", "search_soles_usage_movement_types", "get_vehicle_registrations", "get_member_vehicles"].includes(name)) {
+      if (["get_invoices", "get_sales_per_sqm", "get_member_purchases", "get_sales", "analyze_members", "compare_member_purchases_vs_sales", "analyze_campaign_sales_performance", "search_promotions", "get_member_soles", "get_soles_usage", "search_soles_usage_destinations", "search_soles_usage_movement_types", "get_vehicle_registrations", "get_member_vehicles"].includes(name)) {
         presentationCall.result = protectedResultForModel;
       }
 
@@ -1903,7 +1906,7 @@ export const chatService = async ({ message, sessionId }) => {
       followupAnswer = buildMemberPromoResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) })
         ?? buildContractIncidenceResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) })
         ?? buildSalesPerSqmResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) })
-        ?? buildSalesYearComparisonResponse(conversationInternalContext.presentationCalls,{restoreValue:value=>restorePiiDeep(sessionId,value)})
+        ?? buildInvoiceDetailResponse(conversationInternalContext.presentationCalls,{restoreValue:value=>restorePiiDeep(sessionId,value)}) ?? buildSalesYearComparisonResponse(conversationInternalContext.presentationCalls,{restoreValue:value=>restorePiiDeep(sessionId,value)})
         ?? buildSalesSampleResponse(conversationInternalContext.presentationCalls, { exportAvailable: Boolean(conversationActions.salesExport?.available) })
         ?? buildSalesSeriesResponse(conversationInternalContext.presentationCalls, { message, restoreValue: (value) => restorePiiDeep(sessionId, value) })
         ?? buildVehicleResponse(conversationInternalContext.presentationCalls)
@@ -1966,7 +1969,7 @@ export const chatService = async ({ message, sessionId }) => {
       ? "Aquí tienes el gráfico solicitado."
       : buildMemberPromoResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) }) ?? buildContractIncidenceResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) }) ?? monthlyIncidenceText ??
       buildSalesPerSqmResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) }) ??
-      buildSalesYearComparisonResponse(conversationInternalContext.presentationCalls,{restoreValue:value=>restorePiiDeep(sessionId,value)}) ??
+      buildInvoiceDetailResponse(conversationInternalContext.presentationCalls,{restoreValue:value=>restorePiiDeep(sessionId,value)}) ?? buildSalesYearComparisonResponse(conversationInternalContext.presentationCalls,{restoreValue:value=>restorePiiDeep(sessionId,value)}) ??
       buildSalesSampleResponse(conversationInternalContext.presentationCalls, { exportAvailable: Boolean(conversationActions.salesExport?.available) }) ??
       buildSalesSeriesResponse(conversationInternalContext.presentationCalls, { message, restoreValue: (value) => restorePiiDeep(sessionId, value) }) ??
       buildVehicleResponse(conversationInternalContext.presentationCalls) ??
