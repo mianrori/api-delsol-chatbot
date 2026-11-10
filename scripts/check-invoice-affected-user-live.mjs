@@ -48,6 +48,7 @@ async function auditNormalization(){
 async function auditViewProjection(){
  const roots=await query('SELECT OWNER,VIEW_NAME,TEXT FROM ALL_VIEWS WHERE VIEW_NAME=:v',{v:'VW_BOT_FACTURAS'});
  if(roots.length!==1)return {status:'definition_ambiguous_or_unavailable',uniqueVisibleDefinition:false,caseResolved:false};
+ const permission=(await query("SELECT CASE WHEN EXISTS(SELECT 1 FROM VW_BOT_FACTURAS WHERE NVL(USER_CAN_CONSULT,'S')<>'N') THEN 1 ELSE 0 END A,CASE WHEN EXISTS(SELECT 1 FROM VW_BOT_FACTURAS WHERE USER_CAN_CONSULT='N') THEN 1 ELSE 0 END N FROM DUAL"))[0];
  const pending=[{row:roots[0],depth:0}],seen=new Set(),views=[];let incomplete=false;
  while(pending.length&&views.length<6){const {row,depth}=pending.shift(),key=row.OWNER+'.'+row.VIEW_NAME;if(seen.has(key))continue;seen.add(key);
   if(typeof row.TEXT!=='string'){incomplete=true;continue;}const p=extractViewProjection(row.TEXT),functions=x=>new Set((String(x??'').match(/\b[A-Z_][A-Z0-9_$#]*(?=\s*\()/gi)??[]).map(x=>x.toUpperCase()).filter(x=>!['SELECT','NVL','DECODE','COALESCE','CASE','MAX','MIN','COUNT','SUM','UPPER','LOWER','TO_CHAR','TO_NUMBER'].includes(x)));
@@ -56,7 +57,7 @@ async function auditViewProjection(){
   if(depth>=2)continue;
   try{const deps=await query("SELECT REFERENCED_OWNER O,REFERENCED_NAME N FROM ALL_DEPENDENCIES WHERE OWNER=:o AND NAME=:n AND REFERENCED_TYPE='VIEW'",{o:row.OWNER,n:row.VIEW_NAME});for(const dep of deps){if(seen.has(dep.O+'.'+dep.N))continue;const definitions=await query('SELECT OWNER,VIEW_NAME,TEXT FROM ALL_VIEWS WHERE OWNER=:o AND VIEW_NAME=:n',{o:dep.O,n:dep.N});if(definitions.length===1)pending.push({row:definitions[0],depth:depth+1});else incomplete=true;}}catch{incomplete=true;}
  }
- return {status:'metadata_inspected',views,dependencyInspectionCapped:pending.length>0,metadataUnavailableForSomeDependencies:incomplete,depthLimit:2,noBaseTableDataRead:true,noRawDefinitionOrOwnersExported:true,applicationCauseNotPresumed:true};
+ return {status:'metadata_inspected',permissionAcrossVisibleView:{anyAuthorized:Number(permission.A)===1,anyRestricted:Number(permission.N)===1},views,dependencyInspectionCapped:pending.length>0,metadataUnavailableForSomeDependencies:incomplete,depthLimit:2,noBaseTableDataRead:true,noRawDefinitionOrOwnersExported:true,applicationCauseNotPresumed:true};
 }
 
 try{
