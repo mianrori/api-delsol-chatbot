@@ -196,7 +196,9 @@ export function preserveSearchSelection({name,input,history=[],currentCalls=[],r
  // grouping or previously absent keys. The successful context survives trimming.
  const autonomous=name==='get_sales'?selectionTurn.autonomousCategorySales:null;
  let result;
- if(name==='get_sales'&&selectionTurn.salesComparison){
+ if(name==='get_invoices'&&selectionTurn.invoiceNamedRequest){
+  result={...input};
+ }else if(name==='get_sales'&&selectionTurn.salesComparison){
   result={...input};
  }else if(autonomous){
   result={...input,dateFrom:autonomous.dateFrom,dateTo:autonomous.dateTo,...(autonomous.groupBy?{groupBy:autonomous.groupBy}:{})};

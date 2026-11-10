@@ -1,3 +1,4 @@
+import {executeNamedInvoiceRequest} from './invoiceNamedRequest.service.js';
 import {buildInvoiceDetailResponse} from './invoiceDetailPresentation.service.js';
 import {applySalesMetrics} from './salesMetrics.service.js';
 import { buildMemberPurchasesResponse, resolveMemberPurchasesPage } from "./memberPurchasesPresentation.service.js";
@@ -373,6 +374,7 @@ Para consultas de facturas:
 - si la consulta de facturas incluye un período explícito, pasa ese mismo dateFrom/dateTo también a search_invoice_customers; la resolución del cliente debe hacerse dentro del mismo período que luego utilizará get_invoices;
 - no resuelvas globalmente un cliente de facturación y luego filtres otro período si el usuario ya proporcionó fechas;
 - usa search_invoice_concepts cuando el usuario mencione un concepto de factura por texto y todavía no tengas un conceptId resuelto;
+- distingue concepto de cliente/local: en "facturas de arrendamiento mínimo del 2023 del local impacto", busca "arrendamiento mínimo" con search_invoice_concepts y "impacto" con search_invoice_customers dentro de 2023. Después usa ambos identificadores y ese mismo período en get_invoices; espera selección si algún buscador devuelve ambigüedad;
 - usa get_invoices para obtener detalle o resumen de facturas;
 - para buscar facturas de una matrícula usa directamente get_invoices con plate, eliminando espacios en blanco y guiones. No resuelvas un cliente por matrícula salvo que el usuario pida identificar al cliente; conserva los filtros previamente confirmados en seguimientos;
 - si una fila autorizada tiene pdfUrl, ofrece [Ver PDF](pdfUrl) usando exactamente ese enlace. No inventes enlaces ni uses archivos de otras filas o páginas;
@@ -1668,7 +1670,15 @@ export const chatService = async ({ message, sessionId }) => {
     ?? resolveMemberSolesPage({ message, history: protectedHistory })
     ?? resolveMemberSolesBreakdown({ message, history: protectedHistory })
     ?? resolveMemberSolesBalance({ message: messages.at(-1).content[0].text });
-  if (salesYearComparison?.autonomous&&salesYearComparison.search) {
+  const namedInvoice=await executeNamedInvoiceRequest({sessionId,message:messages.at(-1).content[0].text,execute:async(name,input)=>{
+    const content=[{toolUse:{toolUseId:'invoice_named_'+randomUUID(),name,input}}];messages.push({role:'assistant',content});
+    const executed=await executeToolRequests({content,sessionId,sourceMessages:messages});messages.push({role:'user',content:executed.toolResults});
+    conversationActions=mergeActions(conversationActions,executed.actions);
+    conversationInternalContext={...conversationInternalContext,...executed.internalContext,presentationCalls:[...(conversationInternalContext.presentationCalls??[]),...executed.internalContext.presentationCalls]};toolIterations++;
+    return executed.internalContext.presentationCalls.at(-1)?.result;
+  }});
+  if(namedInvoice)followupAnswer=namedInvoice.answer;
+  if (!namedInvoice&&salesYearComparison?.autonomous&&salesYearComparison.search) {
     const content=[{toolUse:{toolUseId:'comparison_category_'+randomUUID(),name:'search_categories',input:{search:salesYearComparison.search}}}];
     messages.push({role:'assistant',content});
     const lookup=await executeToolRequests({content,sessionId,sourceMessages:messages});
@@ -1679,7 +1689,9 @@ export const chatService = async ({ message, sessionId }) => {
     else if(result?.status==='AMBIGUOUS')followupAnswer=['Hay varias coincidencias en el catálogo autorizado. Selecciona un rubro para comparar ambos años por mes:',...(result.options??[]).map(o=>o.optionId+'. '+o.name),...(result.hasMore?['La lista está limitada; puedes precisar el nombre.']:[])].join('\n');
     else if(result?.status!=='RESOLVED')followupAnswer='No fue posible resolver el rubro autorizado. No se consultaron ventas.';
   }
-  if (salesYearComparison && !followupAnswer) {
+  if (namedInvoice) {
+    // The explicit concept/customer request has already been handled.
+  } else if (salesYearComparison && !followupAnswer) {
     const content = salesYearComparison.inputs.map((input) => ({ toolUse: {
       toolUseId: `sales_comparison_${randomUUID()}`, name: "get_sales", input,
     } }));

@@ -1,3 +1,4 @@
+import {oracleSearchText,normalizeSearchText as normalizeConceptName} from '../searchText.sql.js';
 // src/repositories/invoiceConcepts.repository.js
 
 const normalizeSearchText = (value) =>
@@ -16,6 +17,7 @@ export const searchInvoiceConceptsRepository = async ({
     return [];
   }
 
+  const normalizedQuery=normalizeConceptName(query),name=oracleSearchText("DESCRIPCION");
   const sql = `
     SELECT
       COD_CONCEPTO,
@@ -26,12 +28,12 @@ export const searchInvoiceConceptsRepository = async ({
         DESCRIPCION
       FROM VW_BOT_CONCEPTOS
       WHERE
-        INSTR(UPPER(DESCRIPCION), :query) > 0
+        INSTR(${name}, :normalizedQuery) > 0
         OR UPPER(COD_CONCEPTO) = :query
       ORDER BY
         CASE
-          WHEN UPPER(DESCRIPCION) = :query THEN 1
-          WHEN INSTR(UPPER(DESCRIPCION), :query) = 1 THEN 2
+          WHEN ${name} = :normalizedQuery THEN 1
+          WHEN INSTR(${name}, :normalizedQuery) = 1 THEN 2
           ELSE 3
         END,
         DESCRIPCION, COD_CONCEPTO
@@ -43,6 +45,7 @@ export const searchInvoiceConceptsRepository = async ({
     sql,
     {
       query: searchText,
+      normalizedQuery,
       limit: Number(limit),
     },
     {
