@@ -683,3 +683,21 @@ una muestra real y mantiene la reserva del archivo ausente. Las seis reservas
 F3/F4/M7, F5/T1, muestras pendientes y demás límites del balance se conservan.
 PR #46 en borrador hasta revisar el diagnóstico; sin merge, despliegue o cambios
 de datos, configuración, permisos o expiraciones.
+
+### Facturas: concepto y cliente/local explícitos
+
+| Caso | Evidencia | Límite |
+| --- | --- | --- |
+| «facturas de arrendamiento mínimo del 2023 del local impacto» | Concepto y cliente en resolvers separados, período 01/01/2023–31/12/2023 y ambos IDs efectivos en get_invoices. | Gramática acotada, sin IDs/nombres hardcodeados ni evaluación lingüística remota exhaustiva. |
+| Tildes, ambigüedad y selección | 13 regresiones nuevas: descripción sin sensibilidad a tildes, código literal preservado, NOT_FOUND por dominio, selección válida/incorrecta y recorte del historial. | No se atribuyen las ambigüedades sintéticas a la muestra real, que fue RESOLVED en ambos dominios. |
+| Oracle autorizado | **15/15 en 5816a8b**, mediante chatService, buscadores, servicios y repositorios. Facturas 2023 y detalle conciliados; cierres/logout aprobados. | **No incluye router/controller HTTP.** Modelo controlado que rechaza llamadas, cero Bedrock/proveedor. |
+| Pregunta literal completa por HTTP | Nuevo ejecutor de un solo POST en copia aislada con router/controller y Oracle real; argumentos finales, filas, paginación y enlaces PDF. | Pendiente de revisar; no se repiten 28 pruebas ni 15 controles, no se descarga PDF ni se despliega el candidato. |
+
+**28/28 pruebas afectadas Node 22.23.4 sobre `5816a8b`**; resultado Oracle previo
+congelado SHA-256 `b536329c7945f41ecc49e4447f0c73c79403565b390654af6553d33f4a9b77d2`.
+No se suman pruebas y aserciones como cobertura única. Alcances y futura evidencia
+HTTP en [invoice-named-request-investigation.md](invoice-named-request-investigation.md).
+Permisos por sesión, paginación y enlaces PDF conservados. Reservas históricas
+(incluido el archivo ausente con 404 y su muestra positiva separada) sin cambios.
+PR en borrador; sin merge, despliegue ni cambios de datos/configuración/permisos/
+expiraciones.

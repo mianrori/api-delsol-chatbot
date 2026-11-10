@@ -65,3 +65,30 @@ No se modificaron datos, configuración, permisos o expiraciones. La gramática
 es acotada; no se acredita interpretación remota exhaustiva ni otras muestras
 fiscales. Las reservas previas, incluida la del PDF ausente, no se modifican.
 Los cambios posteriores a `5816a8b` de esta entrega solo documentan resultados.
+
+## Alcance HTTP: ampliación solicitada
+
+Las 15 comprobaciones de `5816a8b` invocaron `chatService` con Oracle real y
+pasaron por buscadores/servicios/repositorios, pero **no por router/controller
+HTTP**. Las 28 pruebas incluyen HTTP con datos controlados para otros flujos de
+facturas; no se atribuyen a la pregunta literal completa con Oracle real.
+
+Se añade únicamente el POST literal de este caso mediante router, controller,
+chat, resolvers, servicios y repositorios del candidato en loopback efímero.
+El SDK está controlado y rechaza su invocación; la ruta tipada no necesita llamar
+al modelo. No se acredita modelo real, Bedrock ni conversación servida por el
+DEV desplegado en 5400. El control contrasta los argumentos finales de cliente,
+concepto y fechas, binds/permisos, conteos, filas, paginación, enlaces PDF y estado
+con SELECT independientes. No descarga PDFs ni repite las 28/15 comprobaciones.
+
+Ejecutor reproducible con entradas ocultas y sesión solo en memoria:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-invoice-named-http-dev.ps1
+```
+
+Su preflight reutiliza el reporte congelado y el hash de las 28 pruebas, exige
+identidad de aplicación/pruebas con `5816a8b` y verifica la copia aislada. La sesión
+DEV propia se cierra con logout y el servidor efímero se cierra al terminar.
+Resultado de este único recorrido HTTP pendiente de revisar. Las reservas de
+matrícula/PDF y de las PR anteriores permanecen sin cambios.
