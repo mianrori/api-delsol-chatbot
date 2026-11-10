@@ -32,8 +32,11 @@ try{
  const known={plate:spaced,customerIds:[String(c.C)],conceptIds:[String(c.K)],dateFrom:from,dateTo:to,cancelled:c.A==='S',mode:'detail',page:1,rows:1};
  const application=express();application.use(express.json());application.use('/chatbot/api',router.router);server=await new Promise(resolve=>{const x=application.listen(0,'127.0.0.1',()=>resolve(x));});
  store.clearConversation(sessionId);const missing=await post({message:'Facturas'});check(missing.status===400&&!missing.body.success,'HTTP_MISSING_SESSION_REJECTED');check(calls.length===0,'NO_ORACLE_TOOL_WITHOUT_SESSION');
- let linked=0;for(const page of [1,2]){
-  queries=[];plans=[page===1?known:{page:2}];const response=await post({sessionId,message:page===1?'Facturas de la matr\u00edcula '+spaced:'Siguiente p\u00e1gina',username:'IGNORED_FRONTEND_IDENTITY'});
+ const pdfPage=expected.findIndex(r=>Boolean(r.D))+1;check(pdfPage>0,'AUTHORIZED_POSITIVE_PDF_PAGE_FOUND');
+ const pdfOnly=process.argv.includes('--pdf-only');report.mode=pdfOnly?'positive PDF page only; prior two pages reused':'two initial pages plus first PDF-bearing page';
+ const pages=pdfOnly?[pdfPage]:[...new Set([1,2,pdfPage])];
+ let linked=0;for(const page of pages){
+  queries=[];plans=[page===pages[0]?{...known,page}:{page}];const response=await post({sessionId,message:page===pages[0]?'Facturas de la matr\u00edcula '+spaced:'Siguiente p\u00e1gina',username:'IGNORED_FRONTEND_IDENTITY'});
   check(response.status===200&&response.body.env==='development'&&response.body.success===true,'PAGE_'+page+'_HTTP_CONTRACT');const actual=calls.at(-1);check(same(actual.args,{...known,page}),'PAGE_'+page+'_FINAL_FILTERS_PRESERVED');
   const result=actual.result,row=result.data[0],oracle=expected[page-1];check(result.totalRows===expected.length&&result.totalInvoices===new Set(expected.map(r=>r.N)).size&&result.returnedRows===1&&row.invoiceNumber===oracle.N&&row.concept.description===oracle.K&&row.plate===oracle.P&&Number(row.amount)===Number(oracle.A),'PAGE_'+page+'_DETAIL_COUNTS_MATCH_INDEPENDENT_ORACLE');
   const expectedUrl=oracle.D?pdfBase+'/'+String(oracle.D).replace(/^\/+/,''):null;check(row.pdfUrl===expectedUrl&&!Object.hasOwn(JSON.parse(JSON.stringify(row)),'pdf'),'PAGE_'+page+'_URL_EQUALS_ERP_BASE_AND_ORACLE_PDF');
@@ -45,7 +48,7 @@ try{
    let prefix=[];const reader=pdf.body?.getReader();if(reader)try{while(prefix.length<5){const v=await reader.read();if(v.done)break;prefix.push(...v.value.subarray(0,5-prefix.length));}}finally{await reader.cancel();}report.pdfSignatureValid=String.fromCharCode(...prefix)==='%PDF-';check(pdf.status===200&&report.pdfContentTypeValid&&report.pdfSignatureValid,'CONFIGURED_PDF_HTTP_GET_VALID');linked++;
   }
  }
- check(linked===1,'ONE_REAL_PDF_LINK_HTTP_VERIFIED');check(modelCalls===2,'CONTROLLED_MODEL_TWO_CALLS_ONLY');report.success=true;
+ check(linked===1,'ONE_REAL_PDF_LINK_HTTP_VERIFIED');check(modelCalls===pages.length,'CONTROLLED_MODEL_MATCHES_SELECTED_PAGES_ONLY');report.success=true;
 }catch(e){report.error={code:/^(?:ORA-\d{5}|NJS-\d{3}|DPI-\d{4})$/.test(e?.code??'')?e.code:'INVOICE_PDF_CONTROL_FAILED'};}
 finally{if(server)await new Promise(resolve=>server.close(resolve));if(sessionId)store.clearConversation(sessionId);sessionId=null;report.connectionsClosed=opened===closed&&!closeErrors;if(!report.connectionsClosed)report.success=false;}
 report.controlledModelCalls=modelCalls;report.realModelCalls=0;report.providerCalls=0;report.finishedAt=new Date().toISOString();emit(JSON.stringify(report));process.exitCode=report.success?0:1;

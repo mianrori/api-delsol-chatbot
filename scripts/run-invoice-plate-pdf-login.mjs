@@ -11,7 +11,7 @@ const report={suite:'invoice-plate-pdf-helper',success:false,startedAt:new Date(
 const run=(command,args,options={})=>execFileSync(command,args,{cwd:root,encoding:'utf8',stdio:['pipe','pipe','pipe'],maxBuffer:20971520,windowsHide:true,...options});
 const dock=(...args)=>run(docker,args),git=(...args)=>run('git',args);
 const hash=b=>createHash('sha256').update(b).digest('hex');
-let ownedSession,commit,candidate,payload;
+let ownedSession,commit,candidate,payload;let workerExtra=[];
 try{
  if(process.argv.slice(2).some(a=>!['--preflight','--run'].includes(a)))throw Error();
  commit=git('rev-parse','HEAD').trim();report.commit=commit;
@@ -43,13 +43,20 @@ try{
   if(!count||count!==passed||!/^# fail 0$/m.test(out))throw Error('FOCUSED_TESTS_FAILED');
   writeFileSync(outputPath,out);report.focused={commit,node:version,tests:count,passed,failed:0,outputSha256:hash(out)};
  }
+ const partialPath=resolve(root,'logs/invoice-plate-pdf-2826a4d-partial.json');
+ if(existsSync(partialPath)){
+  const raw=readFileSync(partialPath),partial=JSON.parse(raw);
+  const failed=partial.worker?.checks?.filter(c=>!c.passed)??[];
+  if(hash(raw)!=='dbf28115d3b3ecbfd85bd62d5280d76a7873552cc0f53912c1ba0e7888395d79'||partial.commit!=='2826a4d8a0cc09e90bb53c2a6a9708d11968ea55'||failed.length!==1||failed[0].code!=='ONE_REAL_PDF_LINK_HTTP_VERIFIED'||!partial.logout||!partial.worker.connectionsClosed||!partial.logAudit.every(a=>a.recognizedSanitizedOnly)||git('diff',partial.commit,commit,'--','src','test','config.js','package.json','package-lock.json').trim())throw Error('SOURCE_MISMATCH');
+  report.reusedPartial={commit:partial.commit,reportSha256:hash(raw),passed:partial.worker.checks.filter(c=>c.passed).length,unmet:'PDF GET was not attempted because neither of the first two rows had PDF',notReexecuted:true};workerExtra=['--pdf-only'];
+ }
  report.phase='MODULE_PREFLIGHT';const pre=JSON.parse(dock('exec',bot,'node','--experimental-vm-modules',candidate+'/scripts/check-invoice-plate-pdf-dev.mjs',commit,'--preflight'));if(!pre.success||pre.suite!=='invoice-plate-pdf-dev'||pre.commit!==commit)throw Error();
  if(process.argv.includes('--preflight')){report.success=true;report.phase='PREFLIGHT_COMPLETE';}
  else{
   report.phase='HIDDEN_INPUT';let input='';for await(const c of process.stdin){input+=c;if(input.length>16384)throw Error();}payload=JSON.parse(input);input='';
   report.phase='ERP_LOGIN';ownedSession=await loginDev(payload.authorized);payload=null;
   report.phase='CONTROLLED_HTTP_ORACLE_PDF';report.worker=await new Promise((resolveWorker,reject)=>{
-   const child=spawn(docker,['exec','-i','-e','NODE_DEBUG=','-e','NODE_OPTIONS=','-e','NODE_V8_COVERAGE=',bot,'node','--experimental-vm-modules',candidate+'/scripts/check-invoice-plate-pdf-dev.mjs',commit],{stdio:['pipe','pipe','pipe'],windowsHide:true});
+   const child=spawn(docker,['exec','-i','-e','NODE_DEBUG=','-e','NODE_OPTIONS=','-e','NODE_V8_COVERAGE=',bot,'node','--experimental-vm-modules',candidate+'/scripts/check-invoice-plate-pdf-dev.mjs',commit,...workerExtra],{stdio:['pipe','pipe','pipe'],windowsHide:true});
    let raw='',size=0;child.stdout.on('data',c=>{size+=c.length;if(size<131072)raw+=c;});child.stderr.on('data',()=>{});child.on('error',()=>reject(Error('WORKER_FAILED')));child.stdin.on('error',()=>{});
    child.on('close',()=>{try{const r=JSON.parse(raw);raw='';if(size>=131072||r.suite!=='invoice-plate-pdf-dev'||r.commit!==commit)throw Error();resolveWorker(r);}catch{reject(Error('WORKER_FAILED'));}});child.stdin.end(JSON.stringify({sessionId:ownedSession}));
   });
