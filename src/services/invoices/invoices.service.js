@@ -1,4 +1,5 @@
 import {normalizeInvoicePlate} from '../../utils/invoicePlate.js';
+import {invoiceAccessDeniedError} from '../../utils/invoiceAccess.js';
 import config from "../../../config.js";
 import { getInvoicesRepository } from "../../repositories/invoices/invoices.repository.js";
 
@@ -40,6 +41,10 @@ export const getInvoices = async (args, connection) => {
     ...args,
     plate: normalizeInvoicePlate(args.plate),
   });
+  // Denial is distinct from an empty authorized result or an out-of-range page.
+  if (result.hasRestrictedData && (args.mode === 'summary'
+    ? result.hasAuthorizedData === false
+    : result.totalRows === 0)) throw invoiceAccessDeniedError();
 
   if (!Array.isArray(result?.data)) {
     if (

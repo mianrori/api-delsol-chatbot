@@ -1,3 +1,11 @@
+import {INVOICE_PARTIAL_ACCESS_MESSAGE} from '../../utils/invoiceAccess.js';
+
+export function appendInvoiceAccessWarning(text, calls = []) {
+ if (!calls.some(c => c.name === 'get_invoices' && c.result?.hasRestrictedData === true)
+   || text.includes(INVOICE_PARTIAL_ACCESS_MESSAGE)) return text;
+ return text + '\n\n' + INVOICE_PARTIAL_ACCESS_MESSAGE;
+}
+
 const cell=value=>String(value??'Sin datos').replace(/([\\`*_[\]<>|])/g,'\\$1').replace(/[\r\n]+/g,' ');
 const number=value=>typeof value==='number'&&Number.isFinite(value)?new Intl.NumberFormat('es-PY',{maximumFractionDigits:6}).format(value):'Sin datos';
 const date=value=>{if(value==null)return 'Sin datos';const iso=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(value));return iso?`${iso[3]}/${iso[2]}/${iso[1]}`:cell(value);};
@@ -22,5 +30,5 @@ export function buildInvoiceDetailResponse(calls=[],{restoreValue=v=>v}={}){
   }
  }
  if(result.hasMore&&result.nextPage!=null)lines.push('',`Puedes pedir la siguiente p\u00e1gina (${result.nextPage}).`);
- return lines.join('\n');
+ return appendInvoiceAccessWarning(lines.join('\n'), calls);
 }

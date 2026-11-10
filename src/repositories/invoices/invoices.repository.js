@@ -152,6 +152,12 @@ export const getInvoicesRepository = async ({
   }
 
   const whereSql = `WHERE ${where.join("\n AND ")}`;
+  // Only a permission bit leaves this probe: never restricted rows or counts.
+  // Keep every requested filter, independently of the authorized page.
+  const restrictedWhereSql = `WHERE ${["USER_CAN_CONSULT = 'N'", ...where.slice(1)].join("\n AND ")}`;
+  const restrictedFlagSql = `CASE WHEN EXISTS (
+    SELECT 1 FROM VW_BOT_FACTURAS ${restrictedWhereSql}
+  ) THEN 1 ELSE 0 END AS HAS_RESTRICTED_DATA`;
 
   /*
    * =============================================================
@@ -178,11 +184,13 @@ export const getInvoicesRepository = async ({
      * COUNT(DISTINCT NRO_FACTURA) representa facturas reales.
      */
     const countSql = `
+      SELECT totals.*, ${restrictedFlagSql} FROM (
       SELECT
         COUNT(*) AS TOTAL_ROWS,
         COUNT(DISTINCT NRO_FACTURA) AS TOTAL_INVOICES
       FROM VW_BOT_FACTURAS
       ${whereSql}
+      ) totals
     `;
 
     const countResult = await connection.execute(countSql, binds, {
@@ -353,6 +361,7 @@ export const getInvoicesRepository = async ({
     const hasMore = safePage < totalPages;
 
     return {
+      ...(Number(countResult.rows?.[0]?.HAS_RESTRICTED_DATA) === 1 ? {hasRestrictedData: true} : {}),
       page: safePage,
       rows: safeRows,
       returnedRows,
@@ -462,6 +471,9 @@ export const getInvoicesRepository = async ({
   const result = await connection.execute(sql, binds, {
     outFormat: 4002,
   });
+  const access = await connection.execute(`SELECT ${restrictedFlagSql} FROM DUAL`, binds, {outFormat: 4002});
+  const restricted = Number(access.rows?.[0]?.HAS_RESTRICTED_DATA) === 1
+    ? {hasRestrictedData: true, hasAuthorizedData: (result.rows ?? []).length > 0} : {};
 
   const mapped = (result.rows ?? []).map((row) => ({
     invoiceNumber: row.INVOICE_NUMBER ?? undefined,
@@ -490,16 +502,18 @@ export const getInvoicesRepository = async ({
   }));
 
   if (safeGroupBy.length === 0 && mapped.length <= 1) {
-    return (
-      mapped[0] ?? {
+    return {
+      ...(mapped[0] ?? {
         totalAmount: 0,
         invoiceCount: 0,
         currencySymbol: null,
-      }
-    );
+      }),
+      ...restricted,
+    };
   }
 
   return {
+    ...restricted,
     data: mapped,
   };
 };
