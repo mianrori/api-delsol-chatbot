@@ -138,10 +138,10 @@ export const getInvoicesRepository = async ({
 
   const normalizedPlate=normalizeInvoicePlate(plate);
   if (normalizedPlate!==undefined) {
-    binds.plate = `%${normalizedPlate}%`;
+    binds.plate = normalizedPlate;
 
     where.push(`
-      REGEXP_REPLACE(UPPER(MATRICULA), '[-[:space:]]', '') LIKE :plate
+      REGEXP_REPLACE(UPPER(MATRICULA), '[-[:space:]]', '') = :plate
     `);
   }
 
