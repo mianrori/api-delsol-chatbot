@@ -2,7 +2,7 @@ import {executeNamedInvoiceRequest} from './invoiceNamedRequest.service.js';
 import {buildInvoiceDetailResponse, appendInvoiceAccessWarning} from './invoiceDetailPresentation.service.js';
 import {applySalesMetrics} from './salesMetrics.service.js';
 import { buildMemberPurchasesResponse, resolveMemberPurchasesPage } from "./memberPurchasesPresentation.service.js";
-import {preserveSearchSelection,beginSearchSelectionTurn,recordSearchToolResult,captureSearchQueryContext} from './searchSelection.service.js';
+import {preserveSearchSelection,beginSearchSelectionTurn,recordSearchToolResult,captureSearchQueryContext,recordInvoiceQueryContext} from './searchSelection.service.js';
 import { buildMemberPromoResponse, resolveMemberPromoPage, resolveMemberPromoSelection, preserveMemberPromoFollowup } from "./memberPromoPurchasesPresentation.service.js";
 import { preserveSalesPerSqmFollowup } from "./salesPerSqmFollowup.service.js";
 import { preserveContractIncidenceFollowup } from "./contractIncidenceFollowup.service.js";
@@ -1428,6 +1428,7 @@ const executeToolRequests = async ({ content, sessionId, sourceMessages = [], ch
       if(name==='get_sales')input=applySalesMetrics(input,getSearchSelectionTurn(sessionId).salesMetrics);
       block.toolUse.input=input;presentationCall.input=input;
       validateProtectedToolInput({ name, input });
+      recordInvoiceQueryContext(sessionId,name,protectPiiDeep(sessionId,input));
 
       if (name === "generate_chart" && !chartRequested) throw new Error("El usuario debe solicitar el gráfico antes de generarlo.");
       const restoredInput = name === "generate_chart" ? input : restorePiiDeep(sessionId, input);
@@ -1670,13 +1671,18 @@ export const chatService = async ({ message, sessionId }) => {
     ?? resolveMemberSolesPage({ message, history: protectedHistory })
     ?? resolveMemberSolesBreakdown({ message, history: protectedHistory })
     ?? resolveMemberSolesBalance({ message: messages.at(-1).content[0].text });
-  const namedInvoice=await executeNamedInvoiceRequest({sessionId,message:messages.at(-1).content[0].text,execute:async(name,input)=>{
+  const executeInvoice=async(name,input)=>{
     const content=[{toolUse:{toolUseId:'invoice_named_'+randomUUID(),name,input}}];messages.push({role:'assistant',content});
     const executed=await executeToolRequests({content,sessionId,sourceMessages:messages});messages.push({role:'user',content:executed.toolResults});
     conversationActions=mergeActions(conversationActions,executed.actions);
     conversationInternalContext={...conversationInternalContext,...executed.internalContext,presentationCalls:[...(conversationInternalContext.presentationCalls??[]),...executed.internalContext.presentationCalls]};toolIterations++;
-    return executed.internalContext.presentationCalls.at(-1)?.result;
-  }});
+    return executed.internalContext.accessDenied ? {status:'ACCESS_DENIED'} : executed.internalContext.presentationCalls.at(-1)?.result;
+  };
+  const plateRequest=getSearchSelectionTurn(sessionId).invoicePlateRequest;
+  const unresolvedInvoiceDenied=plateRequest&&!plateRequest.autonomous&&getSearchResolutions(sessionId).invoiceNamedRequest?.phase==='denied';
+  const namedInvoice=unresolvedInvoiceDenied ? {answer:ACCESS_DENIED_MESSAGE} : plateRequest
+    ? {answer:(await executeInvoice('get_invoices',plateRequest.input))?.data?'Detalle de facturas consultado.':'No fue posible consultar las facturas.'}
+    : await executeNamedInvoiceRequest({sessionId,message:messages.at(-1).content[0].text,execute:executeInvoice});
   if(namedInvoice)followupAnswer=namedInvoice.answer;
   if (!namedInvoice&&salesYearComparison?.autonomous&&salesYearComparison.search) {
     const content=[{toolUse:{toolUseId:'comparison_category_'+randomUUID(),name:'search_categories',input:{search:salesYearComparison.search}}}];

@@ -23,7 +23,7 @@ try{
    if(sql.includes('COUNT(*) AS TOTAL_ROWS'))return {rows:[{TOTAL_ROWS:accessCase==='denied'?0:3,TOTAL_INVOICES:accessCase==='denied'?0:2,HAS_RESTRICTED_DATA:1}]};
    return accessCase==='denied'?{rows:[]}:r;
   };
-  plans=[initial];const r=await post({sessionId:s,message:'Facturas de la matr\u00edcula ab 123 de 2023',username:'IGNORED'});
+  plans=[initial];const r=await post({sessionId:s,message:'Consulta el detalle de facturas filtrado por matr\u00edcula ab 123 de 2023',username:'IGNORED'});
   assert.equal(r.status,200);assert.equal(r.body.success,true);assert.equal(modelCalls,1);
   if(accessCase==='denied'){
    assert.match(r.body.response,/no tiene permisos/);assert.doesNotMatch(r.body.response,/No se encontraron|Ver PDF|F1|F2/);assert.deepEqual(r.body.actions,{});
@@ -34,7 +34,7 @@ try{
   process.stdout.write('INVOICE_HTTP_PASS');
  }else{
  const denied=await post({sessionId:'BAD',message:'Facturas',username:'IGNORED'});assert.equal(denied.status,404);assert.equal(calls.length,0);
- plans=[initial];const first=await post({sessionId:s,message:'Facturas de la matr\u00edcula ab 123 de 2023',username:'IGNORED'});assert.equal(first.status,200);assert.equal(first.body.success,true);assert.equal(first.body.actions.invoicePagination.nextPage,2);assert.equal(first.body.actions.invoicePagination.totalRows,3);assert.equal(first.body.actions.invoicePagination.totalInvoices,2);assert.match(first.body.response,/\[Ver PDF\]\(<https:\/\/pdf.example.test\/base\/a.pdf>\)/);assert.equal(first.body.response.split('\n').filter(l=>/^\| F[12] /.test(l)).length,2);
+ plans=[initial];const first=await post({sessionId:s,message:'Consulta el detalle de facturas filtrado por matr\u00edcula ab 123 de 2023',username:'IGNORED'});assert.equal(first.status,200);assert.equal(first.body.success,true);assert.equal(first.body.actions.invoicePagination.nextPage,2);assert.equal(first.body.actions.invoicePagination.totalRows,3);assert.equal(first.body.actions.invoicePagination.totalInvoices,2);assert.match(first.body.response,/\[Ver PDF\]\(<https:\/\/pdf.example.test\/base\/a.pdf>\)/);assert.equal(first.body.response.split('\n').filter(l=>/^\| F[12] /.test(l)).length,2);
  plans=[{page:2}];const next=await post({sessionId:s,message:'Siguiente p\u00e1gina'});assert.equal(next.status,200);assert.deepEqual(calls[1].args,{...initial,page:2});assert.equal(next.body.actions.invoicePagination.hasMore,false);assert.match(next.body.response,/b%20\(2\).pdf/);assert.doesNotMatch(next.body.response,/base\/a.pdf/);assert.equal(next.body.response.split('\n').filter(l=>/^\| F2 /.test(l)).length,1);
  for(const q of queries){assert.equal(q.binds.plate,'AB123');assert.equal(q.binds.customerId0,'C1');assert.equal(q.binds.conceptId0,'K1');assert.equal(q.binds.period,'01/2023');assert.equal(q.binds.cancelled,'N');assert.match(q.sql,/NVL\(USER_CAN_CONSULT, 'S'\) <> 'N'/);}
  assert.equal(modelCalls,2);assert.ok(validated.includes(s));assert.ok(validated.includes('BAD'));process.stdout.write('INVOICE_HTTP_PASS');

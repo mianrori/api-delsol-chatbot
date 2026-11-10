@@ -723,3 +723,15 @@ solo documentan resultados. PR #47 en borrador con las reservas conservadas.
 | Ausencia real | HTTP 200 vacio, SELECT confirma ausencia de ambas clases y no se muestra denegacion. | No equivale a denegacion; filtro sin datos, sin crear registros. |
 
 **ea812b4: 25/25 aserciones, 3 POST HTTP**, aplicacion y pruebas identicas a **6b85edd**. Las 38 pruebas se reutilizaron por hash, sin repetir. Candidato aislado, sesion/proxy Oracle reales; **4 invocaciones SDK controladas, cero modelo real/Bedrock/proveedor y cero descargas PDF**. Cierres, logout y logs sanitizados aprobados. Reporte SHA-256 9605fcaa58da48138d39c318988488ed97633cdbea93f3ec5f93b4ae478a7097; alcance y muestras faltantes en [invoice-access-authorization.md](invoice-access-authorization.md). PR #48 en borrador, DEV sin cambios, reservas previas conservadas. No se suman aserciones y pruebas como cobertura unica; no se modificaron datos, configuracion, permisos o expiraciones.
+
+
+### Facturas: consulta autonoma por matricula despues de otro alcance
+
+| Caso | Evidencia | Limite |
+| --- | --- | --- |
+| Consulta autonoma por matricula | 73e1eef: 56/56 pruebas enfocadas y 6/6 de seleccion; 7d05971: Oracle/HTTP tras recorte confirma solo matricula/detalle/pagina, sin cliente, concepto o fechas heredados. | La matricula solicitada resulto ABSENT para esta sesion; no se acredita un positivo real. |
+| Seguimiento explicito «filtra tambien» | Conserva cliente/concepto efectivos y 2023 tras recorte; estado y SELECT independientes coinciden. | Resultado real ABSENT dentro del alcance anterior, no permiso denegado. |
+| Denegacion al resolver cliente | 5f94216: 20/20 controles afectados, cuatro regresiones HTTP nuevas antes/despues del recorte. No permite que el seguimiento consulte otros clientes sin resolver el anterior. | No hubo muestra inicialmente denegada en esta sesion; esta rama sigue con cobertura sintetica. |
+| Denegacion al consultar facturas; nueva matricula permitida/restringida/ausente | Cobertura sintetica inicial, chat y HTTP, ambas intenciones y recorte. | Consulta inicial real AUTHORIZED; no se presenta como Oracle real denegacion seguida de matricula. |
+
+**7d05971: 48/48 comprobaciones en cuatro POST HTTP 200**, aplicacion/pruebas identicas a 5f94216. Las 56/6 pruebas de 73e1eef se reutilizan para partes no modificadas; 20 controles cubren el ajuste adicional. SDK controlado no invocado: cero Bedrock/modelo real/proveedor y descargas PDF. Cierres, logout y logs sanitizados aprobados. Reporte SHA-256 5ce138983586a094e2f013308ab1d9c246b3eb3cab0e73d500fe99633708ff3f; 315 archivos, manifiesto 16d0fc86dfb5515563e68f89fabdbef1752a9a7fa352f946c82cb6b971824fde. [Alcance y muestras faltantes](invoice-plate-query-scope.md). PR #49 en borrador, DEV sin cambios. Reservas restringidas/mixtas/segunda pagina mixta y positivo PDF/404 separados conservadas. Sin merge, despliegue o cambios de datos, configuracion, permisos o expiraciones.

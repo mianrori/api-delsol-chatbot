@@ -1,0 +1,276 @@
+{
+  "suite": "invoice-plate-scope-http-helper",
+  "success": true,
+  "startedAt": "2026-11-10T18:51:15.914Z",
+  "phase": "COMPLETE",
+  "commit": "7d05971affa315f7cb8f32be73930770f6711b43",
+  "verifiedSourceFiles": 315,
+  "manifestSha256": "16d0fc86dfb5515563e68f89fabdbef1752a9a7fa352f946c82cb6b971824fde",
+  "validatedApplicationCommit": "5f94216c722d92114f653508e63f774f0a5ddec2",
+  "requestedBaseCommit": "73e1eef92125c6e6159ea127456270ce903bd92b",
+  "reusedEvidence": {
+    "focused56": {
+      "commit": "73e1eef92125c6e6159ea127456270ce903bd92b",
+      "outputSha256": "67030383c7d7a25b56cdef7699bdcde348de347cb5e69f093abc165c7acaef3b",
+      "notReexecuted": true,
+      "applicability": "original autonomous plate scope and unaffected paths; new denial-resolution change covered separately"
+    },
+    "invoiceSelection6": {
+      "commit": "73e1eef92125c6e6159ea127456270ce903bd92b",
+      "outputSha256": "2e1fffc1d1179e409d066407455055ffcb5853f1f06f7ea6e6328644aa38b977",
+      "notReexecuted": true
+    },
+    "affected20": {
+      "commit": "5f94216c722d92114f653508e63f774f0a5ddec2",
+      "outputSha256": "e35e3bd9b52c92412e18e2f1050c11fbbeb9bf664f018947954fd2d31b412ebf",
+      "newHttpRegressions": 4,
+      "scope": "resolution denial and affected typed paths",
+      "notReexecuted": true
+    }
+  },
+  "worker": {
+    "suite": "invoice-plate-scope-http-dev",
+    "commit": "7d05971affa315f7cb8f32be73930770f6711b43",
+    "success": true,
+    "checks": [
+      {
+        "code": "SAFE_COMMITTED_DEV",
+        "passed": true
+      },
+      {
+        "code": "HTTP_CONTRACT_1",
+        "passed": true
+      },
+      {
+        "code": "INITIAL_CONCEPT_ROLE_autonomous",
+        "passed": true
+      },
+      {
+        "code": "INITIAL_CUSTOMER_AND_2023_autonomous",
+        "passed": true
+      },
+      {
+        "code": "INITIAL_FINAL_FILTERS_autonomous",
+        "passed": true
+      },
+      {
+        "code": "INITIAL_autonomous_COUNTS_AND_PERMISSION_CLASS_MATCH_ORACLE",
+        "passed": true
+      },
+      {
+        "code": "INITIAL_autonomous_FULL_AUTHORIZED_PAGE_MATCHES_ORACLE",
+        "passed": true
+      },
+      {
+        "code": "INITIAL_autonomous_AUTHORIZED_PAGINATION",
+        "passed": true
+      },
+      {
+        "code": "INITIAL_autonomous_CORRECT_DENIAL_ABSENCE_OR_PARTIAL_WORDING",
+        "passed": true
+      },
+      {
+        "code": "INITIAL_autonomous_PRESENTATION_HAS_EVERY_AUTHORIZED_ROW",
+        "passed": true
+      },
+      {
+        "code": "INITIAL_autonomous_ONLY_AUTHORIZED_PDF_LINKS_NO_DOWNLOAD",
+        "passed": true
+      },
+      {
+        "code": "ORIGINAL_TOOLS_TRIMMED_autonomous",
+        "passed": true
+      },
+      {
+        "code": "HTTP_CONTRACT_2",
+        "passed": true
+      },
+      {
+        "code": "DIRECT_PLATE_ONLY_TOOL_autonomous",
+        "passed": true
+      },
+      {
+        "code": "NORMALIZED_PLATE_AND_PAGE_autonomous",
+        "passed": true
+      },
+      {
+        "code": "AUTONOMOUS_REMOVES_CUSTOMER_CONCEPT_AND_ALL_PERIOD_FILTERS",
+        "passed": true
+      },
+      {
+        "code": "PLATE_autonomous_COUNTS_AND_PERMISSION_CLASS_MATCH_ORACLE",
+        "passed": true
+      },
+      {
+        "code": "PLATE_autonomous_FULL_AUTHORIZED_PAGE_MATCHES_ORACLE",
+        "passed": true
+      },
+      {
+        "code": "PLATE_autonomous_AUTHORIZED_PAGINATION",
+        "passed": true
+      },
+      {
+        "code": "PLATE_autonomous_CORRECT_DENIAL_ABSENCE_OR_PARTIAL_WORDING",
+        "passed": true
+      },
+      {
+        "code": "PLATE_autonomous_PRESENTATION_HAS_EVERY_AUTHORIZED_ROW",
+        "passed": true
+      },
+      {
+        "code": "PLATE_autonomous_ONLY_AUTHORIZED_PDF_LINKS_NO_DOWNLOAD",
+        "passed": true
+      },
+      {
+        "code": "PERSISTENT_SCOPE_MATCHES_FINAL_ARGS_autonomous",
+        "passed": true
+      },
+      {
+        "code": "OLD_NAMED_METADATA_RETIRED",
+        "passed": true
+      },
+      {
+        "code": "HTTP_CONTRACT_3",
+        "passed": true
+      },
+      {
+        "code": "INITIAL_CONCEPT_ROLE_additive",
+        "passed": true
+      },
+      {
+        "code": "INITIAL_CUSTOMER_AND_2023_additive",
+        "passed": true
+      },
+      {
+        "code": "INITIAL_FINAL_FILTERS_additive",
+        "passed": true
+      },
+      {
+        "code": "INITIAL_additive_COUNTS_AND_PERMISSION_CLASS_MATCH_ORACLE",
+        "passed": true
+      },
+      {
+        "code": "INITIAL_additive_FULL_AUTHORIZED_PAGE_MATCHES_ORACLE",
+        "passed": true
+      },
+      {
+        "code": "INITIAL_additive_AUTHORIZED_PAGINATION",
+        "passed": true
+      },
+      {
+        "code": "INITIAL_additive_CORRECT_DENIAL_ABSENCE_OR_PARTIAL_WORDING",
+        "passed": true
+      },
+      {
+        "code": "INITIAL_additive_PRESENTATION_HAS_EVERY_AUTHORIZED_ROW",
+        "passed": true
+      },
+      {
+        "code": "INITIAL_additive_ONLY_AUTHORIZED_PDF_LINKS_NO_DOWNLOAD",
+        "passed": true
+      },
+      {
+        "code": "ORIGINAL_TOOLS_TRIMMED_additive",
+        "passed": true
+      },
+      {
+        "code": "HTTP_CONTRACT_4",
+        "passed": true
+      },
+      {
+        "code": "DIRECT_PLATE_ONLY_TOOL_additive",
+        "passed": true
+      },
+      {
+        "code": "NORMALIZED_PLATE_AND_PAGE_additive",
+        "passed": true
+      },
+      {
+        "code": "ADDITIVE_PRESERVES_EFFECTIVE_CUSTOMER_CONCEPT_2023",
+        "passed": true
+      },
+      {
+        "code": "PLATE_additive_COUNTS_AND_PERMISSION_CLASS_MATCH_ORACLE",
+        "passed": true
+      },
+      {
+        "code": "PLATE_additive_FULL_AUTHORIZED_PAGE_MATCHES_ORACLE",
+        "passed": true
+      },
+      {
+        "code": "PLATE_additive_AUTHORIZED_PAGINATION",
+        "passed": true
+      },
+      {
+        "code": "PLATE_additive_CORRECT_DENIAL_ABSENCE_OR_PARTIAL_WORDING",
+        "passed": true
+      },
+      {
+        "code": "PLATE_additive_PRESENTATION_HAS_EVERY_AUTHORIZED_ROW",
+        "passed": true
+      },
+      {
+        "code": "PLATE_additive_ONLY_AUTHORIZED_PDF_LINKS_NO_DOWNLOAD",
+        "passed": true
+      },
+      {
+        "code": "PERSISTENT_SCOPE_MATCHES_FINAL_ARGS_additive",
+        "passed": true
+      },
+      {
+        "code": "TYPED_HTTP_PATH_NO_SDK_REAL_MODEL_OR_PROVIDER",
+        "passed": true
+      },
+      {
+        "code": "ALL_ORACLE_CONNECTIONS_CLOSED",
+        "passed": true
+      }
+    ],
+    "startedAt": "2026-11-10T18:51:19.391Z",
+    "scope": "two real HTTP sequences over isolated candidate and real session/proxy Oracle; typed deterministic route; SDK rejects invocation; no real model or deployed-5400 claim",
+    "sequences": [
+      {
+        "intent": "autonomous",
+        "initialDenied": false,
+        "trimmed": true,
+        "resultClass": "ABSENT"
+      },
+      {
+        "intent": "additive",
+        "initialDenied": false,
+        "trimmed": true,
+        "resultClass": "ABSENT"
+      }
+    ],
+    "samples": {
+      "initialNamedScopeClass": "AUTHORIZED",
+      "initialDeniedSampleAvailable": false,
+      "plateClassification": "ABSENT",
+      "missing": [
+        "real initially denied named scope for this session"
+      ]
+    },
+    "serverClosed": true,
+    "connectionsClosed": true,
+    "httpConversationRequests": 4,
+    "controlledModelCalls": 0,
+    "realModelCalls": 0,
+    "providerCalls": 0,
+    "pdfDownloads": 0,
+    "finishedAt": "2026-11-10T18:51:24.851Z"
+  },
+  "logout": true,
+  "logAudit": [
+    {
+      "service": "chatbot",
+      "lines": 0,
+      "recognizedSanitizedOnly": true
+    },
+    {
+      "service": "erp",
+      "lines": 2,
+      "recognizedSanitizedOnly": true
+    }
+  ],
+  "finishedAt": "2026-11-10T18:51:55.206Z"
+}
