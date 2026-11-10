@@ -1676,10 +1676,11 @@ export const chatService = async ({ message, sessionId }) => {
     const executed=await executeToolRequests({content,sessionId,sourceMessages:messages});messages.push({role:'user',content:executed.toolResults});
     conversationActions=mergeActions(conversationActions,executed.actions);
     conversationInternalContext={...conversationInternalContext,...executed.internalContext,presentationCalls:[...(conversationInternalContext.presentationCalls??[]),...executed.internalContext.presentationCalls]};toolIterations++;
-    return executed.internalContext.presentationCalls.at(-1)?.result;
+    return executed.internalContext.accessDenied ? {status:'ACCESS_DENIED'} : executed.internalContext.presentationCalls.at(-1)?.result;
   };
   const plateRequest=getSearchSelectionTurn(sessionId).invoicePlateRequest;
-  const namedInvoice=plateRequest
+  const unresolvedInvoiceDenied=plateRequest&&!plateRequest.autonomous&&getSearchResolutions(sessionId).invoiceNamedRequest?.phase==='denied';
+  const namedInvoice=unresolvedInvoiceDenied ? {answer:ACCESS_DENIED_MESSAGE} : plateRequest
     ? {answer:(await executeInvoice('get_invoices',plateRequest.input))?.data?'Detalle de facturas consultado.':'No fue posible consultar las facturas.'}
     : await executeNamedInvoiceRequest({sessionId,message:messages.at(-1).content[0].text,execute:executeInvoice});
   if(namedInvoice)followupAnswer=namedInvoice.answer;

@@ -26,3 +26,7 @@ test('autonomous scope rejects stale model filters; later pagination uses only p
 for(const scenario of ['allowed','denied','empty','followup'])for(const trimmed of [false,true])test('HTTP denied then plate '+scenario+'; trimmed='+trimmed,()=>{
  const r=spawnSync(process.execPath,['--experimental-vm-modules',fileURLToPath(new URL('./fixtures/invoicePlateScope.mjs',import.meta.url)),scenario,String(trimmed),'http'],{encoding:'utf8',timeout:20000});assert.equal(r.status,0,r.stdout+r.stderr);assert.match(r.stdout,/INVOICE_PLATE_SCOPE_PASS/);
 });
+
+for(const scenario of ['customer-autonomous','customer-followup'])for(const trimmed of [false,true])test('HTTP resolution denial '+scenario+'; trimmed='+trimmed,()=>{
+ const r=spawnSync(process.execPath,['--experimental-vm-modules',fileURLToPath(new URL('./fixtures/invoicePlateScope.mjs',import.meta.url)),scenario,String(trimmed),'http'],{encoding:'utf8',timeout:20000});assert.equal(r.status,0,r.stdout+r.stderr);assert.match(r.stdout,/INVOICE_PLATE_SCOPE_PASS/);
+});

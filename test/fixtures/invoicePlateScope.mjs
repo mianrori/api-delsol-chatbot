@@ -9,6 +9,8 @@ const conceptAmbiguous=['concept-ambiguous','both-ambiguous','wrong-choice'].inc
 let stage='initial';const attempts=[];
 const connection={async execute(sql,binds){queries.push({sql,binds:structuredClone(binds)});
  if(sql.includes('VW_BOT_CONCEPTOS'))return {rows:[{COD_CONCEPTO:'K1',DESCRIPCION:'ARRENDAMIENTO MINIMO'}]};
+ if(sql.includes('FROM DUAL'))return {rows:[{HAS_RESTRICTED_DATA:stage==='initial'&&scenario.startsWith('customer-')?1:0}]};
+ if(sql.includes('MATCH_PRIORITY')&&stage==='initial'&&scenario.startsWith('customer-'))return {rows:[]};
  if(sql.includes('MATCH_PRIORITY'))return {rows:[{COD_CLIENTE:'C1',NOM_CLIENTE:'IMPACTO',MATCH_PRIORITY:4}]};
  if(sql.includes('COUNT(*) AS TOTAL_ROWS'))return {rows:[{TOTAL_ROWS:stage==='initial'||scenario==='followup'||scenario==='denied'||scenario==='empty'?0:1,TOTAL_INVOICES:stage==='initial'||scenario==='followup'||scenario==='denied'||scenario==='empty'?0:1,HAS_RESTRICTED_DATA:stage==='initial'||scenario==='followup'||scenario==='denied'?1:0}]};
  if(stage==='initial'||scenario==='followup'||scenario==='denied'||scenario==='empty')return {rows:[]};
@@ -35,9 +37,10 @@ const crop=()=>{let h=store.getConversation(sessionId);for(let i=0;i<14;i++)h=tr
 try{
  store.clearConversation(sessionId);
  const first=await turn('facturas de arrendamiento m\u00ednimo del 2023 del local impacto');assert.match(first,/no tiene permisos/);
- assert.deepEqual(attempts.at(-1).args,{customerIds:['C1'],conceptIds:['K1'],dateFrom:'01/01/2023',dateTo:'31/12/2023',mode:'detail',page:1,rows:20});
+ if(!scenario.startsWith('customer-'))assert.deepEqual(attempts.at(-1).args,{customerIds:['C1'],conceptIds:['K1'],dateFrom:'01/01/2023',dateTo:'31/12/2023',mode:'detail',page:1,rows:20});
  if(trimmed)crop();stage='plate';const n=attempts.length;
- const answer=await turn(scenario==='followup'?'filtra tambi\u00e9n por matr\u00edcula anx123':'facturas de la matr\u00edcula anx123');
+ const answer=await turn(['followup','customer-followup'].includes(scenario)?'filtra tambi\u00e9n por matr\u00edcula anx123':'facturas de la matr\u00edcula anx123');
+ if(scenario==='customer-followup'){assert.equal(attempts.length,n);assert.match(answer,/no tiene permisos/);assert.doesNotMatch(answer,/Ver PDF|ALLOWED-PLATE/);assert.equal(store.getSearchResolutions(sessionId).invoiceNamedRequest.phase,'denied');assert.equal(modelCalls,0);process.stdout.write('INVOICE_PLATE_SCOPE_PASS');}else{
  assert.equal(attempts.length,n+1);assert.equal(attempts.at(-1).name,'get_invoices');
  const expected=scenario==='followup'?{customerIds:['C1'],conceptIds:['K1'],dateFrom:'01/01/2023',dateTo:'31/12/2023',mode:'detail',page:1,rows:20,plate:'anx123'}:{plate:'anx123',mode:'detail',page:1,rows:20};
  assert.deepEqual(attempts.at(-1).args,expected);
@@ -50,4 +53,5 @@ try{
   for(const q of queries.filter(q=>q.binds.plate)){assert.equal(q.binds.customerId0,undefined);assert.equal(q.binds.conceptId0,undefined);assert.equal(q.binds.dateFrom,undefined);assert.equal(q.binds.dateTo,undefined);assert.equal(q.binds.plate,'ANX123');assert.match(q.sql,/USER_CAN_CONSULT/);}
  }
  assert.equal(modelCalls,0);process.stdout.write('INVOICE_PLATE_SCOPE_PASS');
+ }
 }finally{store.clearConversation(sessionId);if(server)await new Promise(resolve=>server.close(resolve));}

@@ -1,5 +1,6 @@
 ﻿import {getSearchResolutions,setSearchResolutions,getSearchSelectionTurn,setSearchSelectionTurn} from '../../state/conversation.store.js';
 import {restorePiiDeep} from './pii.service.js';
+import {ACCESS_DENIED_MESSAGE} from './toolErrors.service.js';
 
 // Separate the two explicitly named roles before a model can swap their tools.
 // Unqualified "facturas de X" remains outside this bounded grammar.
@@ -35,6 +36,9 @@ export async function executeNamedInvoiceRequest({sessionId,message,execute}){
  for(const role of ['concept','customer']){
   if(request[role]?.status==='RESOLVED')continue;
   const result=await execute(role==='concept'?'search_invoice_concepts':'search_invoice_customers',role==='concept'?{query:request.conceptQuery}:{query:request.customerQuery,dateFrom:request.dateFrom,dateTo:request.dateTo});
+  if(result?.status==='ACCESS_DENIED'){
+   request.phase='denied';save();return {answer:ACCESS_DENIED_MESSAGE};
+  }
   if(result?.status==='AMBIGUOUS'){
    request.options=(result.options??[]).map(o=>minimal(role,o));request.phase=role+'Pending';save();return {answer:pendingAnswer(role)};
   }
