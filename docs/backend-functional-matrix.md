@@ -747,3 +747,13 @@ solo documentan resultados. PR #47 en borrador con las reservas conservadas.
 | Oracle independiente y conversacion nueva | ABSENT para la misma identidad; respuesta coincide. | ANX123 literal, no positiva. Pendiente auditoria Unicode/proyeccion de vista; no hay correccion demostrada. |
 
 Ejecutor caed886, tres preguntas HTTP reales y dos resets de conversacion propia; no SDK controlado, cero eventos Bedrock, conexiones/driver/inspector/logout cerrados y logs sanitizados. Reporte SHA-256 d97cb76388f15c9fd0162c4775ebed16a41adf56eca85b288bcbdd6cf4e60065. [Investigacion abierta](invoice-affected-user-investigation.md). PR #50 en borrador, sin merge, despliegue o cambios de datos/permisos/expiraciones. Reservas de facturas restringidas por esa matricula, mixtos, segunda pagina mixta y PDF positivo/404 separados conservadas.
+
+### Proyeccion Oracle del usuario afectado: b014b94
+
+| Caso | Evidencia | Limite |
+| --- | --- | --- |
+| Permiso de la vista | Expresion combina columna y USER; misma identidad con filas permitidas y N. | No es una denegacion global uniforme; no atribuir N a cualquier vacio. |
+| MATRICULA | TRIM/UPPER y funciones anidadas, sin condicion explicita de permiso en la proyeccion. | Cuerpos de funciones, predicados y politicas no inspeccionados; ocultacion no descartada. |
+| ANX123 tras denegacion y aislada | Se reutilizan HTTP caed886 y Unicode b96353a: ausencia de coincidencias visibles autorizadas/restringidas; sin filtros anteriores. | No demuestra ausencia global ni matricula oculta. Caso abierto. |
+
+Aplicacion 22f4b02 reverificada tras reinicio de Docker, sin despliegue. Control actual solo Oracle/metadatos: cero HTTP repetido, cierres/logout/logs aprobados, cero Bedrock/PDF. Reporte SHA-256 1da5be7a957d9cd91379cc5c119f333e1c766f1176a9b7818c547155a2d35d18. [Diagnostico y consulta administrativa pendiente](invoice-affected-user-investigation.md). PR #50 en borrador, sin correccion especulativa.
