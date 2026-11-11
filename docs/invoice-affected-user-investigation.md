@@ -1,5 +1,7 @@
 ﻿# Reapertura: usuario afectado y proceso habitual
 
+Estado vigente (11 de noviembre de 2026): **caso abierto, bloqueado para completar la comprobacion administrativa**. El usuario confirma que no hay acceso administrativo. La consulta DBA_* preparada no se ejecuto y no hay resultado administrativo que revisar. No se solicita ampliar permisos ni se sustituye la identidad afectada. Las secciones siguientes conservan la secuencia historica de evidencias; no hay correccion de aplicacion demostrada.
+
 Base: 22f4b02. Estado: investigacion pendiente de reproduccion con el usuario DEV afectado; caso no resuelto.
 
 Los controles historicos con otra sesion autorizada no acreditan la secuencia que comienza con denegacion. No se reutilizan como reproduccion ni se presupone la causa.
@@ -62,3 +64,9 @@ ALL_POLICIES devolvio cero politicas visibles en la vista y en cada una de las d
 La secuencia original y la consulta aislada caed886 siguen siendo la evidencia HTTP: denegacion inicial confirmada, matricula autonoma sin filtros heredados y ninguna coincidencia autorizada/restringida en la vista para la misma identidad. Unicode b96353a no encontro candidatas. No se repitieron esos controles ni se asume que los datos sean inmutables entre sesiones. **No hay causa demostrada de un defecto de la aplicacion; caso abierto y PR #50 en borrador.**
 
 [Reporte sanitizado de dependencias](invoice-affected-user-dependencies-948332d.json), SHA-256 **c378792808e660ad20c02a68d8b6bda422bb330d97cd8275fdb141a15d260351**. Identidad PostgreSQL/Oracle proxy coincidente, conexiones e inspector cerrados, logout y logs sanitizados aprobados. Cero Bedrock/PDF. Sin cambios de aplicacion, merge o despliegue; reservas anteriores conservadas.
+
+## Sin acceso administrativo
+
+El usuario confirma que no hay acceso para ejecutar la comprobacion administrativa pendiente. Se conserva la consulta preparada para una futura ejecucion autorizada; no se presenta como ejecutada ni como evidencia Oracle adicional. El bloqueo es la falta de confirmacion de completitud del catalogo y de politicas/dependencias fuera de la visibilidad de la identidad afectada. No es un error Oracle observado al consultar DBA_*: esas consultas no se intentaron.
+
+La evidencia disponible demuestra la denegacion inicial, la retirada del alcance heredado y cero coincidencias visibles para ANX123 en secuencia y aislada. No demuestra ausencia global, restriccion de ANX123 ni su exclusion por un join o politica. El caso y la PR #50 siguen abiertos, en borrador; sin cambios de aplicacion, controles repetidos, nuevas sesiones o cambios de datos/permisos/expiraciones. Se conservan las reservas previas y los cierres/logout ya documentados.

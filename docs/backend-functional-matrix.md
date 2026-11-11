@@ -764,7 +764,7 @@ Aplicacion 22f4b02 reverificada tras reinicio de Docker, sin despliegue. Control
 | --- | --- | --- |
 | Funciones de MATRICULA | LOWER/REPLACE/UPPER/TRIM sobre columna; sin condicion de permiso ni funcion propia en esa expresion. | No prueba que la columna fuente tenga valor para ANX123. |
 | Relaciones de la vista | Diez dependencias TABLE; varios INNER JOIN con igualdad. Pueden excluir filas sin relacion requerida antes de su clasificacion observable. | No demuestra que ANX123 exista ni que un join la excluya. |
-| Politicas/dependencias no visibles | ALL_POLICIES sin filas en vista y diez tablas; consultas completadas sin errores/cortes. | Completitud ALL_* no certificada. Pendiente inventario administrativo DBA_* preparado y revision del resultado. |
+| Politicas/dependencias no visibles | ALL_POLICIES sin filas en vista y diez tablas; consultas completadas sin errores/cortes. | Completitud ALL_* no certificada. Usuario confirma falta de acceso administrativo: inventario DBA_* preparado pero no ejecutado. Bloqueo vigente. |
 | Secuencia y matricula aislada | HTTP caed886 y Unicode b96353a reutilizados sin repetirlos. | Cero coincidencias visibles no equivale a denegacion ni ausencia global. Caso abierto. |
 
 Reporte SHA-256 c378792808e660ad20c02a68d8b6bda422bb330d97cd8275fdb141a15d260351. Cero POST/resets/filas de tablas base/funciones ejecutadas; conexiones, inspector, logout y logs sanitizados aprobados. Aplicacion 22f4b02 sin cambios. [Diagnostico y bloqueo](invoice-affected-user-investigation.md). PR #50 en borrador; reservas anteriores conservadas.
