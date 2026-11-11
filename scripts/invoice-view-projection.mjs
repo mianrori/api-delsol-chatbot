@@ -8,8 +8,8 @@ export function extractViewProjection(text){
  const find=name=>parts.find(p=>new RegExp('(?:\\b|\\")'+name+'\\"?\\s*$','i').test(p))??null;
  return {parsed:true,plate:find('MATRICULA'),permission:find('USER_CAN_CONSULT')};
 }
-export function publicProjectionShape(expression){
+export function publicProjectionShape(expression,extraKeywords=[]){
  if(!expression)return null;
- const known=new Set('SELECT FROM WHERE AND OR NOT CASE WHEN THEN ELSE END DECODE NVL COALESCE NULL AS MAX MIN DISTINCT USER_CAN_CONSULT MATRICULA USER SYS_CONTEXT ROWNUM UPPER TRIM TO_CHAR TO_NUMBER IN IS EXISTS ON JOIN LEFT RIGHT INNER OUTER CAST VARCHAR2 NUMBER COUNT SUM'.split(' '));
+ const known=new Set('SELECT FROM WHERE AND OR NOT CASE WHEN THEN ELSE END DECODE NVL COALESCE NULL AS MAX MIN DISTINCT USER_CAN_CONSULT MATRICULA USER SYS_CONTEXT ROWNUM UPPER TRIM TO_CHAR TO_NUMBER IN IS EXISTS ON JOIN LEFT RIGHT INNER OUTER CAST VARCHAR2 NUMBER COUNT SUM'.split(' '));for(const word of extraKeywords)known.add(word);
  return expression.replace(/'(?:''|[^'])*'/g,"'<literal>'").replace(/\b\d+(?:\.\d+)?\b/g,'<number>').replace(/"(?:""|[^"])*"/g,'<identifier>').replace(/[A-Za-z_][A-Za-z0-9_$#]*/g,w=>known.has(w.toUpperCase())?w.toUpperCase():['literal','number','identifier'].includes(w)?w:'identifier').replace(/\s+/g,' ').trim();
 }
