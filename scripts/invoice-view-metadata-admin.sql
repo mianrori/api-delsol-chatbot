@@ -44,3 +44,47 @@ WHERE object_owner = :dependency_owner AND object_name = :dependency_name;
 -- permisos; que parte del permiso depende de USER y que parte de la fila;
 -- puede un predicado ocultar filas antes de evaluar la matricula.
 -- No buscar ANX123 en tablas base para eludir restricciones de la vista.
+
+-- Continuacion administrativa tras 948332d. Ejecutar SOLO con acceso existente
+-- de un administrador en el mismo DEV. Estas consultas no fueron ejecutadas
+-- por el chatbot. No conectar otra cuenta para consultar facturas.
+-- El control afectado vio diez dependencias TABLE y ninguna FUNCTION/PACKAGE;
+-- ALL_POLICIES no mostro filas para la vista ni esas tablas. Verificar si esa
+-- visibilidad coincide con el catalogo completo, sin cambiar privilegios.
+SELECT owner, view_name, text_length, text
+FROM dba_views
+WHERE view_name = 'VW_BOT_FACTURAS';
+
+SELECT d.owner, d.name, d.type, d.referenced_owner, d.referenced_name,
+       d.referenced_type, d.referenced_link_name
+FROM dba_dependencies d
+WHERE d.type = 'VIEW' AND d.name = 'VW_BOT_FACTURAS'
+ORDER BY d.owner, d.referenced_type, d.referenced_owner, d.referenced_name;
+
+-- Incluye una fila por objeto aun sin politicas; revisar que el conjunto
+-- corresponda a la definicion DEV esperada si hay varios propietarios.
+WITH roots AS (
+  SELECT owner, view_name AS object_name FROM dba_views
+  WHERE view_name = 'VW_BOT_FACTURAS'
+), scoped_objects AS (
+  SELECT owner, object_name FROM roots
+  UNION
+  SELECT d.referenced_owner, d.referenced_name
+  FROM dba_dependencies d
+  JOIN roots r ON r.owner = d.owner AND r.object_name = d.name
+  WHERE d.type = 'VIEW' AND d.referenced_type IN ('TABLE', 'VIEW')
+    AND d.referenced_link_name IS NULL
+)
+SELECT o.owner, o.object_name, p.policy_name, p.pf_owner, p.package,
+       p.function, p.sel, p.enable
+FROM scoped_objects o
+LEFT JOIN dba_policies p
+  ON p.object_owner = o.owner AND p.object_name = o.object_name
+ORDER BY o.owner, o.object_name, p.policy_name;
+
+-- Si aparecen politicas o dependencias adicionales, inspeccionar sus cuerpos
+-- con DBA_SOURCE siguiendo los binds anteriores. No ejecutarlos ni extraer
+-- sus filas de negocio. Entregar solo: proyeccion de matricula condicionada
+-- por identidad o no; predicados/politicas que pueden ocultar filas; alcance
+-- de visibilidad confirmado o limite concreto. Los INNER JOIN ya observados
+-- pueden excluir filas, pero no prueban que ANX123 exista antes de esos joins.
