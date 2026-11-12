@@ -768,3 +768,16 @@ Aplicacion 22f4b02 reverificada tras reinicio de Docker, sin despliegue. Control
 | Secuencia y matricula aislada | HTTP caed886 y Unicode b96353a reutilizados sin repetirlos. | Cero coincidencias visibles no equivale a denegacion ni ausencia global. Caso abierto. |
 
 Reporte SHA-256 c378792808e660ad20c02a68d8b6bda422bb330d97cd8275fdb141a15d260351. Cero POST/resets/filas de tablas base/funciones ejecutadas; conexiones, inspector, logout y logs sanitizados aprobados. Aplicacion 22f4b02 sin cambios. [Diagnostico y bloqueo](invoice-affected-user-investigation.md). PR #50 en borrador; reservas anteriores conservadas.
+
+### Estado vigente PR #50: autorizacion por fila (12 de noviembre de 2026)
+
+Reemplaza el bloqueo administrativo como orientacion del trabajo; las inspecciones anteriores son evidencia historica. Se conserva `NVL(USER_CAN_CONSULT, 'S') <> 'N'` para recuperar datos y se comparte una lista explicita de filtros normalizados con el sondeo independiente `EXISTS` de filas N, que devuelve solo un bit. El sondeo ya existia en 22f4b02; no se atribuye a este refactor una correccion demostrada de ANX123.
+
+| Caso | Evidencia actual | Limite |
+| --- | --- | --- |
+| Solo restringidas / mixtas / ausentes | 71/71 pruebas enfocadas con Node 22.23.4; mensaje exacto, aviso parcial, filtros completos y binds identicos en detalle/resumen. | Oracle simulado; no acredita muestras restringidas reales. |
+| Denegacion inicial → matricula autonoma | Regresion chat/HTTP, con/sin recorte, ahora tambien mixta; conteos y PDF solo autorizado. | Flujo determinista, sin modelo real ni descargas PDF. |
+| Usuario afectado en Oracle/HTTP | Contraste con caed886 historico: inicial denegada, matricula autonoma sin alcance heredado y misma ausencia en secuencia/nueva conversacion conciliada con Oracle. | No reprodujo N para ANX123. No es una ejecucion del candidato nuevo. |
+| Contraste nuevo del candidato | GET DEV saludable; no se abrio login ni se hizo Oracle/POST con otra identidad. | Falta login protegido del usuario afectado para repetirlo en candidato aislado. No declarar resuelto el caso. |
+
+[Detalle vigente y reservas](invoice-affected-user-investigation.md). PR en borrador. Sin nuevas inspecciones administrativas, merge, despliegue ni cambios de datos/permisos/expiraciones. Positivos Oracle restringidos/mixtos, segunda pagina mixta y PDF positivo/404 separados siguen pendientes.

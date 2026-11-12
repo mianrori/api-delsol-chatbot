@@ -10,7 +10,7 @@ test('complete plate request owns its scope and additive wording preserves it',(
  for(const text of ['facturas de arrendamiento minimo del 2023 del local impacto','siguiente pagina','facturas de la matricula anterior','filtra por concepto'])assert.equal(getInvoicePlateRequest(text),null);
 });
 
-for(const scenario of ['allowed','denied','empty','followup'])for(const trimmed of [false,true])test(`denied named query then plate ${scenario}; history trimmed=${trimmed}`,()=>{
+for(const scenario of ['allowed','denied','mixed','empty','followup'])for(const trimmed of [false,true])test(`denied named query then plate ${scenario}; history trimmed=${trimmed}`,()=>{
  const r=spawnSync(process.execPath,['--experimental-vm-modules',fileURLToPath(new URL('./fixtures/invoicePlateScope.mjs',import.meta.url)),scenario,String(trimmed)],{encoding:'utf8',timeout:20000});assert.equal(r.status,0,r.stdout+r.stderr);assert.match(r.stdout,/INVOICE_PLATE_SCOPE_PASS/);
 });
 
@@ -23,7 +23,7 @@ test('autonomous scope rejects stale model filters; later pagination uses only p
  }finally{store.clearConversation(id);}
 });
 
-for(const scenario of ['allowed','denied','empty','followup'])for(const trimmed of [false,true])test('HTTP denied then plate '+scenario+'; trimmed='+trimmed,()=>{
+for(const scenario of ['allowed','denied','mixed','empty','followup'])for(const trimmed of [false,true])test('HTTP denied then plate '+scenario+'; trimmed='+trimmed,()=>{
  const r=spawnSync(process.execPath,['--experimental-vm-modules',fileURLToPath(new URL('./fixtures/invoicePlateScope.mjs',import.meta.url)),scenario,String(trimmed),'http'],{encoding:'utf8',timeout:20000});assert.equal(r.status,0,r.stdout+r.stderr);assert.match(r.stdout,/INVOICE_PLATE_SCOPE_PASS/);
 });
 

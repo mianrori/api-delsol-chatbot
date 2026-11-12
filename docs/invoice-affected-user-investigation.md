@@ -1,6 +1,37 @@
 ﻿# Reapertura: usuario afectado y proceso habitual
 
-Estado vigente (11 de noviembre de 2026): **caso abierto, bloqueado para completar la comprobacion administrativa**. El usuario confirma que no hay acceso administrativo. La consulta DBA_* preparada no se ejecuto y no hay resultado administrativo que revisar. No se solicita ampliar permisos ni se sustituye la identidad afectada. Las secciones siguientes conservan la secuencia historica de evidencias; no hay correccion de aplicacion demostrada.
+## Reorientacion PR #50: autorizacion por fila (12 de noviembre de 2026)
+
+**Caso abierto, PR en borrador.** La vista devuelve filas y `USER_CAN_CONSULT` decide si pueden mostrarse. La comprobacion administrativa deja de ser un requisito para este trabajo; no se repiten inspecciones de catalogos, dependencias o politicas. Las secciones posteriores son historia de la investigacion, no instrucciones vigentes.
+
+`NVL(USER_CAN_CONSULT, 'S') <> 'N'` excluye las filas restringidas antes del conteo y del detalle por matricula. Por eso un conteo autorizado de cero no permite distinguir denegacion de ausencia. Se conserva ese predicado obligatorio para datos, totales, resumenes, paginacion y PDFs. La existencia de restringidos se determina con `CASE WHEN EXISTS (SELECT 1 FROM VW_BOT_FACTURAS WHERE USER_CAN_CONSULT = 'N' AND ...filtros efectivos...) THEN 1 ELSE 0 END`, sin devolver sus columnas, importes, identificadores, PDFs ni cantidades.
+
+El sondeo ya existia en 22f4b02. Este cambio hace explicita una unica lista de filtros efectivos compartida por ambos predicados, en lugar de obtener el alcance restringido con `where.slice(1)`. No se afirma que faltara el sondeo en la reproduccion historica ni que este refactor arregle ANX123. En detalle, el bit independiente sigue viajando junto al conteo autorizado en una sentencia; no depende de su pagina ni de que haya filas autorizadas. En resumen, se obtiene con SELECT sobre DUAL separado del agregado autorizado.
+
+Cliente, concepto, fechas, factura, periodo, matricula y anulacion usan los mismos predicados y binds. Ambas ramas usan `normalizeInvoicePlate` y la misma igualdad `REGEXP_REPLACE(UPPER(MATRICULA), '[-[:space:]]', '') = :plate`. No se amplian coincidencias con LIKE ni se inventa una restriccion por existir filas N fuera del alcance.
+
+| Filas coincidentes autorizadas | Existen restringidas en el mismo alcance | Respuesta |
+| --- | --- | --- |
+| Ninguna | Si | ACCESS_DENIED: «El usuario no tiene permisos para consultar esta información». Sin datos, enlaces ni acciones. |
+| Si | Si | Solo filas autorizadas y aviso parcial; conteos, importes y PDFs exclusivamente autorizados. |
+| Ninguna | No | Ausencia de coincidencias; sin denegacion falsa. |
+| Si | No | Resultado autorizado habitual. Una pagina fuera de rango conserva sus totales y no se convierte en denegacion. |
+
+### Regresion y contraste disponible
+
+71/71 pruebas enfocadas aprobadas con Node 22.23.4 en candidato temporal aislado, sin cambiar /app ni reiniciar el servicio. Incluye `invoiceAccess`, `invoices`, `invoicePlateScope`, `invoicePlatePdf` e `invoiceNamedRequest`. Se comparan los predicados completos y binds de ambos alcances en detalle/resumen para variantes normalizadas de matricula, y el mensaje exacto del servicio. La secuencia «facturas de arrendamiento minimo del 2023 del local impacto» (denegada) → «facturas de la matricula anx123» incluye ahora tambien mixtos, chat/HTTP y con/sin recorte de historial, aviso parcial, conteos y enlace PDF autorizado. Son conexiones Oracle simuladas y flujo determinista sin modelo real; no acreditan positivos Oracle restringidos ni descarga de PDFs.
+
+La fixture HTTP fija ahora `NODE_ENV=development`: antes dependia del entorno del proceso y omitia `env` al ejecutarse localmente sin NODE_ENV. Se verifico de nuevo el archivo de alcance tras ese ajuste; el refactor de aplicacion ya habia pasado la suite enfocada.
+
+Se contrasta la regresion con el [reporte Oracle/HTTP del usuario afectado caed886](invoice-affected-user-caed886.json), reutilizado como evidencia historica, no como ejecucion del candidato nuevo: identidad PostgreSQL/proxy Oracle coincidente; primera pregunta denegada en search_invoice_customers; consulta autonoma de matricula sin cliente, concepto o fechas heredadas; en secuencia y conversacion nueva, conteo autorizado cero y bit restringido falso, conciliados con SELECT independientes de la misma identidad. La [auditoria de normalizacion b96353a](invoice-affected-user-normalization-b96353a.json) tampoco encontro candidatas para el literal ANX123.
+
+**No se reprodujeron filas restringidas para esa matricula y no se declara resuelto el caso.** El endpoint DEV sigue saludable (GET 200, development); esto no valida el candidato. No se hizo un nuevo login ni Oracle/POST con el usuario afectado: no hay una sesion/login protegido de ese usuario disponible en esta ejecucion. Para validar nuevamente el candidato hace falta ejecutar el contraste con su login protegido en un candidato aislado, sin desplegarlo; los ejecutores historicos fijados a 22f4b02 no acreditan automaticamente este cambio. Se mantienen pendientes los positivos Oracle de solo restringidos, mixtos, segunda pagina mixta y PDF positivo/404 separados. No se infiere ausencia global a partir de la vista.
+
+Sin merge, despliegue, cambios de datos, permisos, configuracion o expiraciones. Sin nuevas inspecciones administrativas.
+
+## Estado historico anterior (11 de noviembre de 2026)
+
+El usuario confirma que no hay acceso administrativo. La consulta DBA_* preparada no se ejecuto y no hay resultado administrativo que revisar. No se solicitaron privilegios ni se sustituyo la identidad afectada.
 
 Base: 22f4b02. Estado: investigacion pendiente de reproduccion con el usuario DEV afectado; caso no resuelto.
 

@@ -5,9 +5,35 @@ import {fileURLToPath} from 'node:url';
 import {getInvoices} from '../src/services/invoices/invoices.service.js';
 import {hasRestrictedInvoiceCustomerRepository} from '../src/repositories/invoices/invoiceCustomers.repository.js';
 import {buildInvoiceDetailResponse,appendInvoiceAccessWarning} from '../src/services/ai/invoiceDetailPresentation.service.js';
-import {INVOICE_PARTIAL_ACCESS_MESSAGE} from '../src/utils/invoiceAccess.js';
+import {INVOICE_PARTIAL_ACCESS_MESSAGE,INVOICE_ACCESS_DENIED_MESSAGE} from '../src/utils/invoiceAccess.js';
 const fake=(...results)=>({queries:[],async execute(sql,binds){this.queries.push({sql,binds});return {rows:results.shift()??[]};}});
 const filters={customerIds:['C1'],conceptIds:['K1'],dateFrom:'01/01/2023',dateTo:'31/12/2023',invoiceNumber:'F1',plate:'ab -123',period:'01/2023',cancelled:false,page:2,rows:1};
+
+// Compare complete predicates, not just column presence: the probe must neither
+// inherit the authorized predicate nor lose a filter (including normalized plate).
+for(const mode of ['detail','summary'])for(const plate of ['anx123',' AN-X 123\t','an\nx-123'])test(`${mode}: authorized and restricted scopes are identical for ${JSON.stringify(plate)}`,async()=>{
+ const c=mode==='detail'
+  ?fake([{TOTAL_ROWS:1,TOTAL_INVOICES:1,HAS_RESTRICTED_DATA:1}],[{NRO_FACTURA:'ALLOWED',IMPORTE:20}])
+  :fake([{TOTAL_AMOUNT:20,INVOICE_COUNT:1,CURRENCY_SYMBOL:'PYG'}],[{HAS_RESTRICTED_DATA:1}]);
+ const result=await getInvoices({...filters,mode,plate},c);
+ assert.equal(result.hasRestrictedData,true);
+ const probe=c.queries.find(q=>q.sql.includes('CASE WHEN EXISTS ('));
+ const restricted=probe.sql.split('SELECT 1 FROM VW_BOT_FACTURAS WHERE ')[1].split(') THEN 1 ELSE 0 END')[0].trim();
+ const authorized=c.queries[0].sql.split("WHERE NVL(USER_CAN_CONSULT, 'S') <> 'N'")[1].split(mode==='detail'?') totals':'GROUP BY')[0].trim();
+ assert.equal(restricted.replace(/^USER_CAN_CONSULT = 'N'/,'').trim(),authorized);
+ assert.doesNotMatch(restricted,/NVL\(USER_CAN_CONSULT|COUNT\(|PDF|IMPORTE|NOM_CLIENTE|ROW_NUMBER|:offset|:maxRow/);
+ for(const q of c.queries)assert.equal(q.binds.plate,'ANX123');
+ if(mode==='summary'){
+  assert.deepEqual(c.queries[0].binds,c.queries[1].binds);
+  assert.equal(result.totalAmount,20);assert.equal(result.invoiceCount,1);
+ }
+});
+
+test('invoice service uses the exact denial wording and never builds a PDF for denied-only scope',async()=>{
+ await assert.rejects(getInvoices({plate:'an-x 123'},fake([{TOTAL_ROWS:0,TOTAL_INVOICES:0,HAS_RESTRICTED_DATA:1}],[])),e=>{
+  assert.equal(e.code,'ACCESS_DENIED');assert.equal(e.message,'El usuario no tiene permisos para consultar esta información.');assert.equal(e.message,INVOICE_ACCESS_DENIED_MESSAGE);return true;
+ });
+});
 
 test('restricted existence probe keeps every filter and reveals only a bit, never denied rows/counts',async()=>{
  const c=fake([{TOTAL_ROWS:2,TOTAL_INVOICES:2,HAS_RESTRICTED_DATA:1}],[{NRO_FACTURA:'ALLOWED',IMPORTE:10}]);
