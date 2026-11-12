@@ -1,5 +1,7 @@
 # Deudas de facturas: candidato en borrador
 
+> **Contrato vigente:** [SERIE_FACTURA y estados confirmados de DEUDA](invoice-balances-series-contract.md). Las secciones siguientes son historia de la validación de diez columnas en 11a4316. Se sustituyeron sus reglas de signos y nombres de argumentos: negativos siempre excluidos, pending predeterminado, settled cero y all/unknown con nulos explícitos. Serie/número sigue sin demostrar unicidad; agregaciones bloqueadas. Evidencia actual: 0c34985, 117 aserciones Oracle/HTTP y 25 pruebas locales.
+
 ## Contrato vigente y alcance
 
 El usuario cambió la vista durante la validación: añadió COD_MONEDA y renombró SALDO a DEUDA. Oracle DEV confirmó diez columnas en VW_BOT_FACTURAS_SALDOS; COD_MONEDA es VARCHAR2 y DEUDA es NUMBER(18,2). No existe USER_CAN_CONSULT. El candidato actual usa exclusivamente DEUDA y el código nativo de moneda; no aplica un predicado de permisos inventado ni consulta otra vista de negocio.

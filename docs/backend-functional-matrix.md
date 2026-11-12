@@ -1,5 +1,21 @@
 # Alcance y evidencia del backend del chatbot
 
+## Actualización PR #51: series y estados de deuda
+
+Esta sección prevalece sobre las entradas históricas de saldos/deudas de diez columnas. PR en borrador, sin desplegar.
+
+| Capacidad | Evidencia actual 0c34985 | Reserva |
+| --- | --- | --- |
+| Serie y número | Once columnas; detalle/PII/filtros por parejas exactas; mismo número con series distintas conciliado en Oracle | Pares repetidos incluso con cliente/sector/moneda; no equivalen a facturas únicas, sin deduplicación |
+| DEUDA | Pending >0 predeterminado, settled =0, all no negativas/nulos, unknown nulos; negativos siempre excluidos, también en buscador | Null desconocido, nunca cero/cancelada |
+| Conteos y paginación | Filas, números, pares y clientes separados; SQL independiente y páginas conciliados | Conteo de entidades factura y agregaciones monetarias continúan bloqueados por granularidad |
+| Monedas y orden | COD_MONEDA nativo para orden de registros; sin mezclar ni convertir monedas | Totales/rankings agregados bloqueados; colisión de símbolos solo local |
+| Vencimiento/antigüedad | Asunción 12/11/2026; vencidos y 30 días con muestra | Sin positivos pending hoy/futuro/undated/próximos siete días; vacíos conciliados |
+| PII/sessionId/HTTP | Serie incluida; SDK/historial protegidos, respuesta autorizada restaurada; sesión inválida rechazada | ORA-01031 inyectado sin datos; denegación real sigue sin muestra |
+| Cierre | Perfil 1/1, validación 8/8 conexiones, logout y logs sanitizados aprobados; listener efímero cerrado | Imagen/arranque desplegados sin cambios |
+
+117 aserciones Oracle/HTTP, siete POST, seis SDK controlados, cero proveedor/PDF; 25/25 pruebas locales afectadas en Node 22.23.5, sin suite completa. [Contrato y evidencia vigentes](invoice-balances-series-contract.md). ANX123 y muestra mixta Oracle de PR #50 pendientes independientes. Sin merge, despliegue o cambios de datos, permisos o expiraciones.
+
 Corte actualizado: **06/11/2026**, base desplegada `059ac13` (PR #41 fusionada).
 
 ## Balance actual del cierre
