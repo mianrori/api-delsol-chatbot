@@ -24,11 +24,11 @@ driver.getConnection=async(...args)=>{const c=await originalGetConnection.apply(
 async function profile(connection){
  const run=async(sql,binds={})=>(await connection.execute(sql,binds,{outFormat:4002,maxRows:20})).rows;
  const meta=await connection.execute('SELECT * FROM VW_BOT_FACTURAS_SALDOS WHERE 1=0',{}, {outFormat:4002});
- const columns=meta.metaData.map(c=>c.name);report.columns=columns;check(!columns.includes('USER_CAN_CONSULT'),'NO_USER_CAN_CONSULT_COLUMN_ASSUMPTION');
- check(['NRO_FACTURA','SECTOR','VENCIMIENTO','COD_CLIENTE','NOM_CLIENTE','RAZON_SOCIAL','RUC','SIMBOLO_MONEDA','SALDO'].every(c=>columns.includes(c)),'EXPECTED_BALANCE_COLUMNS_PRESENT');
+ const columns=meta.metaData.map(c=>c.name);report.columns=columns;report.columnTypes=meta.metaData.map(c=>({name:c.name,type:c.dbTypeName,precision:c.precision,scale:c.scale}));report.schemaContract='COD_MONEDA_DEUDA';check(!columns.includes('USER_CAN_CONSULT'),'NO_USER_CAN_CONSULT_COLUMN_ASSUMPTION');
+ check(['NRO_FACTURA','SECTOR','VENCIMIENTO','COD_CLIENTE','NOM_CLIENTE','RAZON_SOCIAL','RUC','SIMBOLO_MONEDA','COD_MONEDA','DEUDA'].every(c=>columns.includes(c)),'EXPECTED_BALANCE_COLUMNS_PRESENT');
  const inventory=(await run(`SELECT COUNT(*) R,COUNT(DISTINCT NRO_FACTURA) I,
- SUM(CASE WHEN SALDO>0 THEN 1 ELSE 0 END) P,SUM(CASE WHEN SALDO=0 THEN 1 ELSE 0 END) Z,
- SUM(CASE WHEN SALDO<0 THEN 1 ELSE 0 END) N,SUM(CASE WHEN SALDO IS NULL THEN 1 ELSE 0 END) U,
+ SUM(CASE WHEN DEUDA>0 THEN 1 ELSE 0 END) P,SUM(CASE WHEN DEUDA=0 THEN 1 ELSE 0 END) Z,
+ SUM(CASE WHEN DEUDA<0 THEN 1 ELSE 0 END) N,SUM(CASE WHEN DEUDA IS NULL THEN 1 ELSE 0 END) U,
  SUM(CASE WHEN VENCIMIENTO IS NULL THEN 1 ELSE 0 END) D,
  COUNT(DISTINCT SIMBOLO_MONEDA) M FROM VW_BOT_FACTURAS_SALDOS`))[0];
  report.samples={anyRows:Number(inventory.R)>0,positive:Number(inventory.P)>0,zero:Number(inventory.Z)>0,negative:Number(inventory.N)>0,nullBalance:Number(inventory.U)>0,nullDue:Number(inventory.D)>0,multipleSymbols:Number(inventory.M)>1,rowsEqualDistinctInvoiceNumbers:Number(inventory.R)===Number(inventory.I)};
@@ -37,8 +37,9 @@ async function profile(connection){
  invoiceAcrossCustomers:await duplicate('NRO_FACTURA','COUNT(DISTINCT COD_CLIENTE)>1'),
  invoiceAcrossSectors:await duplicate('NRO_FACTURA','COUNT(DISTINCT SECTOR)>1'),
  invoiceAcrossSymbols:await duplicate('NRO_FACTURA','COUNT(DISTINCT SIMBOLO_MONEDA)>1'),
- repeatedCandidateKey:await duplicate('NRO_FACTURA,COD_CLIENTE,SECTOR,SIMBOLO_MONEDA','COUNT(*)>1'),
- identicalVisibleRows:await duplicate('NRO_FACTURA,SECTOR,VENCIMIENTO,COD_CLIENTE,NOM_CLIENTE,RAZON_SOCIAL,RUC,SIMBOLO_MONEDA,SALDO','COUNT(*)>1'),
+ invoiceAcrossCurrencyCodes:await duplicate('NRO_FACTURA','COUNT(DISTINCT COD_MONEDA)>1'),
+ repeatedCandidateKey:await duplicate('NRO_FACTURA,COD_CLIENTE,SECTOR,COD_MONEDA','COUNT(*)>1'),
+ identicalVisibleRows:await duplicate('NRO_FACTURA,SECTOR,VENCIMIENTO,COD_CLIENTE,NOM_CLIENTE,RAZON_SOCIAL,RUC,COD_MONEDA,SIMBOLO_MONEDA,DEUDA','COUNT(*)>1'),
  businessKeyProven:false};
  const dates=await connection.execute('SELECT DISTINCT VENCIMIENTO FROM VW_BOT_FACTURAS_SALDOS',{}, {outFormat:4002,resultSet:true});
  let seen=0,valid=0,invalid=0,nulls=0,iso=0,complete=false;
@@ -55,14 +56,14 @@ async function profile(connection){
  report.semanticLimits=['zero balance does not prove payment','negative balance does not prove credit/refund without business contract','observed uniqueness is not a documented invoice business key'];
 }
 async function validate(connection){
- const run=async(sql,binds={},maxRows=101)=>(await connection.execute(sql,binds,{outFormat:4002,maxRows,fetchInfo:{SALDO:{type:driver.STRING}}})).rows;
+ const run=async(sql,binds={},maxRows=101)=>(await connection.execute(sql,binds,{outFormat:4002,maxRows,fetchInfo:{DEUDA:{type:driver.STRING}}})).rows;
  const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/Asuncion',day:'2-digit',month:'2-digit',year:'numeric'}).formatToParts(new Date()),part=t=>parts.find(x=>x.type===t).value;
  const asOfDate=part('day')+'/'+part('month')+'/'+part('year'),ref=parseBalanceDueDate(asOfDate),day=d=>String(d.getUTCDate()).padStart(2,'0')+'/'+String(d.getUTCMonth()+1).padStart(2,'0')+'/'+d.getUTCFullYear();
  report.reference={asOfDate,timezone:'America/Asuncion',calendarArithmetic:'UTC calendar days after Asuncion date extraction'};
  const dateSql="CASE WHEN VALIDATE_CONVERSION(TRIM(VENCIMIENTO) AS DATE,'FXDD/MM/YYYY')=1 THEN TO_DATE(TRIM(VENCIMIENTO),'FXDD/MM/YYYY') END";
  const independentScope=args=>{
   const clauses=[],binds={};for(const[key,col]of [['customerIds','COD_CLIENTE'],['invoiceNumbers','NRO_FACTURA'],['sectors','SECTOR'],['currencies','SIMBOLO_MONEDA']])if(args[key]?.length){const list=args[key].map((v,i)=>{binds[key+i]=v;return ':'+key+i;});clauses.push(col+' IN ('+list.join(',')+')');}
-  const signs={positive:'SALDO>0',zero:'SALDO=0',negative:'SALDO<0',unknown:'SALDO IS NULL'};if(signs[args.balanceStatus])clauses.push(signs[args.balanceStatus]);
+  const signs={positive:'DEUDA>0',zero:'DEUDA=0',negative:'DEUDA<0',unknown:'DEUDA IS NULL'};if(signs[args.balanceStatus])clauses.push(signs[args.balanceStatus]);
   if(args.dueStatus&&args.dueStatus!=='all'){if(args.dueStatus!=='undated')binds.ref=asOfDate;const ds={overdue:dateSql+"<TO_DATE(:ref,'DD/MM/YYYY')",dueToday:dateSql+"=TO_DATE(:ref,'DD/MM/YYYY')",upcoming:dateSql+">TO_DATE(:ref,'DD/MM/YYYY')",undated:dateSql+' IS NULL'};clauses.push(ds[args.dueStatus]);}
   for(const[key,op]of [['dueDateFrom','>='],['dueDateTo','<=']])if(args[key]){binds[key]=args[key];clauses.push(dateSql+op+"TO_DATE(:"+key+",'DD/MM/YYYY')");}
   if(args.minDaysOverdue!==undefined){binds.ref=asOfDate;binds.days=args.minDaysOverdue;clauses.push("GREATEST(TO_DATE(:ref,'DD/MM/YYYY')-"+dateSql+',0)>=:days');}
@@ -72,12 +73,12 @@ async function validate(connection){
   const scope={rows:2,page:1,asOfDate,...args},{where,binds}=independentScope(scope);
   const count=(await run('SELECT COUNT(*) R,COUNT(DISTINCT NRO_FACTURA) I,COUNT(DISTINCT COD_CLIENTE) C FROM VW_BOT_FACTURAS_SALDOS WHERE '+where,binds))[0];
   const order=scope.orderBy==='overdueDaysDesc'?"GREATEST(TO_DATE(:sortRef,'DD/MM/YYYY')-"+dateSql+',0) DESC NULLS LAST':dateSql+' ASC NULLS LAST';
-  const offset=(scope.page-1)*scope.rows,expected=await run('SELECT * FROM (SELECT v.*,ROW_NUMBER() OVER(ORDER BY '+order+',NRO_FACTURA,COD_CLIENTE,SECTOR,SIMBOLO_MONEDA,VENCIMIENTO,NOM_CLIENTE,RAZON_SOCIAL,RUC,SALDO) RN FROM VW_BOT_FACTURAS_SALDOS v WHERE '+where+') WHERE RN>:lo AND RN<=:hi ORDER BY RN',{...binds,...(scope.orderBy==='overdueDaysDesc'?{sortRef:asOfDate}:{}),lo:offset,hi:offset+scope.rows});
+  const offset=(scope.page-1)*scope.rows,expected=await run('SELECT * FROM (SELECT v.*,ROW_NUMBER() OVER(ORDER BY '+order+',NRO_FACTURA,COD_CLIENTE,SECTOR,SIMBOLO_MONEDA,VENCIMIENTO,NOM_CLIENTE,RAZON_SOCIAL,RUC,DEUDA) RN FROM VW_BOT_FACTURAS_SALDOS v WHERE '+where+') WHERE RN>:lo AND RN<=:hi ORDER BY RN',{...binds,...(scope.orderBy==='overdueDaysDesc'?{sortRef:asOfDate}:{}),lo:offset,hi:offset+scope.rows});
   const actual=await getInvoiceBalances(scope,connection);
   check(actual.totalRows===Number(count.R)&&actual.matchedInvoiceNumbers===Number(count.I)&&actual.matchedCustomers===Number(count.C),label+'_ROWS_VS_NUMBERS_VS_CUSTOMERS');
   check(actual.returnedRows===expected.length&&actual.totalPages===Math.ceil(Number(count.R)/scope.rows)&&actual.hasMore===(scope.page<actual.totalPages),label+'_PAGINATION');
   check(expected.every((e,i)=>{const r=actual.data[i],d=parseBalanceDueDate(e.VENCIMIENTO),delta=d?(ref-d)/86400000:null,status=d?(delta>0?'overdue':delta===0?'dueToday':'upcoming'):'undated',band=d?(delta<0?'notDue':delta===0?'dueToday':delta<=30?'1-30':delta<=60?'31-60':delta<=90?'61-90':delta<=180?'91-180':'181+'):'undated';
-   return r.invoiceNumber===(e.NRO_FACTURA??null)&&r.customerId===(e.COD_CLIENTE??null)&&r.sector===(e.SECTOR??null)&&r.currencySymbol===(e.SIMBOLO_MONEDA??null)&&r.balance===(e.SALDO==null?null:String(e.SALDO))&&r.dueStatus===status&&r.agingBand===band&&r.daysOverdue===(d?Math.max(delta,0):null);
+   return r.invoiceNumber===(e.NRO_FACTURA??null)&&r.customerId===(e.COD_CLIENTE??null)&&r.sector===(e.SECTOR??null)&&r.currencySymbol===(e.SIMBOLO_MONEDA??null)&&r.balance===(e.DEUDA==null?null:String(e.DEUDA))&&r.dueStatus===status&&r.agingBand===band&&r.daysOverdue===(d?Math.max(delta,0):null);
   }),label+'_EXACT_DECIMAL_ROWS_AND_INDEPENDENT_JS_AGING');
   check(!('totalsByCurrency' in actual)&&!actual.monetaryAggregationAvailable,label+'_NO_SYMBOL_BASED_MONETARY_TOTALS');
   report.cases.push({label,hasSample:expected.length>0,passed:true});return actual;

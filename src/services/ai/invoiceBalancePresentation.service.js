@@ -1,30 +1,24 @@
 export const invoiceBalanceCell=value=>String(value??'Sin datos').replace(/([\\`*_[\]<>|])/g,'\\$1').replace(/[\r\n]+/g,' ');
 const number=value=>value==null?'Desconocido':new Intl.NumberFormat('es-PY',{maximumFractionDigits:2}).format(value);
 const exactBalance=value=>{if(value==null)return 'Desconocido';const m=/^(-?)(\d+)(?:\.(\d{1,2}))?$/.exec(String(value));return m?m[1]+m[2].replace(/\B(?=(\d{3})+(?!\d))/g,'.')+','+(m[3]??'').padEnd(2,'0'):'Importe no representable';};
-const currency=value=>['PYG','GS','GS.','GUARANIES','GUARANI'].includes(String(value).toUpperCase())?'₲':value??'Sin moneda';
 const statuses={overdue:'Vencida',dueToday:'Vence hoy',upcoming:'Por vencer',undated:'Sin vencimiento válido',notDue:'No vencida'};
-const labels={customer:'Cliente',invoice:'Factura',sector:'Sector',dueMonth:'Mes de vencimiento',dueStatus:'Estado de vencimiento',agingBand:'Antigüedad (días)'};
 const table=(head,rows)=>['| '+head.join(' | ')+' |','| '+head.map(()=>'---').join(' | ')+' |',...rows.map(r=>'| '+r.join(' | ')+' |')];
 export function buildInvoiceBalanceResponse(calls=[],{display=invoiceBalanceCell}={}) {
   const matches=calls.filter(c=>c.name==='get_invoice_balances');
   if(matches.length!==1||calls.some(c=>!['get_invoice_balances','search_invoice_balance_customers'].includes(c.name)))return null;
   const r=matches[0].result;
-  if(r?.status==='REQUIRES_SOURCE_IDENTITY')return 'No puedo sumar saldos ni elaborar un ranking monetario con esta vista: solo informa un s?mbolo, sin una clave inequ?voca de divisa y factura. Puedo mostrar los registros individuales autorizados.';
-  if(!r||!Array.isArray(r.data))return null;
+  if(r?.status==='REQUIRES_SOURCE_IDENTITY')return 'Estos datos no identifican inequívocamente la divisa ni la factura. Por eso solo puedo mostrar registros individuales: no sumar saldos ni elaborar rankings monetarios.';
+  if(!r||r.mode!=='detail'||!Array.isArray(r.data))return null;
   const lines=['**Saldos registrados de facturas**',`Vencimientos clasificados al ${display(r.asOfDate)}. Son saldos actuales; no reconstruyen un saldo histórico.`,''];
   lines.push(`Clientes distintos identificados: ${number(r.matchedCustomers)}. Números de factura distintos: ${number(r.matchedInvoiceNumbers)}.`,'');
   lines.push('Cada fila es un registro de la vista, no una factura única. El símbolo no identifica inequívocamente la divisa; no se suman importes ni se infiere pago o crédito por su signo.','');
   if(r.unknownBalanceRows)lines.push('Hay registros con saldo desconocido; no se consideran cero.');
   if(r.invalidDueDateRows)lines.push('Hay vencimientos vacíos o inválidos, clasificados como sin vencimiento válido.');
   if(!r.data.length)lines.push(r.totalRows?'No hay registros en esta página; los conteos corresponden al filtro completo.':'No se encontraron saldos para los filtros solicitados.');
-  else if(r.mode==='detail')lines.push(...table(['Factura','Cliente','Razón social','RUC','Sector','Vencimiento','Estado','Días de atraso','Moneda','Saldo'],r.data.map(row=>[
+  else lines.push(...table(['Número de factura','Cliente','Razón social','RUC','Sector','Vencimiento','Estado','Días de atraso','Símbolo informado','Saldo'],r.data.map(row=>[
     display(row.invoiceNumber),display(row.customerName),display(row.businessName),display(row.taxId),display(row.sector),display(row.dueDate),display(statuses[row.dueStatus]??row.dueStatus),number(row.daysOverdue),display(row.currencySymbol??'Sin símbolo'),exactBalance(row.balance)])));
-  else lines.push(...table([...(r.groupBy??[]).map(g=>labels[g]),'Moneda','Saldo','Vencido','Facturas distintas','Registros'],r.data.map(row=>[
-    ...(r.groupBy??[]).map(g=>display(g==='customer'?row.customerName??row.businessName:g==='invoice'?row.invoiceNumber:g==='dueStatus'?statuses[row.dueStatus]:g==='agingBand'?statuses[row.agingBand]??row.agingBand:row[g])),
-    display(currency(row.currencySymbol)),number(row.totalBalance),number(row.overdueBalance),number(row.invoiceCount),number(row.totalRows)])));
-  lines.push('',`Se muestran ${r.returnedRows} de ${r.totalRows} ${r.mode==='summary'?'grupos':'registros'}. Página ${r.page} de ${r.totalPages}.`);
+  lines.push('',`Se muestran ${r.returnedRows} de ${r.totalRows} registros. Página ${r.page} de ${r.totalPages}.`);
   if(r.hasMore)lines.push(`Puedes pedir la siguiente página (${r.nextPage}).`);
-  if(r.mode==='summary')lines.push('Los conteos distintos se calculan en cada grupo; no deben sumarse entre grupos.');
   return lines.join('\n');
 }
 

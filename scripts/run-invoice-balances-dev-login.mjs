@@ -46,7 +46,7 @@ try{
   report.profile=await worker(report.profileCandidate,'--profile');record('invoice-balances-profile.json',report.profile);
   if(!report.profile.success)throw Error('PROFILE_FAILED');
   record('invoice-balances-progress.json',{phase:'profile_ready',profileCommit:report.profileCandidate.commit,sessionRetainedInMemory:true});
-  const signal=resolve(root,'logs/invoice-balances-continue.json'),deadline=Date.now()+15*60*1000;let plan;
+  const signal=resolve(root,'logs/invoice-balances-continue-'+report.profileCandidate.commit+'.json'),deadline=Date.now()+15*60*1000;let plan;
   while(Date.now()<deadline){if(fs.existsSync(signal)){plan=JSON.parse(fs.readFileSync(signal,'utf8'));break;}await new Promise(r=>setTimeout(r,2000));}
   if(!plan||plan.action!=='validate'||!/^[a-f0-9]{40}$/.test(plan.commit??''))throw Error('VALIDATION_NOT_RELEASED');
   report.validationCandidate=await prepare(plan.commit);record('invoice-balances-progress.json',{phase:'validating',commit:plan.commit});

@@ -95,3 +95,9 @@ test('protected balance selection survives trimmed history and an explicit all-c
   assert.deepEqual(general,{mode:'summary',customerIds:[]});
  }finally{store.clearConversation(id);clearPiiSession(id);}
 });
+
+test('large decimal balances preserve cents without binary floating point conversion',async()=>{
+ const r=await getInvoiceBalances({},fake([{TOTAL_ROWS:1,DISTINCT_INVOICE_NUMBERS:1,DISTINCT_CUSTOMERS:1}],[{...row,SALDO:'9999999999999999.99'}]));
+ assert.equal(r.data[0].balance,'9999999999999999.99');
+ const text=buildInvoiceBalanceResponse([{name:'get_invoice_balances',result:r}]);assert.ok(text.includes('9.999.999.999.999.999,99'));
+});
