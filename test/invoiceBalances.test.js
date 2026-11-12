@@ -51,7 +51,7 @@ test('detail keeps currencies/signs/null balances, global filtered totals and pa
 });
 
 for(const args of [{mode:'summary'},{mode:'summary',groupBy:['customer']},{mode:'summary',groupBy:['invoice']},{mode:'summary',groupBy:['sector']},{mode:'summary',groupBy:['dueMonth']},{mode:'summary',groupBy:['dueStatus']},{mode:'summary',groupBy:['agingBand']},{orderBy:'debtDesc'},{orderBy:'debtAsc'},{minDebt:1},{maxDebt:10}])test('unverified source identities block monetary aggregation/ranking '+JSON.stringify(args),async()=>{
- const c=fake([]);const r=await getInvoiceBalances(args,c);assert.equal(r.status,'REQUIRES_SOURCE_IDENTITY');assert.equal(r.data,undefined);assert.equal(c.queries.length,1);assert.match(c.queries[0].sql,/WHERE 1=0/);assert.doesNotMatch(c.queries[0].sql,/SUM|ORDER BY|USER_CAN_CONSULT/);
+ const c=fake([{TOTAL_ROWS:2,DUPLICATE_ROWS:2}]);const r=await getInvoiceBalances(args,c);assert.equal(r.status,args.mode==='summary'?'INCONSISTENT_HISTORY':'REQUIRES_SOURCE_IDENTITY');assert.equal(r.data,undefined);assert.equal(c.queries.length,1);if(args.mode!=='summary')assert.match(c.queries[0].sql,/WHERE 1=0/);
 });
 
 test('absence, authorized zero and out-of-range pages are not access denial',async()=>{
@@ -132,7 +132,7 @@ test('monetary row ordering requires exactly one native currency code, never a s
  assert.equal(r.data[0].currencyCode,'M1');assert.equal(r.data[0].debt,'90');assert.equal(c.queries[1].binds.currencyCodes0,'M1');
  assert.match(c.queries[1].sql,/COD_MONEDA IN \(:currencyCodes0\)/);assert.match(c.queries[1].sql,/ORDER BY COD_MONEDA, DEUDA DESC NULLS LAST/);
  for(const scope of [{currencies:['$']},{currencyCodes:['M1','M2']}])assert.equal((await getInvoiceBalances({...scope,orderBy:'debtDesc'},fake([]))).status,'REQUIRES_SOURCE_IDENTITY');
- assert.equal((await getInvoiceBalances({currencyCodes:['M1'],mode:'summary',groupBy:['customer']},fake([]))).status,'REQUIRES_SOURCE_IDENTITY');
+ assert.equal((await getInvoiceBalances({currencyCodes:['M1'],mode:'summary',groupBy:['customer']},fake([{DUPLICATE_ROWS:2}]))).status,'INCONSISTENT_HISTORY');
 });
 
 test('same displayed symbol never collapses two native currencies or sums their debts',async()=>{

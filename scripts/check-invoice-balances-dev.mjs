@@ -42,6 +42,62 @@ async function profile(connection){
  report.states={pending:await exists('SELECT 1 FROM VW_BOT_FACTURAS_SALDOS WHERE DEUDA>0'),settled:await exists('SELECT 1 FROM VW_BOT_FACTURAS_SALDOS WHERE DEUDA=0'),negativeExcluded:await exists('SELECT 1 FROM VW_BOT_FACTURAS_SALDOS WHERE DEUDA<0'),unknown:await exists('SELECT 1 FROM VW_BOT_FACTURAS_SALDOS WHERE DEUDA IS NULL')};
  report.contract={pending:'DEUDA>0',settled:'DEUDA=0',all:'DEUDA>=0 OR DEUDA IS NULL',negative:'always excluded',nullDebt:'unknown, never paid or zero; known subtotals must disclose incompleteness'};
 }
+async function profileIntegrity(){report.scope='affected duplicate integrity only; no schema/admin rescan';}
+async function validateIntegrity(connection){
+ const run=async(sql,binds={})=>(await connection.execute(sql,binds,{outFormat:4002,maxRows:30,fetchInfo:{DEUDA:{type:driver.STRING}}})).rows;
+ const base="WITH eligible AS (SELECT * FROM VW_BOT_FACTURAS_SALDOS WHERE DEUDA>=0 OR DEUDA IS NULL), identities AS (SELECT SERIE_FACTURA,NRO_FACTURA,COUNT(*) N FROM eligible GROUP BY SERIE_FACTURA,NRO_FACTURA) ";
+ const unique=await run(base+"SELECT e.SERIE_FACTURA,e.NRO_FACTURA,e.COD_CLIENTE FROM eligible e JOIN identities i ON i.SERIE_FACTURA=e.SERIE_FACTURA AND i.NRO_FACTURA=e.NRO_FACTURA WHERE i.N=1 AND e.DEUDA>0 AND TRIM(e.COD_MONEDA) IS NOT NULL AND TRIM(e.SERIE_FACTURA) IS NOT NULL AND TRIM(e.NRO_FACTURA) IS NOT NULL AND ROWNUM<=6");
+ report.samples={cleanIdentities:unique.length>0};
+ let cleanArgs;
+ if(unique.length){
+  const invoices=unique.map(r=>({invoiceSeries:r.SERIE_FACTURA,invoiceNumber:r.NRO_FACTURA})),binds={};
+  const where=invoices.map((p,i)=>{binds['s'+i]=p.invoiceSeries;binds['n'+i]=p.invoiceNumber;return '(SERIE_FACTURA=:s'+i+' AND NRO_FACTURA=:n'+i+')';}).join(' OR ');
+  cleanArgs={mode:'summary',invoices,rows:100};
+  for(const customer of [false,true]){
+   const expected=await run('SELECT COD_MONEDA'+(customer?',COD_CLIENTE':'')+',COUNT(*) N,SUM(DEUDA) DEUDA FROM VW_BOT_FACTURAS_SALDOS WHERE DEUDA>0 AND ('+where+') GROUP BY COD_MONEDA'+(customer?',COD_CLIENTE':'')+' ORDER BY COD_MONEDA,DEUDA DESC'+(customer?',COD_CLIENTE':''),binds);
+   const r=await getInvoiceBalances({...cleanArgs,groupBy:customer?['customer']:[]},connection);
+   check(r.status==='OK_SUMMARY'&&r.data.length===expected.length,'CLEAN_'+customer+'_SUMMARY_AVAILABLE');
+   check(expected.every((e,i)=>r.data[i].currencyCode===e.COD_MONEDA&&r.data[i].debt===String(e.DEUDA)&&r.data[i].invoiceCount===Number(e.N)&&(!customer||r.data[i].customerId===(e.COD_CLIENTE??null))),'CLEAN_'+customer+'_INDEPENDENT_SUM_COUNTS_RANK_ORDER');
+   check(r.invoiceCount===unique.length,'CLEAN_'+customer+'_INVOICE_COUNT');
+  }
+ }
+ // A clean customer profile is searched independently; absence is documented, never manufactured.
+ const customers=await run(base+"SELECT COD_CLIENTE FROM (SELECT e.COD_CLIENTE FROM eligible e LEFT JOIN identities i ON i.SERIE_FACTURA=e.SERIE_FACTURA AND i.NRO_FACTURA=e.NRO_FACTURA WHERE e.COD_CLIENTE IS NOT NULL GROUP BY e.COD_CLIENTE HAVING COUNT(CASE WHEN i.N<>1 OR i.N IS NULL OR e.DEUDA IS NULL OR TRIM(e.COD_MONEDA) IS NULL THEN 1 END)=0) WHERE ROWNUM=1");
+ report.samples.cleanCustomerProfile=customers.length>0;
+ if(customers.length){const r=await getInvoiceBalances({mode:'summary',customerIds:[customers[0].COD_CLIENTE],debtStatus:'all'},connection);check(r.status==='OK_SUMMARY','CLEAN_CUSTOMER_PROFILE_AVAILABLE');}
+ let duplicateArgs;
+ for(const [label,having]of [['equal','COUNT(DISTINCT DEUDA)=1 AND COUNT(DEUDA)=COUNT(*)'],['different','COUNT(DISTINCT DEUDA)>1']]){
+  const sample=await run("SELECT SERIE_FACTURA,NRO_FACTURA FROM (SELECT SERIE_FACTURA,NRO_FACTURA FROM VW_BOT_FACTURAS_SALDOS WHERE DEUDA>=0 OR DEUDA IS NULL GROUP BY SERIE_FACTURA,NRO_FACTURA HAVING COUNT(*)>1 AND "+having+") WHERE ROWNUM=1");
+  report.samples[label+'DebtDuplicates']=sample.length>0;
+  if(!sample.length)continue;
+  const invoices=sample.map(r=>({invoiceSeries:r.SERIE_FACTURA,invoiceNumber:r.NRO_FACTURA}));if(!invoices[0].invoiceSeries||!invoices[0].invoiceNumber)continue;
+  const args={invoices,debtStatus:'all'},r=await getInvoiceBalances({...args,mode:'summary'},connection);
+  check(r.status==='INCONSISTENT_HISTORY'&&r.invoiceCount===null&&!r.data,label.toUpperCase()+'_DUPLICATES_NO_CALCULATIONS');
+  const d=await getInvoiceBalances({...args,rows:2},connection);check(d.duplicateRows>1&&d.invoiceCount===null&&d.warning&&d.data.length>0,label.toUpperCase()+'_DETAIL_PRESERVED_WITH_WARNING');duplicateArgs=args;
+ }
+ await httpIntegrity(cleanArgs,duplicateArgs);
+ report.reservations=['real denied identity remains unavailable','missing positive profiles are not evidence of resolution','no historical rows corrected; identity guard covers eligible siblings before effective debt/date filters'];
+}
+async function httpIntegrity(cleanArgs,duplicateArgs){
+ const executor=await import('../src/services/ai/toolExecutor.service.js'),context=vm.createContext({console,process,structuredClone,Intl,Date,Map,Set,Number,String,Array,JSON,Math,RegExp,Object,Boolean,Error,AbortController});
+ const synthetic=exports=>new vm.SyntheticModule(Object.keys(exports),function(){for(const[k,v]of Object.entries(exports))this.setExport(k,v);},{context});
+ async function load(path,overrides={}){const url=new URL(path,import.meta.url),m=new vm.SourceTextModule(fs.readFileSync(url,'utf8'),{context});await m.link(async spec=>synthetic(overrides[spec]??await import(spec.startsWith('.')?new URL(spec,url).href:spec.startsWith('node:')?spec:new URL('file://'+createRequire(url).resolve(spec)).href)));await m.evaluate();return m.namespace;}
+ let args,modelCalls=0;
+ const sdk={BedrockRuntimeClient:class{async send(){modelCalls++;return {output:{message:{role:'assistant',content:[{toolUse:{toolUseId:'integrity-'+modelCalls,name:'get_invoice_balances',input:protectPiiDeep(sessionId,args)}}]}},stopReason:'tool_use'};}},ConverseCommand:class{constructor(input){this.input=input;}}};
+ const chat=await load('../src/services/ai/chat.service.js',{'@aws-sdk/client-bedrock-runtime':sdk,'./toolExecutor.service.js':executor}),controller=await load('../src/controllers/chat.controller.js',{'../services/ai/chat.service.js':chat}),router=await load('../src/routes/index.js',{'../controllers/chat.controller.js':controller});
+ const app=express();app.use(express.json());app.use('/chatbot/api',router.router);const server=await new Promise(resolve=>{const s=app.listen(0,'127.0.0.1',()=>resolve(s));});
+ let requests=0;
+ try{
+  for(const [label,input]of [['clean',cleanArgs],['blocked',duplicateArgs?{...duplicateArgs,mode:'summary'}:null],['detail',duplicateArgs]]){
+   if(!input)continue;args=input;store.clearConversation(sessionId);requests++;
+   const response=await fetch('http://127.0.0.1:'+server.address().port+'/chatbot/api/bot/chat',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({sessionId,message:'Consulta deudas de facturas'})}),body=await response.json();
+   check(response.status===200&&body.success,'HTTP_'+label+'_SUCCESS');
+   check(label==='clean'?body.response.includes('Deudas por moneda'):body.response.includes('históricos inconsistentes'),'HTTP_'+label+'_PRESENTATION');
+   const history=JSON.stringify(store.getConversation(sessionId));for(const p of input.invoices??[])for(const v of Object.values(p))if(v.length>=6)check(!history.includes(v),'HTTP_'+label+'_HISTORY_IDENTIFIERS_PROTECTED');
+  }
+  report.http={requests,controlledSdkCalls:modelCalls,realProviderCalls:0};
+ }finally{store.clearConversation(sessionId);clearPiiSession(sessionId);await new Promise(resolve=>server.close(resolve));report.httpCleanup={serverClosed:!server.listening,ownConversationCleared:true};}
+}
 async function validate(connection){
  const run=async(sql,binds={},maxRows=101)=>(await connection.execute(sql,binds,{outFormat:4002,maxRows,fetchInfo:{DEUDA:{type:driver.STRING}}})).rows;
  const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/Asuncion',day:'2-digit',month:'2-digit',year:'numeric'}).formatToParts(new Date()),part=t=>parts.find(x=>x.type===t).value;
@@ -139,7 +195,7 @@ try{
   await withOracleProxySession(sessionId,async({connection})=>{
    const id=(await connection.execute("SELECT USER U,SYS_CONTEXT('USERENV','SESSION_USER') S,SYS_CONTEXT('USERENV','PROXY_USER') P FROM DUAL",{}, {outFormat:4002})).rows[0],norm=v=>String(v??'').trim().toUpperCase();
    check(norm(id.U)===norm(owned.username)&&norm(id.S)===norm(owned.username)&&Boolean(id.P),'SESSION_ID_RESOLVES_POSTGRES_ORACLE_PROXY_IDENTITY');
-   if(report.mode==='--profile')await profile(connection);else if(['--validate','--validate-remaining'].includes(report.mode))await validate(connection);else throw Error('VALIDATION_MODE_NOT_PREPARED');
+   if(report.mode==='--profile')await profileIntegrity();else if(report.mode==='--validate')await validateIntegrity(connection);else throw Error('VALIDATION_MODE_NOT_PREPARED');
   });report.success=true;
  }
 }catch(e){report.error={code:/^[A-Z][A-Z0-9_]+$/.test(e?.message??'')?e.message:/^(?:ORA-\d{5}|NJS-\d{3}|DPI-\d{4})$/.test(e?.code??'')?e.code:'BALANCE_DEV_CONTROL_FAILED'};}
