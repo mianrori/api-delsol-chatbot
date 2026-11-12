@@ -53,6 +53,8 @@ async function profile(connection){
   }
  }catch(e){report.definition={readable:false,technicalCode:/^(?:ORA-\d{5}|NJS-\d{3})$/.test(e?.code??'')?e.code:'DEFINITION_UNAVAILABLE'};}
  report.currency={nativeIdentifierExposed:columns.some(c=>['COD_MONEDA','MONEDA_ID','CURRENCY_ID','ISO_CURRENCY_CODE'].includes(c)),symbolsAreNotProvenCurrencyKeys:true,conversionPerformed:false};
+ report.currency.sameSymbolMultipleCodes=Number((await run("SELECT CASE WHEN EXISTS(SELECT 1 FROM VW_BOT_FACTURAS_SALDOS GROUP BY SIMBOLO_MONEDA HAVING COUNT(DISTINCT COD_MONEDA)>1) THEN 1 ELSE 0 END V FROM DUAL"))[0].V)===1;
+ report.currency.sameCodeMultipleSymbols=Number((await run("SELECT CASE WHEN EXISTS(SELECT 1 FROM VW_BOT_FACTURAS_SALDOS GROUP BY COD_MONEDA HAVING COUNT(DISTINCT SIMBOLO_MONEDA)>1) THEN 1 ELSE 0 END V FROM DUAL"))[0].V)===1;
  report.semanticLimits=['zero balance does not prove payment','negative balance does not prove credit/refund without business contract','observed uniqueness is not a documented invoice business key'];
 }
 async function validate(connection){
