@@ -40,7 +40,7 @@ export async function getInvoiceBalancesRepository({connection,...args}) {
   const execute=(sql,binds={})=>connection.execute(sql,binds,{outFormat:4002,fetchInfo:{DEUDA:{type:oracledb.STRING}}});
   // Neither a symbol nor an invoice number is a proven business identifier.
   // Check Oracle access, but never sum/rank money or invent invoice identities.
-  if(args.mode==='detail'&&(['debtDesc','debtAsc'].includes(args.orderBy)||args.minDebt!==undefined||args.maxDebt!==undefined)&&args.currencyCodes.length!==1){
+  if(((args.mode==='detail'&&['debtDesc','debtAsc'].includes(args.orderBy))||args.minDebt!==undefined||args.maxDebt!==undefined)&&args.currencyCodes.length!==1){
     await execute('SELECT NRO_FACTURA FROM VW_BOT_FACTURAS_SALDOS WHERE 1=0');
     return {status:'REQUIRES_SOURCE_IDENTITY',currencyIdentity:'nativeCode',invoiceIdentity:'unverified',monetaryAggregationAvailable:false,
       reason:'La divisa dispone de COD_MONEDA, pero falta demostrar la clave de factura y la granularidad aditiva de cada registro. No se agregan deudas; ordenar o filtrar importes individuales requiere un único currencyCodes.',queryContext:args};
