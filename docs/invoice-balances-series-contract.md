@@ -1,5 +1,7 @@
 # PR #51: contrato vigente de series y deuda
 
+> Actualización vigente: [integridad por alcance y cálculos condicionados](invoice-balances-integrity-contract.md). Sustituye el bloqueo global descrito abajo: perfiles limpios permiten agregaciones por moneda; perfiles con duplicados conservan detalle/advertencia y bloquean cálculos. Las evidencias de 0c34985 que siguen son históricas.
+
 Este documento sustituye las reglas anteriores de signo y granularidad de invoice-balances-tools.md. Los JSON anteriores se conservan como historia. PR en borrador, sin merge ni despliegue.
 
 ## Contrato

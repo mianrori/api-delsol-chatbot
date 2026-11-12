@@ -1,5 +1,7 @@
 # Deudas de facturas: candidato en borrador
 
+> **Regla más reciente:** [cálculos condicionados a integridad del alcance](invoice-balances-integrity-contract.md), candidato 8420e82. Sustituye el bloqueo global de agregaciones de los documentos anteriores. PR en borrador.
+
 > **Contrato vigente:** [SERIE_FACTURA y estados confirmados de DEUDA](invoice-balances-series-contract.md). Las secciones siguientes son historia de la validación de diez columnas en 11a4316. Se sustituyeron sus reglas de signos y nombres de argumentos: negativos siempre excluidos, pending predeterminado, settled cero y all/unknown con nulos explícitos. Serie/número sigue sin demostrar unicidad; agregaciones bloqueadas. Evidencia actual: 0c34985, 117 aserciones Oracle/HTTP y 25 pruebas locales.
 
 ## Contrato vigente y alcance

@@ -1,5 +1,20 @@
 # Alcance y evidencia del backend del chatbot
 
+## Estado vigente PR #51: integridad por alcance, 8420e82
+
+Esta sección sustituye el bloqueo global de las entradas históricas siguientes; no declara única toda la vista.
+
+| Capacidad | Control afectado | Reserva |
+| --- | --- | --- |
+| Duplicados | Versiones por par serie/número antes de filtros efectivos; deuda igual bloqueó summary real, sin elegir una fila | Sin muestra Oracle de deudas distintas; solo prueba local simulada |
+| Perfiles limpios | Identidades limpias y cliente completo encontrados; sumas/conteos/orden por moneda y cliente conciliados con SQL independiente | No certifica todas las dimensiones/combinaciones |
+| Cálculos inconsistentes | Sin data ni invoiceCount calculado; explicación de registros históricos inconsistentes/información incompleta | Bloqueo conservador del resumen completo, sin subtotal parcial silencioso |
+| Detalle | Filas preservadas con advertencia y conteo de registros separado | No deduplicación ni conteo de facturas sobre identidad inconsistente |
+| PII/HTTP | Tres POST efímeros: summary limpio/bloqueado y detalle advertido; SDK controlado | Texto del historial solo contrastado para identificadores de seis o más caracteres; denegación real pendiente |
+| Cierre | 1/1 preparación, 4/4 validación, logout, logs sanitizados; imagen/arranque intactos | Sin despliegue ni datos históricos corregidos |
+
+26 aserciones Oracle/HTTP y 34/34 pruebas locales afectadas, Node 22.23.5; cero proveedor/PDF, sin suite completa ni repetición de los 117 controles anteriores. [Contrato y evidencia actuales](invoice-balances-integrity-contract.md). PR en borrador; ANX123 y muestra mixta Oracle de PR #50 pendientes independientes. Sin merge, despliegue o cambios de datos, permisos o expiraciones.
+
 ## Actualización PR #51: series y estados de deuda
 
 Esta sección prevalece sobre las entradas históricas de saldos/deudas de diez columnas. PR en borrador, sin desplegar.
