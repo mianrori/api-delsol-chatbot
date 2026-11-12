@@ -6,6 +6,7 @@ import {fileURLToPath} from 'node:url';
 import {resolve} from 'node:path';
 import {loginDev,logoutDev,probeLoginDev} from './dev-protected-login.mjs';
 import {auditAffectedLogs} from './invoice-affected-log-audit.mjs';
+import {APPLICATION_COMMIT,EXECUTOR_FILES,verifyCandidateSource} from './invoice-candidate-source-preflight.mjs';
 const root=fileURLToPath(new URL('../',import.meta.url));
 const docker=process.env.INVOICE_CANDIDATE_AFFECTED_DOCKER||'docker',bot='api-delsol-chatbot-dev',erp='api-delsol-erp-dev';
 const report={suite:'invoice-candidate-affected-helper',success:false,startedAt:new Date().toISOString(),phase:'PREFLIGHT'};
@@ -15,9 +16,13 @@ const hash=b=>createHash('sha256').update(b).digest('hex');
 let ownedSession,commit,candidate,payload,deployedBefore;
 
 try{
- if(process.argv.slice(2).some(a=>!['--preflight','--run'].includes(a)))throw Error();
- commit='be559ef69a5e376c37fd479c36796b7f4023e831';report.commit=commit;report.harnessCommit=git('rev-parse','HEAD').trim();
- if(!/^[a-f0-9]{40}$/.test(commit)||git('diff',commit,'--','src','scripts','test','config.js','package.json','package-lock.json').trim())throw Error('CLEAN_COMMIT_REQUIRED');
+ if(process.argv.slice(2).some(a=>!['--preflight','--source-preflight','--run'].includes(a)))throw Error();
+ commit=APPLICATION_COMMIT;report.commit=commit;
+ report.sourcePreflight=verifyCandidateSource({root});report.harnessCommit=report.sourcePreflight.executorCommit;
+ if(process.argv.includes('--source-preflight')){
+  report.success=true;report.phase='SOURCE_PREFLIGHT_COMPLETE';
+  process.stdout.write(JSON.stringify(report)+'\n');process.exit(0);
+ }
  report.phase='DEV_HEALTH_LOG_GUARD';await probeLoginDev();
  const probe="import config from '/app/config.js';import fs from 'node:fs';import crypto from 'node:crypto';const h=v=>crypto.createHash('sha256').update(v).digest('hex');console.log(JSON.stringify({dev:config.env==='development',safe:!config.bedrockDebugPayloads&&!config.piiDebugShowRaw,oracle:h(JSON.stringify([config.dbHost,config.dbPort,config.dbSid])),pg:h(JSON.stringify([config.pgOracleSessionsHost,config.pgOracleSessionsPort,config.pgOracleSessionsDatabase])),guard:fs.existsSync('/app/src/utils/devAuthTestLogging.js')?h(fs.readFileSync('/app/src/utils/devAuthTestLogging.js','utf8').replaceAll('\\r\\n','\\n')):null,enabled:process.env.ERP_DEV_SAFE_AUTH_TEST_LOGS==='1'}));";
  deployedBefore=JSON.parse(dock('inspect',bot))[0];report.deployedState={unchanged:null};
@@ -28,7 +33,7 @@ try{
  candidate='/tmp/invoice-candidate-affected-'+commit;dock('exec',bot,'mkdir','-p',candidate);
  run(docker,['exec','-i',bot,'tar','-x','-C',candidate],{input:run('git',['archive','--format=tar',commit],{encoding:'buffer'})});
  dock('exec',bot,'ln','-sfn','/app/node_modules',candidate+'/node_modules');
- const files=git('ls-tree','-r','--name-only',commit).trim().split('\n').filter(p=>/^(src\/|scripts\/|test\/|config\.js$|package(?:-lock)?\.json$)/.test(p));
+ const files=git('ls-tree','-r','--name-only',commit).trim().split('\n').filter(p=>/^(src\/|scripts\/|test\/|config\.js$|package(?:-lock)?\.json$)/.test(p)&&!EXECUTOR_FILES.includes(p));
  const normalize=s=>s.replaceAll('\r\n','\n');
  const expected=files.map(p=>[p,hash(normalize(readFileSync(resolve(root,p),'utf8')))]);
  const remote=JSON.parse(run(docker,['exec','-i',bot,'node','--input-type=module'],{input:"import fs from 'node:fs';import crypto from 'node:crypto';const {candidate,files}="+JSON.stringify({candidate,files})+";console.log(JSON.stringify(files.map(p=>[p,crypto.createHash('sha256').update(fs.readFileSync(candidate+'/'+p,'utf8').replaceAll('\\r\\n','\\n')).digest('hex')])));"}));
@@ -38,11 +43,12 @@ try{
 
  if(dock('exec',bot,'node','--version').trim()!=='v22.23.4')throw Error('NODE22_REQUIRED');
  report.noTestsReexecuted=true;
- const workerPath='scripts/check-invoice-candidate-affected-dev.mjs';
- dock('cp',resolve(root,workerPath),bot+':'+candidate+'/'+workerPath);
- report.workerSha256=hash(readFileSync(resolve(root,workerPath)));
- const actualWorker=dock('exec',bot,'node','--input-type=module','-e',"import fs from 'node:fs';import crypto from 'node:crypto';console.log(crypto.createHash('sha256').update(fs.readFileSync('"+candidate+"/"+workerPath+"')).digest('hex'))").trim();
- if(actualWorker!==report.workerSha256)throw Error('SOURCE_MISMATCH');
+ const executorContents=EXECUTOR_FILES.map(path=>[path,git('show',report.harnessCommit+':'+path)]);
+ report.executorFiles=executorContents.map(([path,content])=>({path,sha256:hash(content)}));
+ const install="import fs from 'node:fs';import crypto from 'node:crypto';let raw='';for await(const c of process.stdin)raw+=c;const {candidate,files}=JSON.parse(raw);const hashes=files.map(([path,content])=>{fs.writeFileSync(candidate+'/'+path,content);return {path,sha256:crypto.createHash('sha256').update(fs.readFileSync(candidate+'/'+path)).digest('hex')};});console.log(JSON.stringify(hashes));";
+ const installed=JSON.parse(run(docker,['exec','-i',bot,'node','--input-type=module','-e',install],{input:JSON.stringify({candidate,files:executorContents})}));
+ if(JSON.stringify(installed)!==JSON.stringify(report.executorFiles))throw Error('SOURCE_MISMATCH');
+ report.workerSha256=report.executorFiles.find(x=>x.path==='scripts/check-invoice-candidate-affected-dev.mjs').sha256;
  report.phase='MODULE_PREFLIGHT';const pre=JSON.parse(dock('exec',bot,'node','--experimental-vm-modules',candidate+'/scripts/check-invoice-candidate-affected-dev.mjs',commit,'--preflight'));if(!pre.success||pre.suite!=='invoice-candidate-affected-dev'||pre.commit!==commit)throw Error();
  if(process.argv.includes('--preflight')){report.success=true;report.phase='PREFLIGHT_COMPLETE';}
  else{
@@ -55,7 +61,7 @@ try{
   });
   report.success=report.worker.success;report.phase='COMPLETE';
  }
-}catch(e){report.error={code:['CLEAN_COMMIT_REQUIRED','SAFE_DEV_REQUIRED','SOURCE_MISMATCH','NODE22_REQUIRED','FOCUSED_TESTS_FAILED','ERP_LOGIN_REJECTED','ERP_DEV_GUARD_REQUIRED'].includes(e?.message)?e.message:['ERP_LOGIN_REJECTED','ERP_DEV_GUARD_REQUIRED'].includes(e?.code)?e.code:'DEV_CONTROL_FAILED'};if(/^[A-Z0-9_]+$/.test(e?.code??''))report.error.technicalCode=e.code;if(Number.isInteger(e?.status))report.error.childExitCode=e.status;}
+}catch(e){report.error={code:['APPLICATION_SOURCE_CHANGED','EXECUTOR_SOURCE_CHANGED','EXECUTOR_COMMIT_INCOMPLETE','SAFE_DEV_REQUIRED','SOURCE_MISMATCH','NODE22_REQUIRED','FOCUSED_TESTS_FAILED','ERP_LOGIN_REJECTED','ERP_DEV_GUARD_REQUIRED'].includes(e?.message)?e.message:['ERP_LOGIN_REJECTED','ERP_DEV_GUARD_REQUIRED'].includes(e?.code)?e.code:'DEV_CONTROL_FAILED'};if(/^[A-Z0-9_]+$/.test(e?.code??''))report.error.technicalCode=e.code;if(Number.isInteger(e?.status))report.error.childExitCode=e.status;}
 finally{
  payload=null;
  if(ownedSession){try{await logoutDev(ownedSession);report.logout=true;}catch{report.logout=false;report.success=false;}ownedSession=null;}
@@ -67,8 +73,8 @@ finally{
    const audit=auditAffectedLogs(result.stdout+'\n'+result.stderr,container===bot?'chatbot':'erp');report.logAudit.push({service:container===bot?'chatbot':'erp',...audit});if(!audit.safe)report.success=false;
   }catch{report.logAudit.push({service:container===bot?'chatbot':'erp',auditFailed:true});report.success=false;}
  }
- try{const current=JSON.parse(dock('inspect',bot))[0];if(typeof deployedBefore!=='undefined')report.deployedState.unchanged=current.Image===deployedBefore.Image&&current.State.StartedAt===deployedBefore.State.StartedAt;}catch{}
+ if(deployedBefore)try{const current=JSON.parse(dock('inspect',bot))[0];report.deployedState.unchanged=current.Image===deployedBefore.Image&&current.State.StartedAt===deployedBefore.State.StartedAt;}catch{}
  report.caseResolved=false;report.finishedAt=new Date().toISOString();mkdirSync(resolve(root,'logs'),{recursive:true});
- const target=resolve(root,'logs/invoice-candidate-affected'+(process.argv.includes('--preflight')?'-preflight':'-real')+'.json');writeFileSync(target,JSON.stringify(report,null,2));
+ const target=resolve(root,'logs/invoice-candidate-affected'+(process.argv.includes('--source-preflight')?'-source-preflight':process.argv.includes('--preflight')?'-preflight':'-real')+'.json');writeFileSync(target,JSON.stringify(report,null,2));
  process.stdout.write(JSON.stringify(report)+'\n');process.exitCode=report.success?0:1;
 }

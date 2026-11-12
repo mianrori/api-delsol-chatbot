@@ -50,6 +50,18 @@ Todas las conexiones Oracle cerradas sin errores; driver restaurado; servidor te
 
 PR #50 sigue en borrador, caso original pendiente. Sin merge, despliegue o inspecciones administrativas.
 
+### Correccion local del preflight posterior a 6c395d9
+
+La revision detecto que el preflight comparaba todo scripts/ contra be559ef y rechazaba los ejecutores anadidos en 6c395d9. Se corrige con `invoice-candidate-source-preflight.mjs`: aplicacion (src e index.js), pruebas de negocio, configuracion y restantes scripts se fijan a **be559ef**; seis archivos de ejecutores/dependencias enumerados explicitamente y su nueva prueba local se verifican contra **HEAD**, resuelto al SHA completo del commit que los contiene. No se excluye scripts/ en bloque. Documentacion y evidencia no se tratan como codigo ejecutable.
+
+Se contrastan tanto los commits como el indice y el arbol de trabajo. Se rechazan archivos funcionales nuevos, cambios preparados ocultos por una copia de trabajo restaurada y un commit de ejecutores incompleto. En una futura ejecucion autorizada, los ejecutores se exportan desde su commit verificado y se cotejan por hash al copiarlos; el archivo Git de la aplicacion permanece fijado a be559ef. El worker y la aplicacion no cambian.
+
+**17/17 comprobaciones locales aprobadas** en repositorios Git temporales: candidato final con ejecutores versionados aceptado; modificaciones de aplicacion/pruebas/configuracion/otros scripts rechazadas; cada ejecutor alterado detectado; alteraciones preparadas en el indice y cambios funcionales ya committeados tampoco se ocultan restaurando la copia de trabajo. Comando: `node --test test/invoiceCandidatePreflight.test.js`, Node 24.21.0 local. No se ejecutan las 71 pruebas de negocio ni se usa login, Docker, red u Oracle.
+
+El comando `node scripts/run-invoice-candidate-affected-login.mjs --source-preflight` (o PowerShell con `-SourcePreflight`) ejecuta unicamente esta verificacion Git sobre el commit final. El preflight DEV previo y la ejecucion real tambien exigen la misma verificacion antes de acceder a servicios. Esta correccion no repite ni amplifica el control Oracle/HTTP de be559ef: el reporte historico y sus hashes permanecen intactos. La denegacion real de Impacto fue en el resolver; **ANX123 sigue pendiente y falta una muestra mixta Oracle real**. No se afirma que el nuevo ejecutor haya sido validado otra vez contra servicios externos.
+
+Sin merge, despliegue ni cambios de datos, permisos o expiraciones. Una PR lista para revision no equivale al cierre del caso original.
+
 ## Estado historico anterior (11 de noviembre de 2026)
 
 El usuario confirma que no hay acceso administrativo. La consulta DBA_* preparada no se ejecuto y no hay resultado administrativo que revisar. No se solicitaron privilegios ni se sustituyo la identidad afectada.

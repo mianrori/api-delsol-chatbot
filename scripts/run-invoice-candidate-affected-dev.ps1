@@ -1,6 +1,10 @@
-param([switch]$Preflight)
+param([switch]$Preflight,[switch]$SourcePreflight)
 $ErrorActionPreference='Stop'
 $root=Split-Path -Parent $PSScriptRoot
+if($SourcePreflight){
+ & node (Join-Path $PSScriptRoot 'run-invoice-candidate-affected-login.mjs') --source-preflight
+ exit $LASTEXITCODE
+}
 $docker=Get-Command docker -ErrorAction SilentlyContinue
 if($docker){$dockerPath=$docker.Source}else{$dockerPath=Join-Path $env:LOCALAPPDATA 'Programs/DockerDesktop/resources/bin/docker.exe'}
 if(-not (Test-Path -LiteralPath $dockerPath)){throw 'Docker Desktop no encontrado.'}
