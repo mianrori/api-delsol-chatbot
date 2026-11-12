@@ -2,6 +2,10 @@ import express from 'express';
 ﻿import vm from 'node:vm';import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';import {createRequire} from 'node:module';
 import * as store from '../../src/state/conversation.store.js';import {protectPiiDeep,restorePiiDeep} from '../../src/services/ai/pii.service.js';import {trimConversation} from '../../src/services/ai/conversation.service.js';
 import {getInvoices} from '../../src/services/invoices/invoices.service.js';import {searchInvoiceConcepts} from '../../src/services/invoices/searchInvoiceConcepts.service.js';import {searchInvoiceCustomers} from '../../src/services/invoices/searchInvoiceCustomers.service.js';
+import config from '../../config.js';
+import {INVOICE_PARTIAL_ACCESS_MESSAGE} from '../../src/utils/invoiceAccess.js';
+config.urlEndPointDePdf='https://pdf.example.test';
+process.env.NODE_ENV='development';
 for(const k of ['log','info','warn','error','debug'])console[k]=()=>{};
 const [scenario,trimFlag]=process.argv.slice(2),trimmed=trimFlag==='true',sessionId='SYNTHETIC-NAMED-INVOICE';let calls=[],queries=[],modelCalls=0;
 const conceptAmbiguous=['concept-ambiguous','both-ambiguous','wrong-choice'].includes(scenario),customerAmbiguous=['customer-ambiguous','both-ambiguous'].includes(scenario);
@@ -12,9 +16,9 @@ const connection={async execute(sql,binds){queries.push({sql,binds:structuredClo
  if(sql.includes('FROM DUAL'))return {rows:[{HAS_RESTRICTED_DATA:stage==='initial'&&scenario.startsWith('customer-')?1:0}]};
  if(sql.includes('MATCH_PRIORITY')&&stage==='initial'&&scenario.startsWith('customer-'))return {rows:[]};
  if(sql.includes('MATCH_PRIORITY'))return {rows:[{COD_CLIENTE:'C1',NOM_CLIENTE:'IMPACTO',MATCH_PRIORITY:4}]};
- if(sql.includes('COUNT(*) AS TOTAL_ROWS'))return {rows:[{TOTAL_ROWS:stage==='initial'||scenario==='followup'||scenario==='denied'||scenario==='empty'?0:1,TOTAL_INVOICES:stage==='initial'||scenario==='followup'||scenario==='denied'||scenario==='empty'?0:1,HAS_RESTRICTED_DATA:stage==='initial'||scenario==='followup'||scenario==='denied'?1:0}]};
+ if(sql.includes('COUNT(*) AS TOTAL_ROWS'))return {rows:[{TOTAL_ROWS:stage==='initial'||scenario==='followup'||scenario==='denied'||scenario==='empty'?0:1,TOTAL_INVOICES:stage==='initial'||scenario==='followup'||scenario==='denied'||scenario==='empty'?0:1,HAS_RESTRICTED_DATA:stage==='initial'||scenario==='followup'||scenario==='denied'||scenario==='mixed'?1:0}]};
  if(stage==='initial'||scenario==='followup'||scenario==='denied'||scenario==='empty')return {rows:[]};
- return {rows:[{NRO_FACTURA:'ALLOWED-PLATE',NOM_CLIENTE:'OTHER AUTHORIZED CUSTOMER',DES_CONCEPTO:'OTHER AUTHORIZED CONCEPT',IMPORTE:20,MATRICULA:'ANX123',PDF:null}]};
+ return {rows:[{NRO_FACTURA:'ALLOWED-PLATE',NOM_CLIENTE:'OTHER AUTHORIZED CUSTOMER',DES_CONCEPTO:'OTHER AUTHORIZED CONCEPT',IMPORTE:20,MATRICULA:'ANX123',PDF:'allowed.pdf'}]};
 }};
 const context=vm.createContext({console,process,structuredClone,Intl,Date,Map,Set,Number,String,Array,JSON,Math,RegExp,Object,Boolean,Error,AbortController});const synthetic=e=>new vm.SyntheticModule(Object.keys(e),function(){for(const[k,v]of Object.entries(e))this.setExport(k,v);},{context});
 const sdk={BedrockRuntimeClient:class{async send(){modelCalls++;throw Error('MODEL_MUST_NOT_SWAP_EXPLICIT_ROLES');}},ConverseCommand:class{}};
@@ -47,7 +51,13 @@ try{
  const metadata=restorePiiDeep(sessionId,store.getSearchResolutions(sessionId).contexts.get_invoices);assert.deepEqual(metadata,expected);
  if(scenario==='followup'||scenario==='denied'){assert.match(answer,/no tiene permisos/);assert.doesNotMatch(answer,/No se encontraron|ALLOWED-PLATE|Ver PDF/);}
  else if(scenario==='empty'){assert.match(answer,/No se encontraron/);assert.doesNotMatch(answer,/no tiene permisos/);}
- else{assert.match(answer,/ALLOWED-PLATE/);assert.doesNotMatch(answer,/no tiene permisos|IMPACTO/);}
+ else{assert.match(answer,/ALLOWED-PLATE/);assert.doesNotMatch(answer,/no tiene permisos|IMPACTO/);assert.match(answer,/Ver PDF/);}
+ if(scenario==='mixed'){
+  assert.ok(answer.includes(INVOICE_PARTIAL_ACCESS_MESSAGE));
+  const result=calls.at(-1).result;
+  assert.equal(result.hasRestrictedData,true);assert.equal(result.totalRows,1);assert.equal(result.totalInvoices,1);assert.equal(result.totalPages,1);assert.equal(result.hasMore,false);
+  assert.equal(result.data.length,1);assert.equal(result.data[0].pdfUrl,'https://pdf.example.test/allowed.pdf');
+ }
  if(scenario!=='followup'){
   assert.equal(store.getSearchResolutions(sessionId).invoiceNamedRequest,undefined);
   for(const q of queries.filter(q=>q.binds.plate)){assert.equal(q.binds.customerId0,undefined);assert.equal(q.binds.conceptId0,undefined);assert.equal(q.binds.dateFrom,undefined);assert.equal(q.binds.dateTo,undefined);assert.equal(q.binds.plate,'ANX123');assert.match(q.sql,/USER_CAN_CONSULT/);}

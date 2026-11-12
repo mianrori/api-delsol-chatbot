@@ -86,11 +86,8 @@ export const getInvoicesRepository = async ({
 
   const binds = {};
 
-  /*
-   * Filtro obligatorio de seguridad.
-   * No existe ningún parámetro que permita desactivarlo.
-   */
-  const where = ["NVL(USER_CAN_CONSULT, 'S') <> 'N'"];
+  // Build the effective scope once, independently of row authorization.
+  const filters = [];
 
   if (customerIds.length > 0) {
     const clause = buildInClause({
@@ -99,7 +96,7 @@ export const getInvoicesRepository = async ({
       binds,
     });
 
-    where.push(`COD_CLIENTE IN (${clause})`);
+    filters.push(`COD_CLIENTE IN (${clause})`);
   }
 
   if (conceptIds.length > 0) {
@@ -109,38 +106,38 @@ export const getInvoicesRepository = async ({
       binds,
     });
 
-    where.push(`COD_CONCEPTO IN (${clause})`);
+    filters.push(`COD_CONCEPTO IN (${clause})`);
   }
 
   if (dateFrom) {
     binds.dateFrom = dateFrom;
 
-    where.push("FECHA_EMISION >= TO_DATE(:dateFrom, 'DD/MM/YYYY')");
+    filters.push("FECHA_EMISION >= TO_DATE(:dateFrom, 'DD/MM/YYYY')");
   }
 
   if (dateTo) {
     binds.dateTo = dateTo;
 
-    where.push("FECHA_EMISION < TO_DATE(:dateTo, 'DD/MM/YYYY') + 1");
+    filters.push("FECHA_EMISION < TO_DATE(:dateTo, 'DD/MM/YYYY') + 1");
   }
 
   if (invoiceNumber) {
     binds.invoiceNumber = `%${String(invoiceNumber).trim().toUpperCase()}%`;
 
-    where.push("UPPER(NRO_FACTURA) LIKE :invoiceNumber");
+    filters.push("UPPER(NRO_FACTURA) LIKE :invoiceNumber");
   }
 
   if (period) {
     binds.period = String(period).trim().toUpperCase();
 
-    where.push("UPPER(PERIODO) = :period");
+    filters.push("UPPER(PERIODO) = :period");
   }
 
   const normalizedPlate=normalizeInvoicePlate(plate);
   if (normalizedPlate!==undefined) {
     binds.plate = normalizedPlate;
 
-    where.push(`
+    filters.push(`
       REGEXP_REPLACE(UPPER(MATRICULA), '[-[:space:]]', '') = :plate
     `);
   }
@@ -148,13 +145,14 @@ export const getInvoicesRepository = async ({
   if (cancelled === true || cancelled === false) {
     binds.cancelled = cancelled ? "S" : "N";
 
-    where.push("NVL(ANULADO, 'N') = :cancelled");
+    filters.push("NVL(ANULADO, 'N') = :cancelled");
   }
 
-  const whereSql = `WHERE ${where.join("\n AND ")}`;
+  // Mandatory for all data, totals, summaries and pagination; no bypass argument.
+  const whereSql = `WHERE ${["NVL(USER_CAN_CONSULT, 'S') <> 'N'", ...filters].join("\n AND ")}`;
   // Only a permission bit leaves this probe: never restricted rows or counts.
   // Keep every requested filter, independently of the authorized page.
-  const restrictedWhereSql = `WHERE ${["USER_CAN_CONSULT = 'N'", ...where.slice(1)].join("\n AND ")}`;
+  const restrictedWhereSql = `WHERE ${["USER_CAN_CONSULT = 'N'", ...filters].join("\n AND ")}`;
   const restrictedFlagSql = `CASE WHEN EXISTS (
     SELECT 1 FROM VW_BOT_FACTURAS ${restrictedWhereSql}
   ) THEN 1 ELSE 0 END AS HAS_RESTRICTED_DATA`;

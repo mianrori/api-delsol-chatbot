@@ -735,3 +735,55 @@ solo documentan resultados. PR #47 en borrador con las reservas conservadas.
 | Denegacion al consultar facturas; nueva matricula permitida/restringida/ausente | Cobertura sintetica inicial, chat y HTTP, ambas intenciones y recorte. | Consulta inicial real AUTHORIZED; no se presenta como Oracle real denegacion seguida de matricula. |
 
 **7d05971: 48/48 comprobaciones en cuatro POST HTTP 200**, aplicacion/pruebas identicas a 5f94216. Las 56/6 pruebas de 73e1eef se reutilizan para partes no modificadas; 20 controles cubren el ajuste adicional. SDK controlado no invocado: cero Bedrock/modelo real/proveedor y descargas PDF. Cierres, logout y logs sanitizados aprobados. Reporte SHA-256 5ce138983586a094e2f013308ab1d9c246b3eb3cab0e73d500fe99633708ff3f; 315 archivos, manifiesto 16d0fc86dfb5515563e68f89fabdbef1752a9a7fa352f946c82cb6b971824fde. [Alcance y muestras faltantes](invoice-plate-query-scope.md). PR #49 en borrador, DEV sin cambios. Reservas restringidas/mixtas/segunda pagina mixta y positivo PDF/404 separados conservadas. Sin merge, despliegue o cambios de datos, configuracion, permisos o expiraciones.
+
+
+### Reapertura con usuario afectado sobre 22f4b02
+
+| Evidencia real | Resultado | Reserva |
+| --- | --- | --- |
+| Codigo de 5400 | 319 archivos y diez modulos realmente cargados coinciden con 22f4b02. | No se sustituye por candidato ni por modelo controlado. |
+| Denegacion inicial de cliente/concepto/2023 | Reproducida al resolver cliente: N recibido y ACCESS_DENIED, sin cliente confirmado. | Esta evidencia acredita la denegacion real para ese login; no cambia retroactivamente controles de cuentas autorizadas. |
+| Matricula autonoma despues de denegacion | Argumentos y SQL reales sin cliente, concepto o periodo; autorizacion conservada, conteo cero y flag restringido falso. | No se demuestra la incorreccion reportada. |
+| Oracle independiente y conversacion nueva | ABSENT para la misma identidad; respuesta coincide. | ANX123 literal, no positiva. Pendiente auditoria Unicode/proyeccion de vista; no hay correccion demostrada. |
+
+Ejecutor caed886, tres preguntas HTTP reales y dos resets de conversacion propia; no SDK controlado, cero eventos Bedrock, conexiones/driver/inspector/logout cerrados y logs sanitizados. Reporte SHA-256 d97cb76388f15c9fd0162c4775ebed16a41adf56eca85b288bcbdd6cf4e60065. [Investigacion abierta](invoice-affected-user-investigation.md). PR #50 en borrador, sin merge, despliegue o cambios de datos/permisos/expiraciones. Reservas de facturas restringidas por esa matricula, mixtos, segunda pagina mixta y PDF positivo/404 separados conservadas.
+
+### Proyeccion Oracle del usuario afectado: b014b94
+
+| Caso | Evidencia | Limite |
+| --- | --- | --- |
+| Permiso de la vista | Expresion combina columna y USER; misma identidad con filas permitidas y N. | No es una denegacion global uniforme; no atribuir N a cualquier vacio. |
+| MATRICULA | TRIM/UPPER y funciones anidadas, sin condicion explicita de permiso en la proyeccion. | Cuerpos de funciones, predicados y politicas no inspeccionados; ocultacion no descartada. |
+| ANX123 tras denegacion y aislada | Se reutilizan HTTP caed886 y Unicode b96353a: ausencia de coincidencias visibles autorizadas/restringidas; sin filtros anteriores. | No demuestra ausencia global ni matricula oculta. Caso abierto. |
+
+Aplicacion 22f4b02 reverificada tras reinicio de Docker, sin despliegue. Control actual solo Oracle/metadatos: cero HTTP repetido, cierres/logout/logs aprobados, cero Bedrock/PDF. Reporte SHA-256 1da5be7a957d9cd91379cc5c119f333e1c766f1176a9b7818c547155a2d35d18. [Diagnostico y consulta administrativa pendiente](invoice-affected-user-investigation.md). PR #50 en borrador, sin correccion especulativa.
+
+### Dependencias y predicados: 948332d
+
+| Caso | Evidencia accesible | Limite |
+| --- | --- | --- |
+| Funciones de MATRICULA | LOWER/REPLACE/UPPER/TRIM sobre columna; sin condicion de permiso ni funcion propia en esa expresion. | No prueba que la columna fuente tenga valor para ANX123. |
+| Relaciones de la vista | Diez dependencias TABLE; varios INNER JOIN con igualdad. Pueden excluir filas sin relacion requerida antes de su clasificacion observable. | No demuestra que ANX123 exista ni que un join la excluya. |
+| Politicas/dependencias no visibles | ALL_POLICIES sin filas en vista y diez tablas; consultas completadas sin errores/cortes. | Completitud ALL_* no certificada. Usuario confirma falta de acceso administrativo: inventario DBA_* preparado pero no ejecutado. Bloqueo vigente. |
+| Secuencia y matricula aislada | HTTP caed886 y Unicode b96353a reutilizados sin repetirlos. | Cero coincidencias visibles no equivale a denegacion ni ausencia global. Caso abierto. |
+
+Reporte SHA-256 c378792808e660ad20c02a68d8b6bda422bb330d97cd8275fdb141a15d260351. Cero POST/resets/filas de tablas base/funciones ejecutadas; conexiones, inspector, logout y logs sanitizados aprobados. Aplicacion 22f4b02 sin cambios. [Diagnostico y bloqueo](invoice-affected-user-investigation.md). PR #50 en borrador; reservas anteriores conservadas.
+
+### Estado vigente PR #50: autorizacion por fila (12 de noviembre de 2026)
+
+Reemplaza el bloqueo administrativo como orientacion del trabajo; las inspecciones anteriores son evidencia historica. Se conserva `NVL(USER_CAN_CONSULT, 'S') <> 'N'` para recuperar datos y se comparte una lista explicita de filtros normalizados con el sondeo independiente `EXISTS` de filas N, que devuelve solo un bit. El sondeo ya existia en 22f4b02; no se atribuye a este refactor una correccion demostrada de ANX123.
+
+| Caso | Evidencia actual | Limite |
+| --- | --- | --- |
+| Solo restringidas / mixtas / ausentes | 71/71 pruebas enfocadas con Node 22.23.4; mensaje exacto, aviso parcial, filtros completos y binds identicos en detalle/resumen. | Oracle simulado; no acredita muestras restringidas reales. |
+| Denegacion inicial → matricula autonoma | Regresion chat/HTTP, con/sin recorte, ahora tambien mixta; conteos y PDF solo autorizado. | Flujo determinista, sin modelo real ni descargas PDF. |
+| Usuario afectado en Oracle/HTTP | Contraste con caed886 historico: inicial denegada, matricula autonoma sin alcance heredado y misma ausencia en secuencia/nueva conversacion conciliada con Oracle. | No reprodujo N para ANX123. No es una ejecucion del candidato nuevo. |
+| Contraste nuevo be559ef con usuario afectado | Login protegido, identidad PostgreSQL/Oracle proxy coincidente; 28/28 comprobaciones en dos POST HTTP reales aislados. Impacto denegado en resolver; ANX123 ausente, sin filtros heredados, conciliado con conteo autorizado/EXISTS restringido independientes. Sondeo minimo SQL verificado. | Sin SDK/modelo invocado; no prueba el listener desplegado. No se observaron facturas restringidas/mixtas para ANX123; caso original pendiente. No se repitieron las 71 pruebas. |
+
+Reporte [be559ef sanitizado](invoice-candidate-affected-be559ef.json), SHA-256 `625691ea1139638b24b205bab1272455aa2a4148d3e81fc7d4d51a9140b2d636`. Conexiones/driver/servidor temporal cerrados o restaurados, conversacion propia limpiada, logout aprobado; logs chatbot sin lineas nuevas y ERP solo dos metadatos de autenticacion. Contenedor habitual sin cambios de imagen/arranque; cero modelo/proveedor/PDF/inspector. La denegacion inicial real no alcanzo get_invoices: su rama de solo restringidas y la mixta siguen sin positivo Oracle real en este control.
+
+[Detalle vigente y reservas](invoice-affected-user-investigation.md). PR en borrador. Sin nuevas inspecciones administrativas, merge, despliegue ni cambios de datos/permisos/expiraciones. Positivos Oracle restringidos/mixtos, segunda pagina mixta y PDF positivo/404 separados siguen pendientes.
+
+### Revision final del preflight: 8535403
+
+Se corrige el rechazo de los ejecutores introducidos en 6c395d9. Aplicacion/pruebas/configuracion y scripts no enumerados siguen fijados a be559ef; seis ejecutores/dependencias concretos y su prueba local se cotejan con el commit candidato HEAD que los contiene. Se comprueban commits, indice y copia de trabajo; no se excluye scripts/ en bloque. 17/17 pruebas locales Git aprobadas, incluidos cambios funcionales y ejecutores alterados; el preflight de fuentes de 8535403 pasa sin servicios externos. Revision del diff sin hallazgos pendientes dentro de ese alcance, preparada para marcar la PR lista para revision. Aplicacion, worker y evidencia Oracle/HTTP anteriores intactos; no se repiten las 71 pruebas ni los controles reales. **ANX123 y muestra mixta Oracle siguen pendientes**; lista para revision no significa caso original corregido. Sin merge ni despliegue.
