@@ -7,7 +7,7 @@ export const searchInvoiceBalanceCustomersTool={toolSpec:{
 }};
 export const getInvoiceBalancesTool={toolSpec:{
   name:'get_invoice_balances',
-  description:'Consulta el saldo ACTUAL registrado de facturas por cliente/local, factura, sector, moneda y vencimiento: detalle, deuda vencida/por vencer, antigüedad, rankings, conteos y resúmenes. Usa IDs resueltos con search_invoice_balance_customers. No consulta pagos, emisión, conceptos, matrícula, PDF ni reconstruye saldos históricos. asOfDate solo clasifica vencimientos del saldo actual. Los saldos conservan signo; no sumes monedas diferentes. Paginación en detalle y resumen; totalsByCurrency abarca todo el filtro, no solo la página. matchedCustomers y matchedInvoices cuentan clientes y facturas identificados distintos de todo el filtro, sin sumar conteos por moneda. Rankings ordenados dentro de cada moneda; filtra currencies para un top de una moneda. Fechas vacías/inválidas quedan como undated y saldos NULL como desconocidos, no cero.',
+  description:'Consulta registros individuales de saldo actual de la vista autorizada: clientes, n?meros de factura, sectores, s?mbolos, vencimientos y signo del importe. Un n?mero puede repetirse entre clientes/sectores/s?mbolos; filas no equivalen a facturas. La vista no expone clave de divisa ni factura: summary, sumas, rangos monetarios y orden monetario devuelven REQUIRES_SOURCE_IDENTITY, sin agregar valores. El s?mbolo es una etiqueta, no identifica una divisa. Cero no prueba pago y negativo no prueba cr?dito. SALDO se conserva como texto decimal exacto, sin convertir importes. asOfDate solo clasifica vencimientos, no reconstruye historia. Usa search_invoice_balance_customers para resolver clientes; detalle paginado. Sin PDF, emisi?n, cobros, conceptos ni matr?cula.',
   inputSchema:{json:{type:'object',properties:{
     customerIds:textList('IDs de clientes resueltos por el buscador de saldos. [] consulta todos los clientes visibles.'),
     invoiceNumbers:textList('Números exactos de factura (o sus tokens PII); sin coincidencia parcial ni comodines.'),
@@ -16,7 +16,7 @@ export const getInvoiceBalancesTool={toolSpec:{
     dueDateFrom:date('Vencimiento mínimo inclusivo, DD/MM/YYYY; no es fecha de emisión.'),dueDateTo:date('Vencimiento máximo inclusivo DD/MM/YYYY.'),
     asOfDate:date('Fecha para clasificar vencimiento/antigüedad. Por defecto hoy en Paraguay. NO reconstruye el saldo a esta fecha.'),
     dueStatus:{type:'string',enum:['all','overdue','dueToday','upcoming','undated'],description:'Vencida: vencimiento anterior a la referencia; dueToday hoy; upcoming posterior; undated fecha vacía/inválida.'},
-    balanceStatus:{type:'string',enum:['all','positive','zero','negative','nonZero','unknown'],description:'Por defecto all. Para deuda usa positive; para saldos a favor negative. Nunca conviertas saldo desconocido a cero ni infieras pagos.'},
+    balanceStatus:{type:'string',enum:['all','positive','zero','negative','nonZero','unknown'],description:'Signo numérico registrado; por defecto all. Cero no prueba pago; negativo no prueba crédito o devolución sin definición contable. Null es desconocido.'},
     minBalance:{type:'number'},maxBalance:{type:'number'},
     minDaysOverdue:{type:'integer',minimum:0},maxDaysOverdue:{type:'integer',minimum:0},
     mode:{type:'string',enum:['detail','summary'],default:'detail'},

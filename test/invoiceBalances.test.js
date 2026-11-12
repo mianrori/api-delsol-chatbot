@@ -9,37 +9,29 @@ import {clearPiiSession} from '../src/state/pii.store.js';
 import {tools} from '../src/tools/index.js';
 
 const fake=(...rows)=>({queries:[],async execute(sql,binds){this.queries.push({sql,binds});return {rows:rows.shift()??[]};}});
-const totals=[{CURRENCY_SYMBOL:'PYG',TOTAL_ROWS:3,INVOICE_COUNT:2,MATCHED_CUSTOMERS:1,MATCHED_INVOICES:3,TOTAL_BALANCE:90,POSITIVE_BALANCE:100,NEGATIVE_BALANCE:-10,OVERDUE_BALANCE:100,UNKNOWN_BALANCE_ROWS:1,INVALID_DUE_DATE_ROWS:1},
- {CURRENCY_SYMBOL:'USD',TOTAL_ROWS:1,INVOICE_COUNT:1,TOTAL_BALANCE:20}];
+const totals=[{TOTAL_ROWS:4,DISTINCT_INVOICE_NUMBERS:3,DISTINCT_CUSTOMERS:1,UNKNOWN_BALANCE_ROWS:1,INVALID_DUE_DATE_ROWS:1}];
 const row={NRO_FACTURA:'F-PRIVATE',COD_CLIENTE:'C-PRIVATE',NOM_CLIENTE:'TIENDA PRIVADA',RAZON_SOCIAL:'SOCIEDAD PRIVADA',RUC:'80001234-5',SIMBOLO_MONEDA:'PYG',SALDO:90,DUE_DATE:new Date('2026-10-01'),VENCIMIENTO:'01/10/2026',DUE_STATUS:'overdue',DAYS_OVERDUE:42,AGING_BAND:'31-60'};
 
 test('detail keeps currencies/signs/null balances, global filtered totals and pagination distinct',async()=>{
  const c=fake(totals,[row,{...row,NRO_FACTURA:'F-NULL',SALDO:null,DUE_DATE:null,VENCIMIENTO:'31/02/2026'}]);
- const r=await getInvoiceBalances({customerIds:['C1'],invoiceNumbers:["F'1"],sectors:['LOCAL'],currencies:['PYG'],dueDateFrom:'01/01/2026',dueDateTo:'31/12/2026',asOfDate:'12/11/2026',balanceStatus:'positive',dueStatus:'overdue',minBalance:1,maxBalance:200,minDaysOverdue:30,maxDaysOverdue:90,page:2,rows:2},c);
+ const r=await getInvoiceBalances({customerIds:['C1'],invoiceNumbers:["F'1"],sectors:['LOCAL'],currencies:['PYG'],dueDateFrom:'01/01/2026',dueDateTo:'31/12/2026',asOfDate:'12/11/2026',balanceStatus:'positive',dueStatus:'overdue',minDaysOverdue:30,maxDaysOverdue:90,page:2,rows:2},c);
  assert.equal(r.totalRows,4);assert.equal(r.totalPages,2);assert.equal(r.page,2);assert.equal(r.hasMore,false);assert.equal(r.returnedRows,2);assert.equal(r.data[1].balance,null);assert.equal(r.data[1].dueDate,null);assert.equal(r.data[1].dueDateRaw,undefined);
- assert.deepEqual(r.totalsByCurrency.map(t=>t.totalBalance),[90,20]);assert.equal(r.totalsByCurrency[0].negativeBalance,-10);
+ assert.equal(r.monetaryAggregationAvailable,false);assert.equal(r.totalsByCurrency,undefined);assert.equal(r.data[0].balance,'90');
  for(const q of c.queries){assert.match(q.sql,/VW_BOT_FACTURAS_SALDOS/);assert.doesNotMatch(q.sql,/USER_CAN_CONSULT|VW_BOT_FACTURAS\b|\bUPDATE\b|\bDELETE\b|\bINSERT\b/);assert.equal(q.binds.invoiceNumbers0,"F'1");assert.ok(!q.sql.includes("F'1"));assert.equal(q.binds.asOfDate,'12/11/2026');assert.match(q.sql,/DUE_DATE <= TO_DATE\(:dueDateTo/);}
  assert.deepEqual(c.queries[1].binds,{...c.queries[0].binds,offset:2,maxRow:4});
  assert.match(c.queries[0].sql,/CASE WHEN REGEXP_LIKE[\s\S]+CASE WHEN SUBSTR[\s\S]+CASE WHEN SUBSTR[\s\S]+THEN TO_DATE/);
  assert.equal(r.queryContext.page,2);assert.equal(r.balanceBasis,'currentViewSnapshot');
- assert.equal(r.matchedCustomers,1);assert.equal(r.matchedInvoices,3);
- assert.match(c.queries[0].sql,/SELECT COUNT\(DISTINCT COD_CLIENTE\) FROM filtered/);
+ assert.equal(r.matchedCustomers,1);assert.equal(r.matchedInvoiceNumbers,3);
+ assert.match(c.queries[0].sql,/COUNT\(DISTINCT COD_CLIENTE\)/);
 });
 
-test('summary groups and counts pages before slicing, with independent global per-currency totals',async()=>{
- const c=fake(totals,[{TOTAL_GROUPS:8}],[{CUSTOMER_ID:'C1',CUSTOMER_NAME:'A',CURRENCY_SYMBOL:'PYG',TOTAL_BALANCE:90,TOTAL_ROWS:2,INVOICE_COUNT:1}]);
- const r=await getInvoiceBalances({mode:'summary',groupBy:['customer'],orderBy:'balanceDesc',rows:3,page:2},c);
- assert.equal(r.totalRows,8);assert.equal(r.totalPages,3);assert.equal(r.nextPage,3);assert.equal(r.data[0].customerName,'A');
- assert.equal(r.totalsByCurrency.length,2);assert.match(c.queries[1].sql,/GROUP BY COD_CLIENTE, SIMBOLO_MONEDA/);assert.match(c.queries[2].sql,/ORDER BY CURRENCY_SYMBOL, TOTAL_BALANCE DESC NULLS LAST/);assert.equal(c.queries[2].binds.offset,3);
-});
-
-for(const group of ['invoice','sector','dueMonth','dueStatus','agingBand'])test('safe summary dimension '+group,async()=>{
- const c=fake([],[],[]);await getInvoiceBalances({mode:'summary',groupBy:[group],orderBy:'group'},c);assert.match(c.queries[2].sql,/ROW_NUMBER/);assert.doesNotMatch(c.queries[2].sql,/undefined/);
+for(const args of [{mode:'summary'},{mode:'summary',groupBy:['customer']},{mode:'summary',groupBy:['invoice']},{mode:'summary',groupBy:['sector']},{mode:'summary',groupBy:['dueMonth']},{mode:'summary',groupBy:['dueStatus']},{mode:'summary',groupBy:['agingBand']},{orderBy:'balanceDesc'},{orderBy:'balanceAsc'},{minBalance:1},{maxBalance:10}])test('unverified source identities block monetary aggregation/ranking '+JSON.stringify(args),async()=>{
+ const c=fake([]);const r=await getInvoiceBalances(args,c);assert.equal(r.status,'REQUIRES_SOURCE_IDENTITY');assert.equal(r.data,undefined);assert.equal(c.queries.length,1);assert.match(c.queries[0].sql,/WHERE 1=0/);assert.doesNotMatch(c.queries[0].sql,/SUM|ORDER BY|USER_CAN_CONSULT/);
 });
 
 test('absence, authorized zero and out-of-range pages are not access denial',async()=>{
  const empty=await getInvoiceBalances({},fake([],[]));assert.equal(empty.totalRows,0);
- const zero=await getInvoiceBalances({},fake([{TOTAL_ROWS:1,CURRENCY_SYMBOL:'PYG',TOTAL_BALANCE:0}],[{...row,SALDO:0}]));assert.equal(zero.data[0].balance,0);assert.equal(zero.totalRows,1);
+ const zero=await getInvoiceBalances({},fake([{TOTAL_ROWS:1,CURRENCY_SYMBOL:'PYG',TOTAL_BALANCE:0}],[{...row,SALDO:0}]));assert.equal(zero.data[0].balance,'0');assert.equal(zero.totalRows,1);
  const page=await getInvoiceBalances({page:3,rows:1},fake([{TOTAL_ROWS:1,CURRENCY_SYMBOL:'PYG'}],[]));assert.equal(page.totalRows,1);assert.equal(page.returnedRows,0);
  const denied=Object.assign(Error('denied'),{errorNum:1031});await assert.rejects(getInvoiceBalances({}, {execute:async()=>{throw denied;}}),e=>e===denied);
 });
@@ -65,7 +57,7 @@ test('PII protects model results and argument arrays, restores only within match
  const id='BALANCE-PII';try{
   const r=await getInvoiceBalances({},fake(totals,[row]));const protectedR=protectPiiDeep(id,r,null,['get_invoice_balances']);
   for(const v of ['F-PRIVATE','C-PRIVATE','TIENDA PRIVADA','SOCIEDAD PRIVADA','80001234-5'])assert.ok(!JSON.stringify(protectedR).includes(v));
-  assert.equal(protectedR.data[0].balance,90);assert.equal(protectedR.totalsByCurrency[0].totalBalance,90);assert.deepEqual(restorePiiDeep(id,protectedR),r);
+  assert.equal(protectedR.data[0].balance,'90');assert.equal(protectedR.totalsByCurrency,undefined);assert.deepEqual(restorePiiDeep(id,protectedR),r);
   const args=protectPiiDeep(id,{customerIds:['C-PRIVATE'],invoiceNumbers:['F-PRIVATE']});assert.match(args.customerIds[0],/^\[PII_CUSTOMER_ID_/);assert.match(args.invoiceNumbers[0],/^\[PII_INVOICE_NUMBER_/);assert.equal(restorePiiDeep('OTHER-BALANCE',args).customerIds[0],args.customerIds[0]);
   assert.doesNotMatch(protectPiiText(id,'Saldo de Tienda Secreta al 12/11/2026'),/Tienda Secreta/);
   assert.doesNotMatch(protectPiiText(id,'Cuánto debe Tienda Secreta'),/Tienda Secreta/);
@@ -76,7 +68,7 @@ test('PII protects model results and argument arrays, restores only within match
 
 test('presentation renders full detail and per-currency totals without internal IDs, guessing or PDFs; followup preserves scope',async()=>{
  const r=await getInvoiceBalances({rows:1,customerIds:['C1'],asOfDate:'12/11/2026'},fake(totals,[row]));
- const text=buildInvoiceBalanceResponse([{name:'get_invoice_balances',result:r}]);assert.match(text,/F-PRIVATE/);assert.match(text,/TIENDA PRIVADA/);assert.match(text,/USD/);assert.match(text,/₲/);assert.match(text,/no reconstruyen un saldo histórico/);assert.doesNotMatch(text,/C-PRIVATE|Ver PDF/);
+ const text=buildInvoiceBalanceResponse([{name:'get_invoice_balances',result:r}]);assert.match(text,/F-PRIVATE/);assert.match(text,/TIENDA PRIVADA/);assert.match(text,/PYG/);assert.match(text,/no se suman importes/);assert.match(text,/no reconstruyen un saldo histórico/);assert.doesNotMatch(text,/C-PRIVATE|Ver PDF/);
  const history=[{role:'assistant',content:[{toolUse:{name:'get_invoice_balances',toolUseId:'b',input:{}}}]},{role:'user',content:[{toolResult:{toolUseId:'b',status:'success',content:[{json:r}]}}]}];
  assert.deepEqual(resolveInvoiceBalancePage({message:'siguiente página',history}).input,{...r.queryContext,page:2});
  assert.equal(resolveInvoiceBalancePage({message:'saldo general',history}),null);

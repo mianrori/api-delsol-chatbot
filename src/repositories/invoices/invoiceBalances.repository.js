@@ -1,3 +1,4 @@
+import oracledb from 'oracledb';
 // This view has no USER_CAN_CONSULT column. Oracle controls its visibility.
 // Nested CASE validates VARCHAR2 dates before TO_DATE (compatible with Oracle 11g).
 const dueDateSql=`CASE WHEN REGEXP_LIKE(TRIM(VENCIMIENTO), '^[0-9]{2}/[0-9]{2}/[0-9]{4}$') THEN
@@ -30,59 +31,34 @@ function scopeSql(args) {
   ), filtered AS (SELECT * FROM classified ${where.length?'WHERE '+where.join(' AND '):''})`};
 }
 
-const metrics=`COUNT(*) AS TOTAL_ROWS, COUNT(DISTINCT NRO_FACTURA) AS INVOICE_COUNT, COUNT(DISTINCT COD_CLIENTE) AS CUSTOMER_COUNT,
- SUM(SALDO) AS TOTAL_BALANCE,
- SUM(CASE WHEN SALDO>0 THEN SALDO ELSE 0 END) AS POSITIVE_BALANCE,
- SUM(CASE WHEN SALDO<0 THEN SALDO ELSE 0 END) AS NEGATIVE_BALANCE,
- SUM(CASE WHEN DUE_STATUS='overdue' THEN SALDO ELSE 0 END) AS OVERDUE_BALANCE,
- SUM(CASE WHEN DUE_STATUS='dueToday' THEN SALDO ELSE 0 END) AS DUE_TODAY_BALANCE,
- SUM(CASE WHEN DUE_STATUS='upcoming' THEN SALDO ELSE 0 END) AS UPCOMING_BALANCE,
- SUM(CASE WHEN DUE_STATUS='undated' THEN SALDO ELSE 0 END) AS UNDATED_BALANCE,
- SUM(CASE WHEN SALDO IS NULL THEN 1 ELSE 0 END) AS UNKNOWN_BALANCE_ROWS,
- SUM(CASE WHEN DUE_DATE IS NULL THEN 1 ELSE 0 END) AS INVALID_DUE_DATE_ROWS,
- MAX(DAYS_OVERDUE) AS MAX_DAYS_OVERDUE`;
-const numeric=(v)=>v==null?null:Number(v);
-function mapMetrics(row) {
-  return {currencySymbol:row.CURRENCY_SYMBOL??null,totalRows:Number(row.TOTAL_ROWS??0),invoiceCount:Number(row.INVOICE_COUNT??0),customerCount:Number(row.CUSTOMER_COUNT??0),
-    totalBalance:numeric(row.TOTAL_BALANCE),positiveBalance:numeric(row.POSITIVE_BALANCE),negativeBalance:numeric(row.NEGATIVE_BALANCE),
-    overdueBalance:numeric(row.OVERDUE_BALANCE),dueTodayBalance:numeric(row.DUE_TODAY_BALANCE),upcomingBalance:numeric(row.UPCOMING_BALANCE),undatedBalance:numeric(row.UNDATED_BALANCE),
-    unknownBalanceRows:Number(row.UNKNOWN_BALANCE_ROWS??0),invalidDueDateRows:Number(row.INVALID_DUE_DATE_ROWS??0),maxDaysOverdue:numeric(row.MAX_DAYS_OVERDUE)};
-}
-const dimensions={
- customer:{group:'COD_CLIENTE',select:'COD_CLIENTE AS CUSTOMER_ID, MAX(NOM_CLIENTE) AS CUSTOMER_NAME, MAX(RAZON_SOCIAL) AS BUSINESS_NAME, MAX(RUC) AS TAX_ID'},
- invoice:{group:'NRO_FACTURA',select:'NRO_FACTURA AS INVOICE_NUMBER'},
- sector:{group:'SECTOR',select:'SECTOR'},
- dueMonth:{group:"TO_CHAR(DUE_DATE,'YYYY-MM')",select:"TO_CHAR(DUE_DATE,'YYYY-MM') AS DUE_MONTH"},
- dueStatus:{group:'DUE_STATUS',select:'DUE_STATUS'},agingBand:{group:'AGING_BAND',select:'AGING_BAND'},
-};
+const numeric=v=>v==null?null:Number(v);
 export async function getInvoiceBalancesRepository({connection,...args}) {
-  const {cte,binds}=scopeSql(args),execute=(sql,b=binds)=>connection.execute(sql,b,{outFormat:4002});
-  const totals=await execute(`${cte} SELECT totals.*,
-   (SELECT COUNT(DISTINCT COD_CLIENTE) FROM filtered) AS MATCHED_CUSTOMERS,
-   (SELECT COUNT(DISTINCT NRO_FACTURA) FROM filtered) AS MATCHED_INVOICES
-   FROM (SELECT SIMBOLO_MONEDA AS CURRENCY_SYMBOL, ${metrics} FROM filtered GROUP BY SIMBOLO_MONEDA) totals ORDER BY CURRENCY_SYMBOL`);
-  const totalsByCurrency=(totals.rows??[]).map(mapMetrics);
-  const groups=args.groupBy.map(g=>dimensions[g]),groupColumns=[...groups.map(g=>g.group),'SIMBOLO_MONEDA'];
-  const grouped=`SELECT ${[...groups.map(g=>g.select),'SIMBOLO_MONEDA AS CURRENCY_SYMBOL',metrics].join(', ')} FROM filtered GROUP BY ${groupColumns.join(', ')}`;
-  const totalRows=args.mode==='detail'?totalsByCurrency.reduce((n,r)=>n+r.totalRows,0):Number((await execute(`${cte} SELECT COUNT(*) AS TOTAL_GROUPS FROM (${grouped})`)).rows?.[0]?.TOTAL_GROUPS??0);
-  const offset=(args.page-1)*args.rows,maxRow=offset+args.rows;
-  const detailOrder={dueDateAsc:'DUE_DATE ASC NULLS LAST',balanceDesc:'SALDO DESC NULLS LAST',balanceAsc:'SALDO ASC NULLS LAST',overdueDaysDesc:'DAYS_OVERDUE DESC NULLS LAST',invoiceNumber:'NRO_FACTURA'};
-  const summaryOrder={balanceDesc:'TOTAL_BALANCE DESC NULLS LAST',balanceAsc:'TOTAL_BALANCE ASC NULLS LAST',invoiceCountDesc:'INVOICE_COUNT DESC',group:'CURRENCY_SYMBOL'};
-  // Currency is the leading sort key: ranks never compare unlike monetary units.
-  const order=args.mode==='detail'?`SIMBOLO_MONEDA, ${detailOrder[args.orderBy]}, NRO_FACTURA, COD_CLIENTE, SECTOR, VENCIMIENTO, NOM_CLIENTE, RAZON_SOCIAL, RUC, SALDO`
-    :`CURRENCY_SYMBOL, ${summaryOrder[args.orderBy]}, ${groups.map(g=>g.group).map(g=>g.startsWith('TO_CHAR')?'DUE_MONTH':g==='COD_CLIENTE'?'CUSTOMER_ID':g==='NRO_FACTURA'?'INVOICE_NUMBER':g).concat(['CURRENCY_SYMBOL']).join(', ')}`;
-  const inner=args.mode==='detail'?'SELECT filtered.* FROM filtered':grouped;
-  const result=await execute(`${cte} SELECT * FROM (SELECT result_rows.*, ROW_NUMBER() OVER (ORDER BY ${order}) AS RN FROM (${inner}) result_rows) WHERE RN>:offset AND RN<=:maxRow ORDER BY RN`,{...binds,offset,maxRow});
-  const data=(result.rows??[]).map(row=>args.mode==='detail'?{
-    invoiceNumber:row.NRO_FACTURA??null,sector:row.SECTOR??null,dueDate:row.DUE_DATE==null?null:row.VENCIMIENTO?.trim(),
-    dueStatus:row.DUE_STATUS,agingBand:row.AGING_BAND,daysOverdue:numeric(row.DAYS_OVERDUE),
-    customerId:row.COD_CLIENTE??null,customerName:row.NOM_CLIENTE??null,businessName:row.RAZON_SOCIAL??null,taxId:row.RUC??null,
-    currencySymbol:row.SIMBOLO_MONEDA??null,balance:numeric(row.SALDO),
-  }:{...mapMetrics(row),...Object.fromEntries(args.groupBy.flatMap(g=>g==='customer'?[['customerId',row.CUSTOMER_ID??null],['customerName',row.CUSTOMER_NAME??null],['businessName',row.BUSINESS_NAME??null],['taxId',row.TAX_ID??null]]:
-    [[g==='invoice'?'invoiceNumber':g,g==='invoice'?row.INVOICE_NUMBER??null:g==='sector'?row.SECTOR??null:g==='dueMonth'?row.DUE_MONTH??null:g==='dueStatus'?row.DUE_STATUS:row.AGING_BAND]]))});
+  const execute=(sql,binds={})=>connection.execute(sql,binds,{outFormat:4002,fetchInfo:{SALDO:{type:oracledb.STRING}}});
+  // Neither a symbol nor an invoice number is a proven business identifier.
+  // Check Oracle access, but never sum/rank money or invent invoice identities.
+  if(args.mode==='summary'||['balanceDesc','balanceAsc'].includes(args.orderBy)||args.minBalance!==undefined||args.maxBalance!==undefined){
+    await execute('SELECT NRO_FACTURA FROM VW_BOT_FACTURAS_SALDOS WHERE 1=0');
+    return {status:'REQUIRES_SOURCE_IDENTITY',currencyIdentity:'unverified',invoiceIdentity:'unverified',monetaryAggregationAvailable:false,
+      reason:'La vista no expone una clave inequívoca de divisa ni una clave de factura. Se requiere esa identificación antes de agregar saldos o elaborar rankings monetarios.',queryContext:args};
+  }
+  const {cte,binds}=scopeSql(args);
+  const counted=await execute(cte+` SELECT COUNT(*) AS TOTAL_ROWS, COUNT(DISTINCT NRO_FACTURA) AS DISTINCT_INVOICE_NUMBERS,
+   COUNT(DISTINCT COD_CLIENTE) AS DISTINCT_CUSTOMERS,
+   SUM(CASE WHEN SALDO IS NULL THEN 1 ELSE 0 END) AS UNKNOWN_BALANCE_ROWS,
+   SUM(CASE WHEN DUE_DATE IS NULL THEN 1 ELSE 0 END) AS INVALID_DUE_DATE_ROWS FROM filtered`,binds);
+  const counts=counted.rows?.[0]??{},totalRows=Number(counts.TOTAL_ROWS??0),offset=(args.page-1)*args.rows;
+  const order={dueDateAsc:'DUE_DATE ASC NULLS LAST',overdueDaysDesc:'DAYS_OVERDUE DESC NULLS LAST',invoiceNumber:'NRO_FACTURA'}[args.orderBy];
+  const result=await execute(cte+` SELECT * FROM (SELECT filtered.*, ROW_NUMBER() OVER (
+   ORDER BY ${order}, NRO_FACTURA, COD_CLIENTE, SECTOR, SIMBOLO_MONEDA, VENCIMIENTO, NOM_CLIENTE, RAZON_SOCIAL, RUC, SALDO) AS RN
+   FROM filtered) WHERE RN>:offset AND RN<=:maxRow ORDER BY RN`,{...binds,offset,maxRow:offset+args.rows});
+  const data=(result.rows??[]).map(row=>({invoiceNumber:row.NRO_FACTURA??null,sector:row.SECTOR??null,dueDate:row.DUE_DATE==null?null:row.VENCIMIENTO?.trim(),
+    dueStatus:row.DUE_STATUS,agingBand:row.AGING_BAND,daysOverdue:numeric(row.DAYS_OVERDUE),customerId:row.COD_CLIENTE??null,
+    customerName:row.NOM_CLIENTE??null,businessName:row.RAZON_SOCIAL??null,taxId:row.RUC??null,currencySymbol:row.SIMBOLO_MONEDA??null,balance:row.SALDO==null?null:String(row.SALDO)}));
   const totalPages=Math.ceil(totalRows/args.rows);
-  return {mode:args.mode,asOfDate:args.asOfDate,balanceBasis:'currentViewSnapshot',queryContext:args,groupBy:args.groupBy,totalsByCurrency,
-    matchedCustomers:Number(totals.rows?.[0]?.MATCHED_CUSTOMERS??0),matchedInvoices:Number(totals.rows?.[0]?.MATCHED_INVOICES??0),
+  return {status:'OK_DETAIL_ONLY',mode:'detail',asOfDate:args.asOfDate,balanceBasis:'currentViewSnapshot',queryContext:args,groupBy:[],
+    currencyIdentity:'unverified',invoiceIdentity:'unverified',monetaryAggregationAvailable:false,
+    matchedCustomers:Number(counts.DISTINCT_CUSTOMERS??0),matchedInvoiceNumbers:Number(counts.DISTINCT_INVOICE_NUMBERS??0),
+    unknownBalanceRows:Number(counts.UNKNOWN_BALANCE_ROWS??0),invalidDueDateRows:Number(counts.INVALID_DUE_DATE_ROWS??0),
     page:args.page,rows:args.rows,totalRows,totalPages,returnedRows:data.length,hasMore:args.page<totalPages,nextPage:args.page<totalPages?args.page+1:null,previousPage:args.page>1?args.page-1:null,data};
 }
 
