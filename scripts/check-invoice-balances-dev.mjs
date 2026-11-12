@@ -49,8 +49,9 @@ async function validate(connection){
  report.reference={asOfDate,timezone:'America/Asuncion',calendarArithmetic:'UTC calendar days after Asuncion date extraction'};
  const dateSql="CASE WHEN VALIDATE_CONVERSION(TRIM(VENCIMIENTO) AS DATE,'FXDD/MM/YYYY')=1 THEN TO_DATE(TRIM(VENCIMIENTO),'FXDD/MM/YYYY') END";
  const independentScope=args=>{
-  const clauses=[],binds={};for(const[key,col]of [['customerIds','COD_CLIENTE'],['invoiceNumbers','NRO_FACTURA'],['sectors','SECTOR'],['currencies','SIMBOLO_MONEDA'],['currencyCodes','COD_MONEDA']])if(args[key]?.length){const list=args[key].map((v,i)=>{binds[key+i]=v;return ':'+key+i;});clauses.push(col+' IN ('+list.join(',')+')');}
-  const signs={positive:'DEUDA>0',zero:'DEUDA=0',negative:'DEUDA<0',unknown:'DEUDA IS NULL'};if(signs[args.balanceStatus])clauses.push(signs[args.balanceStatus]);
+  const clauses=['(DEUDA>=0 OR DEUDA IS NULL)'],binds={};for(const[key,col]of [['customerIds','COD_CLIENTE'],['invoiceNumbers','NRO_FACTURA'],['invoiceSeries','SERIE_FACTURA'],['sectors','SECTOR'],['currencies','SIMBOLO_MONEDA'],['currencyCodes','COD_MONEDA']])if(args[key]?.length){const list=args[key].map((v,i)=>{binds[key+i]=v;return ':'+key+i;});clauses.push(col+' IN ('+list.join(',')+')');}
+  const signs={pending:'DEUDA>0',settled:'DEUDA=0',unknown:'DEUDA IS NULL'};if(signs[args.debtStatus??'pending'])clauses.push(signs[args.debtStatus??'pending']);
+  if(args.invoices?.length)clauses.push('('+args.invoices.map((v,i)=>{binds['s'+i]=v.invoiceSeries;binds['n'+i]=v.invoiceNumber;return '(SERIE_FACTURA=:s'+i+' AND NRO_FACTURA=:n'+i+')';}).join(' OR ')+')');
   if(args.dueStatus&&args.dueStatus!=='all'){if(args.dueStatus!=='undated')binds.ref=asOfDate;const ds={overdue:dateSql+"<TO_DATE(:ref,'DD/MM/YYYY')",dueToday:dateSql+"=TO_DATE(:ref,'DD/MM/YYYY')",upcoming:dateSql+">TO_DATE(:ref,'DD/MM/YYYY')",undated:dateSql+' IS NULL'};clauses.push(ds[args.dueStatus]);}
   for(const[key,op]of [['dueDateFrom','>='],['dueDateTo','<=']])if(args[key]){binds[key]=args[key];clauses.push(dateSql+op+"TO_DATE(:"+key+",'DD/MM/YYYY')");}
   if(args.minDaysOverdue!==undefined){binds.ref=asOfDate;binds.days=args.minDaysOverdue;clauses.push("GREATEST(TO_DATE(:ref,'DD/MM/YYYY')-"+dateSql+',0)>=:days');}
@@ -59,54 +60,54 @@ async function validate(connection){
  const reconcile=async(args,label)=>{
   const scope={rows:2,page:1,asOfDate,...args},{where,binds}=independentScope(scope);
   const count=(await run('SELECT COUNT(*) R,COUNT(DISTINCT NRO_FACTURA) I,COUNT(DISTINCT COD_CLIENTE) C FROM VW_BOT_FACTURAS_SALDOS WHERE '+where,binds))[0];
-  const order=scope.orderBy==='balanceDesc'?'DEUDA DESC NULLS LAST':scope.orderBy==='overdueDaysDesc'?"GREATEST(TO_DATE(:sortRef,'DD/MM/YYYY')-"+dateSql+',0) DESC NULLS LAST':dateSql+' ASC NULLS LAST';
-  const offset=(scope.page-1)*scope.rows,expected=await run('SELECT * FROM (SELECT v.*,ROW_NUMBER() OVER(ORDER BY '+(scope.orderBy==='balanceDesc'?'COD_MONEDA,':'')+order+',NRO_FACTURA,COD_CLIENTE,SECTOR,COD_MONEDA,SIMBOLO_MONEDA,VENCIMIENTO,NOM_CLIENTE,RAZON_SOCIAL,RUC,DEUDA) RN FROM VW_BOT_FACTURAS_SALDOS v WHERE '+where+') WHERE RN>:lo AND RN<=:hi ORDER BY RN',{...binds,...(scope.orderBy==='overdueDaysDesc'?{sortRef:asOfDate}:{}),lo:offset,hi:offset+scope.rows});
+  const pairCount=(await run('SELECT COUNT(*) P FROM (SELECT SERIE_FACTURA,NRO_FACTURA FROM VW_BOT_FACTURAS_SALDOS WHERE '+where+' AND SERIE_FACTURA IS NOT NULL AND NRO_FACTURA IS NOT NULL GROUP BY SERIE_FACTURA,NRO_FACTURA)',binds))[0].P;
+  const order=scope.orderBy==='debtDesc'?'DEUDA DESC NULLS LAST':scope.orderBy==='overdueDaysDesc'?"GREATEST(TO_DATE(:sortRef,'DD/MM/YYYY')-"+dateSql+',0) DESC NULLS LAST':dateSql+' ASC NULLS LAST';
+  const offset=(scope.page-1)*scope.rows,expected=await run('SELECT * FROM (SELECT v.*,ROW_NUMBER() OVER(ORDER BY '+(scope.orderBy==='debtDesc'?'COD_MONEDA,':'')+order+',SERIE_FACTURA,NRO_FACTURA,COD_CLIENTE,SECTOR,COD_MONEDA,SIMBOLO_MONEDA,VENCIMIENTO,NOM_CLIENTE,RAZON_SOCIAL,RUC,DEUDA) RN FROM VW_BOT_FACTURAS_SALDOS v WHERE '+where+') WHERE RN>:lo AND RN<=:hi ORDER BY RN',{...binds,...(scope.orderBy==='overdueDaysDesc'?{sortRef:asOfDate}:{}),lo:offset,hi:offset+scope.rows});
   const actual=await getInvoiceBalances(scope,connection);
-  check(actual.totalRows===Number(count.R)&&actual.matchedInvoiceNumbers===Number(count.I)&&actual.matchedCustomers===Number(count.C),label+'_ROWS_VS_NUMBERS_VS_CUSTOMERS');
+  check(actual.matchedInvoicePairs===Number(pairCount)&&actual.totalRows===Number(count.R)&&actual.matchedInvoiceNumbers===Number(count.I)&&actual.matchedCustomers===Number(count.C),label+'_ROWS_VS_NUMBERS_VS_CUSTOMERS');
   check(actual.returnedRows===expected.length&&actual.totalPages===Math.ceil(Number(count.R)/scope.rows)&&actual.hasMore===(scope.page<actual.totalPages),label+'_PAGINATION');
   check(expected.every((e,i)=>{const r=actual.data[i],d=parseBalanceDueDate(e.VENCIMIENTO),delta=d?(ref-d)/86400000:null,status=d?(delta>0?'overdue':delta===0?'dueToday':'upcoming'):'undated',band=d?(delta<0?'notDue':delta===0?'dueToday':delta<=30?'1-30':delta<=60?'31-60':delta<=90?'61-90':delta<=180?'91-180':'181+'):'undated';
-   return r.invoiceNumber===(e.NRO_FACTURA??null)&&r.customerId===(e.COD_CLIENTE??null)&&r.sector===(e.SECTOR??null)&&r.currencySymbol===(e.SIMBOLO_MONEDA??null)&&r.currencyCode===(e.COD_MONEDA??null)&&r.debt===(e.DEUDA==null?null:String(e.DEUDA))&&r.dueStatus===status&&r.agingBand===band&&r.daysOverdue===(d?Math.max(delta,0):null);
+   return r.invoiceSeries===(e.SERIE_FACTURA??null)&&r.invoiceNumber===(e.NRO_FACTURA??null)&&r.customerId===(e.COD_CLIENTE??null)&&r.sector===(e.SECTOR??null)&&r.currencySymbol===(e.SIMBOLO_MONEDA??null)&&r.currencyCode===(e.COD_MONEDA??null)&&r.debt===(e.DEUDA==null?null:String(e.DEUDA))&&r.debtState===(e.DEUDA==null?'unknown':Number(e.DEUDA)===0?'settled':'pending')&&r.dueStatus===status&&r.agingBand===band&&r.daysOverdue===(d?Math.max(delta,0):null);
   }),label+'_EXACT_DECIMAL_ROWS_AND_INDEPENDENT_JS_AGING');
   check(!('totalsByCurrency' in actual)&&!actual.monetaryAggregationAvailable,label+'_NO_SYMBOL_BASED_MONETARY_TOTALS');
   report.cases.push({label,hasSample:expected.length>0,passed:true});return actual;
  };
  report.cases=[];
- const chosen=(await run('SELECT COD_CLIENTE FROM (SELECT COD_CLIENTE,COUNT(*) N FROM VW_BOT_FACTURAS_SALDOS WHERE COD_CLIENTE IS NOT NULL GROUP BY COD_CLIENTE HAVING COUNT(*) BETWEEN 3 AND 60 ORDER BY N DESC,COD_CLIENTE) WHERE ROWNUM=1'))[0]?.COD_CLIENTE;
+ const chosen=(await run('SELECT COD_CLIENTE FROM (SELECT COD_CLIENTE,COUNT(*) N FROM VW_BOT_FACTURAS_SALDOS WHERE DEUDA>0 AND COD_CLIENTE IS NOT NULL GROUP BY COD_CLIENTE HAVING COUNT(*) BETWEEN 3 AND 60 ORDER BY N DESC,COD_CLIENTE) WHERE ROWNUM=1'))[0]?.COD_CLIENTE;
  const base=chosen?{customerIds:[chosen]}:{};
  const first=report.mode==='--validate-remaining'?null:await reconcile(base,'DETAIL_FIRST');if(report.mode!=='--validate-remaining')await reconcile({...base,page:2},'DETAIL_SECOND');
  for(const dueStatus of (report.mode==='--validate-remaining'?['undated']:['overdue','dueToday','upcoming','undated']))await reconcile({dueStatus},'DUE_'+dueStatus);
- for(const balanceStatus of ['positive','zero','negative','unknown'])await reconcile({balanceStatus},'SIGN_'+balanceStatus);
+ for(const debtStatus of ['pending','settled','all','unknown'])await reconcile({debtStatus},'SIGN_'+debtStatus);
  await reconcile({dueDateFrom:asOfDate,dueDateTo:asOfDate},'ASUNCION_TODAY_INCLUSIVE');
  await reconcile({dueDateFrom:day(new Date(+ref+86400000)),dueDateTo:day(new Date(+ref+7*86400000))},'NEXT_SEVEN_DAYS');
  await reconcile({minDaysOverdue:30,orderBy:'overdueDaysDesc'},'AGING_30_DAYS');
- for(const [label,args]of [['TOTALS',{mode:'summary'}],['CUSTOMER_RANKING',{mode:'summary',groupBy:['customer'],orderBy:'balanceDesc'}],['BALANCE_ORDER',{orderBy:'balanceDesc'}]]){
+ for(const [label,args]of [['TOTALS',{mode:'summary'}],['CUSTOMER_RANKING',{mode:'summary',groupBy:['customer'],orderBy:'debtDesc'}],['BALANCE_ORDER',{orderBy:'debtDesc'}]]){
   const r=await getInvoiceBalances({...args,asOfDate},connection);check(r.status==='REQUIRES_SOURCE_IDENTITY'&&!r.data&&!r.totalsByCurrency,label+'_BLOCKED_WITHOUT_NATIVE_CURRENCY_AND_INVOICE_KEYS');
  }
  const raw=(await run('SELECT * FROM VW_BOT_FACTURAS_SALDOS WHERE '+independentScope(base).where,independentScope(base).binds,1))[0];
  if(raw?.COD_CLIENTE){const found=await searchInvoiceBalanceCustomers({query:String(raw.COD_CLIENTE)},connection);const options=found.status==='RESOLVED'?[found]:found.options??[];
   check(options.some(o=>o.customerId===raw.COD_CLIENTE),'CUSTOMER_EXACT_ID_PRESENT');
   const missing='NO_MATCH_'+crypto.randomBytes(16).toString('hex');check((await searchInvoiceBalanceCustomers({query:missing},connection)).status==='NOT_FOUND','CUSTOMER_ABSENCE');
-  await reconcile({customerIds:[raw.COD_CLIENTE]},'FRESH_HTTP_SCOPE');if(raw.COD_MONEDA!=null)await reconcile({currencyCodes:[raw.COD_MONEDA],orderBy:'balanceDesc'},'NATIVE_CURRENCY_ROW_RANK');else report.nativeCurrencyRankSampleMissing=true;await httpValidation(raw,asOfDate,first);
+  await reconcile({customerIds:[raw.COD_CLIENTE]},'FRESH_HTTP_SCOPE');if(raw.COD_MONEDA!=null)await reconcile({currencyCodes:[raw.COD_MONEDA],orderBy:'debtDesc'},'NATIVE_CURRENCY_ROW_RANK');else report.nativeCurrencyRankSampleMissing=true;await httpValidation(raw,asOfDate,first);
  }else report.missingHttpCustomerSample=true;
- const src=fs.readFileSync(new URL('../src/repositories/invoices/invoiceBalances.repository.js',import.meta.url),'utf8'),conversion=/const dueDateSql=`([\s\S]*?)`;/m.exec(src)?.[1];check(Boolean(conversion),'ACTUAL_DATE_EXPRESSION_AVAILABLE');
- const dateCases=[null,'','31/02/2026','29/02/2024','29/02/2025','01/13/2026','01/01/0000','2026-11-12'];
- for(const value of dateCases){const result=(await run('SELECT TO_CHAR(('+conversion.replaceAll('VENCIMIENTO',':v')+"),'DD/MM/YYYY') D FROM DUAL",{v:value}))[0].D;check((result??null)===(parseBalanceDueDate(value)?day(parseBalanceDueDate(value)):null),'NULL_INVALID_LEAP_DATE_CONVERSION_'+dateCases.indexOf(value));}
+ const pairs=await run("SELECT SERIE_FACTURA,NRO_FACTURA FROM VW_BOT_FACTURAS_SALDOS WHERE (DEUDA>=0 OR DEUDA IS NULL) AND NRO_FACTURA IN (SELECT NRO_FACTURA FROM VW_BOT_FACTURAS_SALDOS WHERE (DEUDA>=0 OR DEUDA IS NULL) GROUP BY NRO_FACTURA HAVING COUNT(DISTINCT SERIE_FACTURA)>1) GROUP BY SERIE_FACTURA,NRO_FACTURA ORDER BY NRO_FACTURA,SERIE_FACTURA",{},2);
+ if(pairs.length===2)await reconcile({debtStatus:'all',invoices:pairs.map(r=>({invoiceSeries:r.SERIE_FACTURA,invoiceNumber:r.NRO_FACTURA}))},'EXACT_SERIES_NUMBER_PAIRS');else report.seriesSampleMissing=true;
  report.missingSamples=report.cases.filter(c=>!c.hasSample).map(c=>c.label);
- report.semanticReservations=['native currency code exposed; additive invoice grain missing so totals and grouped rankings blocked','invoice business key not proven; only rows and distinct number strings counted','zero/negative accounting meaning not established','real permission-denied identity not supplied; injected denial only'];
+ report.semanticReservations=['native currency code exposed; additive invoice grain missing so totals and grouped rankings blocked','invoice business key not proven; only rows and distinct series/number pairs counted, not business invoices','negative excluded; zero settled; null unknown','real permission-denied identity not supplied; injected denial only'];
 }
 
 async function httpValidation(raw,asOfDate){
  const executor=await import('../src/services/ai/toolExecutor.service.js'),context=vm.createContext({console,process,structuredClone,Intl,Date,Map,Set,Number,String,Array,JSON,Math,RegExp,Object,Boolean,Error,AbortController});
  const synthetic=exports=>new vm.SyntheticModule(Object.keys(exports),function(){for(const[k,v]of Object.entries(exports))this.setExport(k,v);},{context});
  async function load(path,overrides={}){const url=new URL(path,import.meta.url),m=new vm.SourceTextModule(fs.readFileSync(url,'utf8'),{context});await m.link(async spec=>synthetic(overrides[spec]??await import(spec.startsWith('.')?new URL(spec,url).href:spec.startsWith('node:')?spec:new URL('file://'+createRequire(url).resolve(spec)).href)));await m.evaluate();return m.namespace;}
- const directPii={customerId:raw.COD_CLIENTE,customerName:raw.NOM_CLIENTE,businessName:raw.RAZON_SOCIAL,taxId:raw.RUC,invoiceNumber:raw.NRO_FACTURA},protectedPii=protectPiiDeep(sessionId,directPii);
+ const directPii={customerId:raw.COD_CLIENTE,customerName:raw.NOM_CLIENTE,businessName:raw.RAZON_SOCIAL,taxId:raw.RUC,invoiceSeries:raw.SERIE_FACTURA,invoiceNumber:raw.NRO_FACTURA},protectedPii=protectPiiDeep(sessionId,directPii);
  check(Object.entries(directPii).every(([k,v])=>v==null||String(v).trim()===''||/^\[PII_/.test(protectedPii[k])),'REAL_FIELDS_PSEUDONYMIZED');
- let stage=0,modelCalls=0,injectDenied=false,httpCalls=0;const calls=[];
+ let requestedStatus='pending',stage=0,modelCalls=0,injectDenied=false,httpCalls=0;const calls=[];
  const sdk={BedrockRuntimeClient:class{async send(command){modelCalls++;const messages=command.input.messages,serialized=JSON.stringify(messages);
   for(const value of Object.values(directPii).filter(v=>typeof v==='string'&&v.length>=6))check(!serialized.includes(value),'MODEL_INPUT_NO_RAW_PII_'+modelCalls);
   if(stage++===0)return {output:{message:{role:'assistant',content:[{toolUse:{toolUseId:'balance-lookup',name:'search_invoice_balance_customers',input:{query:protectPiiValue(sessionId,'CUSTOMER_ID',raw.COD_CLIENTE)}}}]}},stopReason:'tool_use'};
   const lookup=messages.flatMap(m=>m.content??[]).map(b=>b.toolResult?.content?.find(c=>c.json)?.json).filter(Boolean).at(-1),id=lookup?.customerId??lookup?.options?.[0]?.customerId??protectedPii.customerId;
-  return {output:{message:{role:'assistant',content:[{toolUse:{toolUseId:'balance-detail-'+modelCalls,name:'get_invoice_balances',input:{customerIds:[id],asOfDate,rows:2}}}]}},stopReason:'tool_use'};
+  return {output:{message:{role:'assistant',content:[{toolUse:{toolUseId:'balance-detail-'+modelCalls,name:'get_invoice_balances',input:{customerIds:requestedStatus==='pending'?[id]:[],debtStatus:requestedStatus,asOfDate,rows:2}}}]}},stopReason:'tool_use'};
  }},ConverseCommand:class{constructor(input){this.input=input;}}};
  const wrapped=async req=>{check(req.context.sessionId===sessionId,'HTTP_TOOL_USES_OWNED_SESSION_ID');
   if(injectDenied){const get=driver.getConnection;driver.getConnection=async(...args)=>{const c=await get(...args);c.execute=async()=>{throw Object.assign(Error('INJECTED_DENIAL'),{errorNum:1031});};return c;};try{return await executor.executeTool(req);}finally{driver.getConnection=get;}}
@@ -120,9 +121,10 @@ async function httpValidation(raw,asOfDate){
   const result=await post('Consulta el saldo del local '+String(raw.NOM_CLIENTE??raw.COD_CLIENTE));check(result.status===200&&result.body.success,'REAL_HTTP_BALANCE_CONTRACT');
   const detail=calls.find(c=>c.name==='get_invoice_balances')?.result;check(detail?.data.length>0,'REAL_HTTP_HAS_AUTHORIZED_DETAIL');
   const escape=v=>String(v??'Sin datos').replace(/([\\`*_[\]<>|])/g,'\\$1').replace(/[\r\n]+/g,' ');
-  check(detail.data.every(r=>result.body.response.includes(escape(r.invoiceNumber))&&result.body.response.includes(escape(r.customerName))),'AUTHORIZED_IDENTITIES_RESTORED_IN_FINAL_RESPONSE');
+  check(detail.data.every(r=>result.body.response.includes(escape(r.invoiceSeries))&&result.body.response.includes(escape(r.invoiceNumber))&&result.body.response.includes(escape(r.customerName))),'AUTHORIZED_IDENTITIES_RESTORED_IN_FINAL_RESPONSE');
   const history=JSON.stringify(store.getConversation(sessionId));for(const value of Object.values(directPii).filter(v=>typeof v==='string'&&v.length>=6))check(!history.includes(value),'HISTORY_NO_RAW_PII');
   const before=modelCalls;if(detail.hasMore){const next=await post('Siguiente página');check(next.status===200&&modelCalls===before,'REAL_HTTP_PAGINATION_WITHOUT_MODEL');}else report.httpNextPageMissing=true;
+  for(const state of ['settled','all','unknown']){requestedStatus=state;const response=await post('Consulta deudas '+state),data=calls.at(-1)?.result;check(response.status===200&&data?.status==='OK_DETAIL_ONLY'&&data.data.every(r=>r.debt==null||Number(r.debt)>=0)&&(state!=='settled'||data.data.every(r=>r.debtState==='settled'))&&(state!=='unknown'||data.data.every(r=>r.debtState==='unknown')),'HTTP_DEBT_STATE_'+state);}
   injectDenied=true;const d=await post('Consulta nuevamente el saldo');check(d.status===200&&d.body.response==='El usuario no tiene permisos para consultar esta información.'&&Object.keys(d.body.actions??{}).length===0,'INJECTED_ORACLE_DENIAL_NO_DATA_OR_ACTIONS');
   report.http={requests:httpCalls,controlledSdkCalls:modelCalls,realProviderCalls:0,denialEvidence:'injected ORA-01031 on real proxy connection; not a real denied account',modelAndHistoryProtected:true,authorizedFinalIdentityRestored:true};
  }finally{store.clearConversation(sessionId);clearPiiSession(sessionId);await new Promise(resolve=>server.close(resolve));report.httpCleanup={serverClosed:!server.listening,ownConversationCleared:true};}

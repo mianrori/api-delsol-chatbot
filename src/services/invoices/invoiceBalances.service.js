@@ -23,24 +23,26 @@ const option = (value, allowed, key) => {if(!allowed.includes(value)) fail(`${ke
 const integer = (value, min, max, key) => {if(!Number.isInteger(value)||value<min||value>max) fail(`${key} fuera de rango.`);return value;};
 
 export function normalizeInvoiceBalanceArgs(args={}) {
-  const allowed=['customerIds','invoiceNumbers','sectors','currencies','currencyCodes','dueDateFrom','dueDateTo','asOfDate','dueStatus','balanceStatus','minBalance','maxBalance','minDaysOverdue','maxDaysOverdue','mode','groupBy','orderBy','page','rows'];
+  const allowed=['invoices','customerIds','invoiceNumbers','invoiceSeries','sectors','currencies','currencyCodes','dueDateFrom','dueDateTo','asOfDate','dueStatus','debtStatus','minDebt','maxDebt','minDaysOverdue','maxDaysOverdue','mode','groupBy','orderBy','page','rows'];
   if(Object.keys(args).some(k=>!allowed.includes(k))) fail('Filtro de saldos no soportado.');
   const result={...args};
-  for(const key of ['customerIds','invoiceNumbers','sectors','currencies','currencyCodes'])result[key]=array(args[key],key);
+  for(const key of ['customerIds','invoiceNumbers','invoiceSeries','sectors','currencies','currencyCodes'])result[key]=array(args[key],key);
+  if(args.invoices!==undefined&&(!Array.isArray(args.invoices)||args.invoices.length>100))fail('invoices debe ser una lista de pares serie/número.');
+  result.invoices=(args.invoices??[]).map(pair=>{if(!pair||typeof pair!=='object'||Object.keys(pair).some(k=>!['invoiceSeries','invoiceNumber'].includes(k))||!['invoiceSeries','invoiceNumber'].every(k=>typeof pair[k]==='string'&&pair[k].trim()&&pair[k].length<=120))fail('Cada factura requiere serie y número no vacíos.');return {invoiceSeries:pair.invoiceSeries.trim(),invoiceNumber:pair.invoiceNumber.trim()};});
   result.asOfDate=args.asOfDate??today();date(result.asOfDate);
   for(const key of ['dueDateFrom','dueDateTo'])if(args[key]!==undefined)date(args[key]);
   if(args.dueDateFrom&&args.dueDateTo&&date(args.dueDateFrom)>date(args.dueDateTo))fail('Rango de vencimientos inválido.');
   result.mode=option(args.mode??'detail',['detail','summary'],'mode');
   result.dueStatus=option(args.dueStatus??'all',['all','overdue','dueToday','upcoming','undated'],'dueStatus');
-  result.balanceStatus=option(args.balanceStatus??'all',['all','positive','zero','negative','nonZero','unknown'],'balanceStatus');
+  result.debtStatus=option(args.debtStatus??'pending',['pending','settled','all','unknown'],'debtStatus');
   result.groupBy=array(args.groupBy,'groupBy');
   for(const group of result.groupBy)option(group,['customer','invoice','sector','dueMonth','dueStatus','agingBand'],'groupBy');
   if(result.mode==='detail'&&result.groupBy.length)fail('groupBy requiere mode summary.');
-  result.orderBy=option(args.orderBy??(result.mode==='detail'?'dueDateAsc':'balanceDesc'),result.mode==='detail'?['dueDateAsc','balanceDesc','balanceAsc','overdueDaysDesc','invoiceNumber']:['balanceDesc','balanceAsc','invoiceCountDesc','group'],'orderBy');
+  result.orderBy=option(args.orderBy??(result.mode==='detail'?'dueDateAsc':'debtDesc'),result.mode==='detail'?['dueDateAsc','debtDesc','debtAsc','overdueDaysDesc','invoiceNumber']:['debtDesc','debtAsc','invoiceCountDesc','group'],'orderBy');
   result.page=integer(args.page??1,1,1000000,'page');result.rows=integer(args.rows??20,1,100,'rows');
-  for(const key of ['minBalance','maxBalance'])if(args[key]!==undefined&&(typeof args[key]!=='number'||!Number.isFinite(args[key])))fail(`${key} debe ser numérico.`);
+  for(const key of ['minDebt','maxDebt'])if(args[key]!==undefined&&(typeof args[key]!=='number'||!Number.isFinite(args[key])||args[key]<0))fail(`${key} debe ser numérico.`);
   for(const key of ['minDaysOverdue','maxDaysOverdue'])if(args[key]!==undefined)integer(args[key],0,3652058,key);
-  for(const [lo,hi]of [['minBalance','maxBalance'],['minDaysOverdue','maxDaysOverdue']])if(args[lo]!==undefined&&args[hi]!==undefined&&args[lo]>args[hi])fail('Rango inválido.');
+  for(const [lo,hi]of [['minDebt','maxDebt'],['minDaysOverdue','maxDaysOverdue']])if(args[lo]!==undefined&&args[hi]!==undefined&&args[lo]>args[hi])fail('Rango inválido.');
   return result;
 }
 

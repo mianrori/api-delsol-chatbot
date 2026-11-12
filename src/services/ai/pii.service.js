@@ -92,6 +92,7 @@ const FIELD_TYPES = new Map([
   // Facturas / transacciones
   ["invoicenumber", "INVOICE_NUMBER"],
   ["invoicenumbers", "INVOICE_NUMBER"],
+  ["invoiceseries", "INVOICE_SERIES"],
   ["transactionnumber", "TRANSACTION_NUMBER"],
   ["conceptdescription", "CONCEPT_DESCRIPTION"],
   ["conceptid", "CONCEPT_ID"],
@@ -289,6 +290,8 @@ const isGroupingCalendarQualifier = (value) => {
 
 const protectKnownTextPatterns = (sessionId, text) => {
   let protectedText = String(text ?? "");
+  protectedText=protectedText.replace(/\b(serie\s+(?:de\s+(?:la\s+)?factura|factura)\s*(?::|=)?\s*)([A-Z0-9][A-Z0-9./_-]{0,119})\b/gi,
+    (_match,prefix,value)=>`${prefix}${protectPiiValue(sessionId,'INVOICE_SERIES',value)}`);
 
   protectedText=protectedText.replace(
     /\b((?:saldos?|deuda)\s+(?:de\s+(?:la\s+)?)?factura\s+(?:(?:nro\.?|n[uú]mero|n[°ºo])\s*)?)([A-Z0-9][A-Z0-9./-]{2,35})\b/gi,
