@@ -7,12 +7,13 @@ export const searchInvoiceBalanceCustomersTool={toolSpec:{
 }};
 export const getInvoiceBalancesTool={toolSpec:{
   name:'get_invoice_balances',
-  description:'Consulta registros individuales de saldo actual: clientes, números de factura, sectores, símbolos, vencimientos y signo del importe. Los números de factura se repiten entre clientes/sectores/símbolos; filas no equivalen a facturas. La vista no expone claves inequívocas de divisa ni factura: summary, sumas, rangos monetarios y orden monetario devuelven REQUIRES_SOURCE_IDENTITY, sin agregar valores. El símbolo es una etiqueta, no identifica una divisa. Cero no prueba pago y negativo no prueba crédito. SALDO se conserva como texto decimal exacto. asOfDate solo clasifica vencimientos, no reconstruye historia. Usa search_invoice_balance_customers; detalle paginado. Sin PDF, emisión, cobros, conceptos ni matrícula.',
+  description:'Consulta registros individuales actuales de DEUDA, con COD_MONEDA como clave de divisa. Los números se repiten entre clientes/sectores/códigos de moneda y la clave aditiva de factura no está demostrada: summary, sumas y rankings por cliente permanecen bloqueados con REQUIRES_SOURCE_IDENTITY. Para ordenar importes individuales o filtrar rangos monetarios requiere exactamente un currencyCodes. Nunca identifica la divisa por el símbolo ni convierte importes. Cero no prueba pago y negativo no prueba crédito; deuda se conserva como texto decimal exacto. asOfDate solo clasifica vencimientos, no reconstruye historia. Usa search_invoice_balance_customers; detalle paginado. Sin PDF, emisión, cobros, conceptos ni matrícula.',
   inputSchema:{json:{type:'object',properties:{
     customerIds:textList('IDs de clientes resueltos por el buscador de saldos. [] consulta todos los clientes visibles.'),
     invoiceNumbers:textList('Números exactos de factura (o sus tokens PII); sin coincidencia parcial ni comodines.'),
     sectors:textList('Sectores exactos presentes en registros devueltos; no inventes valores.'),
     currencies:textList('Filtra etiquetas de símbolo exactas de registros devueltos. No son claves de divisa ni habilitan sumas/conversión.'),
+    currencyCodes:textList('COD_MONEDA exactos retornados, clave de divisa. Orden y rangos de importes requieren un único código; no habilita sumas hasta confirmar la granularidad aditiva.'),
     dueDateFrom:date('Vencimiento mínimo inclusivo, DD/MM/YYYY; no es fecha de emisión.'),dueDateTo:date('Vencimiento máximo inclusivo DD/MM/YYYY.'),
     asOfDate:date('Fecha para clasificar vencimiento/antigüedad. Por defecto hoy en Paraguay. NO reconstruye el saldo a esta fecha.'),
     dueStatus:{type:'string',enum:['all','overdue','dueToday','upcoming','undated'],description:'Vencida: vencimiento anterior a la referencia; dueToday hoy; upcoming posterior; undated fecha vacía/inválida.'},

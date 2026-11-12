@@ -23,10 +23,10 @@ const option = (value, allowed, key) => {if(!allowed.includes(value)) fail(`${ke
 const integer = (value, min, max, key) => {if(!Number.isInteger(value)||value<min||value>max) fail(`${key} fuera de rango.`);return value;};
 
 export function normalizeInvoiceBalanceArgs(args={}) {
-  const allowed=['customerIds','invoiceNumbers','sectors','currencies','dueDateFrom','dueDateTo','asOfDate','dueStatus','balanceStatus','minBalance','maxBalance','minDaysOverdue','maxDaysOverdue','mode','groupBy','orderBy','page','rows'];
+  const allowed=['customerIds','invoiceNumbers','sectors','currencies','currencyCodes','dueDateFrom','dueDateTo','asOfDate','dueStatus','balanceStatus','minBalance','maxBalance','minDaysOverdue','maxDaysOverdue','mode','groupBy','orderBy','page','rows'];
   if(Object.keys(args).some(k=>!allowed.includes(k))) fail('Filtro de saldos no soportado.');
   const result={...args};
-  for(const key of ['customerIds','invoiceNumbers','sectors','currencies'])result[key]=array(args[key],key);
+  for(const key of ['customerIds','invoiceNumbers','sectors','currencies','currencyCodes'])result[key]=array(args[key],key);
   result.asOfDate=args.asOfDate??today();date(result.asOfDate);
   for(const key of ['dueDateFrom','dueDateTo'])if(args[key]!==undefined)date(args[key]);
   if(args.dueDateFrom&&args.dueDateTo&&date(args.dueDateFrom)>date(args.dueDateTo))fail('Rango de vencimientos inválido.');

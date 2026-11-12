@@ -22,7 +22,7 @@ const sessions=await load('../../src/services/sessions/oracleSession.service.js'
    async close(){closed++;},async execute(sql,binds){queries.push({sql,binds:structuredClone(binds)});if(denied)throw Object.assign(Error('PRIVATE_ORACLE_ERROR'),{errorNum:1031});
     if(sql.includes('ROWNUM<=21'))return {rows:customerIds.map(id=>({COD_CLIENTE:id,CUSTOMER_NAME:name+' '+id.at(-1),BUSINESS_NAME:company,TAX_ID:tax,PRIORITY:1}))};
     if(!sql.includes('ROW_NUMBER()'))return {rows:[{CURRENCY_SYMBOL:'PYG',TOTAL_ROWS:2,DISTINCT_INVOICE_NUMBERS:2,DISTINCT_CUSTOMERS:1,TOTAL_BALANCE:123.45,POSITIVE_BALANCE:123.45,OVERDUE_BALANCE:123.45}]};
-    return {rows:[{NRO_FACTURA:binds.offset===0?'PRIVATE-INVOICE-1':'PRIVATE-INVOICE-2',COD_CLIENTE:customerIds[1],NOM_CLIENTE:name+' 2',RAZON_SOCIAL:company,RUC:tax,SIMBOLO_MONEDA:'PYG',SALDO:binds.offset===0?100:23.45,VENCIMIENTO:'01/01/2026',DUE_DATE:new Date('2026-01-01'),DUE_STATUS:'overdue',DAYS_OVERDUE:315,AGING_BAND:'181+'}]};
+    return {rows:[{NRO_FACTURA:binds.offset===0?'PRIVATE-INVOICE-1':'PRIVATE-INVOICE-2',COD_CLIENTE:customerIds[1],NOM_CLIENTE:name+' 2',RAZON_SOCIAL:company,RUC:tax,COD_MONEDA:'M1',SIMBOLO_MONEDA:'PYG',DEUDA:binds.offset===0?100:23.45,VENCIMIENTO:'01/01/2026',DUE_DATE:new Date('2026-01-01'),DUE_STATUS:'overdue',DAYS_OVERDUE:315,AGING_BAND:'181+'}]};
    },
  };}},
  '../../repositories/sessions/oracleSession.repository.js':{
@@ -47,7 +47,7 @@ try{
  const search=await post('Saldo de '+name);assert.match(search.response,/Selecciona/);assert.equal(opened,closed);
  phase='detail';const first=await post('2');assert.match(first.response,/PRIVATE-INVOICE-1/);assert.match(first.response,/TIENDA PRIVADA 2/);assert.doesNotMatch(first.response,/MODEL-FORGED-ID|C-PRIVATE|Ver PDF/);assert.match(first.response,/100,00/);assert.equal(modelCalls,3);assert.equal(opened,closed);
  const countBefore=modelCalls;const second=await post('Siguiente página');assert.equal(modelCalls,countBefore);assert.match(second.response,/PRIVATE-INVOICE-2/);assert.doesNotMatch(second.response,/PRIVATE-INVOICE-1/);assert.equal(opened,closed);
- for(const q of queries.filter(q=>!q.sql.includes('ROWNUM<=21'))){assert.equal(q.binds.customerIds0,customerIds[1]);assert.equal(q.binds.asOfDate,'12/11/2026');assert.match(q.sql,/SALDO > 0/);assert.match(q.sql,/DUE_DATE < REF_DATE/);}
+ for(const q of queries.filter(q=>!q.sql.includes('ROWNUM<=21'))){assert.equal(q.binds.customerIds0,customerIds[1]);assert.equal(q.binds.asOfDate,'12/11/2026');assert.match(q.sql,/DEUDA > 0/);assert.match(q.sql,/DUE_DATE < REF_DATE/);}
  const history=JSON.stringify(store.getConversation(sessionId));for(const value of [...customerIds,name,company,tax,'PRIVATE-INVOICE-1','PRIVATE-INVOICE-2'])assert.ok(!history.includes(value),'PII persisted in history: '+value);
  denied=true;phase='denied';const rejection=await post('Consulta de nuevo el saldo');assert.equal(rejection.response,'El usuario no tiene permisos para consultar esta información.');assert.deepEqual(rejection.actions,{});assert.equal(opened,closed);
  assert.ok(identities.every(v=>v==='SERVER_PROXY_IDENTITY'));assert.ok(!identities.includes('UNTRUSTED_FRONTEND'));

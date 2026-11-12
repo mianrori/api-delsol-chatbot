@@ -7,16 +7,16 @@ export function buildInvoiceBalanceResponse(calls=[],{display=invoiceBalanceCell
   const matches=calls.filter(c=>c.name==='get_invoice_balances');
   if(matches.length!==1||calls.some(c=>!['get_invoice_balances','search_invoice_balance_customers'].includes(c.name)))return null;
   const r=matches[0].result;
-  if(r?.status==='REQUIRES_SOURCE_IDENTITY')return 'Estos datos no identifican inequívocamente la divisa ni la factura. Por eso solo puedo mostrar registros individuales: no sumar saldos ni elaborar rankings monetarios.';
+  if(r?.status==='REQUIRES_SOURCE_IDENTITY')return 'No puedo sumar estas deudas sin confirmar qué representa cada registro y cómo identificar cada factura. Para ordenar importes individuales necesito además una única moneda identificada por su código.';
   if(!r||r.mode!=='detail'||!Array.isArray(r.data))return null;
-  const lines=['**Saldos registrados de facturas**',`Vencimientos clasificados al ${display(r.asOfDate)}. Son saldos actuales; no reconstruyen un saldo histórico.`,''];
+  const lines=['**Deudas registradas de facturas**',`Vencimientos clasificados al ${display(r.asOfDate)}. Son importes actuales; no reconstruyen un saldo histórico.`,''];
   lines.push(`Clientes distintos identificados: ${number(r.matchedCustomers)}. Números de factura distintos: ${number(r.matchedInvoiceNumbers)}.`,'');
-  lines.push('Cada fila es un registro de la vista, no una factura única. El símbolo no identifica inequívocamente la divisa; no se suman importes ni se infiere pago o crédito por su signo.','');
+  lines.push('Cada fila es un registro, no una factura única. La divisa se distingue por su código, no por el símbolo; no se suman importes ni se infiere pago o crédito por su signo.','');
   if(r.unknownBalanceRows)lines.push('Hay registros con saldo desconocido; no se consideran cero.');
   if(r.invalidDueDateRows)lines.push('Hay vencimientos vacíos o inválidos, clasificados como sin vencimiento válido.');
   if(!r.data.length)lines.push(r.totalRows?'No hay registros en esta página; los conteos corresponden al filtro completo.':'No se encontraron saldos para los filtros solicitados.');
-  else lines.push(...table(['Número de factura','Cliente','Razón social','RUC','Sector','Vencimiento','Estado','Días de atraso','Símbolo informado','Saldo'],r.data.map(row=>[
-    display(row.invoiceNumber),display(row.customerName),display(row.businessName),display(row.taxId),display(row.sector),display(row.dueDate),display(statuses[row.dueStatus]??row.dueStatus),number(row.daysOverdue),display(row.currencySymbol??'Sin símbolo'),exactBalance(row.balance)])));
+  else lines.push(...table(['Número de factura','Cliente','Razón social','RUC','Sector','Vencimiento','Estado','Días de atraso','Moneda (código)','Símbolo informado','Deuda'],r.data.map(row=>[
+    display(row.invoiceNumber),display(row.customerName),display(row.businessName),display(row.taxId),display(row.sector),display(row.dueDate),display(statuses[row.dueStatus]??row.dueStatus),number(row.daysOverdue),display(row.currencyCode),display(row.currencySymbol??'Sin símbolo'),exactBalance(row.debt)])));
   lines.push('',`Se muestran ${r.returnedRows} de ${r.totalRows} registros. Página ${r.page} de ${r.totalPages}.`);
   if(r.hasMore)lines.push(`Puedes pedir la siguiente página (${r.nextPage}).`);
   return lines.join('\n');
