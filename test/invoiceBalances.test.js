@@ -107,4 +107,11 @@ test('monetary row ordering requires exactly one native currency code, never a s
  assert.equal(r.data[0].currencyCode,'M1');assert.equal(r.data[0].debt,'90');assert.equal(c.queries[1].binds.currencyCodes0,'M1');
  assert.match(c.queries[1].sql,/COD_MONEDA IN \(:currencyCodes0\)/);assert.match(c.queries[1].sql,/ORDER BY COD_MONEDA, DEUDA DESC NULLS LAST/);
  for(const scope of [{currencies:['$']},{currencyCodes:['M1','M2']}])assert.equal((await getInvoiceBalances({...scope,orderBy:'balanceDesc'},fake([]))).status,'REQUIRES_SOURCE_IDENTITY');
+ assert.equal((await getInvoiceBalances({currencyCodes:['M1'],mode:'summary',groupBy:['customer']},fake([]))).status,'REQUIRES_SOURCE_IDENTITY');
+});
+
+test('same displayed symbol never collapses two native currencies or sums their debts',async()=>{
+ const r=await getInvoiceBalances({},fake([{TOTAL_ROWS:2}],[{...row,COD_MONEDA:'M1',SIMBOLO_MONEDA:'$',DEUDA:'10.01'},{...row,COD_MONEDA:'M2',SIMBOLO_MONEDA:'$',DEUDA:'20.02'}]));
+ assert.deepEqual(r.data.map(x=>[x.currencyCode,x.currencySymbol,x.debt]),[['M1','$','10.01'],['M2','$','20.02']]);assert.equal(r.totalsByCurrency,undefined);
+ const text=buildInvoiceBalanceResponse([{name:'get_invoice_balances',result:r}]);assert.match(text,/M1/);assert.match(text,/M2/);assert.ok(!text.includes('30,03'));
 });
