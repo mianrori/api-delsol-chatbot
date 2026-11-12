@@ -37,6 +37,12 @@ try{
  if(process.argv.includes('--preflight')){report.success=true;}
  else{
   let raw='';for await(const c of process.stdin){raw+=c;if(raw.length>16384)throw Error('INPUT_TOO_LARGE');}payload=JSON.parse(raw);raw='';session=await loginDev(payload.authorized);payload=null;
+  if(process.argv.includes('--remaining')){
+   const prior=JSON.parse(fs.readFileSync(resolve(root,'docs/invoice-balances-dev-c2541f4-partial.json'),'utf8'));
+   if(prior.validation?.error?.code!=='ORA-01036'||!prior.logout||!prior.validation.cleanup.allConnectionsClosed||git('diff',prior.validation.commit,report.profileCandidate.commit,'--','src','config.js','package.json','package-lock.json').trim())throw Error('PRIOR_PARTIAL_EVIDENCE_NOT_APPLICABLE');
+   report.priorPartialEvidence={file:'docs/invoice-balances-dev-c2541f4-partial.json',sha256:hash(fs.readFileSync(resolve(root,'docs/invoice-balances-dev-c2541f4-partial.json'))),commit:prior.validation.commit,approvedCases:prior.validation.cases.map(c=>c.label),notAssumingDataImmutability:true};
+   report.validationCandidate=report.profileCandidate;report.validation=await worker(report.validationCandidate,'--validate-remaining');report.success=report.validation.success;
+  }else{
   report.profile=await worker(report.profileCandidate,'--profile');record('invoice-balances-profile.json',report.profile);
   if(!report.profile.success)throw Error('PROFILE_FAILED');
   record('invoice-balances-progress.json',{phase:'profile_ready',profileCommit:report.profileCandidate.commit,sessionRetainedInMemory:true});
@@ -45,6 +51,7 @@ try{
   if(!plan||plan.action!=='validate'||!/^[a-f0-9]{40}$/.test(plan.commit??''))throw Error('VALIDATION_NOT_RELEASED');
   report.validationCandidate=await prepare(plan.commit);record('invoice-balances-progress.json',{phase:'validating',commit:plan.commit});
   report.validation=await worker(report.validationCandidate,'--validate');report.success=report.validation.success;
+  }
  }
 }catch(e){report.error={code:/^[A-Z][A-Z0-9_]+$/.test(e?.message??'')?e.message:/^[A-Z][A-Z0-9_]+$/.test(e?.code??'')?e.code:'BALANCE_HELPER_FAILED'};}
 finally{

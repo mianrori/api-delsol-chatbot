@@ -1,4 +1,4 @@
-param([switch]$Preflight,[switch]$SourcePreflight)
+param([switch]$Preflight,[switch]$SourcePreflight,[switch]$Remaining)
 $ErrorActionPreference='Stop'
 $root=Split-Path -Parent $PSScriptRoot
 if($SourcePreflight){
@@ -37,6 +37,7 @@ try{
  }
  $payload=@{authorized=$account}|ConvertTo-Json -Compress
  $payload=[regex]::Replace($payload,'[^\x00-\x7F]',{param($m) '\u'+([int][char]$m.Value).ToString('x4')})
- $result=Invoke-Control '--run' $payload
+ $runMode=if($Remaining){'--run --remaining'}else{'--run'}
+ $result=Invoke-Control $runMode $payload
  if($result.success){Write-Output 'INVOICE_BALANCES_DEV_ORACLE_PASS'}else{Write-Output 'INVOICE_BALANCES_DEV_REAL_FAILED: revisar logs/invoice-balances-dev-real.json';exit 1}
 }finally{$payload=$null;$account.Clear()}

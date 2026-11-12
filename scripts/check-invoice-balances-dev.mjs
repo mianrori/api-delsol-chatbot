@@ -63,7 +63,7 @@ async function validate(connection){
  const independentScope=args=>{
   const clauses=[],binds={};for(const[key,col]of [['customerIds','COD_CLIENTE'],['invoiceNumbers','NRO_FACTURA'],['sectors','SECTOR'],['currencies','SIMBOLO_MONEDA']])if(args[key]?.length){const list=args[key].map((v,i)=>{binds[key+i]=v;return ':'+key+i;});clauses.push(col+' IN ('+list.join(',')+')');}
   const signs={positive:'SALDO>0',zero:'SALDO=0',negative:'SALDO<0',unknown:'SALDO IS NULL'};if(signs[args.balanceStatus])clauses.push(signs[args.balanceStatus]);
-  if(args.dueStatus&&args.dueStatus!=='all'){binds.ref=asOfDate;const ds={overdue:dateSql+"<TO_DATE(:ref,'DD/MM/YYYY')",dueToday:dateSql+"=TO_DATE(:ref,'DD/MM/YYYY')",upcoming:dateSql+">TO_DATE(:ref,'DD/MM/YYYY')",undated:dateSql+' IS NULL'};clauses.push(ds[args.dueStatus]);}
+  if(args.dueStatus&&args.dueStatus!=='all'){if(args.dueStatus!=='undated')binds.ref=asOfDate;const ds={overdue:dateSql+"<TO_DATE(:ref,'DD/MM/YYYY')",dueToday:dateSql+"=TO_DATE(:ref,'DD/MM/YYYY')",upcoming:dateSql+">TO_DATE(:ref,'DD/MM/YYYY')",undated:dateSql+' IS NULL'};clauses.push(ds[args.dueStatus]);}
   for(const[key,op]of [['dueDateFrom','>='],['dueDateTo','<=']])if(args[key]){binds[key]=args[key];clauses.push(dateSql+op+"TO_DATE(:"+key+",'DD/MM/YYYY')");}
   if(args.minDaysOverdue!==undefined){binds.ref=asOfDate;binds.days=args.minDaysOverdue;clauses.push("GREATEST(TO_DATE(:ref,'DD/MM/YYYY')-"+dateSql+',0)>=:days');}
   return {where:clauses.length?clauses.join(' AND '):'1=1',binds};
@@ -85,8 +85,8 @@ async function validate(connection){
  report.cases=[];
  const chosen=(await run('SELECT COD_CLIENTE FROM (SELECT COD_CLIENTE,COUNT(*) N FROM VW_BOT_FACTURAS_SALDOS WHERE COD_CLIENTE IS NOT NULL GROUP BY COD_CLIENTE HAVING COUNT(*) BETWEEN 3 AND 60 ORDER BY N DESC,COD_CLIENTE) WHERE ROWNUM=1'))[0]?.COD_CLIENTE;
  const base=chosen?{customerIds:[chosen]}:{};
- const first=await reconcile(base,'DETAIL_FIRST');await reconcile({...base,page:2},'DETAIL_SECOND');
- for(const dueStatus of ['overdue','dueToday','upcoming','undated'])await reconcile({dueStatus},'DUE_'+dueStatus);
+ const first=report.mode==='--validate-remaining'?null:await reconcile(base,'DETAIL_FIRST');if(report.mode!=='--validate-remaining')await reconcile({...base,page:2},'DETAIL_SECOND');
+ for(const dueStatus of (report.mode==='--validate-remaining'?['undated']:['overdue','dueToday','upcoming','undated']))await reconcile({dueStatus},'DUE_'+dueStatus);
  for(const balanceStatus of ['positive','zero','negative','unknown'])await reconcile({balanceStatus},'SIGN_'+balanceStatus);
  await reconcile({dueDateFrom:asOfDate,dueDateTo:asOfDate},'ASUNCION_TODAY_INCLUSIVE');
  await reconcile({dueDateFrom:day(new Date(+ref+86400000)),dueDateTo:day(new Date(+ref+7*86400000))},'NEXT_SEVEN_DAYS');
@@ -98,7 +98,7 @@ async function validate(connection){
  if(raw?.COD_CLIENTE){const found=await searchInvoiceBalanceCustomers({query:String(raw.COD_CLIENTE)},connection);const options=found.status==='RESOLVED'?[found]:found.options??[];
   check(options.some(o=>o.customerId===raw.COD_CLIENTE),'CUSTOMER_EXACT_ID_PRESENT');
   const missing='NO_MATCH_'+crypto.randomBytes(16).toString('hex');check((await searchInvoiceBalanceCustomers({query:missing},connection)).status==='NOT_FOUND','CUSTOMER_ABSENCE');
-  await httpValidation(raw,asOfDate,first);
+  await reconcile({customerIds:[raw.COD_CLIENTE]},'FRESH_HTTP_SCOPE');await httpValidation(raw,asOfDate,first);
  }else report.missingHttpCustomerSample=true;
  const src=fs.readFileSync(new URL('../src/repositories/invoices/invoiceBalances.repository.js',import.meta.url),'utf8'),conversion=/const dueDateSql=`([\s\S]*?)`;/m.exec(src)?.[1];check(Boolean(conversion),'ACTUAL_DATE_EXPRESSION_AVAILABLE');
  const dateCases=[null,'','31/02/2026','29/02/2024','29/02/2025','01/13/2026','01/01/0000','2026-11-12'];
@@ -149,7 +149,7 @@ try{
   await withOracleProxySession(sessionId,async({connection})=>{
    const id=(await connection.execute("SELECT USER U,SYS_CONTEXT('USERENV','SESSION_USER') S,SYS_CONTEXT('USERENV','PROXY_USER') P FROM DUAL",{}, {outFormat:4002})).rows[0],norm=v=>String(v??'').trim().toUpperCase();
    check(norm(id.U)===norm(owned.username)&&norm(id.S)===norm(owned.username)&&Boolean(id.P),'SESSION_ID_RESOLVES_POSTGRES_ORACLE_PROXY_IDENTITY');
-   if(report.mode==='--profile')await profile(connection);else if(report.mode==='--validate')await validate(connection);else throw Error('VALIDATION_MODE_NOT_PREPARED');
+   if(report.mode==='--profile')await profile(connection);else if(['--validate','--validate-remaining'].includes(report.mode))await validate(connection);else throw Error('VALIDATION_MODE_NOT_PREPARED');
   });report.success=true;
  }
 }catch(e){report.error={code:/^[A-Z][A-Z0-9_]+$/.test(e?.message??'')?e.message:/^(?:ORA-\d{5}|NJS-\d{3}|DPI-\d{4})$/.test(e?.code??'')?e.code:'BALANCE_DEV_CONTROL_FAILED'};}
