@@ -14,6 +14,7 @@ import { getSalesPerSqmTool } from "./sales/getSalesPerSqm.tool.js";
 import { searchInvoiceConceptsTool } from "./invoices/searchInvoiceConcepts.tool.js";
 import { searchInvoiceCustomersTool } from "./invoices/searchInvoiceCustomers.tool.js";
 import { getInvoicesTool } from "./invoices/getInvoices.tool.js";
+import {getInvoiceBalancesTool,searchInvoiceBalanceCustomersTool} from './invoices/invoiceBalances.tool.js';
 import { getContractConditionsTool } from "./contracts/getContractConditions.tool.js";
 import { getContractCostPerSqmTool } from "./contracts/getContractCostPerSqm.tool.js";
 import { analyzeContractCostIncidenceTool } from "./contracts/analyzeContractCostIncidence.tool.js";
@@ -43,6 +44,8 @@ export const tools = [
   searchInvoiceConceptsTool,
   searchInvoiceCustomersTool,
   getInvoicesTool,
+  searchInvoiceBalanceCustomersTool,
+  getInvoiceBalancesTool,
   getContractConditionsTool,
   getContractCostPerSqmTool,
   analyzeContractCostIncidenceTool,

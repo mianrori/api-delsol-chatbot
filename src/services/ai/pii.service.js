@@ -80,6 +80,7 @@ const FIELD_TYPES = new Map([
 
   // Clientes / locales
   ["customerid", "CUSTOMER_ID"],
+  ["customerids", "CUSTOMER_ID"],
   ["codcliente", "CUSTOMER_ID"],
   ["categoryid", "CATEGORY_ID"],
   ["codrubro", "CATEGORY_ID"],
@@ -90,6 +91,7 @@ const FIELD_TYPES = new Map([
 
   // Facturas / transacciones
   ["invoicenumber", "INVOICE_NUMBER"],
+  ["invoicenumbers", "INVOICE_NUMBER"],
   ["transactionnumber", "TRANSACTION_NUMBER"],
   ["conceptdescription", "CONCEPT_DESCRIPTION"],
   ["conceptid", "CONCEPT_ID"],
@@ -287,6 +289,16 @@ const isGroupingCalendarQualifier = (value) => {
 
 const protectKnownTextPatterns = (sessionId, text) => {
   let protectedText = String(text ?? "");
+
+  protectedText=protectedText.replace(
+    /\b((?:saldos?|deuda)\s+(?:de\s+(?:la\s+)?)?factura\s+(?:(?:nro\.?|n[uú]mero|n[°ºo])\s*)?)([A-Z0-9][A-Z0-9./-]{2,35})\b/gi,
+    (_match,prefix,value)=>`${prefix}${protectPiiValue(sessionId,'INVOICE_NUMBER',value)}`,
+  );
+
+  protectedText=protectedText.replace(
+    /\b((?:saldos?\s+(?:de\s+(?:las\s+)?facturas\s+)?(?:de|del)|deuda\s+(?:de|del)|cu[aá]nto\s+(?:debe|adeuda))\s+)(?!(?:facturas?|clientes?|locales?|soles|total|vencid[ao]s?)\b)([A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9&.'’ -]{2,80}?)(?=\s+(?:al\s+\d|por\s+(?:moneda|mes|sector|vencimiento)|(?:en|de|desde)\s+(?:20\d{2}|hoy|este|enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre))|\s*[?!;:]?\s*$)/gi,
+    (match,prefix,value)=>isGenericAnalysisSubject(value)?match:`${prefix}${protectPiiValue(sessionId,'BUSINESS_ENTITY',value.trim())}`,
+  );
 
   protectedText = protectedText.replace(
     /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi,

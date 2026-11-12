@@ -15,6 +15,7 @@ import { getSalesPerSqm } from "../sales/salesPerSqm.service.js";
 import { searchInvoiceConcepts } from "../invoices/searchInvoiceConcepts.service.js";
 import { searchInvoiceCustomers } from "../invoices/searchInvoiceCustomers.service.js";
 import { getInvoices } from "../invoices/invoices.service.js";
+import {getInvoiceBalances,searchInvoiceBalanceCustomers} from '../invoices/invoiceBalances.service.js';
 import { getContractConditions } from "../contracts/contractConditions.service.js";
 import { getContractCostPerSqm } from "../contracts/contractCostPerSqm.service.js";
 import { analyzeContractCostIncidence } from "../contracts/contractCostIncidence.service.js";
@@ -42,6 +43,8 @@ const withAuthorizedOracle = async (sessionId, callback) => {
 };
 
 const toolHandlers = {
+  search_invoice_balance_customers: async (args,context) => withAuthorizedOracle(context.sessionId,({connection})=>searchInvoiceBalanceCustomers(args,connection)),
+  get_invoice_balances: async (args,context) => withAuthorizedOracle(context.sessionId,({connection})=>getInvoiceBalances(args,connection)),
   generate_chart: async (args, context) => generateChart(args, { sources: context.chartSources, restoreText: context.restoreChartText }),
   get_vehicle_registrations: async (args, context) => withAuthorizedOracle(context.sessionId, ({ connection }) => getVehicleRegistrations(args, connection)),
   get_soles_usage: async (args, context) => withAuthorizedOracle(context.sessionId, ({ connection }) => getSolesUsage(args, connection)),

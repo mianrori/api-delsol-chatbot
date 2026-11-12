@@ -1,3 +1,4 @@
+import {buildInvoiceBalanceResponse,resolveInvoiceBalancePage,invoiceBalanceCell} from './invoiceBalancePresentation.service.js';
 import {executeNamedInvoiceRequest} from './invoiceNamedRequest.service.js';
 import {buildInvoiceDetailResponse, appendInvoiceAccessWarning} from './invoiceDetailPresentation.service.js';
 import {applySalesMetrics} from './salesMetrics.service.js';
@@ -60,6 +61,7 @@ import {
   logToolResult,
 } from "../../utils/debug.logger.js";
 import {
+  protectPiiValue,
   protectPiiDeep,
   protectPiiText,
   restorePiiDeep,
@@ -70,6 +72,7 @@ const bedrockClient = new BedrockRuntimeClient({
   region: config.awsRegion || "us-east-1",
 });
 
+const balanceResponse=(sessionId,calls)=>buildInvoiceBalanceResponse(calls,{display:value=>protectPiiValue(sessionId,'BALANCE_DISPLAY',invoiceBalanceCell(restorePiiDeep(sessionId,value)))});
 const MAX_TOOL_ITERATIONS = 8;
 const MAX_MODEL_ROWS_WITH_EXPORT = 12;
 
@@ -84,6 +87,8 @@ En esta etapa de migración, las herramientas habilitadas son:
 - search_invoice_customers
 - search_invoice_concepts
 - get_invoices
+- search_invoice_balance_customers
+- get_invoice_balances
 - get_contract_conditions
 - get_contract_cost_per_sqm
 - analyze_contract_cost_incidence
@@ -148,6 +153,17 @@ Para esta etapa:
 - puedes analizar y segmentar socios por actividad comercial, compras, recurrencia, género, edad, cumpleaños, local, rubro y período.
 
 Si el usuario solicita información que requiere una herramienta todavía no habilitada en este servicio, indícale brevemente que esa consulta aún no está disponible en esta etapa de migración.
+
+Para saldos de facturas (prioridad sobre las reglas de facturas emitidas):
+- usa search_invoice_balance_customers para resolver clientes/locales con saldo; nunca search_customers ni search_invoice_customers para este dominio. Espera seleccion si hay ambiguedad o pide precisar si hasMore=true; no inventes customerIds.
+- usa get_invoice_balances para saldo actual, deuda, vencidos, por vencer, saldos a favor, detalle de facturas, rankings y antiguedad. No confundas con soles ni con importes emitidos de get_invoices.
+- deuda: balanceStatus="positive"; saldo a favor: "negative"; saldo neto: "all". Un saldo cero no demuestra pago y un saldo NULL es desconocido.
+- nunca sumes ni compares importes de distintas monedas. Para rankings top N filtra una moneda real con currencies; ordena balanceDesc y agrupa customer. Sin moneda indicada, separa por moneda y pagina sin presentar un top global.
+- mode summary retorna totales de todo el filtro por moneda; detalle y grupos son paginados. Conserva filtros y asOfDate para siguientes paginas; no calcules totales sumando la pagina.
+- groupBy agingBand sirve para antiguedad; dueMonth agrupa por mes de vencimiento, NO historia del saldo. Vencida significa anterior a asOfDate; dueToday es la fecha misma. asOfDate omitida usa hoy en Paraguay; nunca inventes fechas.
+- la vista no permite consultar pagos/cobros, fecha de emision, conceptos, matricula, PDFs ni saldos historicos a una fecha. Explica esa limitacion cuando corresponda. Los permisos los aplica Oracle: un vacio significa ausencia visible, no autoriza afirmar denegacion ni ausencia global.
+- para listar sectores usa mode summary y groupBy sector; para monedas usa summary sin dimensiones. Usa solo sectores y simbolos exactos retornados, no inventes codigos.
+- una nueva consulta de todos los clientes utiliza customerIds=[]; no heredes un cliente anterior que el usuario retiro.
 
 Para consultas de socios:
 - un error ACCESS_DENIED indica falta de permisos del usuario; no significa que la herramienta no exista o que la función esté pendiente de migración; no lo conviertas en ausencia de registros ni busques otra vía para consultar los mismos datos;
@@ -885,7 +901,7 @@ const removeClientOnlyMetadata = ({ name, result }) => {
 
 const validateProtectedToolInput = ({ name, input = {} }) => {
   if (
-    name === "get_sales_per_sqm" &&
+    ["get_sales_per_sqm","get_invoice_balances"].includes(name) &&
     Array.isArray(input.customerIds)
   ) {
     const invalidProtectedCustomerId = input.customerIds.find((value) => {
@@ -894,6 +910,7 @@ const validateProtectedToolInput = ({ name, input = {} }) => {
     });
 
     if (invalidProtectedCustomerId) {
+      if(name==='get_invoice_balances')throw new Error('CUSTOMER_NOT_RESOLVED: resuelve el cliente con search_invoice_balance_customers y utiliza su customerId, no su nombre.');
       throw new Error(
         "CUSTOMER_NOT_RESOLVED: customerIds debe contener únicamente identificadores de cliente previamente resueltos mediante search_customers. Resuelve primero el nombre comercial y vuelve a ejecutar get_sales_per_sqm con el customerId retornado.",
       );
@@ -1509,7 +1526,7 @@ const executeToolRequests = async ({ content, sessionId, sourceMessages = [], ch
       if (isChartSourceTool(name) && protectedResultForModel && typeof protectedResultForModel === "object" && !Array.isArray(protectedResultForModel)) {
         protectedResultForModel.chartSourceId = toolUseId;
       }
-      if (["get_invoices", "get_sales_per_sqm", "get_member_purchases", "get_sales", "analyze_members", "compare_member_purchases_vs_sales", "analyze_campaign_sales_performance", "search_promotions", "get_member_soles", "get_soles_usage", "search_soles_usage_destinations", "search_soles_usage_movement_types", "get_vehicle_registrations", "get_member_vehicles"].includes(name)) {
+      if (["get_invoice_balances", "get_invoices", "get_sales_per_sqm", "get_member_purchases", "get_sales", "analyze_members", "compare_member_purchases_vs_sales", "analyze_campaign_sales_performance", "search_promotions", "get_member_soles", "get_soles_usage", "search_soles_usage_destinations", "search_soles_usage_movement_types", "get_vehicle_registrations", "get_member_vehicles"].includes(name)) {
         presentationCall.result = protectedResultForModel;
       }
 
@@ -1665,7 +1682,8 @@ export const chatService = async ({ message, sessionId }) => {
     restoreValue: (value) => restorePiiDeep(sessionId, value) });
   const promoFollowup = resolveMemberPromoPage({ message, history: protectedHistory, restoreValue: (value) => restorePiiDeep(sessionId, value) })
     ?? resolveMemberPromoSelection({ message, history: protectedHistory, restoreValue: (value) => restorePiiDeep(sessionId, value) });
-  const solesPage = resolveVehiclePage({ message, history: protectedHistory })
+  const solesPage = resolveInvoiceBalancePage({message,history:protectedHistory})
+    ?? resolveVehiclePage({ message, history: protectedHistory })
     ?? resolveVehicleGenderBreakdown({ message, history: protectedHistory })
     ?? resolveSolesUsagePage({ message, history: protectedHistory })
     ?? resolveMemberSolesPage({ message, history: protectedHistory })
@@ -1762,7 +1780,8 @@ export const chatService = async ({ message, sessionId }) => {
       conversationActions = executed.actions;
       conversationInternalContext = executed.internalContext;
       toolIterations = 1;
-      followupAnswer = buildVehicleResponse(executed.internalContext.presentationCalls)
+      followupAnswer = balanceResponse(sessionId,executed.internalContext.presentationCalls)
+        ?? buildVehicleResponse(executed.internalContext.presentationCalls)
         ?? buildSolesUsageResponse(executed.internalContext.presentationCalls)
         ?? buildMemberSolesResponse(executed.internalContext.presentationCalls)
         ?? "No fue posible consultar la página de soles. Vuelve a intentarlo.";
@@ -1921,7 +1940,8 @@ export const chatService = async ({ message, sessionId }) => {
 
       // A complete breakdown is authoritative even when the model requested
       // it after changing dates or filters. Do not ask the model to rewrite it.
-      followupAnswer = buildMemberPromoResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) })
+      followupAnswer = balanceResponse(sessionId,conversationInternalContext.presentationCalls)
+        ?? buildMemberPromoResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) })
         ?? buildContractIncidenceResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) })
         ?? buildSalesPerSqmResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) })
         ?? buildInvoiceDetailResponse(conversationInternalContext.presentationCalls,{restoreValue:value=>restorePiiDeep(sessionId,value)}) ?? buildSalesYearComparisonResponse(conversationInternalContext.presentationCalls,{restoreValue:value=>restorePiiDeep(sessionId,value)})
@@ -1985,7 +2005,7 @@ export const chatService = async ({ message, sessionId }) => {
       ? ACCESS_DENIED_MESSAGE
       : conversationActions.chart?.available
       ? "Aquí tienes el gráfico solicitado."
-      : buildMemberPromoResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) }) ?? buildContractIncidenceResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) }) ?? monthlyIncidenceText ??
+      : balanceResponse(sessionId,conversationInternalContext.presentationCalls) ?? buildMemberPromoResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) }) ?? buildContractIncidenceResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) }) ?? monthlyIncidenceText ??
       buildSalesPerSqmResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) }) ??
       buildInvoiceDetailResponse(conversationInternalContext.presentationCalls,{restoreValue:value=>restorePiiDeep(sessionId,value)}) ?? buildSalesYearComparisonResponse(conversationInternalContext.presentationCalls,{restoreValue:value=>restorePiiDeep(sessionId,value)}) ??
       buildSalesSampleResponse(conversationInternalContext.presentationCalls, { exportAvailable: Boolean(conversationActions.salesExport?.available) }) ??
