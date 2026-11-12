@@ -24,38 +24,23 @@ driver.getConnection=async(...args)=>{const c=await originalGetConnection.apply(
 async function profile(connection){
  const run=async(sql,binds={})=>(await connection.execute(sql,binds,{outFormat:4002,maxRows:20})).rows;
  const meta=await connection.execute('SELECT * FROM VW_BOT_FACTURAS_SALDOS WHERE 1=0',{}, {outFormat:4002});
- const columns=meta.metaData.map(c=>c.name);report.columns=columns;report.columnTypes=meta.metaData.map(c=>({name:c.name,type:c.dbTypeName,precision:c.precision,scale:c.scale}));report.schemaContract='COD_MONEDA_DEUDA';check(!columns.includes('USER_CAN_CONSULT'),'NO_USER_CAN_CONSULT_COLUMN_ASSUMPTION');
- check(['NRO_FACTURA','SECTOR','VENCIMIENTO','COD_CLIENTE','NOM_CLIENTE','RAZON_SOCIAL','RUC','SIMBOLO_MONEDA','COD_MONEDA','DEUDA'].every(c=>columns.includes(c)),'EXPECTED_BALANCE_COLUMNS_PRESENT');
- const inventory=(await run(`SELECT COUNT(*) R,COUNT(DISTINCT NRO_FACTURA) I,
- SUM(CASE WHEN DEUDA>0 THEN 1 ELSE 0 END) P,SUM(CASE WHEN DEUDA=0 THEN 1 ELSE 0 END) Z,
- SUM(CASE WHEN DEUDA<0 THEN 1 ELSE 0 END) N,SUM(CASE WHEN DEUDA IS NULL THEN 1 ELSE 0 END) U,
- SUM(CASE WHEN VENCIMIENTO IS NULL THEN 1 ELSE 0 END) D,
- COUNT(DISTINCT SIMBOLO_MONEDA) M FROM VW_BOT_FACTURAS_SALDOS`))[0];
- report.samples={anyRows:Number(inventory.R)>0,positive:Number(inventory.P)>0,zero:Number(inventory.Z)>0,negative:Number(inventory.N)>0,nullBalance:Number(inventory.U)>0,nullDue:Number(inventory.D)>0,multipleSymbols:Number(inventory.M)>1,rowsEqualDistinctInvoiceNumbers:Number(inventory.R)===Number(inventory.I)};
- const duplicate=async(group,having)=>Number((await run(`SELECT CASE WHEN EXISTS (SELECT 1 FROM VW_BOT_FACTURAS_SALDOS WHERE NRO_FACTURA IS NOT NULL GROUP BY ${group} HAVING ${having}) THEN 1 ELSE 0 END V FROM DUAL`))[0].V)===1;
- report.granularity={repeatedInvoiceNumber:await duplicate('NRO_FACTURA','COUNT(*)>1'),
- invoiceAcrossCustomers:await duplicate('NRO_FACTURA','COUNT(DISTINCT COD_CLIENTE)>1'),
- invoiceAcrossSectors:await duplicate('NRO_FACTURA','COUNT(DISTINCT SECTOR)>1'),
- invoiceAcrossSymbols:await duplicate('NRO_FACTURA','COUNT(DISTINCT SIMBOLO_MONEDA)>1'),
- invoiceAcrossCurrencyCodes:await duplicate('NRO_FACTURA','COUNT(DISTINCT COD_MONEDA)>1'),
- repeatedCandidateKey:await duplicate('NRO_FACTURA,COD_CLIENTE,SECTOR,COD_MONEDA','COUNT(*)>1'),
- identicalVisibleRows:await duplicate('NRO_FACTURA,SECTOR,VENCIMIENTO,COD_CLIENTE,NOM_CLIENTE,RAZON_SOCIAL,RUC,COD_MONEDA,SIMBOLO_MONEDA,DEUDA','COUNT(*)>1'),
- businessKeyProven:false};
- const dates=await connection.execute('SELECT DISTINCT VENCIMIENTO FROM VW_BOT_FACTURAS_SALDOS',{}, {outFormat:4002,resultSet:true});
- let seen=0,valid=0,invalid=0,nulls=0,iso=0,complete=false;
- try{while(seen<=10000){const rows=await dates.resultSet.getRows(500);if(!rows.length){complete=true;break;}for(const r of rows){seen++;if(r.VENCIMIENTO==null||!String(r.VENCIMIENTO).trim())nulls++;else if(parseBalanceDueDate(r.VENCIMIENTO))valid++;else{invalid++;if(/^\d{4}-\d{2}-\d{2}$/.test(String(r.VENCIMIENTO).trim()))iso++;}}}}finally{await dates.resultSet.close();}
- report.dueDate={scanComplete:complete,distinctValuesCapped:!complete,validDDMMYYYYPresent:valid>0,invalidPresent:invalid>0,nullOrBlankPresent:nulls>0,isoShapePresent:iso>0,allNonBlankValidDDMMYYYY:complete&&invalid===0&&valid>0};
- const nonce=crypto.randomBytes(32);report.definition={readable:false};
- try{
-  const defs=await run('SELECT TEXT FROM ALL_VIEWS WHERE VIEW_NAME=:name',{name:'VW_BOT_FACTURAS_SALDOS'});
-  if(defs.length===1&&typeof defs[0].TEXT==='string'){
-   const text=defs[0].TEXT;report.definition={readable:true,opaque:crypto.createHmac('sha256',nonce).update(text).digest('hex'),hasGrouping:/\bGROUP\s+BY\b/i.test(text),hasUnion:/\bUNION\b/i.test(text),mentionsNativeCurrencyKey:/\b(?:COD_MONEDA|MONEDA_ID|CURRENCY_ID)\b/i.test(text),saldoExpressionUsesSum:/\bSUM\s*\([^)]*\bSALDO\b/i.test(text),businessMeaningNotEstablished:true};
-  }
- }catch(e){report.definition={readable:false,technicalCode:/^(?:ORA-\d{5}|NJS-\d{3})$/.test(e?.code??'')?e.code:'DEFINITION_UNAVAILABLE'};}
- report.currency={nativeIdentifierExposed:columns.some(c=>['COD_MONEDA','MONEDA_ID','CURRENCY_ID','ISO_CURRENCY_CODE'].includes(c)),symbolsAreNotProvenCurrencyKeys:true,conversionPerformed:false};
- report.currency.sameSymbolMultipleCodes=Number((await run("SELECT CASE WHEN EXISTS(SELECT 1 FROM VW_BOT_FACTURAS_SALDOS GROUP BY SIMBOLO_MONEDA HAVING COUNT(DISTINCT COD_MONEDA)>1) THEN 1 ELSE 0 END V FROM DUAL"))[0].V)===1;
- report.currency.sameCodeMultipleSymbols=Number((await run("SELECT CASE WHEN EXISTS(SELECT 1 FROM VW_BOT_FACTURAS_SALDOS GROUP BY COD_MONEDA HAVING COUNT(DISTINCT SIMBOLO_MONEDA)>1) THEN 1 ELSE 0 END V FROM DUAL"))[0].V)===1;
- report.semanticLimits=['zero balance does not prove payment','negative balance does not prove credit/refund without business contract','observed uniqueness is not a documented invoice business key'];
+ const columns=meta.metaData.map(c=>c.name);report.columns=columns;report.columnTypes=meta.metaData.map(c=>({name:c.name,type:c.dbTypeName,precision:c.precision,scale:c.scale}));report.schemaContract='SERIE_FACTURA_COD_MONEDA_DEUDA';
+ check(columns.includes('SERIE_FACTURA')&&columns.includes('DEUDA')&&columns.includes('COD_MONEDA')&&!columns.includes('SALDO'),'SERIES_DEBT_NATIVE_CURRENCY_SCHEMA');
+ check(!columns.includes('USER_CAN_CONSULT'),'NO_USER_CAN_CONSULT_ASSUMPTION');
+ const eligible='(DEUDA>=0 OR DEUDA IS NULL)';
+ const exists=async(body)=>Number((await run('SELECT CASE WHEN EXISTS('+body+') THEN 1 ELSE 0 END V FROM DUAL'))[0].V)===1;
+ report.granularity={
+  duplicateSeriesNumber:await exists('SELECT 1 FROM VW_BOT_FACTURAS_SALDOS WHERE '+eligible+' GROUP BY SERIE_FACTURA,NRO_FACTURA HAVING COUNT(*)>1'),
+  nullIdentity:await exists('SELECT 1 FROM VW_BOT_FACTURAS_SALDOS WHERE '+eligible+' AND (SERIE_FACTURA IS NULL OR NRO_FACTURA IS NULL)'),
+  blankIdentity:await exists('SELECT 1 FROM VW_BOT_FACTURAS_SALDOS WHERE '+eligible+' AND (TRIM(SERIE_FACTURA) IS NULL OR TRIM(NRO_FACTURA) IS NULL)'),
+  missingCurrency:await exists('SELECT 1 FROM VW_BOT_FACTURAS_SALDOS WHERE '+eligible+' AND TRIM(COD_MONEDA) IS NULL'),
+  sameNumberDifferentSeries:await exists('SELECT 1 FROM VW_BOT_FACTURAS_SALDOS WHERE '+eligible+' GROUP BY NRO_FACTURA HAVING COUNT(DISTINCT SERIE_FACTURA)>1'),
+  duplicateFullCandidate:await exists('SELECT 1 FROM VW_BOT_FACTURAS_SALDOS WHERE '+eligible+' GROUP BY SERIE_FACTURA,NRO_FACTURA,COD_CLIENTE,SECTOR,COD_MONEDA HAVING COUNT(*)>1'),
+  uniquenessScope:'same authorized view, excluding negative debt, snapshot only; no arbitrary deduplication',
+ };
+ report.granularity.seriesNumberUsable=!report.granularity.duplicateSeriesNumber&&!report.granularity.nullIdentity&&!report.granularity.blankIdentity;
+ report.states={pending:await exists('SELECT 1 FROM VW_BOT_FACTURAS_SALDOS WHERE DEUDA>0'),settled:await exists('SELECT 1 FROM VW_BOT_FACTURAS_SALDOS WHERE DEUDA=0'),negativeExcluded:await exists('SELECT 1 FROM VW_BOT_FACTURAS_SALDOS WHERE DEUDA<0'),unknown:await exists('SELECT 1 FROM VW_BOT_FACTURAS_SALDOS WHERE DEUDA IS NULL')};
+ report.contract={pending:'DEUDA>0',settled:'DEUDA=0',all:'DEUDA>=0 OR DEUDA IS NULL',negative:'always excluded',nullDebt:'unknown, never paid or zero; known subtotals must disclose incompleteness'};
 }
 async function validate(connection){
  const run=async(sql,binds={},maxRows=101)=>(await connection.execute(sql,binds,{outFormat:4002,maxRows,fetchInfo:{DEUDA:{type:driver.STRING}}})).rows;
