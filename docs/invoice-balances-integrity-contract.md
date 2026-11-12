@@ -1,5 +1,7 @@
 # PR #51: cálculos condicionados a integridad del alcance
 
+> Estado posterior: [PR #51 fusionada y Docker DEV validado en 5400, 6ac1556](invoice-balances-dev-live-6ac1556.md). Las reservas se conservan. La indicación de borrador al final corresponde al estado de esta validación anterior.
+
 Regla vigente que sustituye el bloqueo global del contrato de series anterior. La identidad examinada es el par exacto SERIE_FACTURA/NRO_FACTURA; no se declara única la vista completa. No se modifican registros históricos ni se escoge una versión representativa.
 
 ## Criterio de cálculo

@@ -1,5 +1,15 @@
 # Alcance y evidencia del backend del chatbot
 
+## PR #51 fusionada y desplegada: 6ac1556
+
+Merge autorizado y actualización local por avance rápido; solo chatbot Docker DEV reconstruido/recreado. Salud 200 antes/después, PM2 online/cero reinicios al arrancar, sin errores detectados; 248 fuentes y siete módulos cargados coinciden con el merge, Node 22.23.5.
+
+21 aserciones del control desplegado, cinco POST reales en 5400: detalle páginas 1/2, suma/conteo por moneda en alcance limpio, bloqueo por duplicados y detalle preservado con advertencia. Conciliación SQL independiente con los mismos pares/estados; sin deduplicar ni elegir una versión. Historial propio preparado para el flujo determinista de paginación y bloqueo preventivo del SDK, cero intentos/proveedor: no acredita interpretación de lenguaje natural.
+
+Cierres: proceso 5/5, independiente 1/1, driver/SDK restaurados, inspector/pool propios cerrados, conversación limpiada y logout aprobado. Logs sanitizados de stdout/stderr conciliados tras añadir nombres explícitos al auditor, sin relanzar consultas; prueba local específica del auditor aprobada. Primer intento diagnóstico interrumpido sin conexiones/consultas, cerrado y con logout; consta en evidencia.
+
+[Reporte y reservas del despliegue](invoice-balances-dev-live-6ac1556.md). Conservadas muestra Oracle de duplicados con deudas distintas, denegación real, dimensiones/casos temporales no ejercitados positivamente, colisión real de símbolos y pendientes independientes ANX123/muestra mixta de PR #50. Sin suites completas ni cambios de datos históricos, permisos o expiraciones. Los estados de borrador/lista siguientes son históricos.
+
 ## Estado vigente PR #51: integridad por alcance, 8420e82
 
 Esta sección sustituye el bloqueo global de las entradas históricas siguientes; no declara única toda la vista.

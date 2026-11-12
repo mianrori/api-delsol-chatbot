@@ -1,6 +1,6 @@
 ﻿// Never return raw log text or values. Accept only explicit metadata schemas.
 export function auditAffectedLogs(raw,service){
- const lines=String(raw).split(/\r?\n/).filter(x=>x.trim()),known=['search_invoice_concepts','search_invoice_customers','get_invoices'];
+ const lines=String(raw).split(/\r?\n/).filter(x=>x.trim()),known=['search_invoice_concepts','search_invoice_customers','get_invoices','search_invoice_balance_customers','get_invoice_balances'];
  if(service==='erp'){const safe=lines.every(l=>{try{const v=JSON.parse(l);return v.event==='ERP_DEV_SAFE_AUTH_TEST_LOG'&&Object.keys(v).every(k=>['event','correlationId','level','code'].includes(k));}catch{return false;}});return {lines:lines.length,safe,recognized:'ERP protected auth metadata'};}
  let inspectorLines=0,permissionLines=0,unknown=0,calls=0,results=0,permissionErrors=0,bedrockRequests=0,bedrockResponses=0;const retained=[];
  for(const line of lines){const t=line.trim();

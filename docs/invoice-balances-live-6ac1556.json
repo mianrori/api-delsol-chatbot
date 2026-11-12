@@ -1,0 +1,283 @@
+{
+  "suite": "invoice-balances-live-helper",
+  "commit": "6ac1556fbb916ab09f266303f396c76a98681db3",
+  "startedAt": "2026-11-12T20:04:27.234Z",
+  "success": true,
+  "imageId": "sha256:645cde618118f18b1d2bca8874d0e0f398c732684470c99d4ad5a694e18222fd",
+  "startedAtContainer": "2026-11-12T19:58:25.462493994Z",
+  "healthBefore": true,
+  "sourceFiles": 248,
+  "manifestSha256": "0f681a05fa220199d0ad7ba69ee632c6701ba5c2f3e6104cbca69ee0d6db71d5",
+  "pm2": {
+    "online": true,
+    "restarts": 0,
+    "nodeVersion": "22.23.5"
+  },
+  "startupErrors": false,
+  "worker": {
+    "suite": "invoice-balances-live-5400",
+    "commit": "6ac1556fbb916ab09f266303f396c76a98681db3",
+    "success": true,
+    "checks": [
+      {
+        "code": "SAFE_DEV",
+        "passed": true
+      },
+      {
+        "code": "RUNTIME_MODULE_AVAILABLE",
+        "passed": true
+      },
+      {
+        "code": "POSTGRES_ORACLE_PROXY_IDENTITY",
+        "passed": true
+      },
+      {
+        "code": "REQUIRED_LIVE_SAMPLES",
+        "passed": true
+      },
+      {
+        "code": "HTTP_5400_1",
+        "passed": true
+      },
+      {
+        "code": "REAL_TOOL_RESULT_1",
+        "passed": true
+      },
+      {
+        "code": "DETAIL_PAGE_1_INDEPENDENT_SQL",
+        "passed": true
+      },
+      {
+        "code": "DETAIL_1_FINAL_RESTORED",
+        "passed": true
+      },
+      {
+        "code": "HTTP_5400_2",
+        "passed": true
+      },
+      {
+        "code": "REAL_TOOL_RESULT_2",
+        "passed": true
+      },
+      {
+        "code": "DETAIL_PAGE_2_INDEPENDENT_SQL",
+        "passed": true
+      },
+      {
+        "code": "DETAIL_2_FINAL_RESTORED",
+        "passed": true
+      },
+      {
+        "code": "HTTP_5400_3",
+        "passed": true
+      },
+      {
+        "code": "REAL_TOOL_RESULT_3",
+        "passed": true
+      },
+      {
+        "code": "CLEAN_SUMMARY_INDEPENDENT_BY_CURRENCY",
+        "passed": true
+      },
+      {
+        "code": "HTTP_5400_4",
+        "passed": true
+      },
+      {
+        "code": "REAL_TOOL_RESULT_4",
+        "passed": true
+      },
+      {
+        "code": "DUPLICATES_CALCULATIONS_BLOCKED",
+        "passed": true
+      },
+      {
+        "code": "HTTP_5400_5",
+        "passed": true
+      },
+      {
+        "code": "REAL_TOOL_RESULT_5",
+        "passed": true
+      },
+      {
+        "code": "DUPLICATE_DETAIL_PRESERVED_INDEPENDENT_COUNT",
+        "passed": true
+      }
+    ],
+    "startedAt": "2026-11-12T20:05:00.591Z",
+    "providerCalls": 0,
+    "loadedModules": [
+      {
+        "path": "src/controllers/chat.controller.js",
+        "sha256": "67e9ff964adc97ec47d79481dd026e0b4d836f20759ad65ad93fb3b4302acd55"
+      },
+      {
+        "path": "src/repositories/invoices/invoiceBalances.repository.js",
+        "sha256": "fb0c82900e70929927a791f4d778ac09744f59bec19248bdd80be9ab629a0711"
+      },
+      {
+        "path": "src/services/ai/chat.service.js",
+        "sha256": "f840f3b1c15f87d4b28ab137229891200f7116abbb06664703ee13d722556c6d"
+      },
+      {
+        "path": "src/services/ai/invoiceBalancePresentation.service.js",
+        "sha256": "e1e27b0a936ce806112dcd95d7063adb9523135d92b6cf3bef85d5ddd88faff3"
+      },
+      {
+        "path": "src/services/ai/pii.service.js",
+        "sha256": "a5c1003c01ed0b3e9ec09e1fce868368ad6e39de6892f4553598ae9ccbf3d0d2"
+      },
+      {
+        "path": "src/services/invoices/invoiceBalances.service.js",
+        "sha256": "c8a634e27cfbb6c27c907f49d276af9d16652f97b370d8ccf3bca39460a0e5ec"
+      },
+      {
+        "path": "src/services/sessions/oracleSession.service.js",
+        "sha256": "8be29c83faedcbbd40597533b88639f6c2d07a480c4402381f86659efd2e925a"
+      }
+    ],
+    "reference": {
+      "asOfDate": "12/11/2026",
+      "timezone": "America/Asuncion"
+    },
+    "samples": {
+      "clean": true,
+      "duplicates": true
+    },
+    "http": {
+      "endpoint": 5400,
+      "requests": 5,
+      "contextSeededForDeterministicPagination": true,
+      "naturalLanguageModelInterpretationValidated": false
+    },
+    "runtimeCleanup": {
+      "driverRestored": true,
+      "sdkRestored": true,
+      "providerAttempts": 0,
+      "opened": 5,
+      "closed": 5,
+      "closeErrors": 0,
+      "allConnectionsClosed": true,
+      "ownConversationCleared": true
+    },
+    "inspectorClosed": true,
+    "cleanup": {
+      "opened": 1,
+      "closed": 1,
+      "closeErrors": 0,
+      "allConnectionsClosed": true,
+      "postgresPoolClosed": true
+    },
+    "finishedAt": "2026-11-12T20:05:07.620Z"
+  },
+  "logout": true,
+  "finishedAt": "2026-11-12T20:05:07.678Z",
+  "logAudit": [
+    {
+      "service": "chatbot",
+      "lines": 60,
+      "safe": true,
+      "toolCalls": 5,
+      "toolResults": 5,
+      "permissionErrors": 0,
+      "permissionConsoleLines": 0,
+      "inspectorMetadataLines": 5,
+      "unknownRecords": 0,
+      "bedrockRequestEvents": 0,
+      "bedrockResponseEvents": 0,
+      "payloadsHidden": true,
+      "sessionsMasked": true
+    },
+    {
+      "service": "erp",
+      "lines": 2,
+      "safe": true,
+      "recognized": "ERP protected auth metadata"
+    }
+  ],
+  "healthAfter": true,
+  "initialLogAudit": [
+    {
+      "service": "chatbot",
+      "lines": 60,
+      "safe": false,
+      "toolCalls": 0,
+      "toolResults": 0,
+      "permissionErrors": 0,
+      "permissionConsoleLines": 0,
+      "inspectorMetadataLines": 5,
+      "unknownRecords": 10,
+      "bedrockRequestEvents": 0,
+      "bedrockResponseEvents": 0,
+      "payloadsHidden": false,
+      "sessionsMasked": false
+    },
+    {
+      "service": "erp",
+      "lines": 2,
+      "safe": true,
+      "recognized": "ERP protected auth metadata"
+    }
+  ],
+  "auditReconciliation": {
+    "sameOriginalTimeWindow": true,
+    "noHttpOrOracleRerun": true,
+    "reason": "prior helper loaded audit before explicit balance tool names were added; unchanged strict hidden-payload schemas",
+    "auditorSha256": "b0f2d84359de2fdf0e64b0d11bcdd2e28faf2e258f0761f09c28bec173b9d137"
+  },
+  "diagnosticFiles": [
+    {
+      "file": "scripts/check-invoice-balances-live.mjs",
+      "sha256": "76c06879892da759507e62427a9e02749c92d6285b8a752878bca5dede79003c"
+    },
+    {
+      "file": "scripts/invoice-balances-live-runtime.mjs",
+      "sha256": "9919057ef8b7dacd3c5e01d3563f7411cfeff6cf91851e936cf773861147695c"
+    },
+    {
+      "file": "scripts/run-invoice-balances-live-login.mjs",
+      "sha256": "cbbfb9ba86322a949d18183554a832447e7e21f0895d34e3dcd677e981c36dc0"
+    },
+    {
+      "file": "scripts/run-invoice-balances-live.ps1",
+      "sha256": "41f424ab889daf68b348f62044ddf4b50addaeed60b3773ed3ada17399234e5a"
+    },
+    {
+      "file": "scripts/invoice-affected-log-audit.mjs",
+      "sha256": "4936cd0c28e33a0cfce83b9452b622035b132424c0992d10d3e50e2ba0b31abe"
+    }
+  ],
+  "interruptedAttempt": {
+    "error": {
+      "code": "INSPECTOR_EVALUATION_FAILED"
+    },
+    "oracleConnectionsOpened": 0,
+    "allConnectionsClosed": true,
+    "inspectorClosed": true,
+    "logout": true,
+    "logAudit": [
+      {
+        "service": "chatbot",
+        "lines": 5,
+        "safe": true,
+        "toolCalls": 0,
+        "toolResults": 0,
+        "permissionErrors": 0,
+        "permissionConsoleLines": 0,
+        "inspectorMetadataLines": 5,
+        "unknownRecords": 0,
+        "bedrockRequestEvents": 0,
+        "bedrockResponseEvents": 0,
+        "payloadsHidden": true,
+        "sessionsMasked": true
+      },
+      {
+        "service": "erp",
+        "lines": 2,
+        "safe": true,
+        "recognized": "ERP protected auth metadata"
+      }
+    ],
+    "noApplicationChange": true
+  }
+}
