@@ -2,7 +2,7 @@
 
 ## Reorientacion PR #50: autorizacion por fila (12 de noviembre de 2026)
 
-**Caso abierto, PR en borrador.** La vista devuelve filas y `USER_CAN_CONSULT` decide si pueden mostrarse. La comprobacion administrativa deja de ser un requisito para este trabajo; no se repiten inspecciones de catalogos, dependencias o politicas. Las secciones posteriores son historia de la investigacion, no instrucciones vigentes.
+**Caso original abierto; correccion revisada para pasar la PR a lista para revision.** La vista devuelve filas y `USER_CAN_CONSULT` decide si pueden mostrarse. La comprobacion administrativa deja de ser un requisito para este trabajo; no se repiten inspecciones de catalogos, dependencias o politicas. Las secciones posteriores son historia de la investigacion, no instrucciones vigentes.
 
 `NVL(USER_CAN_CONSULT, 'S') <> 'N'` excluye las filas restringidas antes del conteo y del detalle por matricula. Por eso un conteo autorizado de cero no permite distinguir denegacion de ausencia. Se conserva ese predicado obligatorio para datos, totales, resumenes, paginacion y PDFs. La existencia de restringidos se determina con `CASE WHEN EXISTS (SELECT 1 FROM VW_BOT_FACTURAS WHERE USER_CAN_CONSULT = 'N' AND ...filtros efectivos...) THEN 1 ELSE 0 END`, sin devolver sus columnas, importes, identificadores, PDFs ni cantidades.
 
@@ -53,6 +53,8 @@ PR #50 sigue en borrador, caso original pendiente. Sin merge, despliegue o inspe
 ### Correccion local del preflight posterior a 6c395d9
 
 La revision detecto que el preflight comparaba todo scripts/ contra be559ef y rechazaba los ejecutores anadidos en 6c395d9. Se corrige con `invoice-candidate-source-preflight.mjs`: aplicacion (src e index.js), pruebas de negocio, configuracion y restantes scripts se fijan a **be559ef**; seis archivos de ejecutores/dependencias enumerados explicitamente y su nueva prueba local se verifican contra **HEAD**, resuelto al SHA completo del commit que los contiene. No se excluye scripts/ en bloque. Documentacion y evidencia no se tratan como codigo ejecutable.
+
+Commit de correccion: **85354030d84c9ce2b75f2e95602b7a0d61654994**. El preflight de fuentes real sobre ese commit devolvio SOURCE_PREFLIGHT_COMPLETE: 152 archivos de aplicacion, 90 pruebas de negocio, 9 de configuracion y 78 scripts adicionales coinciden con be559ef; 6 ejecutores y 1 prueba de validacion coinciden con 8535403. La revision posterior solo anade este registro documental; el comando resuelve nuevamente HEAD al verificar el commit final que contiene la documentacion. No cambia los commits ni hashes del reporte Oracle/HTTP aprobado.
 
 Se contrastan tanto los commits como el indice y el arbol de trabajo. Se rechazan archivos funcionales nuevos, cambios preparados ocultos por una copia de trabajo restaurada y un commit de ejecutores incompleto. En una futura ejecucion autorizada, los ejecutores se exportan desde su commit verificado y se cotejan por hash al copiarlos; el archivo Git de la aplicacion permanece fijado a be559ef. El worker y la aplicacion no cambian.
 
