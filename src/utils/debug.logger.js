@@ -97,9 +97,7 @@ export const logBedrockRequest = ({ iteration, modelId, input }) => {
     toolCount: input?.toolConfig?.tools?.length ?? 0,
   });
 
-  if (config.bedrockDebugPayloads) {
-    logSection("BEDROCK REQUEST PAYLOAD", sanitizeObject(input));
-  }
+  // Model requests may contain financial results and PII mappings: metadata only.
 };
 
 export const logBedrockResponse = ({ iteration, response }) => {
@@ -120,9 +118,6 @@ export const logBedrockResponse = ({ iteration, response }) => {
       }) ?? [],
   });
 
-  if (config.bedrockDebugPayloads) {
-    logSection("BEDROCK RESPONSE PAYLOAD", sanitizeObject(response));
-  }
 };
 
 export const logToolCall = ({ name, input, sessionId }) => {
@@ -133,9 +128,7 @@ export const logToolCall = ({ name, input, sessionId }) => {
   logSection("TOOL CALL", {
     name,
     sessionId: maskValue(sessionId),
-    input: config.bedrockDebugPayloads
-      ? sanitizeObject(input)
-      : "[payload oculto]",
+    input: "[payload oculto]",
   });
 };
 
@@ -155,9 +148,7 @@ export const logToolResult = ({ name, result, error }) => {
 
   logSection("TOOL RESULT", {
     name,
-    result: config.bedrockDebugPayloads
-      ? sanitizeObject(result)
-      : "[payload oculto]",
+    result: "[payload oculto]",
   });
 };
 
@@ -174,9 +165,7 @@ export const logPiiTransformation = ({
   logSection("PII TRANSFORMATION", {
     field,
     transformation,
-    before: config.piiDebugShowRaw
-      ? originalValue
-      : maskValue(originalValue),
+    before: "[valor oculto]",
     after: transformedValue,
   });
 };

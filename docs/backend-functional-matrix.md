@@ -1,5 +1,36 @@
 # Alcance y evidencia del backend del chatbot
 
+## Estado vigente PR #51: integridad por alcance, 8420e82
+
+Esta sección sustituye el bloqueo global de las entradas históricas siguientes; no declara única toda la vista.
+
+| Capacidad | Control afectado | Reserva |
+| --- | --- | --- |
+| Duplicados | Versiones por par serie/número antes de filtros efectivos; deuda igual bloqueó summary real, sin elegir una fila | Sin muestra Oracle de deudas distintas; solo prueba local simulada |
+| Perfiles limpios | Identidades limpias y cliente completo encontrados; sumas/conteos/orden por moneda y cliente conciliados con SQL independiente | No certifica todas las dimensiones/combinaciones |
+| Cálculos inconsistentes | Sin data ni invoiceCount calculado; explicación de registros históricos inconsistentes/información incompleta | Bloqueo conservador del resumen completo, sin subtotal parcial silencioso |
+| Detalle | Filas preservadas con advertencia y conteo de registros separado | No deduplicación ni conteo de facturas sobre identidad inconsistente |
+| PII/HTTP | Tres POST efímeros: summary limpio/bloqueado y detalle advertido; SDK controlado | Texto del historial solo contrastado para identificadores de seis o más caracteres; denegación real pendiente |
+| Cierre | 1/1 preparación, 4/4 validación, logout, logs sanitizados; imagen/arranque intactos | Sin despliegue ni datos históricos corregidos |
+
+26 aserciones Oracle/HTTP y 34/34 pruebas locales afectadas, Node 22.23.5; cero proveedor/PDF, sin suite completa ni repetición de los 117 controles anteriores. [Contrato y evidencia actuales](invoice-balances-integrity-contract.md). PR en borrador; ANX123 y muestra mixta Oracle de PR #50 pendientes independientes. Sin merge, despliegue o cambios de datos, permisos o expiraciones.
+
+## Actualización PR #51: series y estados de deuda
+
+Esta sección prevalece sobre las entradas históricas de saldos/deudas de diez columnas. PR en borrador, sin desplegar.
+
+| Capacidad | Evidencia actual 0c34985 | Reserva |
+| --- | --- | --- |
+| Serie y número | Once columnas; detalle/PII/filtros por parejas exactas; mismo número con series distintas conciliado en Oracle | Pares repetidos incluso con cliente/sector/moneda; no equivalen a facturas únicas, sin deduplicación |
+| DEUDA | Pending >0 predeterminado, settled =0, all no negativas/nulos, unknown nulos; negativos siempre excluidos, también en buscador | Null desconocido, nunca cero/cancelada |
+| Conteos y paginación | Filas, números, pares y clientes separados; SQL independiente y páginas conciliados | Conteo de entidades factura y agregaciones monetarias continúan bloqueados por granularidad |
+| Monedas y orden | COD_MONEDA nativo para orden de registros; sin mezclar ni convertir monedas | Totales/rankings agregados bloqueados; colisión de símbolos solo local |
+| Vencimiento/antigüedad | Asunción 12/11/2026; vencidos y 30 días con muestra | Sin positivos pending hoy/futuro/undated/próximos siete días; vacíos conciliados |
+| PII/sessionId/HTTP | Serie incluida; SDK/historial protegidos, respuesta autorizada restaurada; sesión inválida rechazada | ORA-01031 inyectado sin datos; denegación real sigue sin muestra |
+| Cierre | Perfil 1/1, validación 8/8 conexiones, logout y logs sanitizados aprobados; listener efímero cerrado | Imagen/arranque desplegados sin cambios |
+
+117 aserciones Oracle/HTTP, siete POST, seis SDK controlados, cero proveedor/PDF; 25/25 pruebas locales afectadas en Node 22.23.5, sin suite completa. [Contrato y evidencia vigentes](invoice-balances-series-contract.md). ANX123 y muestra mixta Oracle de PR #50 pendientes independientes. Sin merge, despliegue o cambios de datos, permisos o expiraciones.
+
 Corte actualizado: **06/11/2026**, base desplegada `059ac13` (PR #41 fusionada).
 
 ## Balance actual del cierre
@@ -795,3 +826,22 @@ Merge autorizado f2c2b2fecf417dbbafd981e256c52520dba0b35b; rama local actualizad
 Dos POST reales en 5400 con login protegido del mismo usuario afectado; 17 comprobaciones del control desplegado aprobadas, sin suites completas ni repeticion de las pruebas previas. Impacto denegado en el resolver sin datos/enlaces/acciones, existencia restringida positiva y autorizada negativa en Oracle independiente con su alcance fuerte/2023. ANX123 autonomo solo plate/mode/page/rows; Oracle confirma ausencia autorizada/restringida, SQL y estado sin filtros heredados, conteos/pagina vacios conciliados, sin PDF. **Discrepancia original ANX123 y muestra mixta Oracle conservadas como pendientes; no se declara corregido el caso original.**
 
 Traza temporal por identidad y bloqueo preventivo de Bedrock retirados/restaurados; cero intentos de proveedor y eventos Bedrock. Cierres: 3/3 conexiones trazadas y 4/4 independientes, pool del worker e inspector propio; conversacion propia limpiada y logout aprobado. Logs sanitizados aprobados, cero registros desconocidos. Sin cambios de datos de negocio, permisos o expiraciones. [Reporte desplegado](invoice-pr50-dev-live-f2c2b2f.json), SHA-256 `f5abf6e8021b99079d33da2769f96929e57a51ae1ef4c58db6470b244936bfed`; [detalle vigente](invoice-affected-user-investigation.md).
+
+### Candidato de deudas de facturas — borrador, sin desplegar
+
+Contrato actualizado por el usuario y confirmado en Oracle DEV: `COD_MONEDA VARCHAR2`, `DEUDA NUMBER(18,2)` reemplaza SALDO; diez columnas, sin USER_CAN_CONSULT. Perfil ad38d3a; aplicación/SQL/HTTP contrastados en **11a4316**. Código posterior de aplicación idéntico al contrastado. El estado desplegado de PR #50 descrito arriba no se modifica.
+
+| Capacidad | Evidencia vigente | Reserva |
+| --- | --- | --- |
+| search_invoice_balance_customers | Búsqueda exacta y ausencia, HTTP real aislado, misma vista e identidad proxy; PII del resultado protegida para el SDK. | Ambigüedad/selección protegida en pruebas locales; no se acredita toda variante lingüística por modelo remoto. |
+| get_invoice_balances: detalle | Dos páginas completas conciliadas contra SQL independiente; texto decimal exacto, filas/números/clientes contados por separado. | NRO_FACTURA se repite incluso en cliente/sector/COD_MONEDA; granularidad aditiva y clave única pendientes. |
+| Signo DEUDA | Positivo, cero, negativo y nulo con muestras reales, sin convertir nulo a cero. | Cero no prueba pago y negativo no prueba crédito; definición contable pendiente. |
+| Vencimientos/antigüedad | DD/MM/YYYY consistente en todos los valores observados; vencidos, futuros y atraso 30 días conciliados con cálculo independiente. Fecha Asuncion 12/11/2026. | Hoy/próximos siete días/undated sin positivo. Nulos, inválidos y bisiestos solo con SELECT sintético DUAL, sin modificar datos. |
+| Identificación de divisa y orden | COD_MONEDA real, filtro nativo y ranking de registros en un único código conciliados. Símbolos no se usan como identidad ni se convierten importes. | No hubo colisión real símbolo→varios códigos; caso sintético local conserva ambas divisas sin colapsar. No es ranking de facturas/clientes. |
+| Totales y rankings agregados | Bloqueados explícitamente, sin SUM(DEUDA) o agrupación por símbolo, hasta acreditar aditividad/clave de factura. | No se certifican ni sustituyen por cálculo del modelo o suma de páginas. |
+| PII y respuesta final | Entrada, resultados del SDK controlado e historial protegidos; respuesta final mantiene identidades autorizadas. Logs sin payloads. | No es prueba de interpretación de un modelo real. |
+| sessionId y denegación | PostgreSQL/USER/SESSION_USER/proxy coinciden; username frontend ignorado; sesión inexistente rechazada; ORA-01031 inyectado sin datos/acciones. | No hay identidad realmente denegada sobre la vista; esa denegación es cobertura sintética sobre conexión real. |
+
+**104 aserciones Oracle/HTTP aprobadas** en control aislado, cuatro POST, tres llamadas SDK controladas y cero proveedor/PDF. **23/23 pruebas locales enfocadas** con Node 22.23.5; no se suman a las aserciones reales ni se repiten suites completas. Cierre 5/5 conexiones, driver restaurado, pool y servidor temporal cerrados, conversación propia limpiada, logout aprobado, logs sanitizados e imagen/arranque habitual sin cambios.
+
+[Perfil vigente](invoice-balances-oracle-profile-ad38d3a.json) · [Evidencia vigente](invoice-balances-oracle-http-11a4316.json), SHA-256 `9fe4733b6b1bec61e937e927eaed4a9114213a26f21285bf6d4e841de049db85` · [Contrato, reservas e historia](invoice-balances-tools.md). Los reportes SALDO anteriores permanecen como historia y no certifican el esquema nuevo. PR en borrador; sin merge, despliegue o cambios de datos de negocio, permisos o expiraciones. ANX123 y muestra mixta de PR #50 conservadas como pendientes independientes.

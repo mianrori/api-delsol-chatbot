@@ -8,6 +8,7 @@ const specs={
  search_categories:{consumers:['get_sales','get_sales_per_sqm','analyze_members','get_member_purchases','get_member_promo_purchases','get_soles_usage','compare_member_purchases_vs_sales','analyze_campaign_sales_performance'],fields:o=>({categoryIds:[o.codRubro]})},
  search_members:{consumers:['get_member','get_member_purchases','get_member_promo_purchases','get_member_soles','get_soles_usage','get_member_vehicles'],fields:o=>({documentNumber:o.documentNumber})},
  search_invoice_customers:{consumers:['get_invoices'],fields:o=>({customerIds:[String(o.customerId)]})},
+ search_invoice_balance_customers:{consumers:['get_invoice_balances'],fields:o=>({customerIds:[String(o.customerId)]})},
  search_invoice_concepts:{consumers:['get_invoices'],fields:o=>({conceptIds:[String(o.conceptId)]})},
  search_soles_types:{consumers:['get_member_soles','get_soles_usage'],fields:(o,name)=>({[name==='get_member_soles'?'typeIds':'solesTypeIds']:[o.typeId]})},
  search_soles_usage_destinations:{consumers:['get_soles_usage'],fields:o=>({destinations:[{destinationType:o.destinationType,destinationCode:o.destinationCode}]})},
@@ -16,7 +17,7 @@ const specs={
 const fail=()=>{throw Object.assign(Error('Selecciona una opción válida del buscador antes de consultar.'),{code:'SEARCH_SELECTION_REQUIRED'});};
 const userText=message=>message?.role==='user'?message.content?.find(b=>typeof b.text==='string')?.text:null;
 const selection=text=>String(text).trim().match(/^(?:(?:la\s+)?(?:opci[oó]n|n[uú]mero)\s*)?(\d+)\s*[.!]?$/i)?.[1];
-const required={search_customers:['codCliente'],search_categories:['codRubro'],search_members:['documentNumber'],search_invoice_customers:['customerId'],search_invoice_concepts:['conceptId'],search_soles_types:['typeId'],search_soles_usage_destinations:['destinationType','destinationCode'],search_soles_usage_movement_types:['movementType']};
+const required={search_customers:['codCliente'],search_categories:['codRubro'],search_members:['documentNumber'],search_invoice_customers:['customerId'],search_invoice_balance_customers:['customerId'],search_invoice_concepts:['conceptId'],search_soles_types:['typeId'],search_soles_usage_destinations:['destinationType','destinationCode'],search_soles_usage_movement_types:['movementType']};
 const optionFrom=result=>result.customer??result.category??result.member??result;
 const persistentSearches=['search_customers','search_categories'];
 const domainFields=search=>search==='search_customers'?['customerId','customerIds']:['categoryIds'];
@@ -34,6 +35,9 @@ const lookupShape=(name,result)=>{
 // Applied once to the protected user message, never by replaying bounded history.
 export function beginSearchSelectionTurn(sessionId,message){
  const state=getSearchResolutions(sessionId),turn={selectedThisTurn:[],validLookups:[],capturedConsumers:[],requestedDomains:[],salesLocalRemovalChange:getSalesLocalRemovalChange(message)};let changed=false;
+ const balanceText=String(message??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+ turn.invoiceBalanceAll=/\b(?:saldo|saldos|deuda|deudas|debe|deben|adeuda|adeudan)\b/.test(balanceText)&&(/\b(?:todos|todas) (?:los |las )?(?:clientes|locales)\b/.test(balanceText)||/\bsaldos? generales?(?: por (?:moneda|sector))?\s*[?.!]?\s*$/.test(balanceText));
+ if(turn.invoiceBalanceAll){delete state.domains.search_invoice_balance_customers;state.contexts.get_invoice_balances={customerIds:[]};if(state.choiceFocus==='search_invoice_balance_customers')delete state.choiceFocus;changed=true;}
  turn.invoicePlateRequest=getInvoicePlateRequest(message);
  if(turn.invoicePlateRequest?.autonomous){
   state.contexts.get_invoices=structuredClone(turn.invoicePlateRequest.input);
@@ -97,6 +101,12 @@ export function beginSearchSelectionTurn(sessionId,message){
 // Store only protected resolver IDs/options and arguments, never business rows.
 export function recordSearchToolResult(sessionId,name,input,result){
  const state=getSearchResolutions(sessionId);
+ if(name==='search_invoice_balance_customers'){
+  const {resolved,valid}=lookupShape(name,result);if(!valid)return false;
+  const minimal=o=>Object.fromEntries(['option','customerId','customerName','businessName','taxId'].filter(k=>o?.[k]!=null).map(k=>[k,o[k]]));
+  state.domains[name]=resolved?{kind:'resolved',selected:minimal(result),call:{input:structuredClone(input)},result:{options:[]}}:{kind:'pending',call:{input:structuredClone(input)},result:{options:(result.options??[]).map(minimal)}};
+  state.choiceFocus=name;setSearchResolutions(sessionId,state);return true;
+ }
  if(persistentSearches.includes(name)){
   const selected=optionFrom(result??{}),minimal=o=>Object.fromEntries(['optionId','option',...required[name]].filter(k=>o?.[k]!=null).map(k=>[k,o[k]]));
   const {resolved,valid}=lookupShape(name,result);if(!valid)return false;
@@ -133,6 +143,7 @@ export function captureSearchQueryContext(sessionId,name,input){
 // Called after the selection guard and input validation, even when Oracle denies
 // execution. Persist only protected scope metadata, never invoice rows.
 export function recordInvoiceQueryContext(sessionId,name,input){
+ if(name==='get_invoice_balances'){const state=getSearchResolutions(sessionId);state.contexts[name]=structuredClone(input);setSearchResolutions(sessionId,state);return;}
  if(name!=='get_invoices')return;
  const state=getSearchResolutions(sessionId);state.contexts.get_invoices=structuredClone(input);setSearchResolutions(sessionId,state);
 }
@@ -188,6 +199,7 @@ export function preserveSearchSelection({name,input,history=[],currentCalls=[],r
   if(state&&!selectionTurn.allowLookup?.[name]&&!isExplicitSearchRequest(currentText,name,input))fail();
  }
  if(!persistent(name)&&states.get(name)?.kind==='cleared'&&!isExplicitSearchRequest(currentText,name,input))throw Object.assign(Error('El filtro fue retirado. Solicita volver a añadirlo antes de buscarlo.'),{code:'SEARCH_FILTER_REMOVED'});
+ if(name==='get_invoice_balances'&&selectionTurn.invoiceBalanceAll)states.delete('search_invoice_balance_customers');
  const resolutions=[],removed=[];
  for(const [search,spec] of Object.entries(specs)){
   if(!spec.consumers.includes(name))continue;
@@ -206,7 +218,7 @@ export function preserveSearchSelection({name,input,history=[],currentCalls=[],r
  const successful=queries.filter(c=>c.name===name&&c.turn<turn&&c.resultStatus==='success').at(-1);
  // Persisted sales context is a complete scope, including absent keys. Merging
  // older history back into it would resurrect filters removed by a new query.
- const original=['get_sales','get_invoices'].includes(name)&&resolutionState?.contexts[name]
+ const original=['get_sales','get_invoices','get_invoice_balances'].includes(name)&&resolutionState?.contexts[name]
   ?structuredClone(resolutionState.contexts[name])
   :{...(successful?.input??{}),...((successful&&successful.turn>=(origin?.turn??-1)?successful:origin)?.input??{}),...(resolutionState?.contexts[name]??{})};
  const selectingNow=Boolean(selection(currentText))&&resolutions.some(r=>r.state.selectedTurn===turn||persistent(r.search)&&selectionTurn.selectedThisTurn?.includes(r.search));
@@ -216,7 +228,9 @@ export function preserveSearchSelection({name,input,history=[],currentCalls=[],r
  // grouping or previously absent keys. The successful context survives trimming.
  const autonomous=name==='get_sales'?selectionTurn.autonomousCategorySales:null;
  let result;
- if(name==='get_invoices'&&selectionTurn.invoicePlateRequest?.autonomous){
+ if(name==='get_invoice_balances'&&selectionTurn.invoiceBalanceAll){
+  result={...input,customerIds:[]};
+ }else if(name==='get_invoices'&&selectionTurn.invoicePlateRequest?.autonomous){
   result={...selectionTurn.invoicePlateRequest.input};
  }else if(name==='get_invoices'&&selectionTurn.invoiceNamedRequest){
   result={...input};
