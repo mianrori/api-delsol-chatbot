@@ -474,6 +474,15 @@ const protectKnownTextPatterns = (sessionId, text) => {
    *
    * No tratamos nombres de meses ni años como entidades comerciales.
    */
+  // Preserve the debt qualifier as intent, protecting only the customer name.
+  protectedText = protectedText.replace(
+    /\b(facturas?\s+de\s+)([A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9&.'’ -]{2,80}?)(?=\s+(?:cuya\s+deuda\s+(?:ya\s+)?est[aá]\s+cancelada|sin\s+deuda\s+pendiente)\b)/gi,
+    (_match,prefix,value)=>`${prefix}${protectPiiValue(sessionId,'BUSINESS_ENTITY',value.trim())}`,
+  );
+  protectedText = protectedText.replace(
+    /\b((?:facturas?\s+(?:pagadas?|sin\s+deuda\s+pendiente)|sin\s+deuda\s+pendiente)\s+(?:de|del)(?:\s+(?:cliente|local))?\s+)([A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9&.'’ -]{2,80}?)(?=\s*[.!?;:]?\s*$)/gi,
+    (_match,prefix,value)=>`${prefix}${protectPiiValue(sessionId,'BUSINESS_ENTITY',value.trim())}`,
+  );
   protectedText = protectedText.replace(
     /\b((?:facturas?|comprobantes?)\s+de\s+)(?!(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre|20\d{2})\b)([A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9&.'’ -]{2,80}?)(?=\s+(?:(?:de|desde|durante|en)\s+(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre|20\d{2}|hoy|ayer|este|esta)|del\s+(?:20\d{2}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4})|(?:sobre|respecto\s+(?:a|de)|frente\s+a)\s+(?:las\s+)?ventas|por\s+(?:d[ií]a|mes|a[nñ]o|local|rubro))|\s*(?:[,.!?;:]|$))/gi,
     (match, prefix, value) => isGenericAnalysisSubject(value)

@@ -13,13 +13,15 @@ export function buildInvoiceBalanceResponse(calls=[],{display=invoiceBalanceCell
     `Página ${r.page} de ${r.totalPages}.`].join('\n');
   if(r?.status==='REQUIRES_SOURCE_IDENTITY')return 'No puedo sumar estas deudas sin confirmar qué representa cada registro y cómo identificar cada factura. Para ordenar importes individuales necesito además una única moneda identificada por su código.';
   if(!r||r.mode!=='detail'||!Array.isArray(r.data))return null;
-  const lines=['**Deudas registradas de facturas**',`Vencimientos clasificados al ${display(r.asOfDate)}. Son importes actuales; no reconstruyen un saldo histórico.`,''];
+  const settled=r.queryContext?.debtStatus==='settled';
+  const lines=[settled?'**Facturas con deuda cancelada**':'**Deudas registradas de facturas**',`Vencimientos clasificados al ${display(r.asOfDate)}. Son importes actuales; no reconstruyen un saldo histórico.`,''];
+  if(settled)lines.push('Deuda cancelada significa deuda cero. No indica que la factura esté anulada.','');
   if(r.warning)lines.push(display(r.warning),'');
   lines.push(`Clientes distintos identificados: ${number(r.matchedCustomers)}. Pares serie/número distintos: ${number(r.matchedInvoicePairs)}.`,'');
   lines.push('Cada fila es un registro: serie/número todavía no demuestra una factura única. Los negativos se excluyen; cero indica deuda cancelada. No se suman importes ni se mezclan monedas.','');
   if(r.unknownDebtRows)lines.push('Hay registros con deuda desconocida; no se consideran cero ni cancelados.');
   if(r.invalidDueDateRows)lines.push('Hay vencimientos vacíos o inválidos, clasificados como sin vencimiento válido.');
-  if(!r.data.length)lines.push(r.totalRows?'No hay registros en esta página; los conteos corresponden al filtro completo.':'No se encontraron saldos para los filtros solicitados.');
+  if(!r.data.length)lines.push(r.totalRows?'No hay registros en esta página; los conteos corresponden al filtro completo.':settled?'No se encontraron facturas con deuda cancelada para los filtros solicitados.':'No se encontraron saldos para los filtros solicitados.');
   else lines.push(...table(['Serie de factura','Número de factura','Estado de deuda','Cliente','Razón social','RUC','Sector','Vencimiento','Estado de vencimiento','Días de atraso','Moneda (código)','Símbolo informado','Deuda'],r.data.map(row=>[
     display(row.invoiceSeries),display(row.invoiceNumber),display({pending:'Pendiente',settled:'Deuda cancelada',unknown:'Desconocida'}[row.debtState]),display(row.customerName),display(row.businessName),display(row.taxId),display(row.sector),display(row.dueDate),display(statuses[row.dueStatus]??row.dueStatus),number(row.daysOverdue),display(row.currencyCode),display(row.currencySymbol??'Sin símbolo'),exactBalance(row.debt)])));
   lines.push('',`Se muestran ${r.returnedRows} de ${r.totalRows} registros. Página ${r.page} de ${r.totalPages}.`);
@@ -27,11 +29,12 @@ export function buildInvoiceBalanceResponse(calls=[],{display=invoiceBalanceCell
   return lines.join('\n');
 }
 
-export function resolveInvoiceBalancePage({message,history=[]}) {
+export function resolveInvoiceBalancePage({message,history=[],pageState}) {
   if(!/^(?:ver m[aá]s|mostrar m[aá]s|siguiente(?: p[aá]gina)?|continuar)[.!?]?$/i.test(String(message).trim()))return null;
   const blocks=history.flatMap(m=>m.content??[]),calls=blocks.filter(b=>b.toolUse&&!b.toolUse.name.startsWith('search_')).map(b=>b.toolUse),last=calls.at(-1);
-  if(last?.name!=='get_invoice_balances')return null;
-  const response=blocks.find(b=>b.toolResult?.toolUseId===last.toolUseId)?.toolResult,result=response?.content?.find(b=>b.json)?.json;
+  if(last&&last.name!=='get_invoice_balances')return null;
+  const response=last?blocks.find(b=>b.toolResult?.toolUseId===last.toolUseId)?.toolResult:pageState;
+  const result=last?response?.content?.find(b=>b.json)?.json:pageState;
   if(response?.status!=='success'||!result?.queryContext)return null;
   if(!result.hasMore)return {answer:'No hay más páginas de saldos para los filtros consultados.'};
   return {toolName:'get_invoice_balances',input:{...structuredClone(result.queryContext),page:result.nextPage}};

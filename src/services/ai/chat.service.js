@@ -42,6 +42,8 @@ import {
   getSearchResolutions,
   setSearchResolutions,
   getSearchSelectionTurn,
+  getInvoiceBalancePageState,
+  setInvoiceBalancePageState,
 } from "../../state/conversation.store.js";
 import {
   compactMemberPurchasePaginationHistory,
@@ -157,6 +159,7 @@ Para esta etapa:
 Si el usuario solicita información que requiere una herramienta todavía no habilitada en este servicio, indícale brevemente que esa consulta aún no está disponible en esta etapa de migración.
 
 Para saldos de facturas (prioridad sobre facturas emitidas):
+- «cuya deuda ya está cancelada», «facturas pagadas», «sin deuda pendiente» y «ahora las canceladas» consultan get_invoice_balances con debtStatus="settled" (DEUDA = 0). Resuelve el cliente con search_invoice_balance_customers. Deuda cancelada no significa factura anulada: no traduzcas estas expresiones a cancelled=true ni uses get_invoices como alternativa ante ausencia. Al cambiar desde pendientes retira debtStatus="pending", reinicia página y conserva el cliente confirmado.
 - resuelve clientes exclusivamente con search_invoice_balance_customers; espera seleccion si hay ambiguedad. No inventes IDs.
 - get_invoice_balances permite registros individuales actuales, filtros de signo y vencimiento y antiguedad. No equivale a get_invoices ni a soles.
 - la vista expone SERIE_FACTURA, COD_MONEDA y DEUDA. Usa invoices para pares exactos invoiceSeries/invoiceNumber; no identifiques una factura solo por su numero. Protege ambos identificadores PII. Usa currencyCodes como identidad de divisa y nunca el simbolo. Repite numeros incluso entre clientes, sectores y codigos de moneda; no supongas que numero o fila identifican una factura.
@@ -1411,9 +1414,10 @@ const executeToolRequests = async ({ content, sessionId, sourceMessages = [], ch
     throwIfRequestAborted();
     const { toolUseId } = block.toolUse;
     let name=block.toolUse.name;
-    const reroutedInvoice=getSearchSelectionTurn(sessionId).pendingInvoice&&name==='get_invoices';
+    const invoiceDebtStatus=getSearchSelectionTurn(sessionId).invoiceDebtStatus??(getSearchSelectionTurn(sessionId).pendingInvoice?'pending':null);
+    const reroutedInvoice=invoiceDebtStatus&&name==='get_invoices';
     if(reroutedInvoice)name=block.toolUse.name='get_invoice_balances';
-    const reroutedCustomer=getSearchSelectionTurn(sessionId).pendingInvoice&&name==='search_invoice_customers';
+    const reroutedCustomer=invoiceDebtStatus&&name==='search_invoice_customers';
     if(reroutedCustomer)name=block.toolUse.name='search_invoice_balance_customers';
     let input = block.toolUse.input ?? {};
     if (name === "get_sales_per_sqm" && sqmFollowup) {
@@ -1446,7 +1450,7 @@ const executeToolRequests = async ({ content, sessionId, sourceMessages = [], ch
     }
 
     try {
-      if(reroutedInvoice)input=pendingInvoiceInput(getSearchResolutions(sessionId));
+      if(reroutedInvoice)input=pendingInvoiceInput(getSearchResolutions(sessionId),invoiceDebtStatus);
       if(reroutedCustomer)input={query:input.query};
       captureSearchQueryContext(sessionId,name,protectPiiDeep(sessionId,input));
       input=preserveSearchSelection({name,input,history:sourceMessages,currentCalls:internalContext.presentationCalls,resolutionState:getSearchResolutions(sessionId),selectionTurn:getSearchSelectionTurn(sessionId)});
@@ -1572,11 +1576,14 @@ const executeToolRequests = async ({ content, sessionId, sourceMessages = [], ch
           ],
         },
       });
-      if(name==='get_invoice_balances')recordInvoiceQueryContext(sessionId,name,protectPiiDeep(sessionId,input));
+      if(name==='get_invoice_balances'){
+        recordInvoiceQueryContext(sessionId,name,protectPiiDeep(sessionId,input));
+        setInvoiceBalancePageState(sessionId,{status:['data','empty'].includes(classifyInvoiceBalanceResult(result))?'success':'blocked',queryContext:protectedResultForModel.queryContext,hasMore:protectedResultForModel.hasMore,nextPage:protectedResultForModel.nextPage});
+      }
     } catch (error) {
       throwIfRequestAborted();
       const denied = isAccessDenied(error);
-      if(name==='get_invoice_balances'){delete presentationCall.result;actions={};}
+      if(name==='get_invoice_balances'){delete presentationCall.result;actions={};setInvoiceBalancePageState(sessionId,{status:'error'});}
       if (denied) {
         internalContext.accessDenied = true;
         actions = {};
@@ -1697,7 +1704,7 @@ export const chatService = async ({ message, sessionId }) => {
     restoreValue: (value) => restorePiiDeep(sessionId, value) });
   const promoFollowup = resolveMemberPromoPage({ message, history: protectedHistory, restoreValue: (value) => restorePiiDeep(sessionId, value) })
     ?? resolveMemberPromoSelection({ message, history: protectedHistory, restoreValue: (value) => restorePiiDeep(sessionId, value) });
-  const solesPage = resolveInvoiceBalancePage({message,history:protectedHistory})
+  const solesPage = resolveInvoiceBalancePage({message,history:protectedHistory,pageState:getSearchResolutions(sessionId).invoiceLastTool==='get_invoice_balances'?getInvoiceBalancePageState(sessionId):null})
     ?? resolveVehiclePage({ message, history: protectedHistory })
     ?? resolveVehicleGenderBreakdown({ message, history: protectedHistory })
     ?? resolveSolesUsagePage({ message, history: protectedHistory })
