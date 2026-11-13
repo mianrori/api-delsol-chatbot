@@ -92,3 +92,46 @@ test('untrusted cells remain escaped and failed results never become tables',()=
  const text=balance(result({data:[{...row,customerName:'Local | <script>\nOtra fila'}]}));assert.match(text,/Local \\\| \\<script\\>/);assert.equal(text.split('\n').filter(l=>l.startsWith('| ')).length,3);
  assert.equal(balance(result({success:false,error:'PRIVATE'})),null);assert.equal(detail({success:false}),null);
 });
+
+// The same display policy must hold for both authorized result shapes.
+for(const presenter of ['balances','invoices']){
+ const callsFor=({multiple=false}={})=>{
+  const customers=[{id:'C1',name:'Tienda Ejemplo'},{id:multiple?'C2':'C1',name:multiple?'Otro Local':'Tienda Ejemplo'}];
+  const data=customers.map((customer,i)=>presenter==='balances'
+   ?{...row,customerId:customer.id,customerName:customer.name,invoiceSeries:i?'B':'A',invoiceNumber:'0001'}
+   :{...invoice,customer:{...invoice.customer,customerId:customer.id,name:customer.name},invoiceSeries:i?'B':'A',invoiceNumber:'0001'});
+  return presenter==='balances'
+   ?[{name:'get_invoice_balances',result:result({data,totalRows:2,totalPages:1,hasMore:false,queryContext:{customerIds:multiple?['C1','C2']:['C1'],debtStatus:'pending'}})}]
+   :[{name:'get_invoices',input:{customerIds:multiple?['C1','C2']:['C1']},result:{data,page:1,totalRows:2,totalPages:1,hasMore:false,hasRestrictedData:true}}];
+ };
+ const render=(calls,message)=>(presenter==='balances'?buildInvoiceBalanceResponse:buildInvoiceDetailResponse)(calls,{message});
+ const assertIdentifiers=text=>{
+  assert.match(header(text),/Serie \| Número/);
+  assert.equal(text.split('\n').filter(line=>/^\| [AB] \| 0001 \|/.test(line)).length,2,'equal numbers remain distinguishable by series, without dropping rows');
+  assert.match(text,/Mostrando 2 de 2 registros\. Página 1 de 1\./);
+ };
+ for(const message of ['mostrar las facturas pendientes del cliente Tienda Ejemplo','mostrar las facturas del cliente Tienda Ejemplo','incluye las facturas del cliente Tienda Ejemplo']){
+  test(`${presenter}: ordinary client reference does not request a customer column: ${message}`,()=>{
+   const calls=callsFor(),before=structuredClone(calls),text=render(calls,message);
+   assert.equal((text.match(/Tienda Ejemplo/g)??[]).length,1);assert.match(text.split('\n')[0],/de Tienda Ejemplo\./);assert.doesNotMatch(header(text),/Cliente/);
+   assertIdentifiers(text);assert.deepEqual(calls,before);
+   assert.doesNotMatch(text,/PRIVATE-RUC|Sociedad Privada/);
+   if(presenter==='invoices'){assert.match(text,/Solo puedo mostrar los registros/);assert.match(text,/Ver PDF/);}
+  });
+ }
+ for(const message of ['incluye la columna cliente','muestra el cliente en cada fila','incluí la columna del cliente','muestra el cliente en cada registro']){
+  test(`${presenter}: explicit customer column request: ${message}`,()=>{
+   const calls=callsFor(),before=structuredClone(calls),text=render(calls,message);assert.match(header(text),/Cliente/);
+   const rows=text.split('\n').filter(line=>/^\| [AB] \| 0001 \|/.test(line));assert.ok(rows.every(line=>line.includes('Tienda Ejemplo')));
+   assertIdentifiers(text);assert.deepEqual(calls,before);
+  });
+ }
+ test(`${presenter}: multiple customers retain per-row identity and invoice identifiers`,()=>{
+  const calls=callsFor({multiple:true}),before=structuredClone(calls),text=render(calls,'mostrar las facturas pendientes');
+  assert.match(header(text),/Cliente/);assert.doesNotMatch(text.split('\n')[0],/de Tienda Ejemplo|de Otro Local/);
+  const customerIndex=header(text).split('|').map(cell=>cell.trim()).indexOf('Cliente');
+  const rows=text.split('\n').filter(line=>/^\| [AB] \| 0001 \|/.test(line));
+  assert.deepEqual(rows.map(line=>line.split('|').map(cell=>cell.trim())[customerIndex]),['Tienda Ejemplo','Otro Local']);
+  assertIdentifiers(text);assert.deepEqual(calls,before);
+ });
+}

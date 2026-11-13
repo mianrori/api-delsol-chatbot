@@ -28,7 +28,7 @@ export function invoiceSingleCustomer(rows,{customer,customerIds=[],totalRows}={
 export function invoicePresentationNeeds(message=''){
  const text=normalize(message).toLowerCase();
  return {tax:/\bruc\b/.test(text),business:/razon social/.test(text),sector:/\bsector\b/.test(text),contract:/\bcontrato\b/.test(text),plate:/matricula|chapa/.test(text),period:/periodo/.test(text),annulled:/anulad/.test(text),
-  customerColumn:/cliente.*(?:cada fila|cada registro)|(?:columnas?|inclui|incluye|mostrar).*\bcliente\b/.test(text),
+  customerColumn:/\bcolumna\s+(?:(?:de|del|el)\s+)?cliente\b|\bcliente\s+(?:en\s+)?cada\s+(?:fila|registro)\b|\bcada\s+(?:fila|registro)\s+(?:el\s+)?cliente\b/.test(text),
   late:/atraso|mora|dias.*venc/.test(text),dueState:/vencidas?|por vencer|vencen hoy/.test(text),rank:/ranking|posicion|mayores|menores/.test(text),
   historical:/histor|a la fecha|al \d|a fecha|\b(?:19|20)\d{2}\b/.test(text),paymentDate:/cuando.*(?:pag|cancel)|fecha.*(?:pago|cancel)|(?:pago|cancelacion).*fecha/.test(text)};
 }
