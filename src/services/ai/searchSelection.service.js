@@ -144,8 +144,8 @@ export function captureSearchQueryContext(sessionId,name,input){
  turn.capturedConsumers=[...(turn.capturedConsumers??[]),name];setSearchSelectionTurn(sessionId,turn);
 }
 
-// Called after the selection guard and input validation, even when Oracle denies
-// execution. Persist only protected scope metadata, never invoice rows.
+// Balances commit only after a usable result; billing retains its existing policy.
+// Persist only protected scope metadata, never invoice rows.
 export function recordInvoiceQueryContext(sessionId,name,input){
  if(name==='get_invoice_balances'){const state=getSearchResolutions(sessionId);state.invoiceLastTool=name;state.contexts[name]=structuredClone(input);setSearchResolutions(sessionId,state);return;}
  if(name!=='get_invoices')return;

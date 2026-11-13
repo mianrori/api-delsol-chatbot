@@ -1,6 +1,7 @@
 import {buildInvoiceBalanceResponse,resolveInvoiceBalancePage,invoiceBalanceCell} from './invoiceBalancePresentation.service.js';
 import {executeNamedInvoiceRequest} from './invoiceNamedRequest.service.js';
 import {executePendingInvoiceRequest,pendingInvoiceInput} from './invoicePendingRequest.service.js';
+import {classifyInvoiceBalanceResult,INVOICE_BALANCE_FAILURE_MESSAGE} from './invoiceBalanceResult.service.js';
 import {buildInvoiceDetailResponse, appendInvoiceAccessWarning} from './invoiceDetailPresentation.service.js';
 import {applySalesMetrics} from './salesMetrics.service.js';
 import { buildMemberPurchasesResponse, resolveMemberPurchasesPage } from "./memberPurchasesPresentation.service.js";
@@ -1452,7 +1453,7 @@ const executeToolRequests = async ({ content, sessionId, sourceMessages = [], ch
       if(name==='get_sales')input=applySalesMetrics(input,getSearchSelectionTurn(sessionId).salesMetrics);
       block.toolUse.input=input;presentationCall.input=input;
       validateProtectedToolInput({ name, input });
-      recordInvoiceQueryContext(sessionId,name,protectPiiDeep(sessionId,input));
+      if(name!=='get_invoice_balances')recordInvoiceQueryContext(sessionId,name,protectPiiDeep(sessionId,input));
 
       if (name === "generate_chart" && !chartRequested) throw new Error("El usuario debe solicitar el gráfico antes de generarlo.");
       const restoredInput = name === "generate_chart" ? input : restorePiiDeep(sessionId, input);
@@ -1475,6 +1476,11 @@ const executeToolRequests = async ({ content, sessionId, sourceMessages = [], ch
       });
       throwIfRequestAborted();
 
+      if(name==='get_invoice_balances'){
+        const outcome=classifyInvoiceBalanceResult(result);
+        if(outcome==='denied')throw Object.assign(Error(ACCESS_DENIED_MESSAGE),{code:ACCESS_DENIED_CODE});
+        if(outcome==='failed')throw Error(INVOICE_BALANCE_FAILURE_MESSAGE);
+      }
       actions = mergeActions(
         actions,
         extractClientActions({ name, result }),
@@ -1566,14 +1572,16 @@ const executeToolRequests = async ({ content, sessionId, sourceMessages = [], ch
           ],
         },
       });
+      if(name==='get_invoice_balances')recordInvoiceQueryContext(sessionId,name,protectPiiDeep(sessionId,input));
     } catch (error) {
       throwIfRequestAborted();
       const denied = isAccessDenied(error);
+      if(name==='get_invoice_balances'){delete presentationCall.result;actions={};}
       if (denied) {
         internalContext.accessDenied = true;
         actions = {};
       }
-      const protectedErrorMessage = denied ? ACCESS_DENIED_MESSAGE : protectPiiText(
+      const protectedErrorMessage = denied ? ACCESS_DENIED_MESSAGE : name==='get_invoice_balances' ? INVOICE_BALANCE_FAILURE_MESSAGE : protectPiiText(
         sessionId,
         error?.message || "Error ejecutando la herramienta.",
       );
