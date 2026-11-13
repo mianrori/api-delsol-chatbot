@@ -17,10 +17,11 @@ export function buildInvoiceBalanceResponse(calls=[],{display=invoiceCell,messag
   const settled=r.queryContext?.debtStatus==='settled';
   const groups=r.queryContext?.groupBy??[],labels={customer:'Cliente',sector:'Sector',dueMonth:'Mes de vencimiento',dueStatus:settled?'Vencimiento respecto de la referencia':'Vencimiento',agingBand:settled?'Antigüedad del vencimiento':'Antigüedad'};
   const dueLabels=settled?{overdue:'Anterior a la referencia',dueToday:'En la fecha de referencia',upcoming:'Posterior a la referencia',notDue:'En o después de la referencia',undated:'No informado'}:statuses;
+  const agingLabels={undated:'No informado',notDue:'En o después de la referencia',dueToday:'En la fecha de referencia'};
   if(settled&&groups.some(group=>['dueStatus','agingBand'].includes(group)))lines.push('La fecha de vencimiento no indica mora actual ni la fecha de pago.');
   const fields=[['Moneda',row=>display(invoiceCurrencyLabel(row))]];
   for(const group of groups){if(group==='invoice'){fields.push(['Serie',row=>display(row.invoiceSeries)],['Número',row=>display(row.invoiceNumber)]);continue;}
-   fields.push([labels[group]??'Grupo',row=>display(group==='customer'?row.customerName??'Nombre no informado':group==='dueStatus'?dueLabels[row.dueStatus]??'No informado':row[{sector:'sector',dueMonth:'dueMonth',agingBand:'agingBand'}[group]])]);}
+   fields.push([labels[group]??'Grupo',row=>display(group==='customer'?row.customerName??'Nombre no informado':group==='dueStatus'?dueLabels[row.dueStatus]??'No informado':group==='agingBand'?agingLabels[row.agingBand]??row.agingBand:row[{sector:'sector',dueMonth:'dueMonth'}[group]])]);}
   if(r.monetaryAggregationAvailable===true)fields.push(['Facturas',row=>invoiceNumber(row.invoiceCount)]);
   fields.push(['Deuda',row=>exactBalance(row.debt)]);if(needs.rank)fields.push(['Posición en su moneda',row=>invoiceNumber(row.currencyRank)]);
   if(r.data.length)lines.push('',...invoiceTable(fields.map(([label])=>label),r.data.map(row=>fields.map(([,format])=>format(row)))));

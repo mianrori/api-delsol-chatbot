@@ -66,6 +66,7 @@ test('zero and out-of-range pages state only the absence actually established',(
 test('settled summaries keep supplied groups without presenting current arrears',()=>{
  const r=result({status:'OK_SUMMARY',mode:'summary',queryContext:{debtStatus:'settled',groupBy:['dueStatus','agingBand']},data:[{currencyCode:'PYG',dueStatus:'overdue',agingBand:'31-60',debt:'0.00'}]});
  const before=structuredClone(r),text=balance(r);assert.match(text,/Anterior a la referencia/);assert.match(text,/Antigüedad del vencimiento/);assert.match(text,/31-60/);assert.match(text,/no indica mora actual ni la fecha de pago/);assert.doesNotMatch(text,/Vencida|Días de atraso/);assert.deepEqual(r,before);
+ for(const agingBand of ['notDue','dueToday','undated']){const output=balance({...r,data:[{...r.data[0],agingBand}]});assert.doesNotMatch(output,/notDue|dueToday|undated/);assert.match(output,/referencia|No informado/);}
 });
 const invoice={invoiceNumber:'SER-0001',issueDate:'2026-11-01',dueDate:'2026-12-01',customer:{customerId:'C1',name:'Tienda Uno',businessName:'Sociedad Privada',taxId:'PRIVATE-RUC'},concept:{description:'Alquiler'},contract:{series:'NOT-INVOICE-SERIES',number:'99'},currencySymbol:'PYG',amount:0,cancelled:false,pdfUrl:'https://pdf.example.test/a (1).pdf'};
 const detail=(changes={},options={})=>buildInvoiceDetailResponse([{name:'get_invoices',input:{customerIds:['C1']},result:{page:1,totalPages:28,totalRows:541,totalInvoices:400,hasMore:true,data:[invoice,{...invoice,invoiceNumber:'SER-0002',pdfUrl:null}],...changes}}],options);
