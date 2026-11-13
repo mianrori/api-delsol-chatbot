@@ -64,6 +64,10 @@ test('zero and out-of-range pages state only the absence actually established',(
  const empty=balance(result({data:[],returnedRows:0,totalRows:0,totalPages:0,hasMore:false,queryContext:{debtStatus:'settled'}}));assert.ok(empty.startsWith('No encontré facturas con deuda cancelada'));assert.match(empty,/Mostrando 0 de 0 registros\./);assert.doesNotMatch(empty,/Página 1 de 0|siguiente|\|/);
  const outside=balance(result({data:[],page:99,hasMore:false}));assert.ok(outside.startsWith('No hay registros en esta página'));assert.doesNotMatch(outside,/No encontré facturas|siguiente página/);
 });
+test('Oracle decimal strings without an integer part retain exact cents without Number conversion',()=>{
+ for(const [debt,expected]of [['.01','0,01'],['.1','0,10'],['000123.40','123,40'],['1234.','1.234,00'],['9007199254740993.01','9.007.199.254.740.993,01']])assert.ok(balance(result({data:[{...row,debt}]})).includes('| '+expected+' |'));
+ assert.match(balance(result({data:[{...row,debt:'0.001'}]})),/Importe no representable/);
+});
 test('settled summaries keep supplied groups without presenting current arrears',()=>{
  const r=result({status:'OK_SUMMARY',mode:'summary',queryContext:{debtStatus:'settled',groupBy:['dueStatus','agingBand']},data:[{currencyCode:'PYG',dueStatus:'overdue',agingBand:'31-60',debt:'0.00'}]});
  const before=structuredClone(r),text=balance(r);assert.match(text,/Anterior a la referencia/);assert.match(text,/Antigüedad del vencimiento/);assert.match(text,/31-60/);assert.match(text,/no indica mora actual ni la fecha de pago/);assert.doesNotMatch(text,/Vencida|Días de atraso/);assert.deepEqual(r,before);

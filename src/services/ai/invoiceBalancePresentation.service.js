@@ -1,6 +1,6 @@
 import {invoiceCell,invoiceNumber,invoiceCurrencyLabel,invoiceTable,invoicePagination,invoiceSingleCustomer,invoicePresentationNeeds} from './invoicePresentation.service.js';
 export const invoiceBalanceCell=invoiceCell;
-const exactBalance=value=>{if(value==null)return 'No informada';const m=/^(-?)(\d+)(?:\.(\d{1,2}))?$/.exec(String(value));return m?m[1]+m[2].replace(/\B(?=(\d{3})+(?!\d))/g,'.')+','+(m[3]??'').padEnd(2,'0'):'Importe no representable';};
+const exactBalance=value=>{if(value==null)return 'No informada';const m=/^(-?)(?:(\d+)(?:\.(\d{0,2}))?|\.(\d{1,2}))$/.exec(String(value));return m?m[1]+(m[2]??'0').replace(/^0+(?=\d)/,'').replace(/\B(?=(\d{3})+(?!\d))/g,'.')+','+(m[3]??m[4]??'').padEnd(2,'0'):'Importe no representable';};
 const statuses={overdue:'Vencida',dueToday:'Vence hoy',upcoming:'Por vencer',undated:'No informado',notDue:'No vencida'};
 const integrityWarning=r=>r.duplicateRows>0?'Hay registros históricos duplicados; por eso no puedo calcular un total confiable.':r.missingIdentityRows>0?'Faltan datos para identificar algunas facturas; no puedo calcular un total confiable.':r.unknownDebtRows>0?'Hay registros con deuda no informada; no puedo calcular un total confiable.':r.missingCurrencyRows>0?'Falta identificar la moneda de algunos importes; no puedo calcular un total confiable.':'Hay registros históricos inconsistentes o datos incompletos; no puedo calcular un total confiable.';
 export function buildInvoiceBalanceResponse(calls=[],{display=invoiceCell,message='',currencyLabels={}}={}){

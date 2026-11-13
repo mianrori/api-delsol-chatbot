@@ -10,7 +10,7 @@ export async function executeGlobalInvoiceBalanceRequest({sessionId,message,exec
  const initial=isGlobalPendingTotal(message),detail=isUsdBalanceDetail(message);
  if(!initial&&!detail)return null;
  const previous=previousState??getSearchResolutions(sessionId),current=getSearchResolutions(sessionId),scope=current.contexts.get_invoice_balances;
- if(!initial&&(current.invoiceLastTool!=='get_invoice_balances'||!scope||scope.customerIds?.length!==0||scope.debtStatus!=='pending'))return {answer:'Primero indicá el alcance de saldos pendientes que querés detallar.'};
+ if(!initial&&(current.invoiceLastTool!=='get_invoice_balances'||!scope||scope.customerIds?.length!==0||scope.debtStatus!=='pending'))return null;
  let input={customerIds:[],debtStatus:'pending',mode:'summary',groupBy:[],orderBy:'group',page:1,rows:20},currency;
  if(detail){
   currency=await execute('resolve_invoice_balance_currency',{currency:'USD'});

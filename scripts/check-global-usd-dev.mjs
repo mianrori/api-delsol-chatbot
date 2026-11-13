@@ -49,7 +49,8 @@ try{
    for(let i=0;i<expected.length;i++){const d=r.data[i],e=expected[i];check(d.invoiceSeries===(e.SERIE_FACTURA??null)&&d.invoiceNumber===(e.NRO_FACTURA??null)&&d.customerId===(e.COD_CLIENTE??null)&&d.currencyCode===e.COD_MONEDA&&d.debt===String(e.DEUDA)&&Number(d.debt)>0,'INDEPENDENT_IDENTIFIERS_CURRENCY_EXACT_DEBT');
     const cells=table[i+2].split(/(?<!\\)\|/).slice(1,-1).map(v=>v.trim()),headers=table[0].split('|').slice(1,-1).map(v=>v.trim()),at=name=>cells[headers.indexOf(name)];
     check(at('Serie')===invoiceCell(d.invoiceSeries)&&at('Número')===invoiceCell(d.invoiceNumber)&&at('Cliente')===invoiceCell(d.customerName??d.businessName)&&at('Moneda')==='USD','EXACT_COMMERCIAL_ROW_PRESENTATION');
-    const [whole,fraction='']=String(e.DEUDA).split('.'),amount=whole.replace(/\B(?=(\d{3})+(?!\d))/g,'.')+','+fraction.padEnd(2,'0');check(at('Deuda')===amount,'PRESENTED_DECIMAL_EXACTNESS');
+    if(/^\./.test(String(e.DEUDA)))report.sourceDecimalWithoutIntegerPartObserved=true;
+    const [whole,fraction='']=String(e.DEUDA).split('.'),amount=(whole||'0').replace(/^0+(?=\d)/,'').replace(/\B(?=(\d{3})+(?!\d))/g,'.')+','+fraction.padEnd(2,'0');check(at('Deuda')===amount,'PRESENTED_DECIMAL_EXACTNESS');
    }
    if(r.duplicateRows>0)check(entry.body.response.includes('históricos duplicados')&&r.invoiceCount===null,'DUPLICATES_RETAINED_AND_TOTAL_BLOCKED');
    const state=restorePiiDeep(sessionId,store.getSearchResolutions(sessionId));check(state.contexts.get_invoice_balances.customerIds.length===0&&state.contexts.get_invoice_balances.currencyCodes[0]===code,'PERSISTED_SCOPE_AFTER_PAGE');

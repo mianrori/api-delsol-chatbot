@@ -17,7 +17,7 @@ const sessions=await load('../../src/services/sessions/oracleSession.service.js'
   if(sql.includes('LEFT JOIN ranked'))return {rows:[{TOTAL_ROWS:50,DUPLICATE_ROWS:2,TOTAL_GROUPS:0}]};
   assert.equal(binds.currencyCodes0,'CODE-X');
   if(!sql.includes('ROW_NUMBER()'))return {rows:[{TOTAL_ROWS:scenario==='empty'?0:41,DISTINCT_CUSTOMERS:3,DUPLICATE_ROWS:2}]};
-  return {rows:scenario==='empty'?[]:Array.from({length:Math.max(0,Math.min(41,binds.maxRow)-binds.offset)},(_,i)=>({SERIE_FACTURA:i%2?'PRIVATE-S2':'PRIVATE-S1',NRO_FACTURA:'PRIVATE-N'+(i+binds.offset),COD_CLIENTE:'PRIVATE-C'+i%3,NOM_CLIENTE:'PRIVATE-NAME'+i%3,DUE_DATE:new Date('2030-01-01'),VENCIMIENTO:'01/01/2030',COD_MONEDA:'CODE-X',SIMBOLO_MONEDA:'$',DEUDA:'9007199254740993.01'}))};
+  return {rows:scenario==='empty'?[]:Array.from({length:Math.max(0,Math.min(41,binds.maxRow)-binds.offset)},(_,i)=>({SERIE_FACTURA:i%2?'PRIVATE-S2':'PRIVATE-S1',NRO_FACTURA:'PRIVATE-N'+(i+binds.offset),COD_CLIENTE:'PRIVATE-C'+i%3,NOM_CLIENTE:'PRIVATE-NAME'+i%3,DUE_DATE:new Date('2030-01-01'),VENCIMIENTO:'01/01/2030',COD_MONEDA:'CODE-X',SIMBOLO_MONEDA:'$',DEUDA:i===0?'.01':'9007199254740993.01'}))};
  }};}},
  '../../repositories/sessions/oracleSession.repository.js':{async getOracleSessionRepository(){return {username:'SERVER-ONLY',status:'ACTIVE'};},async touchOracleSessionRepository(){}},
 });

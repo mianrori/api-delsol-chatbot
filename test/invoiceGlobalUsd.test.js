@@ -2,7 +2,12 @@ import test from 'node:test';import assert from 'node:assert/strict';import {spa
 import {resolveInvoiceBalanceCurrency,normalizeInvoiceBalanceArgs,getInvoiceBalances} from '../src/services/invoices/invoiceBalances.service.js';
 import {publicAssistantText,stripInternalReasoning} from '../src/services/ai/assistantOutput.service.js';
 import {getInvoiceBalancesTool} from '../src/tools/invoices/invoiceBalances.tool.js';
+import {executeGlobalInvoiceBalanceRequest} from '../src/services/ai/invoiceGlobalRequest.service.js';
+import {setSearchResolutions,clearConversation} from '../src/state/conversation.store.js';
 const catalogue=rows=>({queries:[],async execute(sql,binds){this.queries.push({sql,binds});return {rows};}});
+test('global USD followup handler leaves existing single-customer flows to their own resolver',async()=>{
+ const sessionId='SCOPED-USD';try{setSearchResolutions(sessionId,{domains:{},invoiceLastTool:'get_invoice_balances',contexts:{get_invoice_balances:{customerIds:['KNOWN'],debtStatus:'pending'}}});assert.equal(await executeGlobalInvoiceBalanceRequest({sessionId,message:'Detalla las que son en dólares',execute:async()=>assert.fail('must not execute a global query')}),null);}finally{clearConversation(sessionId);}
+});
 test('contract, service and repository already allow global paginated detail without customer fanout',async()=>{
  assert.equal(getInvoiceBalancesTool.toolSpec.inputSchema.json.required,undefined);
  assert.deepEqual(normalizeInvoiceBalanceArgs({mode:'detail'}).customerIds,[]);
