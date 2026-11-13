@@ -1,6 +1,22 @@
 # Facturas pendientes: selección de herramienta y alcance
 
-PR en borrador sobre `feature/chat-sales-pilot`. Candidato ejecutado: **c6fcb4bcda9a62ebe09df243ac8072bff21489e7**; base **dcfaba0**. Sin merge ni despliegue.
+PR #52 en borrador sobre `feature/chat-sales-pilot`; base **dcfaba0**. Corrección de resultados validada: **36c72b773f016ff66082aace4b60a8251a5e0c64**. La validación Oracle original corresponde exclusivamente a **c6fcb4bcda9a62ebe09df243ac8072bff21489e7**. Sin merge ni despliegue.
+
+## Corrección del falso éxito y conservación del contexto
+
+Antes, un fallo de `get_invoice_balances` podía terminar con «Consulta de facturas pendientes realizada» y reemplazar el contexto válido. En **36c72b7**, el ejecutor clasifica el resultado antes de crear presentación, acciones o protocolo de éxito. Se distinguen datos, vacío válido, `ACCESS_DENIED` y fallo (resultado ausente, `success:false`, error devuelto o estado inesperado). Los estados de bloqueo por integridad siguen mostrando sus explicaciones, sin habilitar cálculos.
+
+Un fallo devuelve únicamente «No se pudo completar la consulta de facturas pendientes. Inténtalo de nuevo». No se publica el error crudo en respuesta, historial o logs. El intento queda como `toolResult.status=error`, sin datos, contexto de paginación ni acciones de éxito. El HTTP de chat conserva su sobre de conversación `success:true`; eso no representa éxito de la herramienta, cuyo estado es error.
+
+El contexto de saldos solo se confirma después de construir un resultado válido. En ambas ramas deterministas, denegación o fallo restauran el estado de resolución anterior, incluido cliente, buscador y contexto de la última consulta válida. Una búsqueda nominal puede resolver un cliente nuevo, pero un fallo posterior no lo convierte en el cliente confirmado de una consulta completada. El vacío válido sí confirma la consulta y muestra ausencia de registros; los datos válidos conservan la tabla existente. No cambian SQL, repositorios de facturas, sesiones, permisos ni expiraciones.
+
+[Reporte de pruebas afectadas de 36c72b7](invoice-pending-result-36c72b7.json): **96/96 con Node 22.23.5**, 13/11/2026 10:31:58–10:32:08 America/Asuncion (13:31 UTC). Incluye **16 regresiones HTTP nuevas**: rama nominal y «solo las pendientes», cada una con `undefined`, excepción capturada, resultado con error y datos/paginación/acciones espurios, denegación lanzada, denegación devuelta, vacío válido, datos válidos y resultado malformado. Comprueban estado anterior intacto en fallos, protocolo de error sin consulta completada, ausencia de error crudo y de efectos de éxito, SQL pendiente y cierres de conexiones simuladas. El SDK controlado no se invoca en estas expresiones.
+
+```text
+node --test test/invoicePendingResultHttp.test.js test/invoicePendingRouting.test.js test/invoiceBalances.test.js test/invoiceBalancesHttp.test.js test/invoiceBalanceIntegrity.test.js test/invoiceNamedRequest.test.js test/searchSelection.test.js
+```
+
+Solo se ejecutaron pruebas afectadas. Cero llamadas a Oracle real o al proveedor; cero logins, modificaciones de datos, permisos o expiraciones. Se usó una extracción Git temporal del candidato con Node 22 y dependencias de DEV, sin reemplazar el despliegue. La suite global y los controles Oracle ya aprobados **no se repitieron**: sus cifras siguientes son evidencia histórica de c6fcb4b, no una certificación global ni Oracle de 36c72b7. La PR se mantiene en borrador hasta revisar esta corrección.
 
 Pregunta original suministrada por el usuario: **«¿Qué facturas pendientes de pago tiene Impacto?»**.
 
@@ -26,7 +42,7 @@ Argumentos efectivos comprobados, con el identificador redactado únicamente en 
 }
 ```
 
-## Contraste HTTP y Oracle independiente
+## Contraste HTTP y Oracle independiente original: c6fcb4b
 
 [Reporte sanitizado](invoice-pending-oracle-http-c6fcb4b.json), SHA-256 `bfc0d2fee66bb493666657d8b209520ac69fd64777e5b0bb110d1b4568de3582`. Ejecución 13/11/2026, **09:50:13–09:50:38 America/Asuncion** (12:50 UTC).
 
@@ -42,7 +58,7 @@ Identidad comprobada: sessionId de login ERP → PostgreSQL → usuario Oracle p
 
 Una ejecución preliminar del candidato 9313c23 pasó el contraste pero falló al confirmar logout. Se cerró después exclusivamente esa sesión propia mediante el endpoint ERP, se verificó CLOSED y se auditó el intervalo; no se reutiliza como evidencia del candidato final.
 
-## Regresiones y límites
+## Regresiones y límites históricos: c6fcb4b
 
 **80/80 pruebas afectadas con Node 22.23.5**:
 
