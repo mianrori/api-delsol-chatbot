@@ -21,7 +21,7 @@ try{
  report.success=report.validation?.success===true;
 }catch(e){report.error={code:/^[A-Z][A-Z0-9_]+$/.test(e.message)?e.message:'PENDING_HELPER_FAILED'};}
 finally{
- payload=null;if(sessionId){try{await logoutDev(sessionId);report.logout=true;}catch{report.logout=false;report.success=false;}sessionId=null;}
+ payload=null;if(sessionId){report.logoutAttempts=0;report.logout=false;for(let i=0;i<2&&!report.logout;i++){report.logoutAttempts++;try{await logoutDev(sessionId);report.logout=true;}catch{}}if(!report.logout)report.success=false;sessionId=null;}
  report.finishedAt=new Date().toISOString();report.logAudit=[];
  for(const container of [bot,'api-delsol-erp-dev'])try{const audit=auditAffectedLogs(dock('logs','--since',report.startedAt,'--until',report.finishedAt,container),container===bot?'chatbot':'erp');report.logAudit.push({service:container===bot?'chatbot':'erp',...audit});if(!audit.safe||audit.bedrockRequestEvents||audit.bedrockResponseEvents)report.success=false;}catch{report.success=false;report.logAudit.push({failed:true});}
  if(before){const after=JSON.parse(dock('inspect',bot))[0];report.deployedImageAndStartUnchanged=before.Image===after.Image&&before.State.StartedAt===after.State.StartedAt;if(!report.deployedImageAndStartUnchanged)report.success=false;}

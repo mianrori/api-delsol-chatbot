@@ -1412,7 +1412,8 @@ const executeToolRequests = async ({ content, sessionId, sourceMessages = [], ch
     let name=block.toolUse.name;
     const reroutedInvoice=getSearchSelectionTurn(sessionId).pendingInvoice&&name==='get_invoices';
     if(reroutedInvoice)name=block.toolUse.name='get_invoice_balances';
-    if(getSearchSelectionTurn(sessionId).pendingInvoice&&name==='search_invoice_customers')name=block.toolUse.name='search_invoice_balance_customers';
+    const reroutedCustomer=getSearchSelectionTurn(sessionId).pendingInvoice&&name==='search_invoice_customers';
+    if(reroutedCustomer)name=block.toolUse.name='search_invoice_balance_customers';
     let input = block.toolUse.input ?? {};
     if (name === "get_sales_per_sqm" && sqmFollowup) {
       input = preserveSalesPerSqmFollowup({ ...sqmFollowup, input }) ?? input;
@@ -1445,6 +1446,7 @@ const executeToolRequests = async ({ content, sessionId, sourceMessages = [], ch
 
     try {
       if(reroutedInvoice)input=pendingInvoiceInput(getSearchResolutions(sessionId));
+      if(reroutedCustomer)input={query:input.query};
       captureSearchQueryContext(sessionId,name,protectPiiDeep(sessionId,input));
       input=preserveSearchSelection({name,input,history:sourceMessages,currentCalls:internalContext.presentationCalls,resolutionState:getSearchResolutions(sessionId),selectionTurn:getSearchSelectionTurn(sessionId)});
       if(name==='get_sales')input=applySalesMetrics(input,getSearchSelectionTurn(sessionId).salesMetrics);

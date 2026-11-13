@@ -37,6 +37,7 @@ const lookupShape=(name,result)=>{
 export function beginSearchSelectionTurn(sessionId,message){
  const state=getSearchResolutions(sessionId),turn={selectedThisTurn:[],validLookups:[],capturedConsumers:[],requestedDomains:[],salesLocalRemovalChange:getSalesLocalRemovalChange(message)};let changed=false;
  turn.pendingInvoice=isPendingInvoiceRequest(message);
+ if(turn.pendingInvoice){delete state.invoiceNamedRequest;changed=true;}
  const balanceText=String(message??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
  turn.invoiceBalanceAll=/\b(?:saldo|saldos|deuda|deudas|debe|deben|adeuda|adeudan)\b/.test(balanceText)&&(/\b(?:todos|todas) (?:los |las )?(?:clientes|locales)\b/.test(balanceText)||/\bsaldos? generales?(?: por (?:moneda|sector))?\s*[?.!]?\s*$/.test(balanceText));
  if(turn.invoiceBalanceAll){delete state.domains.search_invoice_balance_customers;state.contexts.get_invoice_balances={customerIds:[]};if(state.choiceFocus==='search_invoice_balance_customers')delete state.choiceFocus;changed=true;}
@@ -103,10 +104,11 @@ export function beginSearchSelectionTurn(sessionId,message){
 // Store only protected resolver IDs/options and arguments, never business rows.
 export function recordSearchToolResult(sessionId,name,input,result){
  const state=getSearchResolutions(sessionId);
- if(name==='search_invoice_balance_customers'){
+ if(['search_invoice_balance_customers','search_invoice_customers'].includes(name)){
   const {resolved,valid}=lookupShape(name,result);if(!valid)return false;
   const minimal=o=>Object.fromEntries(['option','customerId','customerName','businessName','taxId'].filter(k=>o?.[k]!=null).map(k=>[k,o[k]]));
   state.domains[name]=resolved?{kind:'resolved',selected:minimal(result),call:{input:structuredClone(input)},result:{options:[]}}:{kind:'pending',call:{input:structuredClone(input)},result:{options:(result.options??[]).map(minimal)}};
+  state.invoiceLastTool=name==='search_invoice_customers'?'get_invoices':'get_invoice_balances';
   state.choiceFocus=name;setSearchResolutions(sessionId,state);return true;
  }
  if(persistentSearches.includes(name)){
@@ -170,6 +172,7 @@ export function preserveSearchSelection({name,input,history=[],currentCalls=[],r
   if(text!=null){
    currentText=text;
    turn++;turnTexts.set(turn,text);
+   if(isPendingInvoiceRequest(text)){states.delete('search_invoice_customers');states.delete('search_invoice_concepts');}
    if(getInvoicePlateRequest(text)?.autonomous){
     states.delete('search_invoice_customers');states.delete('search_invoice_concepts');
     for(let i=queries.length-1;i>=0;i--)if(queries[i].name==='get_invoices')queries.splice(i,1);

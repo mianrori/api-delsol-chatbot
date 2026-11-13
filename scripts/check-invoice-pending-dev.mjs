@@ -10,6 +10,7 @@ import {protectPiiDeep,restorePiiDeep} from '../src/services/ai/pii.service.js';
 import {getValidOracleSession,withOracleProxySession} from '../src/services/sessions/oracleSession.service.js';
 import {closeOracleSessionsPool} from '../src/database/oracleSessions.database.js';
 import {getInvoiceBalances} from '../src/services/invoices/invoiceBalances.service.js';
+import {invoiceBalanceCell} from '../src/services/ai/invoiceBalancePresentation.service.js';
 const emit=process.stdout.write.bind(process.stdout);for(const key of ['log','info','warn','error','debug','trace','dir','table'])console[key]=()=>{};
 const report={suite:'invoice-pending-dev',commit:process.argv[2],success:false,checks:[],cases:[],noDeployment:true};
 const check=(ok,code)=>{report.checks.push({code,passed:Boolean(ok)});if(!ok)throw Error(code);};
@@ -53,6 +54,11 @@ try{
    for(const row of r.data){const k=tuple({SERIE_FACTURA:row.invoiceSeries,NRO_FACTURA:row.invoiceNumber,COD_CLIENTE:row.customerId,NOM_CLIENTE:row.customerName,VENCIMIENTO:row.dueDate,COD_MONEDA:row.currencyCode,DEUDA:row.debt});check((bag.get(k)??0)>0,'INDEPENDENT_DETAIL_FIELDS_MULTIPLICITY');bag.set(k,bag.get(k)-1);check(Number(row.debt)>0,'NO_SETTLED_NEGATIVE_OR_UNKNOWN');}
   });
   if(r.data.length)for(const col of ['Serie de factura','Número de factura','Cliente','Vencimiento','Moneda (código)','Deuda'])check(body.response.includes(col),'RESPONSE_REQUIRED_COLUMN');
+  check(r.data.length===Math.min(r.totalRows,20),'DETAIL_PAGE_COMPLETE');
+  for(const row of r.data){
+   for(const key of ['invoiceSeries','invoiceNumber','customerName','dueDate','currencyCode'])if(row[key]!=null)check(body.response.includes(invoiceBalanceCell(row[key])),'RESPONSE_INDEPENDENT_FIELD');
+   const [whole,fraction='']=row.debt.split('.');const formatted=whole.replace(/\B(?=(\d{3})+(?!\d))/g,'.')+','+fraction.padEnd(2,'0');check(body.response.includes(formatted),'RESPONSE_EXACT_DEBT');
+  }
   report.cases.push({label,tool:query.name,effectiveArguments:{customerIds:'same resolved customer (redacted)',mode:query.input.mode,debtStatus:query.input.debtStatus,page:query.input.page,rows:query.input.rows},hasRows:r.data.length>0,independentOracle:true});
  }
  await verify('original',original);
