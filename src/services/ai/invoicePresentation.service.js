@@ -16,13 +16,14 @@ export function invoicePagination(result,returnedRows){
  if(result.hasMore)text+=' Podés pedir la siguiente página.';
  return text;
 }
-export function invoiceSingleCustomer(rows,{customer,customerIds=[],matchedCustomers,totalRows}={}){
+export function invoiceSingleCustomer(rows,{customer,customerIds=[],totalRows}={}){
  if(!rows.length)return null;
  const people=rows.map(customer),first=people[0];
  if(first?.id==null||!people.every(p=>p?.id!=null&&String(p.id)===String(first.id)))return null;
  const scoped=customerIds.length===1&&String(customerIds[0])===String(first.id);
  const complete=Number.isInteger(totalRows)&&totalRows===rows.length;
- return scoped||matchedCustomers===1||complete?first.name??null:null;
+ // COUNT(DISTINCT customer) ignores NULL identities on other pages.
+ return scoped||complete?first.name??null:null;
 }
 export function invoicePresentationNeeds(message=''){
  const text=normalize(message).toLowerCase();

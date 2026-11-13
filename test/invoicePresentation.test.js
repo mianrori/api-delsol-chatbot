@@ -15,6 +15,7 @@ test('pending detail starts with the result, identifies one scoped customer once
 });
 test('a page showing one customer does not establish a single-customer result',()=>{
  const text=balance(result({matchedCustomers:2,queryContext:{debtStatus:'pending',customerIds:[]}}));assert.match(header(text),/Cliente/);assert.ok(!text.startsWith('Estas son las facturas pendientes de pago de Tienda Uno'));
+ const nullableScope=balance(result({matchedCustomers:1,queryContext:{debtStatus:'pending',customerIds:[]}}));assert.match(header(nullableScope),/Cliente/);assert.ok(!nullableScope.startsWith('Estas son las facturas pendientes de pago de Tienda Uno'));
 });
 test('missing customer identity never collapses rows with coincident names',()=>{
  assert.match(header(balance(result({data:[{...row,customerId:null}],matchedCustomers:1}))),/Cliente/);
