@@ -1,5 +1,13 @@
 # Alcance y evidencia del backend del chatbot
 
+## PR #53 fusionada y desplegada: e471261
+
+Merge autorizado y rama local actualizada por avance rápido; solo chatbot Docker DEV reconstruido. Salud HTTP 200, PM2 online/cero reinicios, Node 22.23.5; 265 archivos y 15 módulos cargados coinciden con el merge. Código ejecutable igual al candidato 879dcf2 (118/118 pruebas afectadas anteriores); c7bd25e solo documenta.
+
+**750 comprobaciones, cinco POST reales en 5400:** literal de Impacto con deuda cancelada y página 2; pendientes del mismo cliente; «ahora las canceladas» y su página 2 directamente después de recortar el historial propio. Catálogo de saldos y `get_invoice_balances`/`DEUDA = 0`, sin ANULADO ni filtro positivo heredado en settled. Resultados, orden, estado, deuda exacta, tabla y paginación conciliados con Oracle independiente. Sin contexto/cursor sembrado ni resultados simulados; cero intentos/llamadas/eventos Bedrock/proveedor.
+
+Cierres proceso 6/6 e independiente 1/1, driver/SDK restaurados, inspector/pool/conversación/cursor propios limpiados y logout/logs sanitizados aprobados. Salud final 200/online/cero reinicios. No se repitieron suites completas ni se provocaron fallos Oracle; no hay cambios de negocio, permisos o expiraciones administrativas. [Detalle y reservas](invoice-settled-dev-live-e471261.md). No se recorrió la cohorte completa; ausencia/denegación/error siguen con cobertura simulada. Reservas y fallos históricos conservados.
+
 ## PR #52 fusionada y desplegada: 9fa4504
 
 Merge autorizado, rama local actualizada por avance rápido y solo chatbot Docker DEV reconstruido. Salud 200 antes/después, PM2 online/cero reinicios, Node 22.23.5; 258 fuentes y 13 módulos cargados coinciden con el merge. Código de aplicación idéntico al candidato 36c72b7 (96/96 pruebas afectadas anteriores); 1112676 solo documenta.

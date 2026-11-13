@@ -1,5 +1,7 @@
 # Deuda cancelada: intención, estado y paginación
 
+**Estado vigente: PR #53 fusionada y merge e471261 desplegado en Docker DEV.** El literal, pendientes→«ahora las canceladas» y las páginas 1/2, incluida continuación tras recorte, quedaron conciliados en el proceso habitual 5400. [Control desplegado, cierre y reservas](invoice-settled-dev-live-e471261.md). Las referencias a borrador/sin despliegue siguientes corresponden a las validaciones anteriores.
+
 Rama separada `fix/invoice-settled-intent`, base **649c8bc**. PR en borrador; sin merge ni despliegue. Candidato validado: **879dcf27f65462d95e8729724749f9cf9ce82a38**.
 
 Pregunta literal: **«Mostrame las facturas de Impacto cuya deuda ya está cancelada»**.
