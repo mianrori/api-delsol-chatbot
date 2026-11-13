@@ -1,4 +1,4 @@
-import {getInvoiceBalancesRepository, searchInvoiceBalanceCustomersRepository} from '../../repositories/invoices/invoiceBalances.repository.js';
+import {getInvoiceBalancesRepository, searchInvoiceBalanceCustomersRepository,getInvoiceBalanceCurrenciesRepository} from '../../repositories/invoices/invoiceBalances.repository.js';
 
 const fail = message => {throw new Error(message);};
 const today = () => {
@@ -48,7 +48,29 @@ export function normalizeInvoiceBalanceArgs(args={}) {
 
 export async function getInvoiceBalances(args, connection) {
   const scope=normalizeInvoiceBalanceArgs(args);
-  return getInvoiceBalancesRepository({connection,...scope});
+  const result=await getInvoiceBalancesRepository({connection,...scope});
+  if(result.status==='OK_SUMMARY'&&result.data?.length&&scope.debtStatus==='pending'&&!scope.customerIds.length&&!scope.groupBy.length&&!scope.invoices.length){
+    const {displayLabels={}}=await resolveInvoiceBalanceCurrency({currency:'USD'},connection);
+    return {...result,data:result.data.map(row=>({...row,...(Object.hasOwn(displayLabels,row.currencyCode)?{currencySymbol:displayLabels[row.currencyCode]}:{})}))};
+  }
+  return result;
+}
+
+export async function resolveInvoiceBalanceCurrency(args={},connection){
+ if(Object.keys(args).some(key=>key!=='currency')||args.currency!=='USD')fail('Indica la moneda comercial USD.');
+ const rows=await getInvoiceBalanceCurrenciesRepository({connection});
+ if(rows.length>200)return {status:'INCOMPLETE',currency:'USD'};
+ const normalize=value=>String(value??'').trim().toUpperCase();
+ const usd=value=>['USD','US$','U$S'].includes(normalize(value));
+ const aliases=new Map([['USD','USD'],['US$','USD'],['U$S','USD'],['PYG','PYG'],['GS','PYG'],['GS.','PYG'],['₲','PYG'],['EUR','EUR'],['€','EUR']]);
+ const displayLabels=Object.fromEntries([...new Set(rows.map(row=>String(row.currencyCode)))].flatMap(code=>{
+  const labels=rows.filter(row=>String(row.currencyCode)===code).map(row=>aliases.get(normalize(row.currencySymbol))??(['','$'].includes(normalize(row.currencySymbol))?aliases.get(normalize(code)):undefined));
+  const known=[...new Set(labels.filter(Boolean))];return known.length===1&&rows.filter(row=>String(row.currencyCode)===code).every(row=>aliases.has(normalize(row.currencySymbol))||['','$'].includes(normalize(row.currencySymbol)))?[[code,known[0]]]:[];
+ }));
+ const codes=[...new Set(rows.filter(row=>usd(row.currencySymbol)||normalize(row.currencyCode)==='USD').map(row=>String(row.currencyCode)))];
+ if(!codes.length)return {status:'NOT_IDENTIFIED',currency:'USD',displayLabels};
+ if(codes.length!==1||rows.some(row=>String(row.currencyCode)===codes[0]&&!usd(row.currencySymbol)&&!['','$'].includes(normalize(row.currencySymbol))))return {status:'AMBIGUOUS',currency:'USD',displayLabels};
+ return {status:'RESOLVED',currency:'USD',currencyCode:codes[0],displayLabels};
 }
 
 export async function searchInvoiceBalanceCustomers(args={}, connection) {

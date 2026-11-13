@@ -1,0 +1,28 @@
+{
+  "commit": "0234b0d071f111309ab74e9a8b87d1bcfec892e8",
+  "node": "v22.23.5",
+  "startedAt": "2026-11-13T20:04:12.594Z",
+  "finishedAt": "2026-11-13T20:04:36.236Z",
+  "exitCode": 0,
+  "tests": [
+    "test/invoiceGlobalP2.test.js",
+    "test/invoiceGlobalUsd.test.js",
+    "test/invoicePendingRouting.test.js",
+    "test/invoicePendingResultHttp.test.js",
+    "test/invoiceSettledIntent.test.js",
+    "test/invoiceBalancesHttp.test.js",
+    "test/searchSelection.test.js",
+    "test/searchResolutionState.test.js",
+    "test/searchContextComposition.test.js"
+  ],
+  "counts": [
+    "# tests 128",
+    "# pass 128",
+    "# fail 0",
+    "# cancelled 0",
+    "# skipped 0",
+    "# todo 0",
+    "# duration_ms 22815.257215"
+  ],
+  "environment": "Isolated git archive in existing Docker DEV, no service restart/build; real HTTP with synthetic Oracle and controlled SDK only. No external provider or Oracle calls."
+}

@@ -37,7 +37,7 @@ const controller=await load('../../src/controllers/chat.controller.js',{'../serv
 const router=await load('../../src/routes/index.js',{'../controllers/chat.controller.js':controller});
 const app=express();app.use(express.json());app.use('/chatbot/api',router.router);
 const server=await new Promise(resolve=>{const s=app.listen(0,'127.0.0.1',()=>resolve(s));});
-const seed=()=>{store.clearConversation(sessionId);store.setSearchResolutions(sessionId,{invoiceLastTool:'get_invoices',domains:{},contexts:protectPiiDeep(sessionId,{get_invoices:{customerIds:['SYNTHETIC-C'],conceptIds:['RENT'],plate:'ABC123',dateFrom:'01/01/2023',dateTo:'31/12/2023',mode:'summary',page:5},get_invoice_balances:{customerIds:['STALE'],debtStatus:'settled',dueStatus:'overdue'}})});};
+const seed=()=>{store.clearConversation(sessionId);store.setSearchResolutions(sessionId,{invoiceLastTool:'get_invoices',domains:{},contexts:protectPiiDeep(sessionId,{get_invoices:{customerIds:['SYNTHETIC-C'],conceptIds:['RENT'],plate:'ABC123',dateFrom:'01/01/2023',dateTo:'31/12/2023',mode:'summary',page:5},get_invoice_balances:{customerIds:[],debtStatus:'settled',dueStatus:'overdue'}})});};
 const post=async message=>fetch('http://127.0.0.1:'+server.address().port+'/chatbot/api/bot/chat',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({sessionId,message,username:'FORGED'})});
 try{
  for(const message of ['¿Qué facturas pendientes de pago tiene Impacto?','facturas pendientes','pendientes de pago','cuánto debe','solo las pendientes','muestra las facturas pendientes ahora']){
