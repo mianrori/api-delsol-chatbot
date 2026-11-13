@@ -1,4 +1,4 @@
-export const INVOICE_BALANCE_FAILURE_MESSAGE='No se pudo completar la consulta de facturas pendientes. Inténtalo de nuevo.';
+export const INVOICE_BALANCE_FAILURE_MESSAGE='No se pudo completar la consulta de saldos de facturas. Inténtalo de nuevo.';
 
 // A resolved promise is not evidence that Oracle returned a usable result.
 export function classifyInvoiceBalanceResult(result){

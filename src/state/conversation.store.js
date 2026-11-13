@@ -5,6 +5,10 @@ const conversations = new Map();
 // Independent of bounded history; no credentials, Oracle identities or connections.
 const searchResolutions = new Map();
 const searchSelectionTurns = new Map();
+// Protected arguments and pagination metadata only; no rows or connections.
+const invoiceBalancePages = new Map();
+export const getInvoiceBalancePageState=sessionId=>structuredClone(invoiceBalancePages.get(sessionId));
+export const setInvoiceBalancePageState=(sessionId,state)=>invoiceBalancePages.set(sessionId,structuredClone(state));
 export const getSearchResolutions=sessionId=>structuredClone(searchResolutions.get(sessionId)??{domains:{},contexts:{}});
 export const setSearchResolutions=(sessionId,state)=>searchResolutions.set(sessionId,structuredClone(state));
 export const getSearchSelectionTurn=sessionId=>structuredClone(searchSelectionTurns.get(sessionId)??{});
@@ -29,5 +33,6 @@ export const clearConversation = (sessionId) => {
   conversations.delete(sessionId);
   searchResolutions.delete(sessionId);
   searchSelectionTurns.delete(sessionId);
+  invoiceBalancePages.delete(sessionId);
   clearPiiSession(sessionId);
 };
