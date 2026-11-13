@@ -3,6 +3,7 @@ import {getSearchResolutions,setSearchResolutions,getSearchSelectionTurn,setSear
 import {getSalesMetricIntent,defaultSalesMetrics} from './salesMetrics.service.js';
 import {getMonthlySalesComparisonIntent} from './salesComparisonIntent.service.js';
 import {getInvoicePlateRequest} from './invoicePlateRequest.service.js';
+import {isPendingInvoiceRequest,pendingInvoiceInput} from './invoicePendingRequest.service.js';
 const specs={
  search_customers:{consumers:['get_sales','get_sales_per_sqm','analyze_members','get_member_purchases','get_member_promo_purchases','compare_member_purchases_vs_sales','analyze_campaign_sales_performance','get_contract_conditions','get_contract_cost_per_sqm','analyze_contract_cost_incidence'],fields:o=>({customerIds:[o.codCliente],customerId:o.codCliente})},
  search_categories:{consumers:['get_sales','get_sales_per_sqm','analyze_members','get_member_purchases','get_member_promo_purchases','get_soles_usage','compare_member_purchases_vs_sales','analyze_campaign_sales_performance'],fields:o=>({categoryIds:[o.codRubro]})},
@@ -35,6 +36,8 @@ const lookupShape=(name,result)=>{
 // Applied once to the protected user message, never by replaying bounded history.
 export function beginSearchSelectionTurn(sessionId,message){
  const state=getSearchResolutions(sessionId),turn={selectedThisTurn:[],validLookups:[],capturedConsumers:[],requestedDomains:[],salesLocalRemovalChange:getSalesLocalRemovalChange(message)};let changed=false;
+ turn.pendingInvoice=isPendingInvoiceRequest(message);
+ if(turn.pendingInvoice){delete state.invoiceNamedRequest;changed=true;}
  const balanceText=String(message??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
  turn.invoiceBalanceAll=/\b(?:saldo|saldos|deuda|deudas|debe|deben|adeuda|adeudan)\b/.test(balanceText)&&(/\b(?:todos|todas) (?:los |las )?(?:clientes|locales)\b/.test(balanceText)||/\bsaldos? generales?(?: por (?:moneda|sector))?\s*[?.!]?\s*$/.test(balanceText));
  if(turn.invoiceBalanceAll){delete state.domains.search_invoice_balance_customers;state.contexts.get_invoice_balances={customerIds:[]};if(state.choiceFocus==='search_invoice_balance_customers')delete state.choiceFocus;changed=true;}
@@ -101,10 +104,11 @@ export function beginSearchSelectionTurn(sessionId,message){
 // Store only protected resolver IDs/options and arguments, never business rows.
 export function recordSearchToolResult(sessionId,name,input,result){
  const state=getSearchResolutions(sessionId);
- if(name==='search_invoice_balance_customers'){
+ if(['search_invoice_balance_customers','search_invoice_customers'].includes(name)){
   const {resolved,valid}=lookupShape(name,result);if(!valid)return false;
   const minimal=o=>Object.fromEntries(['option','customerId','customerName','businessName','taxId'].filter(k=>o?.[k]!=null).map(k=>[k,o[k]]));
   state.domains[name]=resolved?{kind:'resolved',selected:minimal(result),call:{input:structuredClone(input)},result:{options:[]}}:{kind:'pending',call:{input:structuredClone(input)},result:{options:(result.options??[]).map(minimal)}};
+  state.invoiceLastTool=name==='search_invoice_customers'?'get_invoices':'get_invoice_balances';
   state.choiceFocus=name;setSearchResolutions(sessionId,state);return true;
  }
  if(persistentSearches.includes(name)){
@@ -140,12 +144,12 @@ export function captureSearchQueryContext(sessionId,name,input){
  turn.capturedConsumers=[...(turn.capturedConsumers??[]),name];setSearchSelectionTurn(sessionId,turn);
 }
 
-// Called after the selection guard and input validation, even when Oracle denies
-// execution. Persist only protected scope metadata, never invoice rows.
+// Balances commit only after a usable result; billing retains its existing policy.
+// Persist only protected scope metadata, never invoice rows.
 export function recordInvoiceQueryContext(sessionId,name,input){
- if(name==='get_invoice_balances'){const state=getSearchResolutions(sessionId);state.contexts[name]=structuredClone(input);setSearchResolutions(sessionId,state);return;}
+ if(name==='get_invoice_balances'){const state=getSearchResolutions(sessionId);state.invoiceLastTool=name;state.contexts[name]=structuredClone(input);setSearchResolutions(sessionId,state);return;}
  if(name!=='get_invoices')return;
- const state=getSearchResolutions(sessionId);state.contexts.get_invoices=structuredClone(input);setSearchResolutions(sessionId,state);
+ const state=getSearchResolutions(sessionId);state.invoiceLastTool=name;state.contexts.get_invoices=structuredClone(input);setSearchResolutions(sessionId,state);
 }
 
 // Reconstruct resolution state across turns and tool iterations. A failed query
@@ -168,6 +172,7 @@ export function preserveSearchSelection({name,input,history=[],currentCalls=[],r
   if(text!=null){
    currentText=text;
    turn++;turnTexts.set(turn,text);
+   if(isPendingInvoiceRequest(text)){states.delete('search_invoice_customers');states.delete('search_invoice_concepts');}
    if(getInvoicePlateRequest(text)?.autonomous){
     states.delete('search_invoice_customers');states.delete('search_invoice_concepts');
     for(let i=queries.length-1;i>=0;i--)if(queries[i].name==='get_invoices')queries.splice(i,1);
@@ -200,6 +205,7 @@ export function preserveSearchSelection({name,input,history=[],currentCalls=[],r
  }
  if(!persistent(name)&&states.get(name)?.kind==='cleared'&&!isExplicitSearchRequest(currentText,name,input))throw Object.assign(Error('El filtro fue retirado. Solicita volver a añadirlo antes de buscarlo.'),{code:'SEARCH_FILTER_REMOVED'});
  if(name==='get_invoice_balances'&&selectionTurn.invoiceBalanceAll)states.delete('search_invoice_balance_customers');
+ if(name==='get_invoice_balances'&&selectionTurn.pendingInvoice&&resolutionState?.invoiceLastTool==='get_invoices'&&!currentCalls.some(c=>c.name==='search_invoice_balance_customers'))states.delete('search_invoice_balance_customers');
  const resolutions=[],removed=[];
  for(const [search,spec] of Object.entries(specs)){
   if(!spec.consumers.includes(name))continue;
@@ -228,7 +234,10 @@ export function preserveSearchSelection({name,input,history=[],currentCalls=[],r
  // grouping or previously absent keys. The successful context survives trimming.
  const autonomous=name==='get_sales'?selectionTurn.autonomousCategorySales:null;
  let result;
- if(name==='get_invoice_balances'&&selectionTurn.invoiceBalanceAll){
+ if(name==='get_invoice_balances'&&selectionTurn.pendingInvoice){
+  const freshCustomer=currentCalls.some(c=>c.name==='search_invoice_balance_customers'&&c.result?.status==='RESOLVED');
+  result={...(freshCustomer?{mode:'detail',rows:20}:pendingInvoiceInput(resolutionState??{domains:{},contexts:{}})),...input,debtStatus:'pending',page:1};
+ }else if(name==='get_invoice_balances'&&selectionTurn.invoiceBalanceAll){
   result={...input,customerIds:[]};
  }else if(name==='get_invoices'&&selectionTurn.invoicePlateRequest?.autonomous){
   result={...selectionTurn.invoicePlateRequest.input};
