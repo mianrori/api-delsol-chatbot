@@ -889,3 +889,19 @@ Base 8e14c4d (PR #54 fusionada); rama separada `fix/global-pending-usd-detail`. 
 50293c2: **227/227** pruebas Node 22.23.5. Su primer control Oracle falló en la representación decimal y se conserva expresamente como fallido. 37ef45f: **91/91** pruebas afectadas y **192 comprobaciones HTTP/Oracle independientes** aprobadas, cuatro POST, sin resultados/cursor sembrados. 6a7df59: **92/92** pruebas afectadas y **18 comprobaciones nuevas solo del resumen**, un POST adicional; no se repitió el detalle ya aprobado. Ejecuciones superpuestas, no casos únicos sumados. [Reportes por commit](global-pending-usd.md#pruebas-por-commit).
 
 La secuencia real fue determinista: cero invocaciones de modelo/SDK controlado/proveedor. Las regresiones de razonamiento y errores usan entradas controladas y se distinguen de Oracle real. Reservas históricas y fallos globales de c6fcb4b separados (35 Node 22, 17 por falta de git; 18 Windows/Node 24 fuera de rango). No se repitieron suites completas ni se declara verde el estado global. PR en borrador; sin merge, despliegue o cambios de datos de negocio, permisos o expiraciones.
+
+
+### Correcciones de revisión P2: alcance global y salida truncada, 0234b0d
+
+Estado vigente del candidato de PR #55, todavía en borrador. Código **0234b0d071f111309ab74e9a8b87d1bcfec892e8**: **128/128 pruebas afectadas**, Node 22.23.5, desde git archive limpio; [reporte](global-usd-p2-tests-0234b0d.json). Solo guard de contexto y saneamiento de salida modificados; el commit posterior añade documentación/evidencia.
+
+| Corrección | Cobertura nueva/diferencial | Reserva conservada |
+| --- | --- | --- |
+| Cliente antiguo no reduce alcance global | Historial protegido con resolución anterior; resumen global → USD → página 2 antes y página 3 después del recorte. Argumentos finales y estado conservan []/pending/código autorizado. Una variante recorta antes del detalle. | Cobertura HTTP con Oracle sintético, sin nueva sesión ni conciliación Oracle. |
+| Omitido no equivale a todos seleccionados | Guard mantiene la resolución anterior cuando customerIds está ausente; solo [] confirmado prevalece frente a IDs reconstruidos o propuestos sin cambio validado. | La normalización de backend no se usa para inventar una selección global del usuario. |
+| Cambio posterior a un cliente | Búsqueda validada puede sustituir []; consulta posterior confirma nuevo cliente y la paginación tras recorte lo conserva. La búsqueda sola no sobrescribe la consulta válida. | Sin cambios de consultas, permisos, PII o datos. |
+| Razonamiento incompleto | HTTP con aperturas sin >, bloques sin cierre, cierres huérfanos, delimitadores de rol y prefijos partidos devuelve el mensaje seguro, sin texto dudoso, consultas, acciones de éxito o cambios del contexto válido. Bloques completos/nidados conservan solo texto público. | SDK controlado; no se induce razonamiento en un modelo real ni se certifica detectar prosa sin marcas. |
+
+Los dos P2 se reproducían en 8a150e8 y no quedan acreditados por los controles anteriores. Esta ejecución conserva la distinción: 50293c2/227 pruebas precede al arreglo decimal y su control Oracle falló; 37ef45f/91 pruebas +192 controles Oracle es posterior al arreglo; 6a7df59/92 pruebas +18 controles valida etiquetas del resumen. 0234b0d conserva ese formateador y SQL exactamente: evidencia aplicable a partes intactas, no una ejecución Oracle nueva del SHA P2. Las ejecuciones se superponen y no se suman como casos únicos.
+
+Reservas, ausencia/denegación/errores sintéticos y fallos globales históricos conservados y separados. Sin repetir Oracle ni suites completas, merge, despliegue o cambios de datos de negocio, permisos o expiraciones. [Detalle de las correcciones y trazabilidad](global-pending-usd.md#corrección-de-los-dos-p2-de-revisión).
