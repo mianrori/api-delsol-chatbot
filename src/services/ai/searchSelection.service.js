@@ -210,7 +210,7 @@ export function preserveSearchSelection({name,input,history=[],currentCalls=[],r
  // a newly validated customer lookup may supersede that committed selection.
  const balanceScope=resolutionState?.contexts?.get_invoice_balances;
  const globalBalance=name==='get_invoice_balances'&&(selectionTurn.invoiceBalanceAll||
-  !resolutionState?.invoiceBalanceCustomerChangePending&&Object.hasOwn(balanceScope??{},'customerIds')&&Array.isArray(balanceScope.customerIds)&&balanceScope.customerIds.length===0);
+  resolutionState?.invoiceLastTool==='get_invoice_balances'&&!resolutionState.invoiceBalanceCustomerChangePending&&Object.hasOwn(balanceScope??{},'customerIds')&&Array.isArray(balanceScope.customerIds)&&balanceScope.customerIds.length===0);
  if(globalBalance)states.delete('search_invoice_balance_customers');
  const invoiceDebtStatus=selectionTurn.invoiceDebtStatus??(selectionTurn.pendingInvoice?'pending':null);
  if(name==='get_invoice_balances'&&invoiceDebtStatus&&resolutionState?.invoiceLastTool==='get_invoices'&&!currentCalls.some(c=>c.name==='search_invoice_balance_customers'))states.delete('search_invoice_balance_customers');

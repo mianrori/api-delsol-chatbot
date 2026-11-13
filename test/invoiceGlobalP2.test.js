@@ -25,6 +25,11 @@ test('omitted customer filter does not mean an explicit all-customer selection',
   assert.deepEqual(effective.customerIds,['OLD']);assert.equal(Object.hasOwn(omitted,'customerIds'),false);
  }
 });
+test('a later billing customer remains active when returning to pending balances',()=>{
+ const resolutionState={domains:{},invoiceLastTool:'get_invoices',contexts:{get_invoice_balances:global,get_invoices:{customerIds:['BILLING-CUSTOMER'],mode:'detail',page:4}}};
+ const effective=preserveSearchSelection({name:'get_invoice_balances',input:{customerIds:['BILLING-CUSTOMER'],mode:'detail',debtStatus:'pending',page:1,rows:20},history,resolutionState,selectionTurn:{invoiceDebtStatus:'pending'}});
+ assert.deepEqual(effective.customerIds,['BILLING-CUSTOMER']);assert.equal(effective.debtStatus,'pending');assert.equal(effective.page,1);
+});
 test('validated customer change can supersede global across tool iterations and survive trimming',()=>{
  const id='P2-SCOPE';try{
   setSearchResolutions(id,{domains:{},invoiceLastTool:'get_invoice_balances',contexts:{get_invoice_balances:usd}});
@@ -37,7 +42,7 @@ test('validated customer change can supersede global across tool iterations and 
  }finally{clearConversation(id);}
 });
 test('failed or malformed lookup cannot retire confirmed global scope',()=>{
- const id='P2-LOOKUP';try{setSearchResolutions(id,{domains:{},contexts:{get_invoice_balances:usd}});assert.equal(recordSearchToolResult(id,'search_invoice_balance_customers',{}, {status:'RESOLVED',success:false,customerId:'FORGED'}),false);const state=getSearchResolutions(id);assert.equal(state.invoiceBalanceCustomerChangePending,undefined);const result=preserveSearchSelection({name:'get_invoice_balances',input:usd,history,resolutionState:state,selectionTurn:{}});assert.deepEqual(result.customerIds,[]);}finally{clearConversation(id);}
+ const id='P2-LOOKUP';try{setSearchResolutions(id,{domains:{},invoiceLastTool:'get_invoice_balances',contexts:{get_invoice_balances:usd}});assert.equal(recordSearchToolResult(id,'search_invoice_balance_customers',{}, {status:'RESOLVED',success:false,customerId:'FORGED'}),false);const state=getSearchResolutions(id);assert.equal(state.invoiceBalanceCustomerChangePending,undefined);const result=preserveSearchSelection({name:'get_invoice_balances',input:usd,history,resolutionState:state,selectionTurn:{}});assert.deepEqual(result.customerIds,[]);}finally{clearConversation(id);}
 });
 for(const input of ['<think','Respuesta.<think PRIVATE','Respuesta.<analysis\nPRIVATE','<thinking>PRIVATE','PRIVATE</think>Resultado.','PRIVATE_ONE</think>PRIVATE_TWO</analysis>Respuesta.','<think>PRIVATE</analysis>Resultado.','<think>PRIVATE</think','<|analysis','<|analysis|>PRIVATE','<|reasoning PRIVATE','<|analysis|>PRIVATE<|final','<thi'])test('ambiguous reasoning fails closed: '+JSON.stringify(input),()=>{
  assert.equal(stripInternalReasoning(input),SAFE_ASSISTANT_RESPONSE);assert.equal(stripInternalReasoning(stripInternalReasoning(input)),SAFE_ASSISTANT_RESPONSE);
