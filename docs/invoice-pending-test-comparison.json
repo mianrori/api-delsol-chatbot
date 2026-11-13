@@ -1,0 +1,162 @@
+{
+  "baseCommit": "dcfaba0",
+  "candidateCommit": "c6fcb4bcda9a62ebe09df243ac8072bff21489e7",
+  "supportedNode22": {
+    "version": "22.23.5",
+    "base": {
+      "summary": [
+        "# tests 601",
+        "# pass 566",
+        "# fail 35"
+      ],
+      "failures": [
+        "full runner preserves the sports/category and vehicle sequence without stale exports",
+        "all optionally includes soles only when the local document is configured",
+        "purchase suite reconciles monthly and total canjes, distinct members and a changed period",
+        "purchase suite detects wrong periods, totals, currency, percentages and nonadditive members",
+        "campaign suite selects from partial search and checks actual presentation of the three periods",
+        "campaign suite catches silent selection, missing fixtures, dates, totals, averages and causality",
+        "vehicle regression accepts real presentation labels and rejects raw arguments and incorrect counts",
+        "new DEV bridge preserves prepared arguments through the actual HTTP and chat path (controlled auth/data)",
+        "pending HTTP horizontal/pie/multiseries reconcile labels values currency and source period",
+        "HTTP cancellation propagates through request lifecycle and preserves session responses",
+        "final candidate accepts separate application, tests, configuration and committed validation executors",
+        "rejects functional change: src/app.js",
+        "rejects functional change: test/business.test.js",
+        "rejects functional change: config.js",
+        "rejects functional change: scripts/business.mjs",
+        "rejects functional change: scripts/new-functional.mjs",
+        "detects altered executor: scripts/invoice-candidate-source-preflight.mjs",
+        "detects altered executor: scripts/run-invoice-candidate-affected-login.mjs",
+        "detects altered executor: scripts/run-invoice-candidate-affected-dev.ps1",
+        "detects altered executor: scripts/check-invoice-candidate-affected-dev.mjs",
+        "detects altered executor: scripts/dev-protected-login.mjs",
+        "detects altered executor: scripts/invoice-affected-log-audit.mjs",
+        "rejects staged executor tampering",
+        "staged change cannot hide behind restored working file: src/app.js",
+        "staged change cannot hide behind restored working file: scripts/invoice-candidate-source-preflight.mjs",
+        "rejects committed functional change even when working copy is restored to baseline",
+        "application-only commit cannot masquerade as a committed validation harness",
+        "HTTP combined lookups preserve independent identities, explicit changes and prior history in both orders",
+        "candidate HTTP conversations retain pending selections and bind usage category filters",
+        "HTTP filter lifecycle invalidates removed identities through period changes and explicit re-additions",
+        "HTTP targeted retry recreates the long chain and checks trimmed identities without other catalogs",
+        "HTTP focused reselection preserves both confirmed catalogs and exact arguments across history trimming",
+        "HTTP persistent local and category resolutions cross real trimming, selection, removal, themes, sessions and reset",
+        "invoice concept partial search treats SQL wildcard characters literally",
+        "HTTP rejected and valid transitions compare the complete state before and after real trimming"
+      ]
+    },
+    "candidate": {
+      "summary": [
+        "# tests 605",
+        "# pass 570",
+        "# fail 35"
+      ],
+      "failures": [
+        "full runner preserves the sports/category and vehicle sequence without stale exports",
+        "all optionally includes soles only when the local document is configured",
+        "purchase suite reconciles monthly and total canjes, distinct members and a changed period",
+        "purchase suite detects wrong periods, totals, currency, percentages and nonadditive members",
+        "campaign suite selects from partial search and checks actual presentation of the three periods",
+        "campaign suite catches silent selection, missing fixtures, dates, totals, averages and causality",
+        "vehicle regression accepts real presentation labels and rejects raw arguments and incorrect counts",
+        "new DEV bridge preserves prepared arguments through the actual HTTP and chat path (controlled auth/data)",
+        "pending HTTP horizontal/pie/multiseries reconcile labels values currency and source period",
+        "HTTP cancellation propagates through request lifecycle and preserves session responses",
+        "final candidate accepts separate application, tests, configuration and committed validation executors",
+        "rejects functional change: src/app.js",
+        "rejects functional change: test/business.test.js",
+        "rejects functional change: config.js",
+        "rejects functional change: scripts/business.mjs",
+        "rejects functional change: scripts/new-functional.mjs",
+        "detects altered executor: scripts/invoice-candidate-source-preflight.mjs",
+        "detects altered executor: scripts/run-invoice-candidate-affected-login.mjs",
+        "detects altered executor: scripts/run-invoice-candidate-affected-dev.ps1",
+        "detects altered executor: scripts/check-invoice-candidate-affected-dev.mjs",
+        "detects altered executor: scripts/dev-protected-login.mjs",
+        "detects altered executor: scripts/invoice-affected-log-audit.mjs",
+        "rejects staged executor tampering",
+        "staged change cannot hide behind restored working file: src/app.js",
+        "staged change cannot hide behind restored working file: scripts/invoice-candidate-source-preflight.mjs",
+        "rejects committed functional change even when working copy is restored to baseline",
+        "application-only commit cannot masquerade as a committed validation harness",
+        "HTTP combined lookups preserve independent identities, explicit changes and prior history in both orders",
+        "candidate HTTP conversations retain pending selections and bind usage category filters",
+        "HTTP filter lifecycle invalidates removed identities through period changes and explicit re-additions",
+        "HTTP targeted retry recreates the long chain and checks trimmed identities without other catalogs",
+        "HTTP focused reselection preserves both confirmed catalogs and exact arguments across history trimming",
+        "HTTP persistent local and category resolutions cross real trimming, selection, removal, themes, sessions and reset",
+        "invoice concept partial search treats SQL wildcard characters literally",
+        "HTTP rejected and valid transitions compare the complete state before and after real trimming"
+      ]
+    },
+    "newFailures": [],
+    "affected": {
+      "summary": [
+        "# tests 80",
+        "# pass 80",
+        "# fail 0"
+      ],
+      "failures": []
+    }
+  },
+  "supplementaryUnsupportedNode24": {
+    "version": "24.21.0",
+    "base": {
+      "summary": [
+        "ℹ tests 601",
+        "ℹ pass 583",
+        "ℹ fail 18"
+      ],
+      "failures": [
+        "full runner preserves the sports/category and vehicle sequence without stale exports",
+        "all optionally includes soles only when the local document is configured",
+        "purchase suite reconciles monthly and total canjes, distinct members and a changed period",
+        "purchase suite detects wrong periods, totals, currency, percentages and nonadditive members",
+        "campaign suite selects from partial search and checks actual presentation of the three periods",
+        "campaign suite catches silent selection, missing fixtures, dates, totals, averages and causality",
+        "vehicle regression accepts real presentation labels and rejects raw arguments and incorrect counts",
+        "new DEV bridge preserves prepared arguments through the actual HTTP and chat path (controlled auth/data)",
+        "pending HTTP horizontal/pie/multiseries reconcile labels values currency and source period",
+        "HTTP cancellation propagates through request lifecycle and preserves session responses",
+        "HTTP combined lookups preserve independent identities, explicit changes and prior history in both orders",
+        "candidate HTTP conversations retain pending selections and bind usage category filters",
+        "HTTP filter lifecycle invalidates removed identities through period changes and explicit re-additions",
+        "HTTP targeted retry recreates the long chain and checks trimmed identities without other catalogs",
+        "HTTP focused reselection preserves both confirmed catalogs and exact arguments across history trimming",
+        "HTTP persistent local and category resolutions cross real trimming, selection, removal, themes, sessions and reset",
+        "invoice concept partial search treats SQL wildcard characters literally",
+        "HTTP rejected and valid transitions compare the complete state before and after real trimming"
+      ]
+    },
+    "candidate": {
+      "summary": [
+        "ℹ tests 605",
+        "ℹ pass 587",
+        "ℹ fail 18"
+      ],
+      "failures": [
+        "full runner preserves the sports/category and vehicle sequence without stale exports",
+        "all optionally includes soles only when the local document is configured",
+        "purchase suite reconciles monthly and total canjes, distinct members and a changed period",
+        "purchase suite detects wrong periods, totals, currency, percentages and nonadditive members",
+        "campaign suite selects from partial search and checks actual presentation of the three periods",
+        "campaign suite catches silent selection, missing fixtures, dates, totals, averages and causality",
+        "vehicle regression accepts real presentation labels and rejects raw arguments and incorrect counts",
+        "new DEV bridge preserves prepared arguments through the actual HTTP and chat path (controlled auth/data)",
+        "pending HTTP horizontal/pie/multiseries reconcile labels values currency and source period",
+        "HTTP cancellation propagates through request lifecycle and preserves session responses",
+        "HTTP combined lookups preserve independent identities, explicit changes and prior history in both orders",
+        "candidate HTTP conversations retain pending selections and bind usage category filters",
+        "HTTP filter lifecycle invalidates removed identities through period changes and explicit re-additions",
+        "HTTP targeted retry recreates the long chain and checks trimmed identities without other catalogs",
+        "HTTP focused reselection preserves both confirmed catalogs and exact arguments across history trimming",
+        "HTTP persistent local and category resolutions cross real trimming, selection, removal, themes, sessions and reset",
+        "invoice concept partial search treats SQL wildcard characters literally",
+        "HTTP rejected and valid transitions compare the complete state before and after real trimming"
+      ]
+    },
+    "newFailures": []
+  }
+}
