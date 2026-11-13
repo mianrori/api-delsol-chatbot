@@ -41,7 +41,7 @@ export function beginSearchSelectionTurn(sessionId,message){
  if(turn.invoiceDebtStatus){delete state.invoiceNamedRequest;changed=true;}
  const balanceText=String(message??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
  turn.invoiceBalanceAll=/\b(?:saldo|saldos|deuda|deudas|debe|deben|adeuda|adeudan)\b/.test(balanceText)&&(/\b(?:todos|todas) (?:los |las )?(?:clientes|locales)\b/.test(balanceText)||/\bsaldos? generales?(?: por (?:moneda|sector))?\s*[?.!]?\s*$/.test(balanceText));
- if(turn.invoiceBalanceAll){delete state.domains.search_invoice_balance_customers;state.contexts.get_invoice_balances={customerIds:[]};if(state.choiceFocus==='search_invoice_balance_customers')delete state.choiceFocus;changed=true;}
+ if(turn.invoiceBalanceAll){delete state.domains.search_invoice_balance_customers;delete state.invoiceBalanceCustomerChangePending;state.contexts.get_invoice_balances={customerIds:[]};if(state.choiceFocus==='search_invoice_balance_customers')delete state.choiceFocus;changed=true;}
  turn.invoicePlateRequest=getInvoicePlateRequest(message);
  if(turn.invoicePlateRequest?.autonomous){
   state.contexts.get_invoices=structuredClone(turn.invoicePlateRequest.input);
@@ -107,6 +107,7 @@ export function recordSearchToolResult(sessionId,name,input,result){
  const state=getSearchResolutions(sessionId);
  if(['search_invoice_balance_customers','search_invoice_customers'].includes(name)){
   const {resolved,valid}=lookupShape(name,result);if(!valid)return false;
+  if(name==='search_invoice_balance_customers')state.invoiceBalanceCustomerChangePending=true;
   const minimal=o=>Object.fromEntries(['option','customerId','customerName','businessName','taxId'].filter(k=>o?.[k]!=null).map(k=>[k,o[k]]));
   state.domains[name]=resolved?{kind:'resolved',selected:minimal(result),call:{input:structuredClone(input)},result:{options:[]}}:{kind:'pending',call:{input:structuredClone(input)},result:{options:(result.options??[]).map(minimal)}};
   state.invoiceLastTool=name==='search_invoice_customers'?'get_invoices':'get_invoice_balances';
@@ -148,7 +149,7 @@ export function captureSearchQueryContext(sessionId,name,input){
 // Balances commit only after a usable result; billing retains its existing policy.
 // Persist only protected scope metadata, never invoice rows.
 export function recordInvoiceQueryContext(sessionId,name,input){
- if(name==='get_invoice_balances'){const state=getSearchResolutions(sessionId);state.invoiceLastTool=name;state.contexts[name]=structuredClone(input);setSearchResolutions(sessionId,state);return;}
+ if(name==='get_invoice_balances'){const state=getSearchResolutions(sessionId);state.invoiceLastTool=name;state.contexts[name]=structuredClone(input);delete state.invoiceBalanceCustomerChangePending;setSearchResolutions(sessionId,state);return;}
  if(name!=='get_invoices')return;
  const state=getSearchResolutions(sessionId);state.invoiceLastTool=name;state.contexts.get_invoices=structuredClone(input);setSearchResolutions(sessionId,state);
 }
@@ -205,7 +206,12 @@ export function preserveSearchSelection({name,input,history=[],currentCalls=[],r
   if(state&&!selectionTurn.allowLookup?.[name]&&!isExplicitSearchRequest(currentText,name,input))fail();
  }
  if(!persistent(name)&&states.get(name)?.kind==='cleared'&&!isExplicitSearchRequest(currentText,name,input))throw Object.assign(Error('El filtro fue retirado. Solicita volver a añadirlo antes de buscarlo.'),{code:'SEARCH_FILTER_REMOVED'});
- if(name==='get_invoice_balances'&&selectionTurn.invoiceBalanceAll)states.delete('search_invoice_balance_customers');
+ // [] is a confirmed all-customer selection; an absent filter is not. Only
+ // a newly validated customer lookup may supersede that committed selection.
+ const balanceScope=resolutionState?.contexts?.get_invoice_balances;
+ const globalBalance=name==='get_invoice_balances'&&(selectionTurn.invoiceBalanceAll||
+  !resolutionState?.invoiceBalanceCustomerChangePending&&Object.hasOwn(balanceScope??{},'customerIds')&&Array.isArray(balanceScope.customerIds)&&balanceScope.customerIds.length===0);
+ if(globalBalance)states.delete('search_invoice_balance_customers');
  const invoiceDebtStatus=selectionTurn.invoiceDebtStatus??(selectionTurn.pendingInvoice?'pending':null);
  if(name==='get_invoice_balances'&&invoiceDebtStatus&&resolutionState?.invoiceLastTool==='get_invoices'&&!currentCalls.some(c=>c.name==='search_invoice_balance_customers'))states.delete('search_invoice_balance_customers');
  const resolutions=[],removed=[];
@@ -278,6 +284,7 @@ export function preserveSearchSelection({name,input,history=[],currentCalls=[],r
  }
  // Detach nested filters too, so a consumer cannot mutate the stored history.
  const finalInput={...result,...identifiers};
+ if(globalBalance)finalInput.customerIds=[];
  if(resolutionState)for(const search of persistentSearches){
   if(specs[search].consumers.includes(name)&&!states.has(search)&&domainFields(search).some(k=>finalInput[k]!=null&&(!Array.isArray(finalInput[k])||finalInput[k].length)))fail();
  }

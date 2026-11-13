@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {spawnSync} from 'node:child_process';import {fileURLToPath} from 'node:url';
 import {resolveInvoiceBalanceCurrency,normalizeInvoiceBalanceArgs,getInvoiceBalances} from '../src/services/invoices/invoiceBalances.service.js';
-import {publicAssistantText,stripInternalReasoning} from '../src/services/ai/assistantOutput.service.js';
+import {publicAssistantText,stripInternalReasoning,SAFE_ASSISTANT_RESPONSE} from '../src/services/ai/assistantOutput.service.js';
 import {getInvoiceBalancesTool} from '../src/tools/invoices/invoiceBalances.tool.js';
 import {executeGlobalInvoiceBalanceRequest} from '../src/services/ai/invoiceGlobalRequest.service.js';
 import {setSearchResolutions,clearConversation} from '../src/state/conversation.store.js';
@@ -36,8 +36,8 @@ test('currency resolver rejects arbitrary filters before executing SQL',async()=
 test('public text excludes structured reasoning and marked text across content blocks',()=>{
  assert.equal(publicAssistantText({content:[{reasoningContent:{reasoningText:{text:'PRIVATE_THOUGHT',signature:'SECRET'}}},{text:'<think>PRIVATE_1'},{text:'PRIVATE_2</think>Resultado.'}]}),'Resultado.');
  for(const tag of ['analysis','thinking','reasoning','reasoning_content'])assert.equal(stripInternalReasoning(`<${tag}>PRIVATE</${tag}>Resultado.`),'Resultado.');
- assert.equal(stripInternalReasoning('Resultado.<think>PRIVATE_UNFINISHED'),'Resultado.');
- assert.equal(stripInternalReasoning('PRIVATE</think>Resultado.'),'Resultado.');
+ assert.equal(stripInternalReasoning('Resultado.<think>PRIVATE_UNFINISHED'),SAFE_ASSISTANT_RESPONSE);
+ assert.equal(stripInternalReasoning('PRIVATE</think>Resultado.'),SAFE_ASSISTANT_RESPONSE);
  assert.equal(stripInternalReasoning('<|analysis|>PRIVATE<|final|>Resultado.'),'Resultado.');
  assert.equal(publicAssistantText({content:[{text:'PRIVATE',reasoningContent:{}},{text:'Resultado.'}]}),'Resultado.');
 });
