@@ -1,5 +1,13 @@
 # Alcance y evidencia del backend del chatbot
 
+## PR #52 fusionada y desplegada: 9fa4504
+
+Merge autorizado, rama local actualizada por avance rápido y solo chatbot Docker DEV reconstruido. Salud 200 antes/después, PM2 online/cero reinicios, Node 22.23.5; 258 fuentes y 13 módulos cargados coinciden con el merge. Código de aplicación idéntico al candidato 36c72b7 (96/96 pruebas afectadas anteriores); 1112676 solo documenta.
+
+**226 comprobaciones del proceso desplegado, tres POST en 5400:** facturas generales con cliente/concepto/emisión confirmados por Oracle y selección determinista; «solo las pendientes» pasa a `get_invoice_balances`/`DEUDA > 0`, conserva cliente y retira filtros de facturación; página 2 real desde la primera respuesta, sin nueva preparación. Deuda exacta, campos, orden, tabla completa y metadatos de paginación conciliados con SELECT independiente. Contexto preparado solo antes de la consulta general, sin modelo real ni resultados simulados; bloqueo preventivo del SDK, cero intentos/llamadas/eventos Bedrock/proveedor.
+
+Cierres: proceso 3/3 e independiente 1/1, driver/SDK/inspector/pool y conversación propios limpiados; logout confirmado y logs sanitizados aprobados. Salud final 200/PM2 online/cero reinicios. Sin suites completas ni fallos Oracle provocados; datos de negocio, permisos y expiraciones sin cambios administrativos. [Detalle, evidencia y reservas](invoice-pending-dev-live-9fa4504.md). Los fallos globales históricos y todas las reservas de PR #50/#51 se conservan; los estados de borrador siguientes son históricos.
+
 ## PR #51 fusionada y desplegada: 6ac1556
 
 Merge autorizado y actualización local por avance rápido; solo chatbot Docker DEV reconstruido/recreado. Salud 200 antes/después, PM2 online/cero reinicios al arrancar, sin errores detectados; 248 fuentes y siete módulos cargados coinciden con el merge, Node 22.23.5.

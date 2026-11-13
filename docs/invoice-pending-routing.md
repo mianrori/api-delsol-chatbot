@@ -1,5 +1,7 @@
 # Facturas pendientes: selección de herramienta y alcance
 
+**Estado vigente: PR #52 fusionada y merge 9fa4504 desplegado en Docker DEV.** El recorrido general → «solo las pendientes» → página 2 quedó conciliado en 5400 contra Oracle independiente, con cero proveedor y cierre/logout/logs verificados. [Evidencia desplegada y reservas](invoice-pending-dev-live-9fa4504.md). Las referencias a borrador/sin despliegue siguientes describen las validaciones anteriores.
+
 PR #52 en borrador sobre `feature/chat-sales-pilot`; base **dcfaba0**. Corrección de resultados validada: **36c72b773f016ff66082aace4b60a8251a5e0c64**. La validación Oracle original corresponde exclusivamente a **c6fcb4bcda9a62ebe09df243ac8072bff21489e7**. Sin merge ni despliegue.
 
 ## Corrección del falso éxito y conservación del contexto
