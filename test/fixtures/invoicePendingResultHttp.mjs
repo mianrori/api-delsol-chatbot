@@ -76,7 +76,7 @@ try{
   assert.equal(result.status,'success');const state=store.getSearchResolutions(sessionId);
   assert.equal(state.invoiceLastTool,'get_invoice_balances');assert.equal(state.contexts.get_invoice_balances.debtStatus,'pending');
   assert.equal(state.contexts.get_invoice_balances.page,1);assert.equal(state.contexts.get_invoice_balances.dateFrom,undefined);
-  if(outcome==='empty')assert.match(body.response,/No se encontraron saldos/);
+  if(outcome==='empty')assert.match(body.response,/No encontré facturas pendientes de pago/);
   else{assert.match(body.response,/SYNTHETIC-NUMBER/);assert.match(body.response,/25,50/);}
  }
  for(const value of ['PRIVATE_DATABASE_ERROR','PRIVATE_RETURNED_ERROR','MUST_NOT_PRESENT']){

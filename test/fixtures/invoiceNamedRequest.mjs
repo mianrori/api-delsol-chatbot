@@ -38,7 +38,7 @@ try{
    if(customerAmbiguous){assert.match(answer,/Selecciona el cliente\/local/);assert.ok(!calls.some(c=>c.name==='get_invoices'));if(trimmed)crop();answer=await turn('2');}
    const invoice=calls.find(c=>c.name==='get_invoices');assert.ok(invoice);assert.deepEqual(invoice.args,{customerIds:[customerAmbiguous?'C2':'C1'],conceptIds:[conceptAmbiguous?'K2':'K1'],dateFrom:'01/01/2023',dateTo:'31/12/2023',mode:'detail',page:1,rows:20});
    assert.match(answer,/IMPACTO/);assert.match(answer,/ARRENDAMIENTO MINIMO/);assert.doesNotMatch(answer,/cliente \*\*arrendamiento|identificador m\u00e1s preciso/i);
-   if(scenario==='mixed-access')assert.match(answer,/No est\u00e1 autorizado a consultar parte/);
+   if(scenario==='mixed-access')assert.match(answer,/Solo puedo mostrar los registros/);
    const metadata=restorePiiDeep(sessionId,store.getSearchResolutions(sessionId).invoiceNamedRequest);assert.equal(metadata.phase,'complete');assert.deepEqual(metadata.input,invoice.args);assert.ok(!JSON.stringify(metadata).includes('SYNTHETIC-F1'));
    const sql=queries.filter(q=>q.sql.includes('VW_BOT_FACTURAS')&&!q.sql.includes('MATCH_PRIORITY'));assert.equal(sql.length,2);for(const q of sql){assert.equal(q.binds.dateFrom,'01/01/2023');assert.equal(q.binds.dateTo,'31/12/2023');assert.equal(q.binds.customerId0,invoice.args.customerIds[0]);assert.equal(q.binds.conceptId0,invoice.args.conceptIds[0]);assert.equal(q.binds.plate,undefined);assert.match(q.sql,/USER_CAN_CONSULT/);}
   }

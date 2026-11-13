@@ -4,8 +4,8 @@ import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {getInvoices} from '../src/services/invoices/invoices.service.js';
 import {hasRestrictedInvoiceCustomerRepository} from '../src/repositories/invoices/invoiceCustomers.repository.js';
-import {buildInvoiceDetailResponse,appendInvoiceAccessWarning} from '../src/services/ai/invoiceDetailPresentation.service.js';
-import {INVOICE_PARTIAL_ACCESS_MESSAGE,INVOICE_ACCESS_DENIED_MESSAGE} from '../src/utils/invoiceAccess.js';
+import {buildInvoiceDetailResponse,appendInvoiceAccessWarning,INVOICE_PARTIAL_PRESENTATION_MESSAGE as INVOICE_PARTIAL_ACCESS_MESSAGE} from '../src/services/ai/invoiceDetailPresentation.service.js';
+import {INVOICE_ACCESS_DENIED_MESSAGE} from '../src/utils/invoiceAccess.js';
 const fake=(...results)=>({queries:[],async execute(sql,binds){this.queries.push({sql,binds});return {rows:results.shift()??[]};}});
 const filters={customerIds:['C1'],conceptIds:['K1'],dateFrom:'01/01/2023',dateTo:'31/12/2023',invoiceNumber:'F1',plate:'ab -123',period:'01/2023',cancelled:false,page:2,rows:1};
 

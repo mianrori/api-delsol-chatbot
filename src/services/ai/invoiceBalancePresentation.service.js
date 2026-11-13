@@ -1,32 +1,52 @@
-export const invoiceBalanceCell=value=>String(value??'Sin datos').replace(/([\\`*_[\]<>|])/g,'\\$1').replace(/[\r\n]+/g,' ');
-const number=value=>value==null?'Desconocido':new Intl.NumberFormat('es-PY',{maximumFractionDigits:2}).format(value);
-const exactBalance=value=>{if(value==null)return 'Desconocido';const m=/^(-?)(\d+)(?:\.(\d{1,2}))?$/.exec(String(value));return m?m[1]+m[2].replace(/\B(?=(\d{3})+(?!\d))/g,'.')+','+(m[3]??'').padEnd(2,'0'):'Importe no representable';};
-const statuses={overdue:'Vencida',dueToday:'Vence hoy',upcoming:'Por vencer',undated:'Sin vencimiento válido',notDue:'No vencida'};
-const table=(head,rows)=>['| '+head.join(' | ')+' |','| '+head.map(()=>'---').join(' | ')+' |',...rows.map(r=>'| '+r.join(' | ')+' |')];
-export function buildInvoiceBalanceResponse(calls=[],{display=invoiceBalanceCell}={}) {
-  const matches=calls.filter(c=>c.name==='get_invoice_balances');
-  if(matches.length!==1||calls.some(c=>!['get_invoice_balances','search_invoice_balance_customers'].includes(c.name)))return null;
-  const r=matches[0].result;
-  if(r?.status==='INCONSISTENT_HISTORY')return 'Hay registros históricos inconsistentes o información incompleta. No se calculan los totales, rankings ni conteos de facturas afectados. Puedes consultar el detalle, que conserva todos los registros.';
-  if(r?.status==='OK_SUMMARY')return ['**Deudas por moneda**',`Referencia de vencimiento: ${display(r.asOfDate)}. Cálculos sobre identidades serie/número sin repeticiones en el alcance comprobado; sin conversión de moneda.`,
-    ...table(['Moneda (código)',...r.queryContext.groupBy,'Facturas','Deuda','Posición en su moneda'],r.data.map(row=>[display(row.currencyCode),...r.queryContext.groupBy.map(k=>k==='invoice'?`${display(row.invoiceSeries)} / ${display(row.invoiceNumber)}`:display(row[{customer:'customerId',sector:'sector',dueMonth:'dueMonth',dueStatus:'dueStatus',agingBand:'agingBand'}[k]])),number(row.invoiceCount),exactBalance(row.debt),number(row.currencyRank)])),
-    `Página ${r.page} de ${r.totalPages}.`].join('\n');
-  if(r?.status==='REQUIRES_SOURCE_IDENTITY')return 'No puedo sumar estas deudas sin confirmar qué representa cada registro y cómo identificar cada factura. Para ordenar importes individuales necesito además una única moneda identificada por su código.';
-  if(!r||r.mode!=='detail'||!Array.isArray(r.data))return null;
+import {invoiceCell,invoiceNumber,invoiceCurrencyLabel,invoiceTable,invoicePagination,invoiceSingleCustomer,invoicePresentationNeeds} from './invoicePresentation.service.js';
+export const invoiceBalanceCell=invoiceCell;
+const exactBalance=value=>{if(value==null)return 'No informada';const m=/^(-?)(\d+)(?:\.(\d{1,2}))?$/.exec(String(value));return m?m[1]+m[2].replace(/\B(?=(\d{3})+(?!\d))/g,'.')+','+(m[3]??'').padEnd(2,'0'):'Importe no representable';};
+const statuses={overdue:'Vencida',dueToday:'Vence hoy',upcoming:'Por vencer',undated:'No informado',notDue:'No vencida'};
+const integrityWarning=r=>r.duplicateRows>0?'Hay registros históricos duplicados; por eso no puedo calcular un total confiable.':r.missingIdentityRows>0?'Faltan datos para identificar algunas facturas; no puedo calcular un total confiable.':r.unknownDebtRows>0?'Hay registros con deuda no informada; no puedo calcular un total confiable.':r.missingCurrencyRows>0?'Falta identificar la moneda de algunos importes; no puedo calcular un total confiable.':'Hay registros históricos inconsistentes o datos incompletos; no puedo calcular un total confiable.';
+export function buildInvoiceBalanceResponse(calls=[],{display=invoiceCell,message=''}={}){
+ const matches=calls.filter(c=>c.name==='get_invoice_balances');
+ if(matches.length!==1||calls.some(c=>!['get_invoice_balances','search_invoice_balance_customers'].includes(c.name)))return null;
+ const r=matches[0].result,needs=invoicePresentationNeeds(message);
+ if(r?.status==='INCONSISTENT_HISTORY')return integrityWarning(r)+' Podés consultar el detalle.';
+ if(r?.status==='REQUIRES_SOURCE_IDENTITY')return 'No puedo calcular un total confiable con estos datos. Para ordenar o filtrar importes, necesito una sola moneda identificada.';
+ if(!r||r.success===false||r.error||!Array.isArray(r.data))return null;
+ const lines=[];
+ const historical=()=>{if(needs.historical)lines.push('La deuda que se muestra es la actual; no reconstruye el saldo de una fecha pasada.');if(needs.paymentDate)lines.push('No tengo la fecha de pago para indicar cuándo se canceló la deuda.');};
+ if(r.status==='OK_SUMMARY'){
+  lines.push(r.data.length?'Este es el resumen de deudas por moneda.':r.totalRows?'No hay registros en esta página.':'No encontré deudas para los filtros solicitados.');historical();
   const settled=r.queryContext?.debtStatus==='settled';
-  const lines=[settled?'**Facturas con deuda cancelada**':'**Deudas registradas de facturas**',`Vencimientos clasificados al ${display(r.asOfDate)}. Son importes actuales; no reconstruyen un saldo histórico.`,''];
-  if(settled)lines.push('Deuda cancelada significa deuda cero. No indica que la factura esté anulada.','');
-  if(r.warning)lines.push(display(r.warning),'');
-  lines.push(`Clientes distintos identificados: ${number(r.matchedCustomers)}. Pares serie/número distintos: ${number(r.matchedInvoicePairs)}.`,'');
-  lines.push('Cada fila es un registro: serie/número todavía no demuestra una factura única. Los negativos se excluyen; cero indica deuda cancelada. No se suman importes ni se mezclan monedas.','');
-  if(r.unknownDebtRows)lines.push('Hay registros con deuda desconocida; no se consideran cero ni cancelados.');
-  if(r.invalidDueDateRows)lines.push('Hay vencimientos vacíos o inválidos, clasificados como sin vencimiento válido.');
-  if(!r.data.length)lines.push(r.totalRows?'No hay registros en esta página; los conteos corresponden al filtro completo.':settled?'No se encontraron facturas con deuda cancelada para los filtros solicitados.':'No se encontraron saldos para los filtros solicitados.');
-  else lines.push(...table(['Serie de factura','Número de factura','Estado de deuda','Cliente','Razón social','RUC','Sector','Vencimiento','Estado de vencimiento','Días de atraso','Moneda (código)','Símbolo informado','Deuda'],r.data.map(row=>[
-    display(row.invoiceSeries),display(row.invoiceNumber),display({pending:'Pendiente',settled:'Deuda cancelada',unknown:'Desconocida'}[row.debtState]),display(row.customerName),display(row.businessName),display(row.taxId),display(row.sector),display(row.dueDate),display(statuses[row.dueStatus]??row.dueStatus),number(row.daysOverdue),display(row.currencyCode),display(row.currencySymbol??'Sin símbolo'),exactBalance(row.debt)])));
-  lines.push('',`Se muestran ${r.returnedRows} de ${r.totalRows} registros. Página ${r.page} de ${r.totalPages}.`);
-  if(r.hasMore)lines.push(`Puedes pedir la siguiente página (${r.nextPage}).`);
-  return lines.join('\n');
+  const groups=r.queryContext?.groupBy??[],labels={customer:'Cliente',sector:'Sector',dueMonth:'Mes de vencimiento',dueStatus:settled?'Vencimiento respecto de la referencia':'Vencimiento',agingBand:settled?'Antigüedad del vencimiento':'Antigüedad'};
+  const dueLabels=settled?{overdue:'Anterior a la referencia',dueToday:'En la fecha de referencia',upcoming:'Posterior a la referencia',notDue:'En o después de la referencia',undated:'No informado'}:statuses;
+  if(settled&&groups.some(group=>['dueStatus','agingBand'].includes(group)))lines.push('La fecha de vencimiento no indica mora actual ni la fecha de pago.');
+  const fields=[['Moneda',row=>display(invoiceCurrencyLabel(row))]];
+  for(const group of groups){if(group==='invoice'){fields.push(['Serie',row=>display(row.invoiceSeries)],['Número',row=>display(row.invoiceNumber)]);continue;}
+   fields.push([labels[group]??'Grupo',row=>display(group==='customer'?row.customerName??'Nombre no informado':group==='dueStatus'?dueLabels[row.dueStatus]??'No informado':row[{sector:'sector',dueMonth:'dueMonth',agingBand:'agingBand'}[group]])]);}
+  if(r.monetaryAggregationAvailable===true)fields.push(['Facturas',row=>invoiceNumber(row.invoiceCount)]);
+  fields.push(['Deuda',row=>exactBalance(row.debt)]);if(needs.rank)fields.push(['Posición en su moneda',row=>invoiceNumber(row.currencyRank)]);
+  if(r.data.length)lines.push('',...invoiceTable(fields.map(([label])=>label),r.data.map(row=>fields.map(([,format])=>format(row)))));
+  lines.push('',invoicePagination(r,r.data.length));return lines.join('\n');
+ }
+ if(r.mode!=='detail')return null;
+ const settled=r.queryContext?.debtStatus==='settled';
+ const customer=invoiceSingleCustomer(r.data,{customer:row=>({id:row.customerId,name:row.customerName??row.businessName}),customerIds:r.queryContext?.customerIds,matchedCustomers:r.matchedCustomers,totalRows:r.totalRows});
+ const kind=settled?'con deuda cancelada':r.queryContext?.debtStatus==='pending'?'pendientes de pago':'con saldos registrados';
+ lines.push(r.data.length?'Estas son las facturas '+kind+(customer?' de '+display(customer):'')+'.':r.totalRows?'No hay registros en esta página.':'No encontré facturas '+kind+' para los filtros solicitados.');historical();
+ if(needs.annulled&&settled)lines.push('Deuda cancelada significa deuda cero; no indica que la factura esté anulada.');
+ if(r.duplicateRows>0||r.missingIdentityRows>0)lines.push(integrityWarning(r));else if(r.warning)lines.push(display(r.warning));
+ if(r.unknownDebtRows>0)lines.push('Hay registros con deuda no informada; no se consideran saldados.');
+ if(r.invalidDueDateRows>0)lines.push('Algunos registros no tienen un vencimiento válido.');
+ const fields=[['Serie',row=>display(row.invoiceSeries)],['Número',row=>display(row.invoiceNumber)]];
+ if(!customer||needs.customerColumn)fields.push(['Cliente',row=>display(row.customerName??row.businessName)]);
+ if(needs.business)fields.push(['Razón social',row=>display(row.businessName)]);
+ if(needs.tax)fields.push(['RUC',row=>display(row.taxId)]);
+ if(needs.sector)fields.push(['Sector',row=>display(row.sector)]);
+ fields.push(['Vencimiento',row=>display(row.dueDate)]);
+ if(!settled&&needs.dueState)fields.push(['Estado del vencimiento',row=>row.debtState==='pending'?display(statuses[row.dueStatus]??row.dueStatus):'—']);
+ if(!settled&&needs.late)fields.push(['Días de atraso',row=>row.debtState==='pending'?invoiceNumber(row.daysOverdue):'—']);
+ if(!['pending','settled'].includes(r.queryContext?.debtStatus))fields.push(['Estado de deuda',row=>display({pending:'Pendiente',settled:'Sin deuda',unknown:'No informada'}[row.debtState]??'No informado')]);
+ fields.push(['Moneda',row=>display(invoiceCurrencyLabel(row))],['Deuda',row=>exactBalance(row.debt)]);
+ if(r.data.length)lines.push('',...invoiceTable(fields.map(([label])=>label),r.data.map(row=>fields.map(([,format])=>format(row)))));
+ lines.push('',invoicePagination(r,r.data.length));return lines.join('\n');
 }
 
 export function resolveInvoiceBalancePage({message,history=[],pageState}) {

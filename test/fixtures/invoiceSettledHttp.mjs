@@ -55,11 +55,11 @@ try{
    assert.equal(store.getInvoiceBalancePageState(sessionId).status,'error');
    assert.equal(resolveInvoiceBalancePage({message:'Siguiente página',history:[],pageState:store.getInvoiceBalancePageState(sessionId)}),null,'failure cannot resume stale pages after trimming');
   }else{
-   assert.match(body.response,/Facturas con deuda cancelada/);assert.match(body.response,/No indica que la factura esté anulada/);
+   assert.match(body.response,/facturas con deuda cancelada/);assert.doesNotMatch(body.response,/Vencida|Días de atraso|Estado del vencimiento/);
    const scope=store.getSearchResolutions(sessionId).contexts.get_invoice_balances;assert.equal(scope.debtStatus,'settled');assert.equal(scope.page,1);assert.equal(scope.dateFrom,undefined);assert.equal(scope.minDebt,undefined);
-   if(scenario==='empty'){assert.match(body.response,/No se encontraron facturas con deuda cancelada/);assert.doesNotMatch(body.response,/SYNTHETIC-NUMBER/);}
+   if(scenario==='empty'){assert.match(body.response,/No encontré facturas con deuda cancelada/);assert.doesNotMatch(body.response,/SYNTHETIC-NUMBER/);}
    else{
-    assert.equal((body.response.match(/SYNTHETIC-NUMBER-/g)??[]).length,20);assert.match(body.response,/Deuda cancelada/);assert.match(body.response,/0,00/);assert.doesNotMatch(body.response,/25,50/);
+    assert.equal((body.response.match(/SYNTHETIC-NUMBER-/g)??[]).length,20);assert.match(body.response,/deuda cancelada/);assert.match(body.response,/0,00/);assert.doesNotMatch(body.response,/25,50/);
     if(trimmed==='true'){
      const history=store.getConversation(sessionId);for(let i=0;i<12;i++)history.push({role:'user',content:[{text:'Otro tema '+i}]},{role:'assistant',content:[{text:'Recibido.'}]});
      store.setConversation(sessionId,trimConversation(history,10));
