@@ -54,9 +54,9 @@ try{
   const query=calls.find(c=>c.name==='get_invoice_balances');assert.ok(query,message);
   assert.deepEqual(query.arguments,{customerIds:['SYNTHETIC-C'],mode:'detail',debtStatus:'pending',page:1,rows:20});
   if(!message.endsWith('ahora'))assert.equal(modelCalls,before,'bounded pending requests bypass the model');
-  for(const column of ['Serie de factura','Número de factura','Cliente','Vencimiento','Moneda (código)','Deuda'])assert.ok(body.response.includes(column),column);
+  for(const column of ['Serie','Número','Vencimiento','Moneda','Deuda'])assert.ok(body.response.includes(column),column);
   assert.equal((body.response.match(/SYNTHETIC-NUMBER/g)??[]).length,2,'duplicates preserved');
-  assert.match(body.response,/históricos inconsistentes/);assert.match(body.response,/25,50/);
+  assert.match(body.response,/históricos duplicados/);assert.match(body.response,/25,50/);
   const history=JSON.stringify(store.getConversation(sessionId));assert.ok(!history.includes('SYNTHETIC-C'));assert.ok(!history.includes('SYNTHETIC-NUMBER'));
   const blocks=store.getConversation(sessionId).flatMap(m=>m.content??[]);assert.equal(blocks.filter(b=>b.toolUse?.name==='get_invoices').length,message==='solo las pendientes'?1:0);
   assert.equal(opened,closed);

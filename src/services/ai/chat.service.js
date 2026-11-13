@@ -1,3 +1,4 @@
+import {invoicePresentationPrompt} from '../../prompts/sections/invoicePresentation.prompt.js';
 import {buildInvoiceBalanceResponse,resolveInvoiceBalancePage,invoiceBalanceCell} from './invoiceBalancePresentation.service.js';
 import {executeNamedInvoiceRequest} from './invoiceNamedRequest.service.js';
 import {executePendingInvoiceRequest,pendingInvoiceInput} from './invoicePendingRequest.service.js';
@@ -76,7 +77,8 @@ const bedrockClient = new BedrockRuntimeClient({
   region: config.awsRegion || "us-east-1",
 });
 
-const balanceResponse=(sessionId,calls)=>buildInvoiceBalanceResponse(calls,{display:value=>protectPiiValue(sessionId,'BALANCE_DISPLAY',invoiceBalanceCell(restorePiiDeep(sessionId,value)))});
+const balanceResponse=(sessionId,calls,message='')=>buildInvoiceBalanceResponse(calls,{message,display:value=>protectPiiValue(sessionId,'BALANCE_DISPLAY',invoiceBalanceCell(restorePiiDeep(sessionId,value)))});
+const invoiceDetailResponse=(sessionId,calls,message='')=>buildInvoiceDetailResponse(calls,{message,restoreValue:value=>restorePiiDeep(sessionId,value),display:value=>protectPiiValue(sessionId,'INVOICE_DISPLAY',invoiceBalanceCell(value)),protectLink:value=>protectPiiValue(sessionId,'INVOICE_DISPLAY',value)});
 const MAX_TOOL_ITERATIONS = 8;
 const MAX_MODEL_ROWS_WITH_EXPORT = 12;
 
@@ -395,7 +397,7 @@ Para consultas de facturas:
 - no resuelvas globalmente un cliente de facturación y luego filtres otro período si el usuario ya proporcionó fechas;
 - usa search_invoice_concepts cuando el usuario mencione un concepto de factura por texto y todavía no tengas un conceptId resuelto;
 - distingue concepto de cliente/local: en "facturas de arrendamiento mínimo del 2023 del local impacto", busca "arrendamiento mínimo" con search_invoice_concepts y "impacto" con search_invoice_customers dentro de 2023. Después usa ambos identificadores y ese mismo período en get_invoices; espera selección si algún buscador devuelve ambigüedad;
-- usa get_invoices para obtener detalle o resumen de facturas emitidas. Para «facturas pendientes», «pendientes de pago», «cuánto debe» y «solo las pendientes» usa get_invoice_balances, VW_BOT_FACTURAS_SALDOS y debtStatus="pending" (DEUDA > 0). Nunca respondas cuánto queda por pagar con get_invoices. Resuelve nombres con search_invoice_balance_customers. Conserva el cliente confirmado al pasar de facturación a saldos, pero no heredes emisión/dateFrom/dateTo, conceptos, matrícula, agrupación o paginación. Muestra serie, número, cliente, vencimiento, código de moneda y deuda; conserva los bloqueos de integridad para sumas y conteos;
+- usa get_invoices para obtener detalle o resumen de facturas emitidas. Para «facturas pendientes», «pendientes de pago», «cuánto debe» y «solo las pendientes» usa get_invoice_balances, VW_BOT_FACTURAS_SALDOS y debtStatus="pending" (DEUDA > 0). Nunca respondas cuánto queda por pagar con get_invoices. Resuelve nombres con search_invoice_balance_customers. Conserva el cliente confirmado al pasar de facturación a saldos, pero no heredes emisión/dateFrom/dateTo, conceptos, matrícula, agrupación o paginación. Muestra serie, número, cliente, vencimiento, moneda comercial acreditada y deuda; conserva los bloqueos de integridad para sumas y conteos;
 - para buscar facturas de una matrícula usa directamente get_invoices con plate, eliminando espacios en blanco y guiones. No resuelvas un cliente por matrícula salvo que el usuario pida identificar al cliente; conserva los filtros previamente confirmados en seguimientos;
 - si una fila autorizada tiene pdfUrl, ofrece [Ver PDF](pdfUrl) usando exactamente ese enlace. No inventes enlaces ni uses archivos de otras filas o páginas;
 - si el usuario solicita importes agregados o cantidad de facturas, prefiere mode="summary";
@@ -1803,7 +1805,7 @@ export const chatService = async ({ message, sessionId }) => {
       conversationActions = executed.actions;
       conversationInternalContext = executed.internalContext;
       toolIterations = 1;
-      followupAnswer = balanceResponse(sessionId,executed.internalContext.presentationCalls)
+      followupAnswer = balanceResponse(sessionId,executed.internalContext.presentationCalls,message)
         ?? buildVehicleResponse(executed.internalContext.presentationCalls)
         ?? buildSolesUsageResponse(executed.internalContext.presentationCalls)
         ?? buildMemberSolesResponse(executed.internalContext.presentationCalls)
@@ -1871,7 +1873,7 @@ export const chatService = async ({ message, sessionId }) => {
             text: systemPrompt,
           },
           {
-            text: RUNTIME_CAPABILITIES_PROMPT,
+            text: RUNTIME_CAPABILITIES_PROMPT + invoicePresentationPrompt,
           },
           ...(salesRefreshRetried ? [{ text: SALES_REFRESH_INSTRUCTION }] : []),
         ],
@@ -1963,11 +1965,11 @@ export const chatService = async ({ message, sessionId }) => {
 
       // A complete breakdown is authoritative even when the model requested
       // it after changing dates or filters. Do not ask the model to rewrite it.
-      followupAnswer = balanceResponse(sessionId,conversationInternalContext.presentationCalls)
+      followupAnswer = balanceResponse(sessionId,conversationInternalContext.presentationCalls,message)
         ?? buildMemberPromoResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) })
         ?? buildContractIncidenceResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) })
         ?? buildSalesPerSqmResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) })
-        ?? buildInvoiceDetailResponse(conversationInternalContext.presentationCalls,{restoreValue:value=>restorePiiDeep(sessionId,value)}) ?? buildSalesYearComparisonResponse(conversationInternalContext.presentationCalls,{restoreValue:value=>restorePiiDeep(sessionId,value)})
+        ?? invoiceDetailResponse(sessionId,conversationInternalContext.presentationCalls,message) ?? buildSalesYearComparisonResponse(conversationInternalContext.presentationCalls,{restoreValue:value=>restorePiiDeep(sessionId,value)})
         ?? buildSalesSampleResponse(conversationInternalContext.presentationCalls, { exportAvailable: Boolean(conversationActions.salesExport?.available) })
         ?? buildSalesSeriesResponse(conversationInternalContext.presentationCalls, { message, restoreValue: (value) => restorePiiDeep(sessionId, value) })
         ?? buildVehicleResponse(conversationInternalContext.presentationCalls)
@@ -2028,9 +2030,9 @@ export const chatService = async ({ message, sessionId }) => {
       ? ACCESS_DENIED_MESSAGE
       : conversationActions.chart?.available
       ? "Aquí tienes el gráfico solicitado."
-      : balanceResponse(sessionId,conversationInternalContext.presentationCalls) ?? buildMemberPromoResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) }) ?? buildContractIncidenceResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) }) ?? monthlyIncidenceText ??
+      : balanceResponse(sessionId,conversationInternalContext.presentationCalls,message) ?? buildMemberPromoResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) }) ?? buildContractIncidenceResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) }) ?? monthlyIncidenceText ??
       buildSalesPerSqmResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) }) ??
-      buildInvoiceDetailResponse(conversationInternalContext.presentationCalls,{restoreValue:value=>restorePiiDeep(sessionId,value)}) ?? buildSalesYearComparisonResponse(conversationInternalContext.presentationCalls,{restoreValue:value=>restorePiiDeep(sessionId,value)}) ??
+      invoiceDetailResponse(sessionId,conversationInternalContext.presentationCalls,message) ?? buildSalesYearComparisonResponse(conversationInternalContext.presentationCalls,{restoreValue:value=>restorePiiDeep(sessionId,value)}) ??
       buildSalesSampleResponse(conversationInternalContext.presentationCalls, { exportAvailable: Boolean(conversationActions.salesExport?.available) }) ??
       buildSalesSeriesResponse(conversationInternalContext.presentationCalls, { message, restoreValue: (value) => restorePiiDeep(sessionId, value) }) ??
       buildVehicleResponse(conversationInternalContext.presentationCalls) ??

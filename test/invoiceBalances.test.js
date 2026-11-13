@@ -93,7 +93,7 @@ test('PII protects model results and argument arrays, restores only within match
 
 test('presentation renders full detail and per-currency totals without internal IDs, guessing or PDFs; followup preserves scope',async()=>{
  const r=await getInvoiceBalances({rows:1,customerIds:['C1'],asOfDate:'12/11/2026'},fake(totals,[row]));
- const text=buildInvoiceBalanceResponse([{name:'get_invoice_balances',result:r}]);assert.match(text,/F-PRIVATE/);assert.match(text,/TIENDA PRIVADA/);assert.match(text,/PYG/);assert.match(text,/No se suman importes/);assert.match(text,/no reconstruyen un saldo histórico/);assert.doesNotMatch(text,/C-PRIVATE|Ver PDF/);
+ const text=buildInvoiceBalanceResponse([{name:'get_invoice_balances',result:r}]);assert.match(text,/F-PRIVATE/);assert.match(text,/TIENDA PRIVADA/);assert.match(text,/Gs\./);assert.doesNotMatch(text,/No se suman importes|saldo histórico|C-PRIVATE|Ver PDF/);
  const history=[{role:'assistant',content:[{toolUse:{name:'get_invoice_balances',toolUseId:'b',input:{}}}]},{role:'user',content:[{toolResult:{toolUseId:'b',status:'success',content:[{json:r}]}}]}];
  assert.deepEqual(resolveInvoiceBalancePage({message:'siguiente página',history}).input,{...r.queryContext,page:2});
  assert.equal(resolveInvoiceBalancePage({message:'saldo general',history}),null);
@@ -138,5 +138,5 @@ test('monetary row ordering requires exactly one native currency code, never a s
 test('same displayed symbol never collapses two native currencies or sums their debts',async()=>{
  const r=await getInvoiceBalances({},fake([{TOTAL_ROWS:2}],[{...row,COD_MONEDA:'M1',SIMBOLO_MONEDA:'$',DEUDA:'10.01'},{...row,COD_MONEDA:'M2',SIMBOLO_MONEDA:'$',DEUDA:'20.02'}]));
  assert.deepEqual(r.data.map(x=>[x.currencyCode,x.currencySymbol,x.debt]),[['M1','$','10.01'],['M2','$','20.02']]);assert.equal(r.totalsByCurrency,undefined);
- const text=buildInvoiceBalanceResponse([{name:'get_invoice_balances',result:r}]);assert.match(text,/M1/);assert.match(text,/M2/);assert.ok(!text.includes('30,03'));
+ const text=buildInvoiceBalanceResponse([{name:'get_invoice_balances',result:r}]);assert.doesNotMatch(text,/M1|M2|USD/);assert.equal((text.match(/moneda no identificada/g)??[]).length,2);assert.ok(text.includes('10,01'));assert.ok(text.includes('20,02'));assert.ok(!text.includes('30,03'));
 });

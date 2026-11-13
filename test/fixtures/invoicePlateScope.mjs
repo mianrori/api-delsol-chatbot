@@ -3,7 +3,7 @@ import express from 'express';
 import * as store from '../../src/state/conversation.store.js';import {protectPiiDeep,restorePiiDeep} from '../../src/services/ai/pii.service.js';import {trimConversation} from '../../src/services/ai/conversation.service.js';
 import {getInvoices} from '../../src/services/invoices/invoices.service.js';import {searchInvoiceConcepts} from '../../src/services/invoices/searchInvoiceConcepts.service.js';import {searchInvoiceCustomers} from '../../src/services/invoices/searchInvoiceCustomers.service.js';
 import config from '../../config.js';
-import {INVOICE_PARTIAL_ACCESS_MESSAGE} from '../../src/utils/invoiceAccess.js';
+import {INVOICE_PARTIAL_PRESENTATION_MESSAGE as INVOICE_PARTIAL_ACCESS_MESSAGE} from '../../src/services/ai/invoiceDetailPresentation.service.js';
 config.urlEndPointDePdf='https://pdf.example.test';
 process.env.NODE_ENV='development';
 for(const k of ['log','info','warn','error','debug'])console[k]=()=>{};
@@ -50,7 +50,7 @@ try{
  assert.deepEqual(attempts.at(-1).args,expected);
  const metadata=restorePiiDeep(sessionId,store.getSearchResolutions(sessionId).contexts.get_invoices);assert.deepEqual(metadata,expected);
  if(scenario==='followup'||scenario==='denied'){assert.match(answer,/no tiene permisos/);assert.doesNotMatch(answer,/No se encontraron|ALLOWED-PLATE|Ver PDF/);}
- else if(scenario==='empty'){assert.match(answer,/No se encontraron/);assert.doesNotMatch(answer,/no tiene permisos/);}
+ else if(scenario==='empty'){assert.match(answer,/No encontr\u00e9/);assert.doesNotMatch(answer,/no tiene permisos/);}
  else{assert.match(answer,/ALLOWED-PLATE/);assert.doesNotMatch(answer,/no tiene permisos|IMPACTO/);assert.match(answer,/Ver PDF/);}
  if(scenario==='mixed'){
   assert.ok(answer.includes(INVOICE_PARTIAL_ACCESS_MESSAGE));

@@ -10,7 +10,7 @@ for(const debts of [['10','10'],['10','20']])test('duplicate identity blocks equ
  const c=fake([{TOTAL_ROWS:2,DUPLICATE_ROWS:2}]);
  const r=await getInvoiceBalances({mode:'summary',groupBy:['customer']},c);
  assert.equal(r.status,'INCONSISTENT_HISTORY');assert.equal(r.data,undefined);assert.equal(r.invoiceCount,null);
- assert.match(buildInvoiceBalanceResponse([{name:'get_invoice_balances',result:r}]),/históricos inconsistentes/);
+ assert.match(buildInvoiceBalanceResponse([{name:'get_invoice_balances',result:r}]),/históricos duplicados/);
  const d=await getInvoiceBalances({},fake([{TOTAL_ROWS:2,DUPLICATE_ROWS:2}],debts.map(DEUDA=>({SERIE_FACTURA:'S1',NRO_FACTURA:'1',DEUDA}))));
  assert.equal(d.data.length,2);assert.deepEqual(d.data.map(x=>x.debt),debts);assert.equal(d.invoiceCount,null);assert.ok(d.warning);
  assert.doesNotMatch(c.queries[0].sql,/SUM\s*\(\s*DISTINCT|\b(?:MAX|MIN)\s*\(/i);
@@ -45,6 +45,6 @@ test('clean summary identities protected and restored for invoice ranking presen
  const id='INTEGRITY-PII';try{
  const r=await getInvoiceBalances({mode:'summary',groupBy:['invoice']},fake([{TOTAL_ROWS:1,TOTAL_GROUPS:1,RN:1,COD_MONEDA:'M1',DIM0:'SECRET-SERIES',DIM1:'SECRET-INVOICE',DEUDA:'12.34',INVOICE_COUNT:1,CURRENCY_RANK:1}]));
  const p=protectPiiDeep(id,r);assert.ok(!JSON.stringify(p).includes('SECRET-'));assert.deepEqual(restorePiiDeep(id,p),r);
- const text=buildInvoiceBalanceResponse([{name:'get_invoice_balances',result:r}]);assert.ok(text.includes('SECRET-SERIES / SECRET-INVOICE'));assert.ok(text.includes('12,34'));
+ const text=buildInvoiceBalanceResponse([{name:'get_invoice_balances',result:r}]);assert.ok(text.includes('| SECRET-SERIES | SECRET-INVOICE |'));assert.ok(text.includes('12,34'));
  }finally{clearPiiSession(id);}
 });
