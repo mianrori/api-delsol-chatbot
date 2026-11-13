@@ -1,5 +1,6 @@
 import {buildInvoiceBalanceResponse,resolveInvoiceBalancePage,invoiceBalanceCell} from './invoiceBalancePresentation.service.js';
 import {executeNamedInvoiceRequest} from './invoiceNamedRequest.service.js';
+import {executePendingInvoiceRequest,pendingInvoiceInput} from './invoicePendingRequest.service.js';
 import {buildInvoiceDetailResponse, appendInvoiceAccessWarning} from './invoiceDetailPresentation.service.js';
 import {applySalesMetrics} from './salesMetrics.service.js';
 import { buildMemberPurchasesResponse, resolveMemberPurchasesPage } from "./memberPurchasesPresentation.service.js";
@@ -390,7 +391,7 @@ Para consultas de facturas:
 - no resuelvas globalmente un cliente de facturación y luego filtres otro período si el usuario ya proporcionó fechas;
 - usa search_invoice_concepts cuando el usuario mencione un concepto de factura por texto y todavía no tengas un conceptId resuelto;
 - distingue concepto de cliente/local: en "facturas de arrendamiento mínimo del 2023 del local impacto", busca "arrendamiento mínimo" con search_invoice_concepts y "impacto" con search_invoice_customers dentro de 2023. Después usa ambos identificadores y ese mismo período en get_invoices; espera selección si algún buscador devuelve ambigüedad;
-- usa get_invoices para obtener detalle o resumen de facturas;
+- usa get_invoices para obtener detalle o resumen de facturas emitidas. Para «facturas pendientes», «pendientes de pago», «cuánto debe» y «solo las pendientes» usa get_invoice_balances, VW_BOT_FACTURAS_SALDOS y debtStatus="pending" (DEUDA > 0). Nunca respondas cuánto queda por pagar con get_invoices. Resuelve nombres con search_invoice_balance_customers. Conserva el cliente confirmado al pasar de facturación a saldos, pero no heredes emisión/dateFrom/dateTo, conceptos, matrícula, agrupación o paginación. Muestra serie, número, cliente, vencimiento, código de moneda y deuda; conserva los bloqueos de integridad para sumas y conteos;
 - para buscar facturas de una matrícula usa directamente get_invoices con plate, eliminando espacios en blanco y guiones. No resuelvas un cliente por matrícula salvo que el usuario pida identificar al cliente; conserva los filtros previamente confirmados en seguimientos;
 - si una fila autorizada tiene pdfUrl, ofrece [Ver PDF](pdfUrl) usando exactamente ese enlace. No inventes enlaces ni uses archivos de otras filas o páginas;
 - si el usuario solicita importes agregados o cantidad de facturas, prefiere mode="summary";
@@ -1407,7 +1408,11 @@ const executeToolRequests = async ({ content, sessionId, sourceMessages = [], ch
 
   for (const block of toolUses) {
     throwIfRequestAborted();
-    const { toolUseId, name } = block.toolUse;
+    const { toolUseId } = block.toolUse;
+    let name=block.toolUse.name;
+    const reroutedInvoice=getSearchSelectionTurn(sessionId).pendingInvoice&&name==='get_invoices';
+    if(reroutedInvoice)name=block.toolUse.name='get_invoice_balances';
+    if(getSearchSelectionTurn(sessionId).pendingInvoice&&name==='search_invoice_customers')name=block.toolUse.name='search_invoice_balance_customers';
     let input = block.toolUse.input ?? {};
     if (name === "get_sales_per_sqm" && sqmFollowup) {
       input = preserveSalesPerSqmFollowup({ ...sqmFollowup, input }) ?? input;
@@ -1439,6 +1444,7 @@ const executeToolRequests = async ({ content, sessionId, sourceMessages = [], ch
     }
 
     try {
+      if(reroutedInvoice)input=pendingInvoiceInput(getSearchResolutions(sessionId));
       captureSearchQueryContext(sessionId,name,protectPiiDeep(sessionId,input));
       input=preserveSearchSelection({name,input,history:sourceMessages,currentCalls:internalContext.presentationCalls,resolutionState:getSearchResolutions(sessionId),selectionTurn:getSearchSelectionTurn(sessionId)});
       if(name==='get_sales')input=applySalesMetrics(input,getSearchSelectionTurn(sessionId).salesMetrics);
@@ -1697,9 +1703,10 @@ export const chatService = async ({ message, sessionId }) => {
   };
   const plateRequest=getSearchSelectionTurn(sessionId).invoicePlateRequest;
   const unresolvedInvoiceDenied=plateRequest&&!plateRequest.autonomous&&getSearchResolutions(sessionId).invoiceNamedRequest?.phase==='denied';
-  const namedInvoice=unresolvedInvoiceDenied ? {answer:ACCESS_DENIED_MESSAGE} : plateRequest
+  const pendingInvoice=await executePendingInvoiceRequest({sessionId,message:messages.at(-1).content[0].text,execute:executeInvoice});
+  const namedInvoice=pendingInvoice??(unresolvedInvoiceDenied ? {answer:ACCESS_DENIED_MESSAGE} : plateRequest
     ? {answer:(await executeInvoice('get_invoices',plateRequest.input))?.data?'Detalle de facturas consultado.':'No fue posible consultar las facturas.'}
-    : await executeNamedInvoiceRequest({sessionId,message:messages.at(-1).content[0].text,execute:executeInvoice});
+    : await executeNamedInvoiceRequest({sessionId,message:messages.at(-1).content[0].text,execute:executeInvoice}));
   if(namedInvoice)followupAnswer=namedInvoice.answer;
   if (!namedInvoice&&salesYearComparison?.autonomous&&salesYearComparison.search) {
     const content=[{toolUse:{toolUseId:'comparison_category_'+randomUUID(),name:'search_categories',input:{search:salesYearComparison.search}}}];
