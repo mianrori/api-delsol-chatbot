@@ -36,6 +36,14 @@ function scopeSql(args) {
 }
 
 const numeric=v=>v==null?null:Number(v);
+// Bounded, authorized native-code catalogue. No customer loop or money aggregation.
+export async function getInvoiceBalanceCurrenciesRepository({connection}){
+ const result=await connection.execute(`SELECT * FROM (
+  SELECT DISTINCT COD_MONEDA, SIMBOLO_MONEDA FROM VW_BOT_FACTURAS_SALDOS
+  WHERE DEUDA > 0 AND COD_MONEDA IS NOT NULL ORDER BY COD_MONEDA, SIMBOLO_MONEDA
+ ) WHERE ROWNUM<=201`,{},{outFormat:4002});
+ return (result.rows??[]).map(row=>({currencyCode:row.COD_MONEDA,currencySymbol:row.SIMBOLO_MONEDA}));
+}
 export async function getInvoiceBalancesRepository({connection,...args}) {
   const execute=(sql,binds={})=>connection.execute(sql,binds,{outFormat:4002,fetchInfo:{DEUDA:{type:oracledb.STRING}}});
   // Neither a symbol nor an invoice number is a proven business identifier.

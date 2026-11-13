@@ -1,4 +1,4 @@
-import {getInvoiceBalancesRepository, searchInvoiceBalanceCustomersRepository} from '../../repositories/invoices/invoiceBalances.repository.js';
+import {getInvoiceBalancesRepository, searchInvoiceBalanceCustomersRepository,getInvoiceBalanceCurrenciesRepository} from '../../repositories/invoices/invoiceBalances.repository.js';
 
 const fail = message => {throw new Error(message);};
 const today = () => {
@@ -49,6 +49,18 @@ export function normalizeInvoiceBalanceArgs(args={}) {
 export async function getInvoiceBalances(args, connection) {
   const scope=normalizeInvoiceBalanceArgs(args);
   return getInvoiceBalancesRepository({connection,...scope});
+}
+
+export async function resolveInvoiceBalanceCurrency(args={},connection){
+ if(Object.keys(args).some(key=>key!=='currency')||args.currency!=='USD')fail('Indica la moneda comercial USD.');
+ const rows=await getInvoiceBalanceCurrenciesRepository({connection});
+ if(rows.length>200)return {status:'INCOMPLETE',currency:'USD'};
+ const normalize=value=>String(value??'').trim().toUpperCase();
+ const usd=value=>['USD','US$','U$S'].includes(normalize(value));
+ const codes=[...new Set(rows.filter(row=>usd(row.currencySymbol)||normalize(row.currencyCode)==='USD').map(row=>String(row.currencyCode)))];
+ if(!codes.length)return {status:'NOT_IDENTIFIED',currency:'USD'};
+ if(codes.length!==1||rows.some(row=>String(row.currencyCode)===codes[0]&&!usd(row.currencySymbol)&&!['','$'].includes(normalize(row.currencySymbol))))return {status:'AMBIGUOUS',currency:'USD'};
+ return {status:'RESOLVED',currency:'USD',currencyCode:codes[0]};
 }
 
 export async function searchInvoiceBalanceCustomers(args={}, connection) {

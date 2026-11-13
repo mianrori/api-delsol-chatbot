@@ -3,9 +3,9 @@ export const invoiceBalanceCell=invoiceCell;
 const exactBalance=value=>{if(value==null)return 'No informada';const m=/^(-?)(\d+)(?:\.(\d{1,2}))?$/.exec(String(value));return m?m[1]+m[2].replace(/\B(?=(\d{3})+(?!\d))/g,'.')+','+(m[3]??'').padEnd(2,'0'):'Importe no representable';};
 const statuses={overdue:'Vencida',dueToday:'Vence hoy',upcoming:'Por vencer',undated:'No informado',notDue:'No vencida'};
 const integrityWarning=r=>r.duplicateRows>0?'Hay registros históricos duplicados; por eso no puedo calcular un total confiable.':r.missingIdentityRows>0?'Faltan datos para identificar algunas facturas; no puedo calcular un total confiable.':r.unknownDebtRows>0?'Hay registros con deuda no informada; no puedo calcular un total confiable.':r.missingCurrencyRows>0?'Falta identificar la moneda de algunos importes; no puedo calcular un total confiable.':'Hay registros históricos inconsistentes o datos incompletos; no puedo calcular un total confiable.';
-export function buildInvoiceBalanceResponse(calls=[],{display=invoiceCell,message=''}={}){
+export function buildInvoiceBalanceResponse(calls=[],{display=invoiceCell,message='',currencyLabels={}}={}){
  const matches=calls.filter(c=>c.name==='get_invoice_balances');
- if(matches.length!==1||calls.some(c=>!['get_invoice_balances','search_invoice_balance_customers'].includes(c.name)))return null;
+ if(matches.length!==1||calls.some(c=>!['get_invoice_balances','search_invoice_balance_customers','resolve_invoice_balance_currency'].includes(c.name)))return null;
  const r=matches[0].result,needs=invoicePresentationNeeds(message);
  if(r?.status==='INCONSISTENT_HISTORY')return integrityWarning(r)+' Podés consultar el detalle.';
  if(r?.status==='REQUIRES_SOURCE_IDENTITY')return 'No puedo calcular un total confiable con estos datos. Para ordenar o filtrar importes, necesito una sola moneda identificada.';
@@ -19,7 +19,7 @@ export function buildInvoiceBalanceResponse(calls=[],{display=invoiceCell,messag
   const dueLabels=settled?{overdue:'Anterior a la referencia',dueToday:'En la fecha de referencia',upcoming:'Posterior a la referencia',notDue:'En o después de la referencia',undated:'No informado'}:statuses;
   const agingLabels={undated:'No informado',notDue:'En o después de la referencia',dueToday:'En la fecha de referencia'};
   if(settled&&groups.some(group=>['dueStatus','agingBand'].includes(group)))lines.push('La fecha de vencimiento no indica mora actual ni la fecha de pago.');
-  const fields=[['Moneda',row=>display(invoiceCurrencyLabel(row))]];
+  const fields=[['Moneda',row=>display(invoiceCurrencyLabel({...row,currencyCode:currencyLabels[row.currencyCode]??row.currencyCode}))]];
   for(const group of groups){if(group==='invoice'){fields.push(['Serie',row=>display(row.invoiceSeries)],['Número',row=>display(row.invoiceNumber)]);continue;}
    fields.push([labels[group]??'Grupo',row=>display(group==='customer'?row.customerName??'Nombre no informado':group==='dueStatus'?dueLabels[row.dueStatus]??'No informado':group==='agingBand'?agingLabels[row.agingBand]??row.agingBand:row[{sector:'sector',dueMonth:'dueMonth'}[group]])]);}
   if(r.monetaryAggregationAvailable===true)fields.push(['Facturas',row=>invoiceNumber(row.invoiceCount)]);
@@ -45,7 +45,7 @@ export function buildInvoiceBalanceResponse(calls=[],{display=invoiceCell,messag
  if(!settled&&needs.dueState)fields.push(['Estado del vencimiento',row=>row.debtState==='pending'?display(statuses[row.dueStatus]??row.dueStatus):'—']);
  if(!settled&&needs.late)fields.push(['Días de atraso',row=>row.debtState==='pending'?invoiceNumber(row.daysOverdue):'—']);
  if(!['pending','settled'].includes(r.queryContext?.debtStatus))fields.push(['Estado de deuda',row=>display({pending:'Pendiente',settled:'Sin deuda',unknown:'No informada'}[row.debtState]??'No informado')]);
- fields.push(['Moneda',row=>display(invoiceCurrencyLabel(row))],['Deuda',row=>exactBalance(row.debt)]);
+ fields.push(['Moneda',row=>display(invoiceCurrencyLabel({...row,currencyCode:currencyLabels[row.currencyCode]??row.currencyCode}))],['Deuda',row=>exactBalance(row.debt)]);
  if(r.data.length)lines.push('',...invoiceTable(fields.map(([label])=>label),r.data.map(row=>fields.map(([,format])=>format(row)))));
  lines.push('',invoicePagination(r,r.data.length));return lines.join('\n');
 }

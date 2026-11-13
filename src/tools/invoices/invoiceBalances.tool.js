@@ -1,5 +1,10 @@
 const textList=description=>({type:'array',maxItems:100,items:{type:'string',minLength:1,maxLength:120},description});
 const date=description=>({type:'string',pattern:'^\\d{2}/\\d{2}/\\d{4}$',description});
+export const resolveInvoiceBalanceCurrencyTool={toolSpec:{
+ name:'resolve_invoice_balance_currency',
+ description:'Resuelve USD al código nativo acreditado por los saldos pendientes visibles para esta sesión Oracle. No adivina códigos numéricos ni identifica USD por $ aislado. Solo RESOLVED permite usar currencyCode; otros estados no prueban ausencia de deuda en USD.',
+ inputSchema:{json:{type:'object',properties:{currency:{type:'string',enum:['USD']}},required:['currency'],additionalProperties:false}},
+}};
 export const searchInvoiceBalanceCustomersTool={toolSpec:{
   name:'search_invoice_balance_customers',
   description:'Resuelve un cliente/local por nombre, razón social, RUC o código exclusivamente entre los saldos de facturas visibles para el usuario. No utiliza catálogos de ventas o facturas emitidas. Si devuelve AMBIGUOUS o hasMore espera elección o pide precisar; no elijas el primer cliente. Sin coincidencias no implica falta de permisos.',
@@ -9,7 +14,7 @@ export const getInvoiceBalancesTool={toolSpec:{
   name:'get_invoice_balances',
   description:'Consulta DEUDA por serie y número de factura, sin confundirlos con una clave única: serie/número todavía se repite en Oracle. Por defecto pendientes (DEUDA>0); canceladas (DEUDA=0) solo a pedido; todas incluye no negativas y desconocidas. Negativos siempre excluidos. Nulos nunca son cero ni cancelados. Identifica divisas por COD_MONEDA, sin conversiones. Summary y rankings solo se calculan si el perfil del alcance no tiene identidades serie/numero repetidas, faltantes, deuda nula ni moneda faltante. Si hay INCONSISTENT_HISTORY informa registros historicos inconsistentes y no calcules ni dedupliques. Orden de registros monetarios requiere un único currencyCodes. Importe decimal exacto; asOfDate clasifica vencimiento actual, no reconstruye historia. Sin PDF, emisión, cobros, conceptos ni matrícula.',
   inputSchema:{json:{type:'object',properties:{
-    customerIds:textList('IDs de clientes resueltos por el buscador de saldos. [] consulta todos los clientes visibles.'),
+    customerIds:textList('IDs de clientes resueltos por el buscador de saldos. [] u omitido permite detalle global paginado y resumen de todos los clientes visibles; no requiere resolver cada cliente.'),
     invoiceSeries:textList('Series exactas de factura o tokens PII. Para identificar facturas concretas usa los pares de invoices.'),
     invoices:{type:'array',maxItems:100,items:{type:'object',properties:{invoiceSeries:{type:'string',minLength:1,maxLength:120},invoiceNumber:{type:'string',minLength:1,maxLength:120}},required:['invoiceSeries','invoiceNumber'],additionalProperties:false},description:'Pares exactos serie/número. No se cruzan series de una factura con números de otra; no prueba unicidad de filas.'},
     invoiceNumbers:textList('Números exactos de factura (o sus tokens PII); sin coincidencia parcial ni comodines.'),

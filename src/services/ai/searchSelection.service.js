@@ -236,7 +236,9 @@ export function preserveSearchSelection({name,input,history=[],currentCalls=[],r
  // grouping or previously absent keys. The successful context survives trimming.
  const autonomous=name==='get_sales'?selectionTurn.autonomousCategorySales:null;
  let result;
- if(name==='get_invoice_balances'&&invoiceDebtStatus){
+ if(name==='get_invoice_balances'&&selectionTurn.invoiceBalanceGlobalInput){
+  result=structuredClone(selectionTurn.invoiceBalanceGlobalInput);
+ }else if(name==='get_invoice_balances'&&invoiceDebtStatus){
   const freshCustomer=currentCalls.some(c=>c.name==='search_invoice_balance_customers'&&c.result?.status==='RESOLVED');
   result={...(freshCustomer?{mode:'detail',rows:20}:pendingInvoiceInput(resolutionState??{domains:{},contexts:{}},invoiceDebtStatus)),...input,debtStatus:invoiceDebtStatus,page:1};
  }else if(name==='get_invoice_balances'&&selectionTurn.invoiceBalanceAll){

@@ -1,4 +1,6 @@
 import {invoicePresentationPrompt} from '../../prompts/sections/invoicePresentation.prompt.js';
+import {executeGlobalInvoiceBalanceRequest} from './invoiceGlobalRequest.service.js';
+import {publicAssistantText,stripInternalReasoning} from './assistantOutput.service.js';
 import {buildInvoiceBalanceResponse,resolveInvoiceBalancePage,invoiceBalanceCell} from './invoiceBalancePresentation.service.js';
 import {executeNamedInvoiceRequest} from './invoiceNamedRequest.service.js';
 import {executePendingInvoiceRequest,pendingInvoiceInput} from './invoicePendingRequest.service.js';
@@ -77,7 +79,7 @@ const bedrockClient = new BedrockRuntimeClient({
   region: config.awsRegion || "us-east-1",
 });
 
-const balanceResponse=(sessionId,calls,message='')=>buildInvoiceBalanceResponse(calls,{message,display:value=>protectPiiValue(sessionId,'BALANCE_DISPLAY',invoiceBalanceCell(restorePiiDeep(sessionId,value)))});
+const balanceResponse=(sessionId,calls,message='')=>buildInvoiceBalanceResponse(calls,{message,currencyLabels:getSearchResolutions(sessionId).invoiceBalanceCurrencyLabels??{},display:value=>protectPiiValue(sessionId,'BALANCE_DISPLAY',invoiceBalanceCell(restorePiiDeep(sessionId,value)))});
 const invoiceDetailResponse=(sessionId,calls,message='')=>buildInvoiceDetailResponse(calls,{message,restoreValue:value=>restorePiiDeep(sessionId,value),display:value=>protectPiiValue(sessionId,'INVOICE_DISPLAY',invoiceBalanceCell(value)),protectLink:value=>protectPiiValue(sessionId,'INVOICE_DISPLAY',value)});
 const MAX_TOOL_ITERATIONS = 8;
 const MAX_MODEL_ROWS_WITH_EXPORT = 12;
@@ -95,6 +97,7 @@ En esta etapa de migración, las herramientas habilitadas son:
 - get_invoices
 - search_invoice_balance_customers
 - get_invoice_balances
+- resolve_invoice_balance_currency
 - get_contract_conditions
 - get_contract_cost_per_sqm
 - analyze_contract_cost_incidence
@@ -492,17 +495,7 @@ const normalizeHistory = (history = []) => {
     });
 };
 
-const extractText = (message) => {
-  if (!Array.isArray(message?.content)) {
-    return "";
-  }
-
-  return message.content
-    .filter((block) => typeof block.text === "string")
-    .map((block) => block.text)
-    .join("\n")
-    .trim();
-};
+const extractText = publicAssistantText;
 
 const removeMarkdownColumns = (text, forbiddenHeaders = []) => {
   const lines = String(text ?? "").split("\n");
@@ -1541,7 +1534,7 @@ const executeToolRequests = async ({ content, sessionId, sourceMessages = [], ch
         [name],
       );
       recordSearchToolResult(sessionId,name,input,protectedResultForModel);
-      if(name.startsWith('search_'))presentationCall.result=protectedResultForModel;
+      if(name.startsWith('search_')||name==='resolve_invoice_balance_currency')presentationCall.result=protectedResultForModel;
       if (isChartSourceTool(name) && protectedResultForModel && typeof protectedResultForModel === "object" && !Array.isArray(protectedResultForModel)) {
         protectedResultForModel.chartSourceId = toolUseId;
       }
@@ -1662,6 +1655,7 @@ export const chatService = async ({ message, sessionId }) => {
     },
   ];
 
+  const previousInvoiceState=getSearchResolutions(sessionId);
   beginSearchSelectionTurn(sessionId,messages.at(-1).content[0].text);
   // Resolver IDs and arguments here are protected, session-scoped metadata.
   // The model needs this scope even after the originating tool call is trimmed.
@@ -1722,7 +1716,8 @@ export const chatService = async ({ message, sessionId }) => {
   };
   const plateRequest=getSearchSelectionTurn(sessionId).invoicePlateRequest;
   const unresolvedInvoiceDenied=plateRequest&&!plateRequest.autonomous&&getSearchResolutions(sessionId).invoiceNamedRequest?.phase==='denied';
-  const pendingInvoice=await executePendingInvoiceRequest({sessionId,message:messages.at(-1).content[0].text,execute:executeInvoice});
+  const pendingInvoice=await executeGlobalInvoiceBalanceRequest({sessionId,message:messages.at(-1).content[0].text,execute:executeInvoice,previousState:previousInvoiceState})
+    ??await executePendingInvoiceRequest({sessionId,message:messages.at(-1).content[0].text,execute:executeInvoice});
   const namedInvoice=pendingInvoice??(unresolvedInvoiceDenied ? {answer:ACCESS_DENIED_MESSAGE} : plateRequest
     ? {answer:(await executeInvoice('get_invoices',plateRequest.input))?.data?'Detalle de facturas consultado.':'No fue posible consultar las facturas.'}
     : await executeNamedInvoiceRequest({sessionId,message:messages.at(-1).content[0].text,execute:executeInvoice}));
@@ -2055,7 +2050,7 @@ export const chatService = async ({ message, sessionId }) => {
 
     const answer = restorePiiTextForUser(
       sessionId,
-      completedAssistantText,
+      stripInternalReasoning(completedAssistantText),
     );
 
     if (!answer) {
