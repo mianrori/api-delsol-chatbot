@@ -16,8 +16,12 @@ test('contract, service and repository already allow global paginated detail wit
 });
 test('USD uses an authorized native code, not a numeric convention or isolated dollar sign',async()=>{
  const c=catalogue([{COD_MONEDA:'CODE-9',SIMBOLO_MONEDA:'USD'},{COD_MONEDA:'CODE-9',SIMBOLO_MONEDA:'$'},{COD_MONEDA:'CODE-1',SIMBOLO_MONEDA:'PYG'}]);
- assert.deepEqual(await resolveInvoiceBalanceCurrency({currency:'USD'},c),{status:'RESOLVED',currency:'USD',currencyCode:'CODE-9'});
+ assert.deepEqual(await resolveInvoiceBalanceCurrency({currency:'USD'},c),{status:'RESOLVED',currency:'USD',currencyCode:'CODE-9',displayLabels:{'CODE-9':'USD','CODE-1':'PYG'}});
  assert.equal(c.queries.length,1);assert.match(c.queries[0].sql,/SELECT DISTINCT COD_MONEDA, SIMBOLO_MONEDA/);assert.match(c.queries[0].sql,/DEUDA > 0/);assert.doesNotMatch(c.queries[0].sql,/SUM\(|COD_CLIENTE|USER_CAN_CONSULT/);
+});
+test('global clean summary labels native codes from the authorized catalogue without recomputing totals',async()=>{
+ const c={queries:[],async execute(sql){this.queries.push(sql);return {rows:sql.includes('ROWNUM<=201')?[{COD_MONEDA:'NATIVE-X',SIMBOLO_MONEDA:'USD'}]:[{TOTAL_ROWS:2,DUPLICATE_ROWS:0,TOTAL_GROUPS:1,RN:1,COD_MONEDA:'NATIVE-X',DEUDA:'10.01',INVOICE_COUNT:2,CURRENCY_RANK:1}]};}};
+ const r=await getInvoiceBalances({mode:'summary'},c);assert.equal(c.queries.length,2);assert.equal(r.data[0].currencySymbol,'USD');assert.equal(r.data[0].currencyCode,'NATIVE-X');assert.equal(r.data[0].debt,'10.01');assert.equal(r.invoiceCount,2);
 });
 for(const [label,rows,status] of [
  ['only $',[{COD_MONEDA:'2',SIMBOLO_MONEDA:'$'}],'NOT_IDENTIFIED'],

@@ -17,7 +17,7 @@ try{
  const probe="import config from '/app/config.js';console.log(JSON.stringify({dev:config.env==='development',safe:!config.bedrockDebugPayloads&&!config.piiDebugShowRaw}));";
  const safe=JSON.parse(run(docker,['exec','-i',bot,'node','--input-type=module'],{input:probe}));if(!safe.dev||!safe.safe)throw Error('SAFE_DEV_REQUIRED');
  let raw='';for await(const chunk of process.stdin){raw+=chunk;if(raw.length>16384)throw Error('INPUT_TOO_LARGE');}payload=JSON.parse(raw);raw='';sessionId=await loginDev(payload.authorized);payload=null;
- try{report.validation=JSON.parse(run(docker,['exec','-i',bot,'node','--experimental-vm-modules',candidate+'/scripts/check-global-usd-dev.mjs',commit],{input:JSON.stringify({sessionId}),timeout:240000}));}catch(e){if(e.stdout){report.validation=JSON.parse(String(e.stdout));}else throw Error('WORKER_FAILED');}
+ try{report.validation=JSON.parse(run(docker,['exec','-i',bot,'node','--experimental-vm-modules',candidate+'/scripts/check-global-usd-dev.mjs',commit,...(process.argv.includes('--summary-only')?['--summary-only']:[])],{input:JSON.stringify({sessionId}),timeout:240000}));}catch(e){if(e.stdout){report.validation=JSON.parse(String(e.stdout));}else throw Error('WORKER_FAILED');}
  report.success=report.validation?.success===true;
 }catch(e){report.error={code:/^[A-Z][A-Z0-9_]+$/.test(e.message)?e.message:'GLOBAL_USD_HELPER_FAILED'};}
 finally{

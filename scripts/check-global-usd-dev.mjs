@@ -26,6 +26,20 @@ try{
  const initial=first.calls[0];check(initial.input.customerIds.length===0&&initial.input.debtStatus==='pending'&&initial.input.mode==='summary'&&!initial.input.dueDateTo&&!initial.input.dueStatus,'GLOBAL_CURRENT_PENDING_NO_DUE_FILTER');
  report.summaryStatus=initial.result.status;
  if(initial.result.status==='INCONSISTENT_HISTORY')check(first.body.response.includes('total confiable')&&!first.body.response.includes('| Deuda'),'SUMMARY_INTEGRITY_BLOCK_VISIBLE');
+ if(process.argv.includes('--summary-only')){
+  report.summaryOnly=true;check(initial.result.status==='OK_SUMMARY','CLEAN_SUMMARY_OBSERVED');
+  await withOracleProxySession(sessionId,async({connection,username})=>{
+   const run=async sql=>(await connection.execute(sql,{},{outFormat:4002,maxRows:201})).rows;
+   const identity=(await run("SELECT USER U,SYS_CONTEXT('USERENV','PROXY_USER') P FROM DUAL"))[0];check(identity.U===owned.username&&username===owned.username&&Boolean(identity.P),'SUMMARY_PROXY_IDENTITY');
+   const catalogue=await run('SELECT DISTINCT COD_MONEDA,SIMBOLO_MONEDA FROM VW_BOT_FACTURAS_SALDOS WHERE DEUDA>0 AND COD_MONEDA IS NOT NULL');
+   check(catalogue.length<=200,'COMPLETE_VISIBLE_CATALOGUE');
+   for(const row of initial.result.data){const labels=catalogue.filter(c=>c.COD_MONEDA===row.currencyCode).map(c=>String(c.SIMBOLO_MONEDA??'').trim().toUpperCase());
+    if(labels.some(label=>['USD','US$','U$S'].includes(label))){check(row.currencySymbol==='USD'&&first.body.response.includes('| USD |'),'SUMMARY_USD_FROM_INDEPENDENT_NATIVE_CODE');report.usdLabelObserved=true;}
+    if(labels.some(label=>['PYG','GS','GS.','₲'].includes(label)))check(row.currencySymbol==='PYG'&&first.body.response.includes('| Gs. |'),'SUMMARY_PYG_FROM_INDEPENDENT_NATIVE_CODE');
+   }
+   check(report.usdLabelObserved,'REAL_USD_SUMMARY_LABEL');
+  });
+ }else{
  const detail=await post('Detalla las que son en dólares');
  const currency=detail.calls.find(c=>c.name==='resolve_invoice_balance_currency');report.currencyResolution=currency?.result?.status;
  check(currency?.result?.status==='RESOLVED','USD_CODE_AUTHORIZED');const code=currency.result.currencyCode;
@@ -57,6 +71,7 @@ try{
    const saved=JSON.stringify(store.getConversation(sessionId).filter(m=>m.role==='assistant'));check(r.data.every(d=>!d.customerName||d.customerName.length<=3||!saved.includes(d.customerName)),'PII_PROTECTED_HISTORY');
   }
  });
+ }
  check(modelCalls===0,'ZERO_MODEL_OR_PROVIDER_ATTEMPTS');check(String((await getValidOracleSession(sessionId)).expires_at)===expiration,'SESSION_EXPIRATION_UNCHANGED');
  report.http={requests:requestCount,usual5400:false,candidateEphemeral:true,resultsSimulated:false,contextSeeded:false};report.success=true;
 }catch(e){report.error={code:/^[A-Z][A-Z0-9_]+$/.test(e?.message??'')?e.message:/^ORA-\d{5}$/.test(e?.code??'')?e.code:'GLOBAL_USD_CONTROL_FAILED'};}

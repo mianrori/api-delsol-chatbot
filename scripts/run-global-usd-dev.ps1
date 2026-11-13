@@ -1,4 +1,4 @@
-param()
+param([switch]$SummaryOnly)
 $Preflight=$false
 $ErrorActionPreference='Stop'
 $root=Split-Path -Parent $PSScriptRoot
@@ -9,6 +9,7 @@ $info.StandardOutputEncoding=[Text.UTF8Encoding]::new($false);$info.StandardErro
 $info.EnvironmentVariables['GLOBAL_USD_DOCKER']=Join-Path $env:LOCALAPPDATA 'Programs/DockerDesktop/resources/bin/docker.exe'
 foreach($name in @('NODE_DEBUG','NODE_OPTIONS','NODE_V8_COVERAGE')){[void]$info.EnvironmentVariables.Remove($name)}
 $info.Arguments='"'+(Join-Path $PSScriptRoot 'run-global-usd-dev-login.mjs')+'"'+$(if($Preflight){' --preflight'}else{''})
+if($SummaryOnly){$info.Arguments+=' --summary-only'}
 $account=@{};$payload=$null;$process=$null;$form=$null;$password=$null
 try{
  if(-not $Preflight){
@@ -30,6 +31,6 @@ try{
  $stdout=$process.StandardOutput.ReadToEndAsync();$stderr=$process.StandardError.ReadToEndAsync()
  if($payload){$process.StandardInput.Write($payload)};$process.StandardInput.Close();$payload=$null;$account.Clear()
  $process.WaitForExit();$result=$stdout.GetAwaiter().GetResult()|ConvertFrom-Json;[void]$stderr.GetAwaiter().GetResult()
- if($result.success){Write-Output 'GLOBAL_USD_PRESENTATION_5400_PASS'}else{Write-Output 'GLOBAL_USD_PRESENTATION_5400_FAILED - reporte sanitizado en logs'}
+ if($result.success){Write-Output 'GLOBAL_USD_CANDIDATE_HTTP_PASS'}else{Write-Output 'GLOBAL_USD_CANDIDATE_HTTP_FAILED - reporte sanitizado en logs'}
 }catch{Write-Output 'GLOBAL_USD_PROTECTED_HELPER_FAILED'}
 finally{$payload=$null;$account.Clear();if($password){$password.Clear()};if($form){$form.Dispose()};if($process){$process.Dispose()}}
