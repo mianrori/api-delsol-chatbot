@@ -6,6 +6,7 @@ import http from "http";
 import config from "./config.js";
 import { router } from "./src/routes/index.js";
 import { closeOracleSessionsPool } from "./src/database/oracleSessions.database.js";
+import { closeRedisClient } from "./src/database/redis.database.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -28,6 +29,7 @@ const shutdown = async (signal) => {
 
   server.close(async () => {
     try {
+      await closeRedisClient();
       await closeOracleSessionsPool();
       console.info("API-DELSOL-CHATBOT detenida correctamente.");
       process.exit(0);

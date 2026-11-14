@@ -1,0 +1,246 @@
+{
+  "suite": "affected-user-live-helper",
+  "success": true,
+  "status": "projection_complete",
+  "baseCommit": "22f4b02c98003312bc1558746740cfc511e2dedd",
+  "startedAt": "2026-11-11T19:50:58.417Z",
+  "accountPolicy": "only the affected DEV user entered in the hidden login; no fallback account",
+  "modelPolicy": "existing 5400 process; no SDK substitution",
+  "helperCommit": "b014b9438f7c3f68d9c110606b6142936312075c",
+  "deployedSource": {
+    "commit": "22f4b02c98003312bc1558746740cfc511e2dedd",
+    "sourceFiles": 319,
+    "manifestSha256": "d8be34ffd0c95a3495b4bc7c116e126e641d3076767b8265771edb4dcd595a87",
+    "imageId": "sha256:cfabf0fa3419b2834fa65185fe4283a465f95fc4b4624e47254e2a3cbf7e8774",
+    "startedAt": "2026-11-11T12:04:20.303914333Z",
+    "priorLifetimeErrorTextSeen": false
+  },
+  "diagnosticFiles": [
+    {
+      "file": "scripts/check-invoice-affected-user-live.mjs",
+      "sha256": "954b2818d5f005d55d398879b5e07ede6bd06aa07bdbe9cb0e1cf5c141bb09a0"
+    },
+    {
+      "file": "scripts/invoice-affected-inspector.mjs",
+      "sha256": "a6b55fbf0980f09ced185e37ee527afa4946f53f389f0aec09f5a3cf335a72a4"
+    },
+    {
+      "file": "scripts/invoice-affected-runtime-trace.mjs",
+      "sha256": "6c113f834bdad85373877905bc294aa5d26008d8600c1c831c7af26ecd02771c"
+    },
+    {
+      "file": "scripts/invoice-view-projection.mjs",
+      "sha256": "a8d62312e87b4c88315c4cf71e42b174236e9905cf36aa4377962c6c18fdf1cd"
+    },
+    {
+      "file": "logs/invoice-affected-expected.json",
+      "sha256": "1497174c2af5e161e3337154cc8db8c121fe0b83786ff781c0da8e3089b0c414"
+    }
+  ],
+  "preflight": {
+    "suite": "affected-user-live-5400",
+    "baseCommit": "22f4b02c98003312bc1558746740cfc511e2dedd",
+    "success": true,
+    "status": "preflight",
+    "checks": [
+      {
+        "code": "SAFE_BASELINE_DEV",
+        "passed": true
+      },
+      {
+        "code": "RUNTIME_TRACE_MODULE_AVAILABLE",
+        "passed": true
+      }
+    ],
+    "startedAt": "2026-11-11T19:51:01.444Z",
+    "modelSubstituted": false,
+    "accountSubstituted": false,
+    "httpChatRequests": 0,
+    "conversationResets": 0,
+    "loadedModules": [
+      {
+        "path": "src/services/ai/chat.service.js",
+        "sha256": "e544093b6ec128a81fe2b0d418d96fd6710d70c782015e2dffbf6cf3cf05cce2"
+      },
+      {
+        "path": "src/services/ai/searchSelection.service.js",
+        "sha256": "0da01be80ac2012335096da246831eb47e637f3c8ec565e50aa0390d64cd59c3"
+      },
+      {
+        "path": "src/services/ai/invoiceNamedRequest.service.js",
+        "sha256": "d22d4796a867db3c3fce4b48b14f2559aab170aa91eacabd5d9969dbccf8f411"
+      },
+      {
+        "path": "src/services/ai/invoicePlateRequest.service.js",
+        "sha256": "f0ef9c0b3637321028a674d513fcb421ec3e40a1fed5aa908eb62707dfe12120"
+      },
+      {
+        "path": "src/repositories/invoices/invoices.repository.js",
+        "sha256": "0c5430a3edccbc1f8ac669fa1b291da4278e928269099ad7cac7b801bf91655d"
+      },
+      {
+        "path": "src/repositories/invoices/invoiceCustomers.repository.js",
+        "sha256": "31e2f52fd7f441d28f6b0400c4525739b0356a63550cb4d94c25437b2b378b74"
+      },
+      {
+        "path": "src/services/invoices/searchInvoiceCustomers.service.js",
+        "sha256": "9065997d3c9ba518ec7c52fb68078542b7f0c84011c8d7b464a5fe17b6e66b01"
+      },
+      {
+        "path": "src/services/invoices/invoices.service.js",
+        "sha256": "b88c34e765db49e8d688c4bf1cfb97a25845fac4ac5b961f360d1006f232b67e"
+      },
+      {
+        "path": "src/services/sessions/oracleSession.service.js",
+        "sha256": "8be29c83faedcbbd40597533b88639f6c2d07a480c4402381f86659efd2e925a"
+      },
+      {
+        "path": "src/controllers/chat.controller.js",
+        "sha256": "67e9ff964adc97ec47d79481dd026e0b4d836f20759ad65ad93fb3b4302acd55"
+      }
+    ],
+    "loadedCodeMatchesBaseline": true,
+    "inspectorClosedOrPreviousStatePreserved": true,
+    "independentConnectionsClosed": true,
+    "finishedAt": "2026-11-11T19:51:01.998Z",
+    "pdfDownloads": 0
+  },
+  "worker": {
+    "suite": "affected-user-live-5400",
+    "baseCommit": "22f4b02c98003312bc1558746740cfc511e2dedd",
+    "success": true,
+    "status": "projection_complete",
+    "checks": [
+      {
+        "code": "SAFE_BASELINE_DEV",
+        "passed": true
+      },
+      {
+        "code": "RUNTIME_TRACE_MODULE_AVAILABLE",
+        "passed": true
+      },
+      {
+        "code": "OWNED_LOGIN_SESSION_REQUIRED",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_ORACLE_USES_SAME_POSTGRES_SESSION_IDENTITY",
+        "passed": true
+      }
+    ],
+    "startedAt": "2026-11-11T19:51:02.358Z",
+    "modelSubstituted": false,
+    "accountSubstituted": false,
+    "httpChatRequests": 0,
+    "conversationResets": 0,
+    "loadedModules": [
+      {
+        "path": "src/services/ai/chat.service.js",
+        "sha256": "e544093b6ec128a81fe2b0d418d96fd6710d70c782015e2dffbf6cf3cf05cce2"
+      },
+      {
+        "path": "src/services/ai/searchSelection.service.js",
+        "sha256": "0da01be80ac2012335096da246831eb47e637f3c8ec565e50aa0390d64cd59c3"
+      },
+      {
+        "path": "src/services/ai/invoiceNamedRequest.service.js",
+        "sha256": "d22d4796a867db3c3fce4b48b14f2559aab170aa91eacabd5d9969dbccf8f411"
+      },
+      {
+        "path": "src/services/ai/invoicePlateRequest.service.js",
+        "sha256": "f0ef9c0b3637321028a674d513fcb421ec3e40a1fed5aa908eb62707dfe12120"
+      },
+      {
+        "path": "src/repositories/invoices/invoices.repository.js",
+        "sha256": "0c5430a3edccbc1f8ac669fa1b291da4278e928269099ad7cac7b801bf91655d"
+      },
+      {
+        "path": "src/repositories/invoices/invoiceCustomers.repository.js",
+        "sha256": "31e2f52fd7f441d28f6b0400c4525739b0356a63550cb4d94c25437b2b378b74"
+      },
+      {
+        "path": "src/services/invoices/searchInvoiceCustomers.service.js",
+        "sha256": "9065997d3c9ba518ec7c52fb68078542b7f0c84011c8d7b464a5fe17b6e66b01"
+      },
+      {
+        "path": "src/services/invoices/invoices.service.js",
+        "sha256": "b88c34e765db49e8d688c4bf1cfb97a25845fac4ac5b961f360d1006f232b67e"
+      },
+      {
+        "path": "src/services/sessions/oracleSession.service.js",
+        "sha256": "8be29c83faedcbbd40597533b88639f6c2d07a480c4402381f86659efd2e925a"
+      },
+      {
+        "path": "src/controllers/chat.controller.js",
+        "sha256": "67e9ff964adc97ec47d79481dd026e0b4d836f20759ad65ad93fb3b4302acd55"
+      }
+    ],
+    "loadedCodeMatchesBaseline": true,
+    "identity": {
+      "targetOpaque": "784931ca3eb803ee5e9462a36072827595fb97227a82d6c3430f474bb44290c5",
+      "oracleSessionMatches": true,
+      "proxyPresent": true
+    },
+    "viewProjection": {
+      "status": "metadata_inspected",
+      "permissionAcrossVisibleView": {
+        "anyAuthorized": true,
+        "anyRestricted": true
+      },
+      "views": [
+        {
+          "label": "requested_view",
+          "depth": 0,
+          "definitionOpaque": "e510e636553b92d09d03f20e681c76b055b2e683a8975703b6cb722e139aa82a",
+          "parsed": true,
+          "plateProjection": "TRIM(UPPER(identifier(identifier(identifier(identifier.identifier), '<literal>', '<literal>'), '<literal>', '<literal>'))) MATRICULA",
+          "permissionProjection": "CASE WHEN identifier.identifier NOT IN ('<literal>', '<literal>') AND EXISTS (SELECT * FROM identifier identifier WHERE identifier.identifier = USER AND identifier.identifier IN ('<literal>', '<literal>', '<literal>')) THEN '<literal>' ELSE '<literal>' END USER_CAN_CONSULT",
+          "plateExplicitlyReferencesPermissionField": false,
+          "plateContainsSubquery": false,
+          "plateContainsConditional": false,
+          "plateExpressionHasNullBranch": false,
+          "explicitNConditionNullsPlate": false,
+          "sharedNontrivialPermissionFunction": false,
+          "projectionOnlyNoUnderlyingDataQueries": true
+        }
+      ],
+      "dependencyInspectionCapped": false,
+      "metadataUnavailableForSomeDependencies": false,
+      "depthLimit": 2,
+      "noBaseTableDataRead": true,
+      "noRawDefinitionOrOwnersExported": true,
+      "applicationCauseNotPresumed": true
+    },
+    "caseResolved": false,
+    "inspectorClosedOrPreviousStatePreserved": true,
+    "independentConnectionsClosed": true,
+    "finishedAt": "2026-11-11T19:51:03.904Z",
+    "pdfDownloads": 0
+  },
+  "caseResolved": false,
+  "logout": true,
+  "finishedAt": "2026-11-11T19:51:33.711Z",
+  "logAudit": [
+    {
+      "service": "chatbot",
+      "lines": 10,
+      "safe": true,
+      "toolCalls": 0,
+      "toolResults": 0,
+      "permissionErrors": 0,
+      "permissionConsoleLines": 0,
+      "inspectorMetadataLines": 10,
+      "unknownRecords": 0,
+      "bedrockRequestEvents": 0,
+      "bedrockResponseEvents": 0,
+      "payloadsHidden": true,
+      "sessionsMasked": true
+    },
+    {
+      "service": "erp",
+      "lines": 2,
+      "safe": true,
+      "recognized": "ERP protected auth metadata"
+    }
+  ]
+}

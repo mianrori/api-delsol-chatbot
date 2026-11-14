@@ -1,4 +1,6 @@
 import { connectWithProxy } from "../../database/oracle.database.js";
+import { randomUUID } from "node:crypto";
+import { throwIfRequestAborted } from "../requestContext.service.js";
 import {
   getOracleSessionRepository,
   touchOracleSessionRepository,
@@ -6,6 +8,18 @@ import {
 
 const normalizeSessionId = (sessionId) => String(sessionId ?? "").trim();
 const normalizeUsername = (username) => String(username ?? "").trim().toUpperCase();
+
+const closeProxyConnection = async (connection, correlationId) => {
+  try {
+    await connection.close();
+  } catch (error) {
+    const driverCode = typeof error?.code === "string" && /^(?:ORA-\d{5}|NJS-\d{3}|DPI-\d{4})$/.test(error.code)
+      ? error.code
+      : Number.isSafeInteger(error?.errorNum) && error.errorNum > 0 && error.errorNum <= 99999
+        ? `ORA-${String(error.errorNum).padStart(5, "0")}` : "ORACLE_CLOSE_ERROR_UNCLASSIFIED";
+    console.error({ correlationId, code: "ORACLE_PROXY_CLOSE_FAILED", driverCode });
+  }
+};
 
 const createSessionError = (code, message) => {
   const error = new Error(message);
@@ -65,13 +79,23 @@ export const getValidOracleSession = async (sessionId) => {
 };
 
 export const createProxyConnectionBySessionId = async (sessionId) => {
+  throwIfRequestAborted();
   const session = await getValidOracleSession(sessionId);
+  throwIfRequestAborted();
+  const correlationId = randomUUID();
   const connection = await connectWithProxy(session.username);
-
-  await touchOracleSessionRepository(session.session_id);
+  try {
+    throwIfRequestAborted();
+    await touchOracleSessionRepository(session.session_id);
+    throwIfRequestAborted();
+  } catch (error) {
+    await closeProxyConnection(connection, correlationId);
+    throw error;
+  }
 
   return {
     connection,
+    correlationId,
     sessionId: session.session_id,
     username: session.username,
   };
@@ -81,16 +105,10 @@ export const withOracleProxySession = async (sessionId, callback) => {
   const context = await createProxyConnectionBySessionId(sessionId);
 
   try {
+    throwIfRequestAborted();
     return await callback(context);
   } finally {
-    try {
-      await context.connection.close();
-    } catch (error) {
-      console.error(
-        `Error cerrando conexión Oracle proxy de la sesión ${context.sessionId}:`,
-        error,
-      );
-    }
+    await closeProxyConnection(context.connection, context.correlationId);
   }
 };
 

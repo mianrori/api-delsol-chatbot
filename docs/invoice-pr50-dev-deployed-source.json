@@ -1,0 +1,33 @@
+{
+  "suite": "pr50-dev-deployed-source",
+  "commit": "f2c2b2fecf417dbbafd981e256c52520dba0b35b",
+  "success": true,
+  "checkedAt": "2026-11-12T15:09:49.797Z",
+  "sourceMatches": true,
+  "sourceFiles": 334,
+  "sourceManifestSha256": "cc4e3c96587a1d0ef6efac94493dac9e7f6ae10460767210143b762764766244",
+  "running": true,
+  "imageId": "sha256:872527d6c50f525b92608e6e60f21d584db49e9822ea340c1c780a396159fb3f",
+  "startedAt": "2026-11-12T15:09:00.608040123Z",
+  "nodeVersion": "v22.23.5",
+  "process": {
+    "unique": true,
+    "online": true,
+    "restarts": 0,
+    "development": true,
+    "port5400": true,
+    "scriptMatches": true
+  },
+  "development": true,
+  "safeLogging": true,
+  "health": {
+    "httpStatus": 200,
+    "development": true,
+    "success": true
+  },
+  "startup": {
+    "serverRunningMessage": true,
+    "pm2Online": true,
+    "errorTextSeen": false
+  }
+}
