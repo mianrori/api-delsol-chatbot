@@ -35,7 +35,7 @@ try{
   const customer=calls.find(c=>c.name==='search_invoice_customers');assert.deepEqual(customer.args,{query:'impacto',dateFrom:'01/01/2023',dateTo:'31/12/2023'});
   if(scenario==='customer-missing'){assert.match(answer,/cliente\/local/);assert.ok(!calls.some(c=>c.name==='get_invoices'));}
   else{
-   if(customerAmbiguous){assert.match(answer,/Selecciona el cliente\/local/);assert.ok(!calls.some(c=>c.name==='get_invoices'));if(trimmed)crop();answer=await turn('2');}
+   if(customerAmbiguous){assert.match(answer,/Código de cliente/);assert.match(answer,/\| 1 \| C1 \| IMPACTO C1 \|/);assert.match(answer,/\| 2 \| C2 \| IMPACTO C2 \|/);assert.ok(!calls.some(c=>c.name==='get_invoices'));if(trimmed)crop();answer=await turn('2');}
    const invoice=calls.find(c=>c.name==='get_invoices');assert.ok(invoice);assert.deepEqual(invoice.args,{customerIds:[customerAmbiguous?'C2':'C1'],conceptIds:[conceptAmbiguous?'K2':'K1'],dateFrom:'01/01/2023',dateTo:'31/12/2023',mode:'detail',page:1,rows:20});
    assert.match(answer,/IMPACTO/);assert.match(answer,/ARRENDAMIENTO MINIMO/);assert.doesNotMatch(answer,/cliente \*\*arrendamiento|identificador m\u00e1s preciso/i);
    if(scenario==='mixed-access')assert.match(answer,/Solo puedo mostrar los registros/);

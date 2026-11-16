@@ -47,7 +47,7 @@ try{
  const body=await post(message);assert.deepEqual(body.actions,{});assert.equal(opened,closed);
  assert.ok(calls.every(c=>['get_invoice_balances','search_invoice_balance_customers'].includes(c.name)));
  if(scenario==='noContext'){assert.equal(calls.length,0);assert.match(body.response,/Indica el cliente/);}
- else if(scenario==='ambiguous'){assert.equal(calls.length,1);assert.equal(calls[0].name,'search_invoice_balance_customers');assert.match(body.response,/Selecciona el cliente/);}
+ else if(scenario==='ambiguous'){assert.equal(calls.length,1);assert.equal(calls[0].name,'search_invoice_balance_customers');assert.match(body.response,/Código de cliente/);assert.match(body.response,/SYNTHETIC-C/);assert.match(body.response,/OTHER-C/);}
  else{
   const query=calls.find(c=>c.name==='get_invoice_balances');assert.deepEqual(query.arguments,{customerIds:[customerId],mode:'detail',debtStatus:'settled',page:1,rows:20});
   if(['denied','failed'].includes(scenario)){
