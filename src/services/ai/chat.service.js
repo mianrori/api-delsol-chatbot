@@ -1,4 +1,5 @@
 import {invoicePresentationPrompt} from '../../prompts/sections/invoicePresentation.prompt.js';
+import {buildCustomerSelectionResponse} from './customerSelectionPresentation.service.js';
 import {executeGlobalInvoiceBalanceRequest} from './invoiceGlobalRequest.service.js';
 import {publicAssistantText,stripInternalReasoning} from './assistantOutput.service.js';
 import {buildInvoiceBalanceResponse,resolveInvoiceBalancePage,invoiceBalanceCell} from './invoiceBalancePresentation.service.js';
@@ -81,6 +82,7 @@ const bedrockClient = new BedrockRuntimeClient({
 
 const balanceResponse=(sessionId,calls,message='')=>buildInvoiceBalanceResponse(calls,{message,currencyLabels:getSearchResolutions(sessionId).invoiceBalanceCurrencyLabels??{},display:value=>protectPiiValue(sessionId,'BALANCE_DISPLAY',invoiceBalanceCell(restorePiiDeep(sessionId,value)))});
 const invoiceDetailResponse=(sessionId,calls,message='')=>buildInvoiceDetailResponse(calls,{message,restoreValue:value=>restorePiiDeep(sessionId,value),display:value=>protectPiiValue(sessionId,'INVOICE_DISPLAY',invoiceBalanceCell(value)),protectLink:value=>protectPiiValue(sessionId,'INVOICE_DISPLAY',value)});
+const customerSelectionResponse=(sessionId,calls)=>buildCustomerSelectionResponse(sessionId,calls);
 const MAX_TOOL_ITERATIONS = 8;
 const MAX_MODEL_ROWS_WITH_EXPORT = 12;
 
@@ -408,9 +410,8 @@ Para consultas de facturas:
 - nunca inventes customerIds, conceptIds, números de factura, matrículas ni referencias de contrato;
 - no expongas identificadores internos en la respuesta comercial;
 - si un concepto o cliente es ambiguo, presenta opciones y espera la selección del usuario;
-- en una ambigüedad de clientes de facturación muestra únicamente columnas comerciales útiles como "Opción", "Cliente" y "Razón social";
-- no muestres customerId, código de cliente ni ID de cliente en la tabla de opciones;
-- si varias opciones tienen el mismo nombre comercial, conserva las filas distintas pero no expongas identificadores internos;
+- en una ambigüedad de clientes muestra "Opción", "Código de cliente" y "Cliente", usando exclusivamente los valores del catálogo autorizado. El código distingue clientes con el mismo nombre;
+- conserva las filas y su numeración; espera la selección sin elegir por tu cuenta. Fuera de esta selección, conserva las restricciones de identificadores internos;
 - las descripciones de conceptos y demás datos sensibles pueden llegar como tokens [PII_*]; consérvalos exactamente;
 - get_invoices en mode="detail" es paginado;
 - page indica la página actual, rows el tamaño solicitado, returnedRows las filas realmente retornadas, totalRows la cantidad total de filas de detalle/conceptos, totalInvoices la cantidad real de facturas distintas, totalPages la cantidad de páginas y hasMore si existen más resultados;
@@ -1960,7 +1961,7 @@ export const chatService = async ({ message, sessionId }) => {
 
       // A complete breakdown is authoritative even when the model requested
       // it after changing dates or filters. Do not ask the model to rewrite it.
-      followupAnswer = balanceResponse(sessionId,conversationInternalContext.presentationCalls,message)
+      followupAnswer = customerSelectionResponse(sessionId,conversationInternalContext.presentationCalls) ?? balanceResponse(sessionId,conversationInternalContext.presentationCalls,message)
         ?? buildMemberPromoResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) })
         ?? buildContractIncidenceResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) })
         ?? buildSalesPerSqmResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) })
@@ -2025,7 +2026,7 @@ export const chatService = async ({ message, sessionId }) => {
       ? ACCESS_DENIED_MESSAGE
       : conversationActions.chart?.available
       ? "Aquí tienes el gráfico solicitado."
-      : balanceResponse(sessionId,conversationInternalContext.presentationCalls,message) ?? buildMemberPromoResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) }) ?? buildContractIncidenceResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) }) ?? monthlyIncidenceText ??
+      : customerSelectionResponse(sessionId,conversationInternalContext.presentationCalls) ?? balanceResponse(sessionId,conversationInternalContext.presentationCalls,message) ?? buildMemberPromoResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) }) ?? buildContractIncidenceResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) }) ?? monthlyIncidenceText ??
       buildSalesPerSqmResponse(conversationInternalContext.presentationCalls, { restoreValue: (value) => restorePiiDeep(sessionId, value) }) ??
       invoiceDetailResponse(sessionId,conversationInternalContext.presentationCalls,message) ?? buildSalesYearComparisonResponse(conversationInternalContext.presentationCalls,{restoreValue:value=>restorePiiDeep(sessionId,value)}) ??
       buildSalesSampleResponse(conversationInternalContext.presentationCalls, { exportAvailable: Boolean(conversationActions.salesExport?.available) }) ??
