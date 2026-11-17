@@ -1,0 +1,135 @@
+{
+  "suite": "invoice-pending-result-affected",
+  "commit": "36c72b773f016ff66082aace4b60a8251a5e0c64",
+  "node": "v22.23.5",
+  "tests": [
+    "test/invoicePendingResultHttp.test.js",
+    "test/invoicePendingRouting.test.js",
+    "test/invoiceBalances.test.js",
+    "test/invoiceBalancesHttp.test.js",
+    "test/invoiceBalanceIntegrity.test.js",
+    "test/invoiceNamedRequest.test.js",
+    "test/searchSelection.test.js"
+  ],
+  "exitCode": 0,
+  "startedAt": "2026-11-13T13:31:58.904Z",
+  "finishedAt": "2026-11-13T13:32:08.576Z",
+  "isolated": true,
+  "realProviderCalls": 0,
+  "realOracleCalls": 0,
+  "businessDataMutations": 0,
+  "success": true,
+  "summary": {
+    "tests": 96,
+    "pass": 96,
+    "fail": 0
+  },
+  "httpRegressions": [
+    {
+      "branch": "named",
+      "outcome": "undefined",
+      "passed": true
+    },
+    {
+      "branch": "named",
+      "outcome": "throw",
+      "passed": true
+    },
+    {
+      "branch": "named",
+      "outcome": "error",
+      "passed": true
+    },
+    {
+      "branch": "named",
+      "outcome": "denied",
+      "passed": true
+    },
+    {
+      "branch": "named",
+      "outcome": "deniedResult",
+      "passed": true
+    },
+    {
+      "branch": "named",
+      "outcome": "empty",
+      "passed": true
+    },
+    {
+      "branch": "named",
+      "outcome": "data",
+      "passed": true
+    },
+    {
+      "branch": "named",
+      "outcome": "malformed",
+      "passed": true
+    },
+    {
+      "branch": "followup",
+      "outcome": "undefined",
+      "passed": true
+    },
+    {
+      "branch": "followup",
+      "outcome": "throw",
+      "passed": true
+    },
+    {
+      "branch": "followup",
+      "outcome": "error",
+      "passed": true
+    },
+    {
+      "branch": "followup",
+      "outcome": "denied",
+      "passed": true
+    },
+    {
+      "branch": "followup",
+      "outcome": "deniedResult",
+      "passed": true
+    },
+    {
+      "branch": "followup",
+      "outcome": "empty",
+      "passed": true
+    },
+    {
+      "branch": "followup",
+      "outcome": "data",
+      "passed": true
+    },
+    {
+      "branch": "followup",
+      "outcome": "malformed",
+      "passed": true
+    }
+  ],
+  "assertions": {
+    "previousValidContextPreservedOnFailure": true,
+    "failedToolNotMarkedComplete": true,
+    "noRawErrorsInResponseHistoryOrLogs": true,
+    "noFailureDataPaginationOrActions": true,
+    "validEmptyDistinctFromFailure": true,
+    "validDataPresented": true,
+    "serverIdentityOnly": true,
+    "proxyConnectionsClosed": true
+  },
+  "rawTestOutputSha256": "d8c3c4b678bec321478e8a79769866f273ed866b42eb541572c5d233b6f3e406",
+  "scope": "HTTP with controlled SDK (never invoked for pending grammar), controlled session repository and simulated Oracle; no live database operations",
+  "historicalEvidence": {
+    "commit": "c6fcb4bcda9a62ebe09df243ac8072bff21489e7",
+    "file": "invoice-pending-oracle-http-c6fcb4b.json",
+    "notRerun": true,
+    "notAttributedToThisCommit": true
+  },
+  "globalSuite": {
+    "notRerun": true,
+    "historicalComparisonFile": "invoice-pending-test-comparison.json",
+    "historicalNode22Failures": 35,
+    "historicalNode22MissingGitFailures": 17,
+    "historicalWindowsNode24Failures": 18,
+    "doesNotCertifyCurrentGlobalSuite": true
+  }
+}

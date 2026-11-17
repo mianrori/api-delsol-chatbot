@@ -1,0 +1,1125 @@
+{
+  "suite": "invoice-pending-live-helper",
+  "commit": "9fa4504a83dc2b39354fa0084150d2c9191515be",
+  "success": true,
+  "startedAt": "2026-11-13T14:05:06.492Z",
+  "healthBefore": true,
+  "imageId": "sha256:608b4e43be90a8084591789c96dac49fe0c28a3a1306081c5d75a9e48aae6caf",
+  "containerStartedAt": "2026-11-13T13:55:24.185815204Z",
+  "pm2": {
+    "online": true,
+    "restarts": 0,
+    "nodeVersion": "22.23.5"
+  },
+  "startup": {
+    "lines": 9,
+    "knownMetadataLines": 4,
+    "errors": false,
+    "remainingLogAudit": {
+      "lines": 5,
+      "safe": true,
+      "toolCalls": 0,
+      "toolResults": 0,
+      "permissionErrors": 0,
+      "permissionConsoleLines": 0,
+      "inspectorMetadataLines": 5,
+      "unknownRecords": 0,
+      "bedrockRequestEvents": 0,
+      "bedrockResponseEvents": 0,
+      "payloadsHidden": true,
+      "sessionsMasked": true
+    }
+  },
+  "sourceFiles": 258,
+  "manifestSha256": "b841e4a19a58b44526be94d478c6e7a5957106d15f3c1c39286bea19d59445d7",
+  "harness": [
+    {
+      "path": "scripts/check-invoice-pending-live.mjs",
+      "sha256": "e8d799e1f21955dc3dc7d915868e10c1c329a3ff2d3007175c00208480377897"
+    },
+    {
+      "path": "scripts/invoice-pending-live-runtime.mjs",
+      "sha256": "f576ded5cac9964b51b3a4cce5607ca8b098ec2a9bade52a1aa9da7280f02f8b"
+    },
+    {
+      "path": "scripts/invoice-affected-inspector.mjs",
+      "sha256": "b3939a15f2a2277ff0a6fa4a0ddeb6c1a5f4d9eb2ed43428295c623c36f07753"
+    }
+  ],
+  "worker": {
+    "suite": "invoice-pending-live-5400",
+    "commit": "9fa4504a83dc2b39354fa0084150d2c9191515be",
+    "success": true,
+    "checks": [
+      {
+        "code": "SAFE_DEV",
+        "passed": true
+      },
+      {
+        "code": "DIAGNOSTIC_RUNTIME_AVAILABLE",
+        "passed": true
+      },
+      {
+        "code": "POSTGRES_ORACLE_PROXY_IDENTITY",
+        "passed": true
+      },
+      {
+        "code": "AUTHORIZED_GENERAL_AND_PENDING_SAMPLE",
+        "passed": true
+      },
+      {
+        "code": "OWNED_GENERAL_CONTEXT_PREPARED",
+        "passed": true
+      },
+      {
+        "code": "HTTP_5400_1",
+        "passed": true
+      },
+      {
+        "code": "TOOL_COMPLETED_1",
+        "passed": true
+      },
+      {
+        "code": "USER_PII_RESTORED_1",
+        "passed": true
+      },
+      {
+        "code": "GENERAL_EFFECTIVE_CUSTOMER_CONCEPT_EMISSION_SCOPE",
+        "passed": true
+      },
+      {
+        "code": "GENERAL_INDEPENDENT_AUTHORIZED_COUNT_AND_ROWS",
+        "passed": true
+      },
+      {
+        "code": "GENERAL_REAL_SQL_VIEW",
+        "passed": true
+      },
+      {
+        "code": "HTTP_5400_2",
+        "passed": true
+      },
+      {
+        "code": "TOOL_COMPLETED_2",
+        "passed": true
+      },
+      {
+        "code": "USER_PII_RESTORED_2",
+        "passed": true
+      },
+      {
+        "code": "PENDING_CUSTOMER_TOOL_SIGN_followup",
+        "passed": true
+      },
+      {
+        "code": "NO_BILLING_FILTER_dateFrom_followup",
+        "passed": true
+      },
+      {
+        "code": "NO_BILLING_FILTER_dateTo_followup",
+        "passed": true
+      },
+      {
+        "code": "NO_BILLING_FILTER_conceptIds_followup",
+        "passed": true
+      },
+      {
+        "code": "NO_BILLING_FILTER_plate_followup",
+        "passed": true
+      },
+      {
+        "code": "NO_BILLING_FILTER_period_followup",
+        "passed": true
+      },
+      {
+        "code": "NO_BILLING_FILTER_cancelled_followup",
+        "passed": true
+      },
+      {
+        "code": "PENDING_EFFECTIVE_SQL_AND_BINDS_followup",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_PAGINATION_followup",
+        "passed": true
+      },
+      {
+        "code": "FULL_PAGE_followup",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_DEBT_FIELDS_AND_ORDER_followup",
+        "passed": true
+      },
+      {
+        "code": "POSITIVE_ONLY_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceSeries_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceNumber_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_customerName_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_dueDate_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_currencyCode_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_EXACT_DEBT_followup",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_DEBT_FIELDS_AND_ORDER_followup",
+        "passed": true
+      },
+      {
+        "code": "POSITIVE_ONLY_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceSeries_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceNumber_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_customerName_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_dueDate_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_currencyCode_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_EXACT_DEBT_followup",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_DEBT_FIELDS_AND_ORDER_followup",
+        "passed": true
+      },
+      {
+        "code": "POSITIVE_ONLY_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceSeries_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceNumber_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_customerName_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_dueDate_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_currencyCode_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_EXACT_DEBT_followup",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_DEBT_FIELDS_AND_ORDER_followup",
+        "passed": true
+      },
+      {
+        "code": "POSITIVE_ONLY_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceSeries_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceNumber_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_customerName_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_dueDate_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_currencyCode_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_EXACT_DEBT_followup",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_DEBT_FIELDS_AND_ORDER_followup",
+        "passed": true
+      },
+      {
+        "code": "POSITIVE_ONLY_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceSeries_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceNumber_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_customerName_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_dueDate_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_currencyCode_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_EXACT_DEBT_followup",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_DEBT_FIELDS_AND_ORDER_followup",
+        "passed": true
+      },
+      {
+        "code": "POSITIVE_ONLY_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceSeries_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceNumber_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_customerName_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_dueDate_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_currencyCode_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_EXACT_DEBT_followup",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_DEBT_FIELDS_AND_ORDER_followup",
+        "passed": true
+      },
+      {
+        "code": "POSITIVE_ONLY_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceSeries_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceNumber_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_customerName_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_dueDate_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_currencyCode_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_EXACT_DEBT_followup",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_DEBT_FIELDS_AND_ORDER_followup",
+        "passed": true
+      },
+      {
+        "code": "POSITIVE_ONLY_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceSeries_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceNumber_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_customerName_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_dueDate_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_currencyCode_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_EXACT_DEBT_followup",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_DEBT_FIELDS_AND_ORDER_followup",
+        "passed": true
+      },
+      {
+        "code": "POSITIVE_ONLY_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceSeries_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceNumber_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_customerName_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_dueDate_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_currencyCode_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_EXACT_DEBT_followup",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_DEBT_FIELDS_AND_ORDER_followup",
+        "passed": true
+      },
+      {
+        "code": "POSITIVE_ONLY_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceSeries_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceNumber_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_customerName_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_dueDate_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_currencyCode_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_EXACT_DEBT_followup",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_DEBT_FIELDS_AND_ORDER_followup",
+        "passed": true
+      },
+      {
+        "code": "POSITIVE_ONLY_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceSeries_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceNumber_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_customerName_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_dueDate_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_currencyCode_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_EXACT_DEBT_followup",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_DEBT_FIELDS_AND_ORDER_followup",
+        "passed": true
+      },
+      {
+        "code": "POSITIVE_ONLY_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceSeries_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceNumber_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_customerName_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_dueDate_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_currencyCode_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_EXACT_DEBT_followup",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_DEBT_FIELDS_AND_ORDER_followup",
+        "passed": true
+      },
+      {
+        "code": "POSITIVE_ONLY_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceSeries_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceNumber_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_customerName_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_dueDate_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_currencyCode_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_EXACT_DEBT_followup",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_DEBT_FIELDS_AND_ORDER_followup",
+        "passed": true
+      },
+      {
+        "code": "POSITIVE_ONLY_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceSeries_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceNumber_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_customerName_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_dueDate_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_currencyCode_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_EXACT_DEBT_followup",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_DEBT_FIELDS_AND_ORDER_followup",
+        "passed": true
+      },
+      {
+        "code": "POSITIVE_ONLY_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceSeries_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceNumber_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_customerName_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_dueDate_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_currencyCode_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_EXACT_DEBT_followup",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_DEBT_FIELDS_AND_ORDER_followup",
+        "passed": true
+      },
+      {
+        "code": "POSITIVE_ONLY_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceSeries_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceNumber_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_customerName_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_dueDate_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_currencyCode_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_EXACT_DEBT_followup",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_DEBT_FIELDS_AND_ORDER_followup",
+        "passed": true
+      },
+      {
+        "code": "POSITIVE_ONLY_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceSeries_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceNumber_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_customerName_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_dueDate_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_currencyCode_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_EXACT_DEBT_followup",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_DEBT_FIELDS_AND_ORDER_followup",
+        "passed": true
+      },
+      {
+        "code": "POSITIVE_ONLY_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceSeries_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceNumber_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_customerName_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_dueDate_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_currencyCode_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_EXACT_DEBT_followup",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_DEBT_FIELDS_AND_ORDER_followup",
+        "passed": true
+      },
+      {
+        "code": "POSITIVE_ONLY_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceSeries_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceNumber_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_customerName_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_dueDate_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_currencyCode_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_EXACT_DEBT_followup",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_DEBT_FIELDS_AND_ORDER_followup",
+        "passed": true
+      },
+      {
+        "code": "POSITIVE_ONLY_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceSeries_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceNumber_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_customerName_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_dueDate_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_currencyCode_followup",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_EXACT_DEBT_followup",
+        "passed": true
+      },
+      {
+        "code": "DEBT_NOT_BILLED_AMOUNT_followup",
+        "passed": true
+      },
+      {
+        "code": "REQUIRED_COLUMN_followup",
+        "passed": true
+      },
+      {
+        "code": "REQUIRED_COLUMN_followup",
+        "passed": true
+      },
+      {
+        "code": "REQUIRED_COLUMN_followup",
+        "passed": true
+      },
+      {
+        "code": "REQUIRED_COLUMN_followup",
+        "passed": true
+      },
+      {
+        "code": "REQUIRED_COLUMN_followup",
+        "passed": true
+      },
+      {
+        "code": "REQUIRED_COLUMN_followup",
+        "passed": true
+      },
+      {
+        "code": "ALL_PRESENTED_ROWS_followup",
+        "passed": true
+      },
+      {
+        "code": "NO_STALE_INVOICE_ACTIONS_followup",
+        "passed": true
+      },
+      {
+        "code": "COMMITTED_PENDING_CONTEXT_followup",
+        "passed": true
+      },
+      {
+        "code": "HTTP_5400_3",
+        "passed": true
+      },
+      {
+        "code": "TOOL_COMPLETED_3",
+        "passed": true
+      },
+      {
+        "code": "USER_PII_RESTORED_3",
+        "passed": true
+      },
+      {
+        "code": "PENDING_CUSTOMER_TOOL_SIGN_natural_page2",
+        "passed": true
+      },
+      {
+        "code": "NO_BILLING_FILTER_dateFrom_natural_page2",
+        "passed": true
+      },
+      {
+        "code": "NO_BILLING_FILTER_dateTo_natural_page2",
+        "passed": true
+      },
+      {
+        "code": "NO_BILLING_FILTER_conceptIds_natural_page2",
+        "passed": true
+      },
+      {
+        "code": "NO_BILLING_FILTER_plate_natural_page2",
+        "passed": true
+      },
+      {
+        "code": "NO_BILLING_FILTER_period_natural_page2",
+        "passed": true
+      },
+      {
+        "code": "NO_BILLING_FILTER_cancelled_natural_page2",
+        "passed": true
+      },
+      {
+        "code": "PENDING_EFFECTIVE_SQL_AND_BINDS_natural_page2",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_PAGINATION_natural_page2",
+        "passed": true
+      },
+      {
+        "code": "FULL_PAGE_natural_page2",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_DEBT_FIELDS_AND_ORDER_natural_page2",
+        "passed": true
+      },
+      {
+        "code": "POSITIVE_ONLY_natural_page2",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceSeries_natural_page2",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_invoiceNumber_natural_page2",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_customerName_natural_page2",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_dueDate_natural_page2",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_FIELD_currencyCode_natural_page2",
+        "passed": true
+      },
+      {
+        "code": "PRESENTED_EXACT_DEBT_natural_page2",
+        "passed": true
+      },
+      {
+        "code": "DEBT_NOT_BILLED_AMOUNT_natural_page2",
+        "passed": true
+      },
+      {
+        "code": "REQUIRED_COLUMN_natural_page2",
+        "passed": true
+      },
+      {
+        "code": "REQUIRED_COLUMN_natural_page2",
+        "passed": true
+      },
+      {
+        "code": "REQUIRED_COLUMN_natural_page2",
+        "passed": true
+      },
+      {
+        "code": "REQUIRED_COLUMN_natural_page2",
+        "passed": true
+      },
+      {
+        "code": "REQUIRED_COLUMN_natural_page2",
+        "passed": true
+      },
+      {
+        "code": "REQUIRED_COLUMN_natural_page2",
+        "passed": true
+      },
+      {
+        "code": "ALL_PRESENTED_ROWS_natural_page2",
+        "passed": true
+      },
+      {
+        "code": "NO_STALE_INVOICE_ACTIONS_natural_page2",
+        "passed": true
+      },
+      {
+        "code": "COMMITTED_PENDING_CONTEXT_natural_page2",
+        "passed": true
+      },
+      {
+        "code": "SESSION_EXPIRATION_UNCHANGED",
+        "passed": true
+      }
+    ],
+    "startedAt": "2026-11-13T14:05:40.919Z",
+    "realProviderCalls": 0,
+    "loadedModules": [
+      {
+        "path": "src/controllers/chat.controller.js",
+        "sha256": "67e9ff964adc97ec47d79481dd026e0b4d836f20759ad65ad93fb3b4302acd55"
+      },
+      {
+        "path": "src/repositories/invoices/invoiceBalances.repository.js",
+        "sha256": "fb0c82900e70929927a791f4d778ac09744f59bec19248bdd80be9ab629a0711"
+      },
+      {
+        "path": "src/repositories/invoices/invoices.repository.js",
+        "sha256": "27b375b83cdb14d008b529b39dc89c726444eb3a2e9328678498b791eab4a2b5"
+      },
+      {
+        "path": "src/services/ai/chat.service.js",
+        "sha256": "db0a83031beeb053661d68fcc9098bc826d93a763a075f1239c68ce304977ec7"
+      },
+      {
+        "path": "src/services/ai/invoiceBalancePresentation.service.js",
+        "sha256": "e1e27b0a936ce806112dcd95d7063adb9523135d92b6cf3bef85d5ddd88faff3"
+      },
+      {
+        "path": "src/services/ai/invoiceBalanceResult.service.js",
+        "sha256": "d5e82eba1a5c1b843aed352575a87fe25dca999f86b0f05a23f1f2da1ccb670e"
+      },
+      {
+        "path": "src/services/ai/invoicePendingRequest.service.js",
+        "sha256": "93876c4f4d0d0983b8a66881f177ce5915daf2177a2a9361ea42c41c7bc93df3"
+      },
+      {
+        "path": "src/services/ai/pii.service.js",
+        "sha256": "a5c1003c01ed0b3e9ec09e1fce868368ad6e39de6892f4553598ae9ccbf3d0d2"
+      },
+      {
+        "path": "src/services/ai/searchSelection.service.js",
+        "sha256": "d7d1fb4b887d86abd2f1e3cd925c2c0a09d0fb12b25f7a84c433b7b1e0e51b6f"
+      },
+      {
+        "path": "src/services/ai/toolExecutor.service.js",
+        "sha256": "ebea8cb122f53043655e4cccf766032b7d069d013ce51bab045564e0872c67d4"
+      },
+      {
+        "path": "src/services/invoices/invoiceBalances.service.js",
+        "sha256": "c8a634e27cfbb6c27c907f49d276af9d16652f97b370d8ccf3bca39460a0e5ec"
+      },
+      {
+        "path": "src/services/invoices/invoices.service.js",
+        "sha256": "b88c34e765db49e8d688c4bf1cfb97a25845fac4ac5b961f360d1006f232b67e"
+      },
+      {
+        "path": "src/services/sessions/oracleSession.service.js",
+        "sha256": "8be29c83faedcbbd40597533b88639f6c2d07a480c4402381f86659efd2e925a"
+      }
+    ],
+    "naturalFollowup": {
+      "generalViaConfirmedContextSelection": true,
+      "preparedFromAuthorizedOracleRows": true,
+      "modelNotUsed": true,
+      "compatibleClientPreserved": true,
+      "emissionAndConceptRemoved": true,
+      "hasPendingRows": true,
+      "hasNaturalNextPage": true
+    },
+    "pagination": "natural followup pages 1 and 2",
+    "http": {
+      "endpoint": 5400,
+      "requests": 3,
+      "realOracle": true,
+      "realSdkCalls": 0,
+      "providerAttempts": 0
+    },
+    "runtimeCleanup": {
+      "opened": 3,
+      "closed": 3,
+      "closeErrors": 0,
+      "allConnectionsClosed": true,
+      "driverRestored": true,
+      "sdkRestored": true,
+      "providerAttempts": 0,
+      "ownConversationCleared": true
+    },
+    "inspectorClosed": true,
+    "cleanup": {
+      "opened": 1,
+      "closed": 1,
+      "closeErrors": 0,
+      "allConnectionsClosed": true,
+      "driverRestored": true,
+      "postgresPoolClosed": true
+    },
+    "finishedAt": "2026-11-13T14:05:49.000Z"
+  },
+  "logout": true,
+  "logoutAttempts": 2,
+  "finishedAt": "2026-11-13T14:05:49.078Z",
+  "logAudit": [
+    {
+      "service": "chatbot",
+      "lines": 38,
+      "safe": true,
+      "toolCalls": 3,
+      "toolResults": 3,
+      "permissionErrors": 0,
+      "permissionConsoleLines": 0,
+      "inspectorMetadataLines": 5,
+      "unknownRecords": 0,
+      "bedrockRequestEvents": 0,
+      "bedrockResponseEvents": 0,
+      "payloadsHidden": true,
+      "sessionsMasked": true
+    },
+    {
+      "service": "erp",
+      "lines": 2,
+      "safe": true,
+      "recognized": "ERP protected auth metadata"
+    }
+  ],
+  "healthAfter": true,
+  "healthAfterAttempts": 1,
+  "deploymentUnchangedDuringControl": true,
+  "finalHealth": {
+    "checkedAt": "2026-11-13T14:06:58.561Z",
+    "image": "sha256:608b4e43be90a8084591789c96dac49fe0c28a3a1306081c5d75a9e48aae6caf",
+    "containerStartedAt": "2026-11-13T13:55:24.185815204Z",
+    "running": true,
+    "pm2": {
+      "online": true,
+      "restarts": 0,
+      "nodeVersion": "22.23.5"
+    },
+    "health": {
+      "status": 200,
+      "success": true,
+      "env": "development"
+    }
+  },
+  "initialPreflight": {
+    "success": false,
+    "workerSuccess": true,
+    "oracleConnections": 0,
+    "inspectorClosed": true,
+    "healthBefore": true,
+    "finalHealthProbeConfirmed": false,
+    "subsequentHealthAndFinalRunConfirmed": true
+  },
+  "harnessSource": [
+    {
+      "path": "scripts/check-invoice-pending-live.mjs",
+      "sha256": "e8d799e1f21955dc3dc7d915868e10c1c329a3ff2d3007175c00208480377897"
+    },
+    {
+      "path": "scripts/invoice-pending-live-runtime.mjs",
+      "sha256": "f576ded5cac9964b51b3a4cce5607ca8b098ec2a9bade52a1aa9da7280f02f8b"
+    },
+    {
+      "path": "scripts/run-invoice-pending-live-login.mjs",
+      "sha256": "0c726f7996efff4e58928b504623c5628bed903b755c5323e72ca776529e32e5"
+    },
+    {
+      "path": "scripts/run-invoice-pending-live.ps1",
+      "sha256": "4023397460cdfd34ec4092688b137fc08aeb939fee106042e631a82ea7131b53"
+    }
+  ]
+}

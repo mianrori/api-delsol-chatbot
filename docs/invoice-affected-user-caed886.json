@@ -1,0 +1,753 @@
+{
+  "suite": "affected-user-live-helper",
+  "success": true,
+  "status": "not_reproduced",
+  "baseCommit": "22f4b02c98003312bc1558746740cfc511e2dedd",
+  "startedAt": "2026-11-10T20:40:05.455Z",
+  "accountPolicy": "only the affected DEV user entered in the hidden login; no fallback account",
+  "modelPolicy": "existing 5400 process; no SDK substitution",
+  "helperCommit": "caed88690773bc5b3afde12541e3bba66e150bbb",
+  "deployedSource": {
+    "commit": "22f4b02c98003312bc1558746740cfc511e2dedd",
+    "sourceFiles": 319,
+    "manifestSha256": "d8be34ffd0c95a3495b4bc7c116e126e641d3076767b8265771edb4dcd595a87",
+    "imageId": "sha256:cfabf0fa3419b2834fa65185fe4283a465f95fc4b4624e47254e2a3cbf7e8774",
+    "startedAt": "2026-11-10T19:13:28.962911151Z",
+    "priorLifetimeErrorTextSeen": true
+  },
+  "diagnosticFiles": [
+    {
+      "file": "scripts/check-invoice-affected-user-live.mjs",
+      "sha256": "a8b8ddf3fc32d627ea56b34a0ebadec0c23cd5d19250c6eb2e133a677f906610"
+    },
+    {
+      "file": "scripts/invoice-affected-inspector.mjs",
+      "sha256": "a6b55fbf0980f09ced185e37ee527afa4946f53f389f0aec09f5a3cf335a72a4"
+    },
+    {
+      "file": "scripts/invoice-affected-runtime-trace.mjs",
+      "sha256": "6c113f834bdad85373877905bc294aa5d26008d8600c1c831c7af26ecd02771c"
+    },
+    {
+      "file": "logs/invoice-affected-expected.json",
+      "sha256": "1497174c2af5e161e3337154cc8db8c121fe0b83786ff781c0da8e3089b0c414"
+    }
+  ],
+  "preflight": {
+    "suite": "affected-user-live-5400",
+    "baseCommit": "22f4b02c98003312bc1558746740cfc511e2dedd",
+    "success": true,
+    "status": "preflight",
+    "checks": [
+      {
+        "code": "SAFE_BASELINE_DEV",
+        "passed": true
+      },
+      {
+        "code": "RUNTIME_TRACE_MODULE_AVAILABLE",
+        "passed": true
+      }
+    ],
+    "startedAt": "2026-11-10T20:40:10.672Z",
+    "modelSubstituted": false,
+    "accountSubstituted": false,
+    "httpChatRequests": 0,
+    "conversationResets": 0,
+    "loadedModules": [
+      {
+        "path": "src/services/ai/chat.service.js",
+        "sha256": "e544093b6ec128a81fe2b0d418d96fd6710d70c782015e2dffbf6cf3cf05cce2"
+      },
+      {
+        "path": "src/services/ai/searchSelection.service.js",
+        "sha256": "0da01be80ac2012335096da246831eb47e637f3c8ec565e50aa0390d64cd59c3"
+      },
+      {
+        "path": "src/services/ai/invoiceNamedRequest.service.js",
+        "sha256": "d22d4796a867db3c3fce4b48b14f2559aab170aa91eacabd5d9969dbccf8f411"
+      },
+      {
+        "path": "src/services/ai/invoicePlateRequest.service.js",
+        "sha256": "f0ef9c0b3637321028a674d513fcb421ec3e40a1fed5aa908eb62707dfe12120"
+      },
+      {
+        "path": "src/repositories/invoices/invoices.repository.js",
+        "sha256": "0c5430a3edccbc1f8ac669fa1b291da4278e928269099ad7cac7b801bf91655d"
+      },
+      {
+        "path": "src/repositories/invoices/invoiceCustomers.repository.js",
+        "sha256": "31e2f52fd7f441d28f6b0400c4525739b0356a63550cb4d94c25437b2b378b74"
+      },
+      {
+        "path": "src/services/invoices/searchInvoiceCustomers.service.js",
+        "sha256": "9065997d3c9ba518ec7c52fb68078542b7f0c84011c8d7b464a5fe17b6e66b01"
+      },
+      {
+        "path": "src/services/invoices/invoices.service.js",
+        "sha256": "b88c34e765db49e8d688c4bf1cfb97a25845fac4ac5b961f360d1006f232b67e"
+      },
+      {
+        "path": "src/services/sessions/oracleSession.service.js",
+        "sha256": "8be29c83faedcbbd40597533b88639f6c2d07a480c4402381f86659efd2e925a"
+      },
+      {
+        "path": "src/controllers/chat.controller.js",
+        "sha256": "67e9ff964adc97ec47d79481dd026e0b4d836f20759ad65ad93fb3b4302acd55"
+      }
+    ],
+    "loadedCodeMatchesBaseline": true,
+    "inspectorClosedOrPreviousStatePreserved": true,
+    "independentConnectionsClosed": true,
+    "finishedAt": "2026-11-10T20:40:11.384Z",
+    "pdfDownloads": 0
+  },
+  "worker": {
+    "suite": "affected-user-live-5400",
+    "baseCommit": "22f4b02c98003312bc1558746740cfc511e2dedd",
+    "success": true,
+    "status": "not_reproduced",
+    "checks": [
+      {
+        "code": "SAFE_BASELINE_DEV",
+        "passed": true
+      },
+      {
+        "code": "RUNTIME_TRACE_MODULE_AVAILABLE",
+        "passed": true
+      },
+      {
+        "code": "OWNED_LOGIN_SESSION_REQUIRED",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_ORACLE_USES_SAME_POSTGRES_SESSION_IDENTITY",
+        "passed": true
+      },
+      {
+        "code": "TRACE_ATTACHED_TO_SAME_IDENTITY",
+        "passed": true
+      },
+      {
+        "code": "NEW_OWNED_CONVERSATION_BEFORE_INITIAL",
+        "passed": true
+      },
+      {
+        "code": "INITIAL_REAL_HTTP_CONTRACT",
+        "passed": true
+      },
+      {
+        "code": "SEQUENTIAL_PLATE_REAL_HTTP_CONTRACT",
+        "passed": true
+      },
+      {
+        "code": "OWNED_CONVERSATION_RESET",
+        "passed": true
+      },
+      {
+        "code": "FRESH_PLATE_REAL_HTTP_CONTRACT",
+        "passed": true
+      },
+      {
+        "code": "OWNED_CONVERSATION_RESET",
+        "passed": true
+      }
+    ],
+    "startedAt": "2026-11-10T20:40:12.137Z",
+    "modelSubstituted": false,
+    "accountSubstituted": false,
+    "httpChatRequests": 3,
+    "conversationResets": 2,
+    "loadedModules": [
+      {
+        "path": "src/services/ai/chat.service.js",
+        "sha256": "e544093b6ec128a81fe2b0d418d96fd6710d70c782015e2dffbf6cf3cf05cce2"
+      },
+      {
+        "path": "src/services/ai/searchSelection.service.js",
+        "sha256": "0da01be80ac2012335096da246831eb47e637f3c8ec565e50aa0390d64cd59c3"
+      },
+      {
+        "path": "src/services/ai/invoiceNamedRequest.service.js",
+        "sha256": "d22d4796a867db3c3fce4b48b14f2559aab170aa91eacabd5d9969dbccf8f411"
+      },
+      {
+        "path": "src/services/ai/invoicePlateRequest.service.js",
+        "sha256": "f0ef9c0b3637321028a674d513fcb421ec3e40a1fed5aa908eb62707dfe12120"
+      },
+      {
+        "path": "src/repositories/invoices/invoices.repository.js",
+        "sha256": "0c5430a3edccbc1f8ac669fa1b291da4278e928269099ad7cac7b801bf91655d"
+      },
+      {
+        "path": "src/repositories/invoices/invoiceCustomers.repository.js",
+        "sha256": "31e2f52fd7f441d28f6b0400c4525739b0356a63550cb4d94c25437b2b378b74"
+      },
+      {
+        "path": "src/services/invoices/searchInvoiceCustomers.service.js",
+        "sha256": "9065997d3c9ba518ec7c52fb68078542b7f0c84011c8d7b464a5fe17b6e66b01"
+      },
+      {
+        "path": "src/services/invoices/invoices.service.js",
+        "sha256": "b88c34e765db49e8d688c4bf1cfb97a25845fac4ac5b961f360d1006f232b67e"
+      },
+      {
+        "path": "src/services/sessions/oracleSession.service.js",
+        "sha256": "8be29c83faedcbbd40597533b88639f6c2d07a480c4402381f86659efd2e925a"
+      },
+      {
+        "path": "src/controllers/chat.controller.js",
+        "sha256": "67e9ff964adc97ec47d79481dd026e0b4d836f20759ad65ad93fb3b4302acd55"
+      }
+    ],
+    "loadedCodeMatchesBaseline": true,
+    "identity": {
+      "targetOpaque": "90a01f57ef2762c6dd9568dae97c3adb529e7add7be5702dc51e503d150ebc46",
+      "oracleSessionMatches": true,
+      "proxyPresent": true
+    },
+    "initial": {
+      "httpStatus": 200,
+      "responseClass": "DENIED",
+      "trace": {
+        "step": "INITIAL",
+        "targetIdentityOpaque": "90a01f57ef2762c6dd9568dae97c3adb529e7add7be5702dc51e503d150ebc46",
+        "intent": {
+          "typedNamed": true,
+          "typedPlate": false,
+          "autonomousPlate": false
+        },
+        "state": {
+          "invoiceContext": {},
+          "namedPhase": "denied",
+          "namedPeriod": {
+            "dateFrom": "01/01/2023",
+            "dateTo": "31/12/2023"
+          },
+          "customerResolved": false,
+          "conceptResolved": true
+        },
+        "calls": [
+          {
+            "turnIndex": 0,
+            "name": "search_invoice_concepts",
+            "args": {
+              "query": {
+                "opaque": "8316c3c4a7d17ab26427cbbaa5fe034397a7fe93de81e3bc71285ac36d44e662"
+              }
+            },
+            "outcome": {
+              "transportStatus": "success",
+              "status": "RESOLVED",
+              "errorCode": null,
+              "hasRestrictedData": false,
+              "hasDataArray": false,
+              "dataEmpty": null
+            }
+          },
+          {
+            "turnIndex": 0,
+            "name": "search_invoice_customers",
+            "args": {
+              "query": {
+                "opaque": "95a237c7fadb94123d3d264fb92ec1eb2bce517c763b5f25a96d6ff1c283e9c2"
+              },
+              "dateFrom": "01/01/2023",
+              "dateTo": "31/12/2023"
+            },
+            "outcome": {
+              "transportStatus": "error",
+              "status": null,
+              "errorCode": "ACCESS_DENIED",
+              "hasRestrictedData": false,
+              "hasDataArray": false,
+              "dataEmpty": null
+            }
+          }
+        ],
+        "currentCalls": [
+          {
+            "turnIndex": 0,
+            "name": "search_invoice_concepts",
+            "args": {
+              "query": {
+                "opaque": "8316c3c4a7d17ab26427cbbaa5fe034397a7fe93de81e3bc71285ac36d44e662"
+              }
+            },
+            "outcome": {
+              "transportStatus": "success",
+              "status": "RESOLVED",
+              "errorCode": null,
+              "hasRestrictedData": false,
+              "hasDataArray": false,
+              "dataEmpty": null
+            }
+          },
+          {
+            "turnIndex": 0,
+            "name": "search_invoice_customers",
+            "args": {
+              "query": {
+                "opaque": "95a237c7fadb94123d3d264fb92ec1eb2bce517c763b5f25a96d6ff1c283e9c2"
+              },
+              "dateFrom": "01/01/2023",
+              "dateTo": "31/12/2023"
+            },
+            "outcome": {
+              "transportStatus": "error",
+              "status": null,
+              "errorCode": "ACCESS_DENIED",
+              "hasRestrictedData": false,
+              "hasDataArray": false,
+              "dataEmpty": null
+            }
+          }
+        ],
+        "sql": [
+          {
+            "step": "INITIAL",
+            "sqlTemplate": "SELECT COD_CONCEPTO, DESCRIPCION FROM ( SELECT COD_CONCEPTO, DESCRIPCION FROM VW_BOT_CONCEPTOS WHERE INSTR(UPPER(REGEXP_REPLACE(TRANSLATE(NVL(DESCRIPCION, '<literal>'), '<literal>', '<literal>'), '<literal>', '<literal>')), :normalizedQuery) > 0 OR UPPER(COD_CONCEPTO) = :query ORDER BY CASE WHEN UPPER(REGEXP_REPLACE(TRANSLATE(NVL(DESCRIPCION, '<literal>'), '<literal>', '<literal>'), '<literal>', '<literal>')) = :normalizedQuery THEN 1 WHEN INSTR(UPPER(REGEXP_REPLACE(TRANSLATE(NVL(DESCRIPCION, '<literal>'), '<literal>', '<literal>'), '<literal>', '<literal>')), :normalizedQuery) = 1 THEN 2 ELSE 3 END, DESCRIPCION, COD_CONCEPTO ) WHERE ROWNUM <= :limit",
+            "binds": {
+              "query": {
+                "opaque": "760744373f2f1100c24a21180911028a1cd597927531ecb0efeacee72f555a83"
+              },
+              "normalizedQuery": {
+                "opaque": "31e7bce04a6f1fe9a3855182bdd089c72f723ce590324ddf3577317256267aa6"
+              },
+              "limit": 10
+            },
+            "authorizedPredicate": false,
+            "restrictedProbe": false,
+            "normalizedPlateEquality": false,
+            "identityMatchesTarget": true,
+            "result": {
+              "empty": false,
+              "restrictedFlagPresent": false,
+              "restrictedFlag": false,
+              "authorizedCountPresent": false,
+              "authorizedCountZero": false
+            }
+          },
+          {
+            "step": "INITIAL",
+            "sqlTemplate": "SELECT * FROM ( SELECT source_rows.*, ROW_NUMBER() OVER ( PARTITION BY COD_CLIENTE ORDER BY MATCH_PRIORITY, SIMILARITY DESC NULLS LAST, NOM_CLIENTE, RAZON_SOCIAL, RUC ) AS CUSTOMER_ROW FROM ( SELECT COD_CLIENTE, NOM_CLIENTE, RAZON_SOCIAL, RUC, MATCH_PRIORITY, SIMILARITY FROM ( SELECT base.*, CASE WHEN UPPER( REGEXP_REPLACE( TRANSLATE( NVL(COD_CLIENTE, '<literal>'), '<literal>', '<literal>' ), '<literal>', '<literal>' ) ) = :queryNormalized THEN 1 WHEN UPPER( REGEXP_REPLACE( TRANSLATE( NVL(RUC, '<literal>'), '<literal>', '<literal>' ), '<literal>', '<literal>' ) ) = :queryNormalized THEN 2 WHEN UPPER( REGEXP_REPLACE( TRANSLATE( NVL(MATRICULA, '<literal>'), '<literal>', '<literal>' ), '<literal>', '<literal>' ) ) = :queryNormalized THEN 3 WHEN UPPER( REGEXP_REPLACE( TRANSLATE( NVL(NOM_CLIENTE, '<literal>'), '<literal>', '<literal>' ), '<literal>', '<literal>' ) ) = :queryNormalized THEN 4 WHEN UPPER( REGEXP_REPLACE( TRANSLATE( NVL(RAZON_SOCIAL, '<literal>'), '<literal>', '<literal>' ), '<literal>', '<literal>' ) ) = :queryNormalized THEN 5 WHEN INSTR( UPPER( REGEXP_REPLACE( TRANSLATE( NVL(NOM_CLIENTE, '<literal>'), '<literal>', '<literal>' ), '<literal>', '<literal>' ) ) , :queryNormalized) > 0 THEN 6 WHEN INSTR( UPPER( REGEXP_REPLACE( TRANSLATE( NVL(RAZON_SOCIAL, '<literal>'), '<literal>', '<literal>' ), '<literal>', '<literal>' ) ) , :queryNormalized) > 0 THEN 7 ELSE 99 END AS MATCH_PRIORITY, CAST(NULL AS NUMBER) AS SIMILARITY FROM ( SELECT DISTINCT COD_CLIENTE, NOM_CLIENTE, RAZON_SOCIAL, RUC, MATRICULA FROM VW_BOT_FACTURAS WHERE NVL(USER_CAN_CONSULT, '<literal>') <> '<literal>' AND FECHA_EMISION >= TO_DATE(:dateFrom, '<literal>') AND FECHA_EMISION < TO_DATE(:dateTo, '<literal>') + 1 ) base ) WHERE MATCH_PRIORITY <= 7 ORDER BY MATCH_PRIORITY, NOM_CLIENTE, RAZON_SOCIAL ) source_rows ) WHERE CUSTOMER_ROW = 1 ORDER BY MATCH_PRIORITY, SIMILARITY DESC NULLS LAST, NOM_CLIENTE, COD_CLIENTE",
+            "binds": {
+              "queryNormalized": {
+                "opaque": "3288daee886eb1b7a2b5caebb45a0de0dc50930fe0f322a28bea4d0ac796fccb"
+              },
+              "dateFrom": "01/01/2023",
+              "dateTo": "31/12/2023"
+            },
+            "authorizedPredicate": true,
+            "restrictedProbe": false,
+            "normalizedPlateEquality": false,
+            "identityMatchesTarget": true,
+            "result": {
+              "empty": true,
+              "restrictedFlagPresent": false,
+              "restrictedFlag": false,
+              "authorizedCountPresent": false,
+              "authorizedCountZero": false
+            }
+          },
+          {
+            "step": "INITIAL",
+            "sqlTemplate": "SELECT * FROM ( SELECT source_rows.*, ROW_NUMBER() OVER ( PARTITION BY COD_CLIENTE ORDER BY MATCH_PRIORITY, SIMILARITY DESC NULLS LAST, NOM_CLIENTE, RAZON_SOCIAL, RUC ) AS CUSTOMER_ROW FROM ( SELECT COD_CLIENTE, NOM_CLIENTE, RAZON_SOCIAL, RUC, 8 AS MATCH_PRIORITY, SIMILARITY FROM ( SELECT base.*, GREATEST( NVL( UTL_MATCH.JARO_WINKLER_SIMILARITY( UPPER( REGEXP_REPLACE( TRANSLATE( NVL(NOM_CLIENTE, '<literal>'), '<literal>', '<literal>' ), '<literal>', '<literal>' ) ) , :queryNormalized ), 0 ), NVL( UTL_MATCH.JARO_WINKLER_SIMILARITY( UPPER( REGEXP_REPLACE( TRANSLATE( NVL(RAZON_SOCIAL, '<literal>'), '<literal>', '<literal>' ), '<literal>', '<literal>' ) ) , :queryNormalized ), 0 ) ) AS SIMILARITY FROM ( SELECT DISTINCT COD_CLIENTE, NOM_CLIENTE, RAZON_SOCIAL, RUC FROM VW_BOT_FACTURAS WHERE NVL(USER_CAN_CONSULT, '<literal>') <> '<literal>' AND FECHA_EMISION >= TO_DATE(:dateFrom, '<literal>') AND FECHA_EMISION < TO_DATE(:dateTo, '<literal>') + 1 ) base ) WHERE SIMILARITY >= :minSimilarity ORDER BY SIMILARITY DESC, NOM_CLIENTE, RAZON_SOCIAL ) source_rows ) WHERE CUSTOMER_ROW = 1 ORDER BY MATCH_PRIORITY, SIMILARITY DESC NULLS LAST, NOM_CLIENTE, COD_CLIENTE",
+            "binds": {
+              "queryNormalized": {
+                "opaque": "3288daee886eb1b7a2b5caebb45a0de0dc50930fe0f322a28bea4d0ac796fccb"
+              },
+              "minSimilarity": 80,
+              "dateFrom": "01/01/2023",
+              "dateTo": "31/12/2023"
+            },
+            "authorizedPredicate": true,
+            "restrictedProbe": false,
+            "normalizedPlateEquality": false,
+            "identityMatchesTarget": true,
+            "result": {
+              "empty": true,
+              "restrictedFlagPresent": false,
+              "restrictedFlag": false,
+              "authorizedCountPresent": false,
+              "authorizedCountZero": false
+            }
+          },
+          {
+            "step": "INITIAL",
+            "sqlTemplate": "SELECT CASE WHEN EXISTS ( SELECT 1 FROM VW_BOT_FACTURAS WHERE USER_CAN_CONSULT = '<literal>' AND FECHA_EMISION >= TO_DATE(:dateFrom, '<literal>') AND FECHA_EMISION < TO_DATE(:dateTo, '<literal>') + 1 AND ( UPPER( REGEXP_REPLACE( TRANSLATE( NVL(COD_CLIENTE, '<literal>'), '<literal>', '<literal>' ), '<literal>', '<literal>' ) ) = :queryNormalized OR UPPER( REGEXP_REPLACE( TRANSLATE( NVL(RUC, '<literal>'), '<literal>', '<literal>' ), '<literal>', '<literal>' ) ) = :queryNormalized OR UPPER( REGEXP_REPLACE( TRANSLATE( NVL(MATRICULA, '<literal>'), '<literal>', '<literal>' ), '<literal>', '<literal>' ) ) = :queryNormalized OR INSTR( UPPER( REGEXP_REPLACE( TRANSLATE( NVL(NOM_CLIENTE, '<literal>'), '<literal>', '<literal>' ), '<literal>', '<literal>' ) ) , :queryNormalized) > 0 OR INSTR( UPPER( REGEXP_REPLACE( TRANSLATE( NVL(RAZON_SOCIAL, '<literal>'), '<literal>', '<literal>' ), '<literal>', '<literal>' ) ) , :queryNormalized) > 0) ) THEN 1 ELSE 0 END AS HAS_RESTRICTED_DATA FROM DUAL",
+            "binds": {
+              "queryNormalized": {
+                "opaque": "3288daee886eb1b7a2b5caebb45a0de0dc50930fe0f322a28bea4d0ac796fccb"
+              },
+              "dateFrom": "01/01/2023",
+              "dateTo": "31/12/2023"
+            },
+            "authorizedPredicate": false,
+            "restrictedProbe": true,
+            "normalizedPlateEquality": false,
+            "identityMatchesTarget": true,
+            "result": {
+              "empty": false,
+              "restrictedFlagPresent": true,
+              "restrictedFlag": true,
+              "authorizedCountPresent": false,
+              "authorizedCountZero": false
+            }
+          }
+        ],
+        "connections": {
+          "opened": 2,
+          "closed": 2,
+          "closeErrors": 0
+        }
+      }
+    },
+    "sequential": {
+      "httpStatus": 200,
+      "responseClass": "ABSENT",
+      "trace": {
+        "step": "SEQUENTIAL_PLATE",
+        "targetIdentityOpaque": "90a01f57ef2762c6dd9568dae97c3adb529e7add7be5702dc51e503d150ebc46",
+        "intent": {
+          "typedNamed": false,
+          "typedPlate": true,
+          "autonomousPlate": true
+        },
+        "state": {
+          "invoiceContext": {
+            "plate": {
+              "opaque": "bf90a5518c5c007958236bf027380a59da774266cb5c113b973f45ca88af3519",
+              "normalizedMatchesRequested": true
+            },
+            "mode": "detail",
+            "page": 1,
+            "rows": 20
+          },
+          "namedPhase": null,
+          "namedPeriod": null,
+          "customerResolved": false,
+          "conceptResolved": false
+        },
+        "calls": [
+          {
+            "turnIndex": 0,
+            "name": "search_invoice_concepts",
+            "args": {
+              "query": {
+                "opaque": "8316c3c4a7d17ab26427cbbaa5fe034397a7fe93de81e3bc71285ac36d44e662"
+              }
+            },
+            "outcome": {
+              "transportStatus": "success",
+              "status": "RESOLVED",
+              "errorCode": null,
+              "hasRestrictedData": false,
+              "hasDataArray": false,
+              "dataEmpty": null
+            }
+          },
+          {
+            "turnIndex": 0,
+            "name": "search_invoice_customers",
+            "args": {
+              "query": {
+                "opaque": "95a237c7fadb94123d3d264fb92ec1eb2bce517c763b5f25a96d6ff1c283e9c2"
+              },
+              "dateFrom": "01/01/2023",
+              "dateTo": "31/12/2023"
+            },
+            "outcome": {
+              "transportStatus": "error",
+              "status": null,
+              "errorCode": "ACCESS_DENIED",
+              "hasRestrictedData": false,
+              "hasDataArray": false,
+              "dataEmpty": null
+            }
+          },
+          {
+            "turnIndex": 1,
+            "name": "get_invoices",
+            "args": {
+              "plate": {
+                "opaque": "bf90a5518c5c007958236bf027380a59da774266cb5c113b973f45ca88af3519",
+                "normalizedMatchesRequested": true
+              },
+              "mode": "detail",
+              "page": 1,
+              "rows": 20
+            },
+            "outcome": {
+              "transportStatus": "success",
+              "status": null,
+              "errorCode": null,
+              "hasRestrictedData": false,
+              "hasDataArray": true,
+              "dataEmpty": true
+            }
+          }
+        ],
+        "currentCalls": [
+          {
+            "turnIndex": 1,
+            "name": "get_invoices",
+            "args": {
+              "plate": {
+                "opaque": "bf90a5518c5c007958236bf027380a59da774266cb5c113b973f45ca88af3519",
+                "normalizedMatchesRequested": true
+              },
+              "mode": "detail",
+              "page": 1,
+              "rows": 20
+            },
+            "outcome": {
+              "transportStatus": "success",
+              "status": null,
+              "errorCode": null,
+              "hasRestrictedData": false,
+              "hasDataArray": true,
+              "dataEmpty": true
+            }
+          }
+        ],
+        "sql": [
+          {
+            "step": "SEQUENTIAL_PLATE",
+            "sqlTemplate": "SELECT totals.*, CASE WHEN EXISTS ( SELECT 1 FROM VW_BOT_FACTURAS WHERE USER_CAN_CONSULT = '<literal>' AND REGEXP_REPLACE(UPPER(MATRICULA), '<literal>', '<literal>') = :plate ) THEN 1 ELSE 0 END AS HAS_RESTRICTED_DATA FROM ( SELECT COUNT(*) AS TOTAL_ROWS, COUNT(DISTINCT NRO_FACTURA) AS TOTAL_INVOICES FROM VW_BOT_FACTURAS WHERE NVL(USER_CAN_CONSULT, '<literal>') <> '<literal>' AND REGEXP_REPLACE(UPPER(MATRICULA), '<literal>', '<literal>') = :plate ) totals",
+            "binds": {
+              "plate": {
+                "opaque": "bf90a5518c5c007958236bf027380a59da774266cb5c113b973f45ca88af3519",
+                "normalizedMatchesRequested": true
+              }
+            },
+            "authorizedPredicate": true,
+            "restrictedProbe": true,
+            "normalizedPlateEquality": true,
+            "identityMatchesTarget": true,
+            "result": {
+              "empty": false,
+              "restrictedFlagPresent": true,
+              "restrictedFlag": false,
+              "authorizedCountPresent": true,
+              "authorizedCountZero": true
+            }
+          },
+          {
+            "step": "SEQUENTIAL_PLATE",
+            "sqlTemplate": "SELECT FECHA_EMISION, NRO_FACTURA, CONDICION_VENTA, SECTOR, PDF, ANULADO, PERIODO, VENCIMIENTO, TIPO_CONTRATO, SERIE_CONTRATO, NRO_CONTRATO, COD_CLIENTE, NOM_CLIENTE, RAZON_SOCIAL, RUC, COD_CONCEPTO, DES_CONCEPTO, SIMBOLO_MONEDA, COTIZACION_MONEDA, PRECIO_UNITARIO, CANTIDAD, GRAVADA, EXENTA, IVA, IMPORTE, MATRICULA FROM ( SELECT q.*, ROW_NUMBER() OVER ( ORDER BY FECHA_EMISION DESC, NRO_FACTURA DESC, COD_CONCEPTO ) AS RN FROM ( SELECT FECHA_EMISION, NRO_FACTURA, CONDICION_VENTA, SECTOR, PDF, ANULADO, PERIODO, VENCIMIENTO, TIPO_CONTRATO, SERIE_CONTRATO, NRO_CONTRATO, COD_CLIENTE, NOM_CLIENTE, RAZON_SOCIAL, RUC, COD_CONCEPTO, DES_CONCEPTO, SIMBOLO_MONEDA, COTIZACION_MONEDA, PRECIO_UNITARIO, CANTIDAD, GRAVADA, EXENTA, IVA, IMPORTE, MATRICULA FROM VW_BOT_FACTURAS WHERE NVL(USER_CAN_CONSULT, '<literal>') <> '<literal>' AND REGEXP_REPLACE(UPPER(MATRICULA), '<literal>', '<literal>') = :plate ) q ) WHERE RN > :offset AND RN <= :maxRow ORDER BY RN",
+            "binds": {
+              "plate": {
+                "opaque": "bf90a5518c5c007958236bf027380a59da774266cb5c113b973f45ca88af3519",
+                "normalizedMatchesRequested": true
+              },
+              "offset": 0,
+              "maxRow": 20
+            },
+            "authorizedPredicate": true,
+            "restrictedProbe": false,
+            "normalizedPlateEquality": true,
+            "identityMatchesTarget": true,
+            "result": {
+              "empty": true,
+              "restrictedFlagPresent": false,
+              "restrictedFlag": false,
+              "authorizedCountPresent": false,
+              "authorizedCountZero": false
+            }
+          }
+        ],
+        "connections": {
+          "opened": 3,
+          "closed": 3,
+          "closeErrors": 0
+        }
+      },
+      "independentOracle": {
+        "classification": "ABSENT",
+        "httpAgreesWithIndependentOracle": true,
+        "plateOpaque": "bf90a5518c5c007958236bf027380a59da774266cb5c113b973f45ca88af3519",
+        "identitySameAsOwnedSession": true
+      }
+    },
+    "fresh": {
+      "httpStatus": 200,
+      "responseClass": "ABSENT",
+      "trace": {
+        "step": "FRESH_PLATE",
+        "targetIdentityOpaque": "90a01f57ef2762c6dd9568dae97c3adb529e7add7be5702dc51e503d150ebc46",
+        "intent": {
+          "typedNamed": false,
+          "typedPlate": true,
+          "autonomousPlate": true
+        },
+        "state": {
+          "invoiceContext": {
+            "plate": {
+              "opaque": "bf90a5518c5c007958236bf027380a59da774266cb5c113b973f45ca88af3519",
+              "normalizedMatchesRequested": true
+            },
+            "mode": "detail",
+            "page": 1,
+            "rows": 20
+          },
+          "namedPhase": null,
+          "namedPeriod": null,
+          "customerResolved": false,
+          "conceptResolved": false
+        },
+        "calls": [
+          {
+            "turnIndex": 0,
+            "name": "get_invoices",
+            "args": {
+              "plate": {
+                "opaque": "bf90a5518c5c007958236bf027380a59da774266cb5c113b973f45ca88af3519",
+                "normalizedMatchesRequested": true
+              },
+              "mode": "detail",
+              "page": 1,
+              "rows": 20
+            },
+            "outcome": {
+              "transportStatus": "success",
+              "status": null,
+              "errorCode": null,
+              "hasRestrictedData": false,
+              "hasDataArray": true,
+              "dataEmpty": true
+            }
+          }
+        ],
+        "currentCalls": [
+          {
+            "turnIndex": 0,
+            "name": "get_invoices",
+            "args": {
+              "plate": {
+                "opaque": "bf90a5518c5c007958236bf027380a59da774266cb5c113b973f45ca88af3519",
+                "normalizedMatchesRequested": true
+              },
+              "mode": "detail",
+              "page": 1,
+              "rows": 20
+            },
+            "outcome": {
+              "transportStatus": "success",
+              "status": null,
+              "errorCode": null,
+              "hasRestrictedData": false,
+              "hasDataArray": true,
+              "dataEmpty": true
+            }
+          }
+        ],
+        "sql": [
+          {
+            "step": "FRESH_PLATE",
+            "sqlTemplate": "SELECT totals.*, CASE WHEN EXISTS ( SELECT 1 FROM VW_BOT_FACTURAS WHERE USER_CAN_CONSULT = '<literal>' AND REGEXP_REPLACE(UPPER(MATRICULA), '<literal>', '<literal>') = :plate ) THEN 1 ELSE 0 END AS HAS_RESTRICTED_DATA FROM ( SELECT COUNT(*) AS TOTAL_ROWS, COUNT(DISTINCT NRO_FACTURA) AS TOTAL_INVOICES FROM VW_BOT_FACTURAS WHERE NVL(USER_CAN_CONSULT, '<literal>') <> '<literal>' AND REGEXP_REPLACE(UPPER(MATRICULA), '<literal>', '<literal>') = :plate ) totals",
+            "binds": {
+              "plate": {
+                "opaque": "bf90a5518c5c007958236bf027380a59da774266cb5c113b973f45ca88af3519",
+                "normalizedMatchesRequested": true
+              }
+            },
+            "authorizedPredicate": true,
+            "restrictedProbe": true,
+            "normalizedPlateEquality": true,
+            "identityMatchesTarget": true,
+            "result": {
+              "empty": false,
+              "restrictedFlagPresent": true,
+              "restrictedFlag": false,
+              "authorizedCountPresent": true,
+              "authorizedCountZero": true
+            }
+          },
+          {
+            "step": "FRESH_PLATE",
+            "sqlTemplate": "SELECT FECHA_EMISION, NRO_FACTURA, CONDICION_VENTA, SECTOR, PDF, ANULADO, PERIODO, VENCIMIENTO, TIPO_CONTRATO, SERIE_CONTRATO, NRO_CONTRATO, COD_CLIENTE, NOM_CLIENTE, RAZON_SOCIAL, RUC, COD_CONCEPTO, DES_CONCEPTO, SIMBOLO_MONEDA, COTIZACION_MONEDA, PRECIO_UNITARIO, CANTIDAD, GRAVADA, EXENTA, IVA, IMPORTE, MATRICULA FROM ( SELECT q.*, ROW_NUMBER() OVER ( ORDER BY FECHA_EMISION DESC, NRO_FACTURA DESC, COD_CONCEPTO ) AS RN FROM ( SELECT FECHA_EMISION, NRO_FACTURA, CONDICION_VENTA, SECTOR, PDF, ANULADO, PERIODO, VENCIMIENTO, TIPO_CONTRATO, SERIE_CONTRATO, NRO_CONTRATO, COD_CLIENTE, NOM_CLIENTE, RAZON_SOCIAL, RUC, COD_CONCEPTO, DES_CONCEPTO, SIMBOLO_MONEDA, COTIZACION_MONEDA, PRECIO_UNITARIO, CANTIDAD, GRAVADA, EXENTA, IVA, IMPORTE, MATRICULA FROM VW_BOT_FACTURAS WHERE NVL(USER_CAN_CONSULT, '<literal>') <> '<literal>' AND REGEXP_REPLACE(UPPER(MATRICULA), '<literal>', '<literal>') = :plate ) q ) WHERE RN > :offset AND RN <= :maxRow ORDER BY RN",
+            "binds": {
+              "plate": {
+                "opaque": "bf90a5518c5c007958236bf027380a59da774266cb5c113b973f45ca88af3519",
+                "normalizedMatchesRequested": true
+              },
+              "offset": 0,
+              "maxRow": 20
+            },
+            "authorizedPredicate": true,
+            "restrictedProbe": false,
+            "normalizedPlateEquality": true,
+            "identityMatchesTarget": true,
+            "result": {
+              "empty": true,
+              "restrictedFlagPresent": false,
+              "restrictedFlag": false,
+              "authorizedCountPresent": false,
+              "authorizedCountZero": false
+            }
+          }
+        ],
+        "connections": {
+          "opened": 4,
+          "closed": 4,
+          "closeErrors": 0
+        }
+      },
+      "independentOracle": {
+        "classification": "ABSENT",
+        "httpAgreesWithIndependentOracle": true,
+        "plateOpaque": "bf90a5518c5c007958236bf027380a59da774266cb5c113b973f45ca88af3519",
+        "identitySameAsOwnedSession": true
+      }
+    },
+    "observations": {
+      "inheritedFilterKeys": [],
+      "routeTools": [
+        "get_invoices"
+      ],
+      "sequentialAndFreshSameClass": true,
+      "restrictedSignalLost": false,
+      "sequentialAgreesWithOracle": true,
+      "freshAgreesWithOracle": true
+    },
+    "exactBugReproduced": false,
+    "caseResolved": false,
+    "runtimeCleanup": {
+      "driverRestored": true,
+      "connectionsClosed": true,
+      "opened": 4,
+      "closed": 4,
+      "closeErrors": 0
+    },
+    "inspectorClosedOrPreviousStatePreserved": true,
+    "independentConnectionsClosed": true,
+    "finishedAt": "2026-11-10T20:40:17.663Z",
+    "pdfDownloads": 0
+  },
+  "caseResolved": false,
+  "logout": true,
+  "finishedAt": "2026-11-10T20:40:47.311Z",
+  "logAudit": [
+    {
+      "service": "chatbot",
+      "lines": 56,
+      "safe": true,
+      "toolCalls": 4,
+      "toolResults": 3,
+      "permissionErrors": 1,
+      "permissionConsoleLines": 1,
+      "inspectorMetadataLines": 10,
+      "unknownRecords": 0,
+      "bedrockRequestEvents": 0,
+      "bedrockResponseEvents": 0,
+      "payloadsHidden": true,
+      "sessionsMasked": true
+    },
+    {
+      "service": "erp",
+      "lines": 2,
+      "safe": true,
+      "recognized": "ERP protected auth metadata"
+    }
+  ]
+}

@@ -1,0 +1,313 @@
+{
+  "suite": "invoice-balances-dev-helper",
+  "success": false,
+  "startedAt": "2026-11-12T18:33:47.995Z",
+  "noDeployment": true,
+  "profileCandidate": {
+    "commit": "1a2851159cbf1484d60ff9f015d05debe7ba7a15",
+    "target": "/tmp/invoice-balances-dev-1a2851159cbf1484d60ff9f015d05debe7ba7a15",
+    "sourceFiles": 339,
+    "manifestSha256": "cbecf329b5aad0f5da859ecc9480b1134a8f268631ba01e93200e33556b4018f"
+  },
+  "preflight": {
+    "suite": "invoice-balances-dev",
+    "commit": "1a2851159cbf1484d60ff9f015d05debe7ba7a15",
+    "mode": "--preflight",
+    "success": true,
+    "checks": [
+      {
+        "code": "SAFE_DEV_CONFIGURATION",
+        "passed": true
+      }
+    ],
+    "startedAt": "2026-11-12T18:33:53.251Z",
+    "providerCalls": 0,
+    "pdfDownloads": 0,
+    "cleanup": {
+      "driverRestored": true,
+      "opened": 0,
+      "closed": 0,
+      "closeErrors": 0,
+      "allConnectionsClosed": true,
+      "postgresPoolClosed": true
+    },
+    "finishedAt": "2026-11-12T18:33:53.251Z"
+  },
+  "profile": {
+    "suite": "invoice-balances-dev",
+    "commit": "1a2851159cbf1484d60ff9f015d05debe7ba7a15",
+    "mode": "--profile",
+    "success": true,
+    "checks": [
+      {
+        "code": "SAFE_DEV_CONFIGURATION",
+        "passed": true
+      },
+      {
+        "code": "OWNED_LOGIN_SESSION_REQUIRED",
+        "passed": true
+      },
+      {
+        "code": "SESSION_ID_RESOLVES_POSTGRES_ORACLE_PROXY_IDENTITY",
+        "passed": true
+      },
+      {
+        "code": "NO_USER_CAN_CONSULT_COLUMN_ASSUMPTION",
+        "passed": true
+      },
+      {
+        "code": "EXPECTED_BALANCE_COLUMNS_PRESENT",
+        "passed": true
+      }
+    ],
+    "startedAt": "2026-11-12T18:33:53.999Z",
+    "providerCalls": 0,
+    "pdfDownloads": 0,
+    "columns": [
+      "NRO_FACTURA",
+      "SECTOR",
+      "VENCIMIENTO",
+      "COD_CLIENTE",
+      "NOM_CLIENTE",
+      "RAZON_SOCIAL",
+      "RUC",
+      "SIMBOLO_MONEDA",
+      "SALDO"
+    ],
+    "samples": {
+      "anyRows": true,
+      "positive": true,
+      "zero": true,
+      "negative": true,
+      "nullBalance": true,
+      "nullDue": false,
+      "multipleSymbols": true,
+      "rowsEqualDistinctInvoiceNumbers": false
+    },
+    "granularity": {
+      "repeatedInvoiceNumber": true,
+      "invoiceAcrossCustomers": true,
+      "invoiceAcrossSectors": true,
+      "invoiceAcrossSymbols": true,
+      "repeatedCandidateKey": true,
+      "identicalVisibleRows": false,
+      "businessKeyProven": false
+    },
+    "dueDate": {
+      "scanComplete": true,
+      "distinctValuesCapped": false,
+      "validDDMMYYYYPresent": true,
+      "invalidPresent": false,
+      "nullOrBlankPresent": false,
+      "isoShapePresent": false,
+      "allNonBlankValidDDMMYYYY": true
+    },
+    "definition": {
+      "readable": true,
+      "opaque": "3e381ecba14379dbb7226c0229f87bed2b07a0cbeef1964b0f4d872734b2d965",
+      "hasGrouping": false,
+      "hasUnion": false,
+      "mentionsNativeCurrencyKey": true,
+      "saldoExpressionUsesSum": false,
+      "businessMeaningNotEstablished": true
+    },
+    "currency": {
+      "nativeIdentifierExposed": false,
+      "symbolsAreNotProvenCurrencyKeys": true,
+      "conversionPerformed": false
+    },
+    "semanticLimits": [
+      "zero balance does not prove payment",
+      "negative balance does not prove credit/refund without business contract",
+      "observed uniqueness is not a documented invoice business key"
+    ],
+    "cleanup": {
+      "driverRestored": true,
+      "opened": 1,
+      "closed": 1,
+      "closeErrors": 0,
+      "allConnectionsClosed": true,
+      "postgresPoolClosed": true
+    },
+    "finishedAt": "2026-11-12T18:33:58.761Z"
+  },
+  "validationCandidate": {
+    "commit": "c2541f4a19be4466d05081574c826cd652977ce3",
+    "target": "/tmp/invoice-balances-dev-c2541f4a19be4466d05081574c826cd652977ce3",
+    "sourceFiles": 339,
+    "manifestSha256": "2ee13a83254ded5333aba9be74d071bd2502afdcff33132135ff1d9c5be16d98"
+  },
+  "validation": {
+    "suite": "invoice-balances-dev",
+    "commit": "c2541f4a19be4466d05081574c826cd652977ce3",
+    "mode": "--validate",
+    "success": false,
+    "checks": [
+      {
+        "code": "SAFE_DEV_CONFIGURATION",
+        "passed": true
+      },
+      {
+        "code": "OWNED_LOGIN_SESSION_REQUIRED",
+        "passed": true
+      },
+      {
+        "code": "SESSION_ID_RESOLVES_POSTGRES_ORACLE_PROXY_IDENTITY",
+        "passed": true
+      },
+      {
+        "code": "DETAIL_FIRST_ROWS_VS_NUMBERS_VS_CUSTOMERS",
+        "passed": true
+      },
+      {
+        "code": "DETAIL_FIRST_PAGINATION",
+        "passed": true
+      },
+      {
+        "code": "DETAIL_FIRST_EXACT_DECIMAL_ROWS_AND_INDEPENDENT_JS_AGING",
+        "passed": true
+      },
+      {
+        "code": "DETAIL_FIRST_NO_SYMBOL_BASED_MONETARY_TOTALS",
+        "passed": true
+      },
+      {
+        "code": "DETAIL_SECOND_ROWS_VS_NUMBERS_VS_CUSTOMERS",
+        "passed": true
+      },
+      {
+        "code": "DETAIL_SECOND_PAGINATION",
+        "passed": true
+      },
+      {
+        "code": "DETAIL_SECOND_EXACT_DECIMAL_ROWS_AND_INDEPENDENT_JS_AGING",
+        "passed": true
+      },
+      {
+        "code": "DETAIL_SECOND_NO_SYMBOL_BASED_MONETARY_TOTALS",
+        "passed": true
+      },
+      {
+        "code": "DUE_overdue_ROWS_VS_NUMBERS_VS_CUSTOMERS",
+        "passed": true
+      },
+      {
+        "code": "DUE_overdue_PAGINATION",
+        "passed": true
+      },
+      {
+        "code": "DUE_overdue_EXACT_DECIMAL_ROWS_AND_INDEPENDENT_JS_AGING",
+        "passed": true
+      },
+      {
+        "code": "DUE_overdue_NO_SYMBOL_BASED_MONETARY_TOTALS",
+        "passed": true
+      },
+      {
+        "code": "DUE_dueToday_ROWS_VS_NUMBERS_VS_CUSTOMERS",
+        "passed": true
+      },
+      {
+        "code": "DUE_dueToday_PAGINATION",
+        "passed": true
+      },
+      {
+        "code": "DUE_dueToday_EXACT_DECIMAL_ROWS_AND_INDEPENDENT_JS_AGING",
+        "passed": true
+      },
+      {
+        "code": "DUE_dueToday_NO_SYMBOL_BASED_MONETARY_TOTALS",
+        "passed": true
+      },
+      {
+        "code": "DUE_upcoming_ROWS_VS_NUMBERS_VS_CUSTOMERS",
+        "passed": true
+      },
+      {
+        "code": "DUE_upcoming_PAGINATION",
+        "passed": true
+      },
+      {
+        "code": "DUE_upcoming_EXACT_DECIMAL_ROWS_AND_INDEPENDENT_JS_AGING",
+        "passed": true
+      },
+      {
+        "code": "DUE_upcoming_NO_SYMBOL_BASED_MONETARY_TOTALS",
+        "passed": true
+      }
+    ],
+    "startedAt": "2026-11-12T18:43:34.797Z",
+    "providerCalls": 0,
+    "pdfDownloads": 0,
+    "reference": {
+      "asOfDate": "12/11/2026",
+      "timezone": "America/Asuncion",
+      "calendarArithmetic": "UTC calendar days after Asuncion date extraction"
+    },
+    "cases": [
+      {
+        "label": "DETAIL_FIRST",
+        "hasSample": true,
+        "passed": true
+      },
+      {
+        "label": "DETAIL_SECOND",
+        "hasSample": true,
+        "passed": true
+      },
+      {
+        "label": "DUE_overdue",
+        "hasSample": true,
+        "passed": true
+      },
+      {
+        "label": "DUE_dueToday",
+        "hasSample": false,
+        "passed": true
+      },
+      {
+        "label": "DUE_upcoming",
+        "hasSample": true,
+        "passed": true
+      }
+    ],
+    "error": {
+      "code": "ORA-01036"
+    },
+    "cleanup": {
+      "driverRestored": true,
+      "opened": 1,
+      "closed": 1,
+      "closeErrors": 0,
+      "allConnectionsClosed": true,
+      "postgresPoolClosed": true
+    },
+    "finishedAt": "2026-11-12T18:43:43.511Z"
+  },
+  "logout": true,
+  "finishedAt": "2026-11-12T18:43:43.615Z",
+  "logAudit": [
+    {
+      "service": "chatbot",
+      "lines": 0,
+      "safe": true,
+      "toolCalls": 0,
+      "toolResults": 0,
+      "permissionErrors": 0,
+      "permissionConsoleLines": 0,
+      "inspectorMetadataLines": 0,
+      "unknownRecords": 0,
+      "bedrockRequestEvents": 0,
+      "bedrockResponseEvents": 0,
+      "payloadsHidden": true,
+      "sessionsMasked": true
+    },
+    {
+      "service": "erp",
+      "lines": 2,
+      "safe": true,
+      "recognized": "ERP protected auth metadata"
+    }
+  ],
+  "deployedImageAndStartUnchanged": true
+}

@@ -1,0 +1,640 @@
+{
+  "suite": "invoice-settled-dev-helper",
+  "success": true,
+  "startedAt": "2026-11-13T14:42:32.022Z",
+  "noDeployment": true,
+  "commit": "879dcf27f65462d95e8729724749f9cf9ce82a38",
+  "validation": {
+    "suite": "invoice-settled-dev",
+    "commit": "879dcf27f65462d95e8729724749f9cf9ce82a38",
+    "success": true,
+    "checks": [
+      {
+        "code": "SAFE_DEV",
+        "passed": true
+      },
+      {
+        "code": "READ_ONLY_ORACLE",
+        "passed": true
+      },
+      {
+        "code": "READ_ONLY_ORACLE",
+        "passed": true
+      },
+      {
+        "code": "READ_ONLY_ORACLE",
+        "passed": true
+      },
+      {
+        "code": "LITERAL_HTTP_SUCCESS",
+        "passed": true
+      },
+      {
+        "code": "LITERAL_BALANCE_CATALOG_QUERY",
+        "passed": true
+      },
+      {
+        "code": "LITERAL_CUSTOMER_UNAMBIGUOUS",
+        "passed": true
+      },
+      {
+        "code": "ONLY_CATALOG_AND_BALANCE_TOOLS",
+        "passed": true
+      },
+      {
+        "code": "EFFECTIVE_SETTLED_ARGUMENTS",
+        "passed": true
+      },
+      {
+        "code": "NO_GENERAL_INVOICE_FALLBACK",
+        "passed": true
+      },
+      {
+        "code": "EFFECTIVE_ZERO_DEBT_SQL_AND_CUSTOMER",
+        "passed": true
+      },
+      {
+        "code": "READ_ONLY_ORACLE",
+        "passed": true
+      },
+      {
+        "code": "POSTGRES_SESSION_ORACLE_PROXY_IDENTITY",
+        "passed": true
+      },
+      {
+        "code": "READ_ONLY_ORACLE",
+        "passed": true
+      },
+      {
+        "code": "READ_ONLY_ORACLE",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_ZERO_COUNT_AND_PAGE",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_PAGINATION",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_ZERO_FIELDS_AND_ORDER",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_ZERO_FIELDS_AND_ORDER",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_ZERO_FIELDS_AND_ORDER",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_ZERO_FIELDS_AND_ORDER",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_ZERO_FIELDS_AND_ORDER",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_ZERO_FIELDS_AND_ORDER",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_ZERO_FIELDS_AND_ORDER",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_ZERO_FIELDS_AND_ORDER",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_ZERO_FIELDS_AND_ORDER",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_ZERO_FIELDS_AND_ORDER",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_ZERO_FIELDS_AND_ORDER",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_ZERO_FIELDS_AND_ORDER",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_ZERO_FIELDS_AND_ORDER",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_ZERO_FIELDS_AND_ORDER",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_ZERO_FIELDS_AND_ORDER",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_ZERO_FIELDS_AND_ORDER",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_ZERO_FIELDS_AND_ORDER",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_ZERO_FIELDS_AND_ORDER",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_ZERO_FIELDS_AND_ORDER",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_ZERO_FIELDS_AND_ORDER",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_SETTLED_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_ZERO_DEBT",
+        "passed": true
+      },
+      {
+        "code": "DEBT_NOT_ANNULMENT_AND_PII_RESTORED",
+        "passed": true
+      },
+      {
+        "code": "NO_GENERAL_ACTIONS",
+        "passed": true
+      },
+      {
+        "code": "CUSTOMER_NAME_PROTECTED_IN_HISTORY",
+        "passed": true
+      },
+      {
+        "code": "NO_MODEL_INVOCATION",
+        "passed": true
+      },
+      {
+        "code": "SESSION_EXPIRATION_UNCHANGED",
+        "passed": true
+      }
+    ],
+    "startedAt": "2026-11-13T14:42:35.797Z",
+    "noDeployment": true,
+    "customerResolution": "RESOLVED",
+    "sample": {
+      "hasZeroDebtRows": true,
+      "absenceObserved": false
+    },
+    "effectiveArguments": {
+      "customerIds": "same customer resolved by balance catalog (redacted)",
+      "mode": "detail",
+      "debtStatus": "settled",
+      "page": 1,
+      "rows": 20
+    },
+    "cleanup": {
+      "opened": 3,
+      "closed": 3,
+      "closeErrors": 0,
+      "allConnectionsClosed": true,
+      "driverRestored": true,
+      "serverClosed": true,
+      "ownConversationCleared": true,
+      "postgresPoolClosed": true
+    },
+    "modelCalls": 0,
+    "realProviderCalls": 0,
+    "finishedAt": "2026-11-13T14:42:41.200Z"
+  },
+  "logoutAttempts": 2,
+  "logout": true,
+  "finishedAt": "2026-11-13T14:42:41.256Z",
+  "logAudit": [
+    {
+      "service": "chatbot",
+      "lines": 0,
+      "safe": true,
+      "toolCalls": 0,
+      "toolResults": 0,
+      "permissionErrors": 0,
+      "permissionConsoleLines": 0,
+      "inspectorMetadataLines": 0,
+      "unknownRecords": 0,
+      "bedrockRequestEvents": 0,
+      "bedrockResponseEvents": 0,
+      "payloadsHidden": true,
+      "sessionsMasked": true
+    },
+    {
+      "service": "erp",
+      "lines": 2,
+      "safe": true,
+      "recognized": "ERP protected auth metadata"
+    }
+  ],
+  "deployedImageAndStartUnchanged": true
+}

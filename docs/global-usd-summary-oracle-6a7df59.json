@@ -1,0 +1,138 @@
+{
+  "suite": "global-usd-dev-helper",
+  "success": true,
+  "startedAt": "2026-11-13T19:33:38.758Z",
+  "noDeployment": true,
+  "commit": "6a7df590e178129d9526a9ddf41c26effeaa1297",
+  "validation": {
+    "suite": "global-usd-candidate",
+    "commit": "6a7df590e178129d9526a9ddf41c26effeaa1297",
+    "success": true,
+    "checks": [
+      {
+        "code": "SAFE_DEV",
+        "passed": true
+      },
+      {
+        "code": "READ_ONLY",
+        "passed": true
+      },
+      {
+        "code": "READ_ONLY",
+        "passed": true
+      },
+      {
+        "code": "HTTP_1",
+        "passed": true
+      },
+      {
+        "code": "NO_GENERAL_ACTIONS",
+        "passed": true
+      },
+      {
+        "code": "PUBLIC_OUTPUT",
+        "passed": true
+      },
+      {
+        "code": "ONE_GLOBAL_SUMMARY_NO_CLIENT_FANOUT",
+        "passed": true
+      },
+      {
+        "code": "GLOBAL_CURRENT_PENDING_NO_DUE_FILTER",
+        "passed": true
+      },
+      {
+        "code": "CLEAN_SUMMARY_OBSERVED",
+        "passed": true
+      },
+      {
+        "code": "READ_ONLY",
+        "passed": true
+      },
+      {
+        "code": "SUMMARY_PROXY_IDENTITY",
+        "passed": true
+      },
+      {
+        "code": "READ_ONLY",
+        "passed": true
+      },
+      {
+        "code": "COMPLETE_VISIBLE_CATALOGUE",
+        "passed": true
+      },
+      {
+        "code": "SUMMARY_PYG_FROM_INDEPENDENT_NATIVE_CODE",
+        "passed": true
+      },
+      {
+        "code": "SUMMARY_USD_FROM_INDEPENDENT_NATIVE_CODE",
+        "passed": true
+      },
+      {
+        "code": "REAL_USD_SUMMARY_LABEL",
+        "passed": true
+      },
+      {
+        "code": "ZERO_MODEL_OR_PROVIDER_ATTEMPTS",
+        "passed": true
+      },
+      {
+        "code": "SESSION_EXPIRATION_UNCHANGED",
+        "passed": true
+      }
+    ],
+    "startedAt": "2026-11-13T19:33:42.873Z",
+    "noDeployment": true,
+    "summaryStatus": "OK_SUMMARY",
+    "summaryOnly": true,
+    "usdLabelObserved": true,
+    "http": {
+      "requests": 1,
+      "usual5400": false,
+      "candidateEphemeral": true,
+      "resultsSimulated": false,
+      "contextSeeded": false
+    },
+    "cleanup": {
+      "opened": 2,
+      "closed": 2,
+      "closeErrors": 0,
+      "allConnectionsClosed": true,
+      "driverRestored": true,
+      "serverClosed": true,
+      "ownConversationCleared": true,
+      "postgresPoolClosed": true
+    },
+    "modelCalls": 0,
+    "realProviderCalls": 0,
+    "finishedAt": "2026-11-13T19:33:44.804Z"
+  },
+  "logoutAttempts": 1,
+  "logout": true,
+  "finishedAt": "2026-11-13T19:33:44.855Z",
+  "logAudit": [
+    {
+      "service": "chatbot",
+      "lines": 0,
+      "safe": true,
+      "toolCalls": 0,
+      "toolResults": 0,
+      "permissionErrors": 0,
+      "permissionConsoleLines": 0,
+      "inspectorMetadataLines": 0,
+      "unknownRecords": 0,
+      "bedrockRequestEvents": 0,
+      "bedrockResponseEvents": 0,
+      "payloadsHidden": true,
+      "sessionsMasked": true
+    },
+    {
+      "service": "erp",
+      "lines": 2,
+      "safe": true,
+      "recognized": "ERP protected auth metadata"
+    }
+  ],
+  "deployedImageAndStartUnchanged": true
+}

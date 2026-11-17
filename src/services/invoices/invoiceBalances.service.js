@@ -1,0 +1,83 @@
+import {getInvoiceBalancesRepository, searchInvoiceBalanceCustomersRepository,getInvoiceBalanceCurrenciesRepository} from '../../repositories/invoices/invoiceBalances.repository.js';
+
+const fail = message => {throw new Error(message);};
+const today = () => {
+  const parts = new Intl.DateTimeFormat('en-US', {timeZone:'America/Asuncion',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
+  const part = type => parts.find(p=>p.type===type).value;
+  return `${part('day')}/${part('month')}/${part('year')}`;
+};
+const date = value => {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(value));
+  if (!m) fail('Fecha inválida: utiliza DD/MM/YYYY.');
+  const [,d,mth,y] = m.map(Number), parsed = new Date(0);
+  parsed.setUTCFullYear(y,mth-1,d); parsed.setUTCHours(0,0,0,0);
+  if (y<1 || parsed.getUTCFullYear()!==y || parsed.getUTCMonth()!==mth-1 || parsed.getUTCDate()!==d) fail('Fecha inválida.');
+  return parsed.getTime();
+};
+const array = (value, key) => {
+  if (value===undefined) return [];
+  if (!Array.isArray(value)||value.length>100||value.some(v=>typeof v!=='string'||!v.trim()||v.length>120)) fail(`${key} debe ser una lista de textos no vacíos (máximo 100).`);
+  return [...new Set(value.map(v=>v.trim()))];
+};
+const option = (value, allowed, key) => {if(!allowed.includes(value)) fail(`${key} no soportado.`);return value;};
+const integer = (value, min, max, key) => {if(!Number.isInteger(value)||value<min||value>max) fail(`${key} fuera de rango.`);return value;};
+
+export function normalizeInvoiceBalanceArgs(args={}) {
+  const allowed=['invoices','customerIds','invoiceNumbers','invoiceSeries','sectors','currencies','currencyCodes','dueDateFrom','dueDateTo','asOfDate','dueStatus','debtStatus','minDebt','maxDebt','minDaysOverdue','maxDaysOverdue','mode','groupBy','orderBy','page','rows'];
+  if(Object.keys(args).some(k=>!allowed.includes(k))) fail('Filtro de saldos no soportado.');
+  const result={...args};
+  for(const key of ['customerIds','invoiceNumbers','invoiceSeries','sectors','currencies','currencyCodes'])result[key]=array(args[key],key);
+  if(args.invoices!==undefined&&(!Array.isArray(args.invoices)||args.invoices.length>100))fail('invoices debe ser una lista de pares serie/número.');
+  result.invoices=(args.invoices??[]).map(pair=>{if(!pair||typeof pair!=='object'||Object.keys(pair).some(k=>!['invoiceSeries','invoiceNumber'].includes(k))||!['invoiceSeries','invoiceNumber'].every(k=>typeof pair[k]==='string'&&pair[k].trim()&&pair[k].length<=120))fail('Cada factura requiere serie y número no vacíos.');return {invoiceSeries:pair.invoiceSeries.trim(),invoiceNumber:pair.invoiceNumber.trim()};});
+  result.asOfDate=args.asOfDate??today();date(result.asOfDate);
+  for(const key of ['dueDateFrom','dueDateTo'])if(args[key]!==undefined)date(args[key]);
+  if(args.dueDateFrom&&args.dueDateTo&&date(args.dueDateFrom)>date(args.dueDateTo))fail('Rango de vencimientos inválido.');
+  result.mode=option(args.mode??'detail',['detail','summary'],'mode');
+  result.dueStatus=option(args.dueStatus??'all',['all','overdue','dueToday','upcoming','undated'],'dueStatus');
+  result.debtStatus=option(args.debtStatus??'pending',['pending','settled','all','unknown'],'debtStatus');
+  result.groupBy=array(args.groupBy,'groupBy');
+  for(const group of result.groupBy)option(group,['customer','invoice','sector','dueMonth','dueStatus','agingBand'],'groupBy');
+  if(result.mode==='detail'&&result.groupBy.length)fail('groupBy requiere mode summary.');
+  result.orderBy=option(args.orderBy??(result.mode==='detail'?'dueDateAsc':'debtDesc'),result.mode==='detail'?['dueDateAsc','debtDesc','debtAsc','overdueDaysDesc','invoiceNumber']:['debtDesc','debtAsc','invoiceCountDesc','group'],'orderBy');
+  result.page=integer(args.page??1,1,1000000,'page');result.rows=integer(args.rows??20,1,100,'rows');
+  for(const key of ['minDebt','maxDebt'])if(args[key]!==undefined&&(typeof args[key]!=='number'||!Number.isFinite(args[key])||args[key]<0))fail(`${key} debe ser numérico.`);
+  for(const key of ['minDaysOverdue','maxDaysOverdue'])if(args[key]!==undefined)integer(args[key],0,3652058,key);
+  for(const [lo,hi]of [['minDebt','maxDebt'],['minDaysOverdue','maxDaysOverdue']])if(args[lo]!==undefined&&args[hi]!==undefined&&args[lo]>args[hi])fail('Rango inválido.');
+  return result;
+}
+
+export async function getInvoiceBalances(args, connection) {
+  const scope=normalizeInvoiceBalanceArgs(args);
+  const result=await getInvoiceBalancesRepository({connection,...scope});
+  if(result.status==='OK_SUMMARY'&&result.data?.length&&scope.debtStatus==='pending'&&!scope.customerIds.length&&!scope.groupBy.length&&!scope.invoices.length){
+    const {displayLabels={}}=await resolveInvoiceBalanceCurrency({currency:'USD'},connection);
+    return {...result,data:result.data.map(row=>({...row,...(Object.hasOwn(displayLabels,row.currencyCode)?{currencySymbol:displayLabels[row.currencyCode]}:{})}))};
+  }
+  return result;
+}
+
+export async function resolveInvoiceBalanceCurrency(args={},connection){
+ if(Object.keys(args).some(key=>key!=='currency')||args.currency!=='USD')fail('Indica la moneda comercial USD.');
+ const rows=await getInvoiceBalanceCurrenciesRepository({connection});
+ if(rows.length>200)return {status:'INCOMPLETE',currency:'USD'};
+ const normalize=value=>String(value??'').trim().toUpperCase();
+ const usd=value=>['USD','US$','U$S'].includes(normalize(value));
+ const aliases=new Map([['USD','USD'],['US$','USD'],['U$S','USD'],['PYG','PYG'],['GS','PYG'],['GS.','PYG'],['₲','PYG'],['EUR','EUR'],['€','EUR']]);
+ const displayLabels=Object.fromEntries([...new Set(rows.map(row=>String(row.currencyCode)))].flatMap(code=>{
+  const labels=rows.filter(row=>String(row.currencyCode)===code).map(row=>aliases.get(normalize(row.currencySymbol))??(['','$'].includes(normalize(row.currencySymbol))?aliases.get(normalize(code)):undefined));
+  const known=[...new Set(labels.filter(Boolean))];return known.length===1&&rows.filter(row=>String(row.currencyCode)===code).every(row=>aliases.has(normalize(row.currencySymbol))||['','$'].includes(normalize(row.currencySymbol)))?[[code,known[0]]]:[];
+ }));
+ const codes=[...new Set(rows.filter(row=>usd(row.currencySymbol)||normalize(row.currencyCode)==='USD').map(row=>String(row.currencyCode)))];
+ if(!codes.length)return {status:'NOT_IDENTIFIED',currency:'USD',displayLabels};
+ if(codes.length!==1||rows.some(row=>String(row.currencyCode)===codes[0]&&!usd(row.currencySymbol)&&!['','$'].includes(normalize(row.currencySymbol))))return {status:'AMBIGUOUS',currency:'USD',displayLabels};
+ return {status:'RESOLVED',currency:'USD',currencyCode:codes[0],displayLabels};
+}
+
+export async function searchInvoiceBalanceCustomers(args={}, connection) {
+  if(Object.keys(args).some(k=>!['query'].includes(k))||typeof args.query!=='string'||!args.query.trim()||args.query.length>120)fail('Indica un cliente, razón social, RUC o código válido.');
+  const matches=await searchInvoiceBalanceCustomersRepository({connection,query:args.query.trim()});
+  const hasMore=matches.length>20,options=matches.slice(0,20).map((item,index)=>({option:index+1,...item}));
+  if(!matches.length)return {status:'NOT_FOUND',query:args.query,options:[],hasMore:false};
+  if(matches.length===1)return {status:'RESOLVED',query:args.query,...matches[0],hasMore:false};
+  return {status:'AMBIGUOUS',query:args.query,options,hasMore};
+}

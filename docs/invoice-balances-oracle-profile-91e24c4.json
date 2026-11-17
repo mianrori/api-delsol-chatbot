@@ -1,0 +1,125 @@
+{
+  "suite": "invoice-balances-dev",
+  "commit": "91e24c4b6484af6ca40e2cce4b66424fa8df5fb9",
+  "mode": "--profile",
+  "success": true,
+  "checks": [
+    {
+      "code": "SAFE_DEV_CONFIGURATION",
+      "passed": true
+    },
+    {
+      "code": "OWNED_LOGIN_SESSION_REQUIRED",
+      "passed": true
+    },
+    {
+      "code": "SESSION_ID_RESOLVES_POSTGRES_ORACLE_PROXY_IDENTITY",
+      "passed": true
+    },
+    {
+      "code": "SERIES_DEBT_NATIVE_CURRENCY_SCHEMA",
+      "passed": true
+    },
+    {
+      "code": "NO_USER_CAN_CONSULT_ASSUMPTION",
+      "passed": true
+    }
+  ],
+  "startedAt": "2026-11-12T19:23:41.744Z",
+  "providerCalls": 0,
+  "pdfDownloads": 0,
+  "columns": [
+    "NRO_FACTURA",
+    "SERIE_FACTURA",
+    "SECTOR",
+    "VENCIMIENTO",
+    "COD_CLIENTE",
+    "NOM_CLIENTE",
+    "RAZON_SOCIAL",
+    "RUC",
+    "COD_MONEDA",
+    "SIMBOLO_MONEDA",
+    "DEUDA"
+  ],
+  "columnTypes": [
+    {
+      "name": "NRO_FACTURA",
+      "type": "VARCHAR2"
+    },
+    {
+      "name": "SERIE_FACTURA",
+      "type": "VARCHAR2"
+    },
+    {
+      "name": "SECTOR",
+      "type": "VARCHAR2"
+    },
+    {
+      "name": "VENCIMIENTO",
+      "type": "VARCHAR2"
+    },
+    {
+      "name": "COD_CLIENTE",
+      "type": "VARCHAR2"
+    },
+    {
+      "name": "NOM_CLIENTE",
+      "type": "VARCHAR2"
+    },
+    {
+      "name": "RAZON_SOCIAL",
+      "type": "VARCHAR2"
+    },
+    {
+      "name": "RUC",
+      "type": "VARCHAR2"
+    },
+    {
+      "name": "COD_MONEDA",
+      "type": "VARCHAR2"
+    },
+    {
+      "name": "SIMBOLO_MONEDA",
+      "type": "VARCHAR2"
+    },
+    {
+      "name": "DEUDA",
+      "type": "NUMBER",
+      "precision": 18,
+      "scale": 2
+    }
+  ],
+  "schemaContract": "SERIE_FACTURA_COD_MONEDA_DEUDA",
+  "granularity": {
+    "duplicateSeriesNumber": true,
+    "nullIdentity": false,
+    "blankIdentity": false,
+    "missingCurrency": false,
+    "sameNumberDifferentSeries": true,
+    "duplicateFullCandidate": true,
+    "uniquenessScope": "same authorized view, excluding negative debt, snapshot only; no arbitrary deduplication",
+    "seriesNumberUsable": false
+  },
+  "states": {
+    "pending": true,
+    "settled": true,
+    "negativeExcluded": true,
+    "unknown": true
+  },
+  "contract": {
+    "pending": "DEUDA>0",
+    "settled": "DEUDA=0",
+    "all": "DEUDA>=0 OR DEUDA IS NULL",
+    "negative": "always excluded",
+    "nullDebt": "unknown, never paid or zero; known subtotals must disclose incompleteness"
+  },
+  "cleanup": {
+    "driverRestored": true,
+    "opened": 1,
+    "closed": 1,
+    "closeErrors": 0,
+    "allConnectionsClosed": true,
+    "postgresPoolClosed": true
+  },
+  "finishedAt": "2026-11-12T19:23:44.673Z"
+}

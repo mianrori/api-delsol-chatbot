@@ -1,0 +1,838 @@
+{
+  "suite": "invoice-pending-dev-helper",
+  "success": true,
+  "startedAt": "2026-11-13T12:50:13.898Z",
+  "noDeployment": true,
+  "commit": "c6fcb4bcda9a62ebe09df243ac8072bff21489e7",
+  "validation": {
+    "suite": "invoice-pending-dev",
+    "commit": "c6fcb4bcda9a62ebe09df243ac8072bff21489e7",
+    "success": true,
+    "checks": [
+      {
+        "code": "SAFE_DEV",
+        "passed": true
+      },
+      {
+        "code": "ORACLE_READ_ONLY",
+        "passed": true
+      },
+      {
+        "code": "POSTGRES_SESSION_PROXY_IDENTITY",
+        "passed": true
+      },
+      {
+        "code": "ORACLE_READ_ONLY",
+        "passed": true
+      },
+      {
+        "code": "ORACLE_READ_ONLY",
+        "passed": true
+      },
+      {
+        "code": "ORACLE_READ_ONLY",
+        "passed": true
+      },
+      {
+        "code": "HTTP_SUCCESS",
+        "passed": true
+      },
+      {
+        "code": "ORIGINAL_BALANCE_RESOLVER",
+        "passed": true
+      },
+      {
+        "code": "PENDING_ONLY_BALANCE_TOOL",
+        "passed": true
+      },
+      {
+        "code": "EFFECTIVE_CUSTOMER_PENDING_DETAIL",
+        "passed": true
+      },
+      {
+        "code": "NO_INCOMPATIBLE_FILTERS",
+        "passed": true
+      },
+      {
+        "code": "EFFECTIVE_SQL_BALANCE_POSITIVE",
+        "passed": true
+      },
+      {
+        "code": "ORACLE_READ_ONLY",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_PENDING_COUNT",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_DETAIL_FIELDS_MULTIPLICITY",
+        "passed": true
+      },
+      {
+        "code": "NO_SETTLED_NEGATIVE_OR_UNKNOWN",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_DETAIL_FIELDS_MULTIPLICITY",
+        "passed": true
+      },
+      {
+        "code": "NO_SETTLED_NEGATIVE_OR_UNKNOWN",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_REQUIRED_COLUMN",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_REQUIRED_COLUMN",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_REQUIRED_COLUMN",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_REQUIRED_COLUMN",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_REQUIRED_COLUMN",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_REQUIRED_COLUMN",
+        "passed": true
+      },
+      {
+        "code": "DETAIL_PAGE_COMPLETE",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_EXACT_DEBT",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_EXACT_DEBT",
+        "passed": true
+      },
+      {
+        "code": "ORACLE_READ_ONLY",
+        "passed": true
+      },
+      {
+        "code": "ORACLE_READ_ONLY",
+        "passed": true
+      },
+      {
+        "code": "HTTP_SUCCESS",
+        "passed": true
+      },
+      {
+        "code": "PENDING_ONLY_BALANCE_TOOL",
+        "passed": true
+      },
+      {
+        "code": "EFFECTIVE_CUSTOMER_PENDING_DETAIL",
+        "passed": true
+      },
+      {
+        "code": "NO_INCOMPATIBLE_FILTERS",
+        "passed": true
+      },
+      {
+        "code": "EFFECTIVE_SQL_BALANCE_POSITIVE",
+        "passed": true
+      },
+      {
+        "code": "ORACLE_READ_ONLY",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_PENDING_COUNT",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_DETAIL_FIELDS_MULTIPLICITY",
+        "passed": true
+      },
+      {
+        "code": "NO_SETTLED_NEGATIVE_OR_UNKNOWN",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_DETAIL_FIELDS_MULTIPLICITY",
+        "passed": true
+      },
+      {
+        "code": "NO_SETTLED_NEGATIVE_OR_UNKNOWN",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_REQUIRED_COLUMN",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_REQUIRED_COLUMN",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_REQUIRED_COLUMN",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_REQUIRED_COLUMN",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_REQUIRED_COLUMN",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_REQUIRED_COLUMN",
+        "passed": true
+      },
+      {
+        "code": "DETAIL_PAGE_COMPLETE",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_EXACT_DEBT",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_EXACT_DEBT",
+        "passed": true
+      },
+      {
+        "code": "ORACLE_READ_ONLY",
+        "passed": true
+      },
+      {
+        "code": "ORACLE_READ_ONLY",
+        "passed": true
+      },
+      {
+        "code": "HTTP_SUCCESS",
+        "passed": true
+      },
+      {
+        "code": "PENDING_ONLY_BALANCE_TOOL",
+        "passed": true
+      },
+      {
+        "code": "EFFECTIVE_CUSTOMER_PENDING_DETAIL",
+        "passed": true
+      },
+      {
+        "code": "NO_INCOMPATIBLE_FILTERS",
+        "passed": true
+      },
+      {
+        "code": "EFFECTIVE_SQL_BALANCE_POSITIVE",
+        "passed": true
+      },
+      {
+        "code": "ORACLE_READ_ONLY",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_PENDING_COUNT",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_DETAIL_FIELDS_MULTIPLICITY",
+        "passed": true
+      },
+      {
+        "code": "NO_SETTLED_NEGATIVE_OR_UNKNOWN",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_DETAIL_FIELDS_MULTIPLICITY",
+        "passed": true
+      },
+      {
+        "code": "NO_SETTLED_NEGATIVE_OR_UNKNOWN",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_REQUIRED_COLUMN",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_REQUIRED_COLUMN",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_REQUIRED_COLUMN",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_REQUIRED_COLUMN",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_REQUIRED_COLUMN",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_REQUIRED_COLUMN",
+        "passed": true
+      },
+      {
+        "code": "DETAIL_PAGE_COMPLETE",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_EXACT_DEBT",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_EXACT_DEBT",
+        "passed": true
+      },
+      {
+        "code": "ORACLE_READ_ONLY",
+        "passed": true
+      },
+      {
+        "code": "ORACLE_READ_ONLY",
+        "passed": true
+      },
+      {
+        "code": "HTTP_SUCCESS",
+        "passed": true
+      },
+      {
+        "code": "PENDING_ONLY_BALANCE_TOOL",
+        "passed": true
+      },
+      {
+        "code": "EFFECTIVE_CUSTOMER_PENDING_DETAIL",
+        "passed": true
+      },
+      {
+        "code": "NO_INCOMPATIBLE_FILTERS",
+        "passed": true
+      },
+      {
+        "code": "EFFECTIVE_SQL_BALANCE_POSITIVE",
+        "passed": true
+      },
+      {
+        "code": "ORACLE_READ_ONLY",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_PENDING_COUNT",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_DETAIL_FIELDS_MULTIPLICITY",
+        "passed": true
+      },
+      {
+        "code": "NO_SETTLED_NEGATIVE_OR_UNKNOWN",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_DETAIL_FIELDS_MULTIPLICITY",
+        "passed": true
+      },
+      {
+        "code": "NO_SETTLED_NEGATIVE_OR_UNKNOWN",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_REQUIRED_COLUMN",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_REQUIRED_COLUMN",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_REQUIRED_COLUMN",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_REQUIRED_COLUMN",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_REQUIRED_COLUMN",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_REQUIRED_COLUMN",
+        "passed": true
+      },
+      {
+        "code": "DETAIL_PAGE_COMPLETE",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_EXACT_DEBT",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_EXACT_DEBT",
+        "passed": true
+      },
+      {
+        "code": "ORACLE_READ_ONLY",
+        "passed": true
+      },
+      {
+        "code": "ORACLE_READ_ONLY",
+        "passed": true
+      },
+      {
+        "code": "HTTP_SUCCESS",
+        "passed": true
+      },
+      {
+        "code": "GENERAL_HTTP_GET_INVOICES",
+        "passed": true
+      },
+      {
+        "code": "ORACLE_READ_ONLY",
+        "passed": true
+      },
+      {
+        "code": "ORACLE_READ_ONLY",
+        "passed": true
+      },
+      {
+        "code": "HTTP_SUCCESS",
+        "passed": true
+      },
+      {
+        "code": "PENDING_ONLY_BALANCE_TOOL",
+        "passed": true
+      },
+      {
+        "code": "EFFECTIVE_CUSTOMER_PENDING_DETAIL",
+        "passed": true
+      },
+      {
+        "code": "NO_INCOMPATIBLE_FILTERS",
+        "passed": true
+      },
+      {
+        "code": "EFFECTIVE_SQL_BALANCE_POSITIVE",
+        "passed": true
+      },
+      {
+        "code": "ORACLE_READ_ONLY",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_PENDING_COUNT",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_DETAIL_FIELDS_MULTIPLICITY",
+        "passed": true
+      },
+      {
+        "code": "NO_SETTLED_NEGATIVE_OR_UNKNOWN",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_DETAIL_FIELDS_MULTIPLICITY",
+        "passed": true
+      },
+      {
+        "code": "NO_SETTLED_NEGATIVE_OR_UNKNOWN",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_REQUIRED_COLUMN",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_REQUIRED_COLUMN",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_REQUIRED_COLUMN",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_REQUIRED_COLUMN",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_REQUIRED_COLUMN",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_REQUIRED_COLUMN",
+        "passed": true
+      },
+      {
+        "code": "DETAIL_PAGE_COMPLETE",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_EXACT_DEBT",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_INDEPENDENT_FIELD",
+        "passed": true
+      },
+      {
+        "code": "RESPONSE_EXACT_DEBT",
+        "passed": true
+      },
+      {
+        "code": "ORACLE_READ_ONLY",
+        "passed": true
+      },
+      {
+        "code": "ORACLE_READ_ONLY",
+        "passed": true
+      },
+      {
+        "code": "ORACLE_READ_ONLY",
+        "passed": true
+      },
+      {
+        "code": "DUPLICATE_SUMMARY_BLOCKED_equal",
+        "passed": true
+      },
+      {
+        "code": "ORACLE_READ_ONLY",
+        "passed": true
+      },
+      {
+        "code": "ORACLE_READ_ONLY",
+        "passed": true
+      },
+      {
+        "code": "DUPLICATE_DETAIL_WARNING_equal",
+        "passed": true
+      },
+      {
+        "code": "ORACLE_READ_ONLY",
+        "passed": true
+      },
+      {
+        "code": "SESSION_EXPIRATION_UNCHANGED",
+        "passed": true
+      }
+    ],
+    "cases": [
+      {
+        "label": "original",
+        "tool": "get_invoice_balances",
+        "effectiveArguments": {
+          "customerIds": "same resolved customer (redacted)",
+          "mode": "detail",
+          "debtStatus": "pending",
+          "page": 1,
+          "rows": 20
+        },
+        "hasRows": true,
+        "independentOracle": true
+      },
+      {
+        "label": "facturas pendientes",
+        "tool": "get_invoice_balances",
+        "effectiveArguments": {
+          "customerIds": "same resolved customer (redacted)",
+          "mode": "detail",
+          "debtStatus": "pending",
+          "page": 1,
+          "rows": 20
+        },
+        "hasRows": true,
+        "independentOracle": true
+      },
+      {
+        "label": "pendientes de pago",
+        "tool": "get_invoice_balances",
+        "effectiveArguments": {
+          "customerIds": "same resolved customer (redacted)",
+          "mode": "detail",
+          "debtStatus": "pending",
+          "page": 1,
+          "rows": 20
+        },
+        "hasRows": true,
+        "independentOracle": true
+      },
+      {
+        "label": "cuánto debe",
+        "tool": "get_invoice_balances",
+        "effectiveArguments": {
+          "customerIds": "same resolved customer (redacted)",
+          "mode": "detail",
+          "debtStatus": "pending",
+          "page": 1,
+          "rows": 20
+        },
+        "hasRows": true,
+        "independentOracle": true
+      },
+      {
+        "label": "solo las pendientes after general HTTP",
+        "tool": "get_invoice_balances",
+        "effectiveArguments": {
+          "customerIds": "same resolved customer (redacted)",
+          "mode": "detail",
+          "debtStatus": "pending",
+          "page": 1,
+          "rows": 20
+        },
+        "hasRows": true,
+        "independentOracle": true
+      }
+    ],
+    "noDeployment": true,
+    "originalResolution": "RESOLVED",
+    "signSamples": {
+      "settled": true,
+      "negative": true
+    },
+    "equalDuplicateSample": true,
+    "differentDuplicateSample": false,
+    "cleanup": {
+      "opened": 14,
+      "closed": 14,
+      "allConnectionsClosed": true,
+      "driverRestored": true,
+      "serverClosed": true,
+      "ownConversationCleared": true
+    },
+    "controlledModelCalls": 1,
+    "realProviderCalls": 0
+  },
+  "logoutAttempts": 2,
+  "logout": true,
+  "finishedAt": "2026-11-13T12:50:38.433Z",
+  "logAudit": [
+    {
+      "service": "chatbot",
+      "lines": 0,
+      "safe": true,
+      "toolCalls": 0,
+      "toolResults": 0,
+      "permissionErrors": 0,
+      "permissionConsoleLines": 0,
+      "inspectorMetadataLines": 0,
+      "unknownRecords": 0,
+      "bedrockRequestEvents": 0,
+      "bedrockResponseEvents": 0,
+      "payloadsHidden": true,
+      "sessionsMasked": true
+    },
+    {
+      "service": "erp",
+      "lines": 2,
+      "safe": true,
+      "recognized": "ERP protected auth metadata"
+    }
+  ],
+  "deployedImageAndStartUnchanged": true
+}

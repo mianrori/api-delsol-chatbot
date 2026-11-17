@@ -1,0 +1,98 @@
+{
+  "suite": "invoice-balances-dev",
+  "commit": "1a2851159cbf1484d60ff9f015d05debe7ba7a15",
+  "mode": "--profile",
+  "success": true,
+  "checks": [
+    {
+      "code": "SAFE_DEV_CONFIGURATION",
+      "passed": true
+    },
+    {
+      "code": "OWNED_LOGIN_SESSION_REQUIRED",
+      "passed": true
+    },
+    {
+      "code": "SESSION_ID_RESOLVES_POSTGRES_ORACLE_PROXY_IDENTITY",
+      "passed": true
+    },
+    {
+      "code": "NO_USER_CAN_CONSULT_COLUMN_ASSUMPTION",
+      "passed": true
+    },
+    {
+      "code": "EXPECTED_BALANCE_COLUMNS_PRESENT",
+      "passed": true
+    }
+  ],
+  "startedAt": "2026-11-12T18:33:53.999Z",
+  "providerCalls": 0,
+  "pdfDownloads": 0,
+  "columns": [
+    "NRO_FACTURA",
+    "SECTOR",
+    "VENCIMIENTO",
+    "COD_CLIENTE",
+    "NOM_CLIENTE",
+    "RAZON_SOCIAL",
+    "RUC",
+    "SIMBOLO_MONEDA",
+    "SALDO"
+  ],
+  "samples": {
+    "anyRows": true,
+    "positive": true,
+    "zero": true,
+    "negative": true,
+    "nullBalance": true,
+    "nullDue": false,
+    "multipleSymbols": true,
+    "rowsEqualDistinctInvoiceNumbers": false
+  },
+  "granularity": {
+    "repeatedInvoiceNumber": true,
+    "invoiceAcrossCustomers": true,
+    "invoiceAcrossSectors": true,
+    "invoiceAcrossSymbols": true,
+    "repeatedCandidateKey": true,
+    "identicalVisibleRows": false,
+    "businessKeyProven": false
+  },
+  "dueDate": {
+    "scanComplete": true,
+    "distinctValuesCapped": false,
+    "validDDMMYYYYPresent": true,
+    "invalidPresent": false,
+    "nullOrBlankPresent": false,
+    "isoShapePresent": false,
+    "allNonBlankValidDDMMYYYY": true
+  },
+  "definition": {
+    "readable": true,
+    "opaque": "3e381ecba14379dbb7226c0229f87bed2b07a0cbeef1964b0f4d872734b2d965",
+    "hasGrouping": false,
+    "hasUnion": false,
+    "mentionsNativeCurrencyKey": true,
+    "saldoExpressionUsesSum": false,
+    "businessMeaningNotEstablished": true
+  },
+  "currency": {
+    "nativeIdentifierExposed": false,
+    "symbolsAreNotProvenCurrencyKeys": true,
+    "conversionPerformed": false
+  },
+  "semanticLimits": [
+    "zero balance does not prove payment",
+    "negative balance does not prove credit/refund without business contract",
+    "observed uniqueness is not a documented invoice business key"
+  ],
+  "cleanup": {
+    "driverRestored": true,
+    "opened": 1,
+    "closed": 1,
+    "closeErrors": 0,
+    "allConnectionsClosed": true,
+    "postgresPoolClosed": true
+  },
+  "finishedAt": "2026-11-12T18:33:58.761Z"
+}

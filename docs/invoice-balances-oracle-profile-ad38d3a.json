@@ -1,0 +1,147 @@
+{
+  "suite": "invoice-balances-dev",
+  "commit": "ad38d3a832561dded027e8e6fb0a54e72be2e6d1",
+  "mode": "--profile",
+  "success": true,
+  "checks": [
+    {
+      "code": "SAFE_DEV_CONFIGURATION",
+      "passed": true
+    },
+    {
+      "code": "OWNED_LOGIN_SESSION_REQUIRED",
+      "passed": true
+    },
+    {
+      "code": "SESSION_ID_RESOLVES_POSTGRES_ORACLE_PROXY_IDENTITY",
+      "passed": true
+    },
+    {
+      "code": "NO_USER_CAN_CONSULT_COLUMN_ASSUMPTION",
+      "passed": true
+    },
+    {
+      "code": "EXPECTED_BALANCE_COLUMNS_PRESENT",
+      "passed": true
+    }
+  ],
+  "startedAt": "2026-11-12T18:56:21.182Z",
+  "providerCalls": 0,
+  "pdfDownloads": 0,
+  "columns": [
+    "NRO_FACTURA",
+    "SECTOR",
+    "VENCIMIENTO",
+    "COD_CLIENTE",
+    "NOM_CLIENTE",
+    "RAZON_SOCIAL",
+    "RUC",
+    "COD_MONEDA",
+    "SIMBOLO_MONEDA",
+    "DEUDA"
+  ],
+  "columnTypes": [
+    {
+      "name": "NRO_FACTURA",
+      "type": "VARCHAR2"
+    },
+    {
+      "name": "SECTOR",
+      "type": "VARCHAR2"
+    },
+    {
+      "name": "VENCIMIENTO",
+      "type": "VARCHAR2"
+    },
+    {
+      "name": "COD_CLIENTE",
+      "type": "VARCHAR2"
+    },
+    {
+      "name": "NOM_CLIENTE",
+      "type": "VARCHAR2"
+    },
+    {
+      "name": "RAZON_SOCIAL",
+      "type": "VARCHAR2"
+    },
+    {
+      "name": "RUC",
+      "type": "VARCHAR2"
+    },
+    {
+      "name": "COD_MONEDA",
+      "type": "VARCHAR2"
+    },
+    {
+      "name": "SIMBOLO_MONEDA",
+      "type": "VARCHAR2"
+    },
+    {
+      "name": "DEUDA",
+      "type": "NUMBER",
+      "precision": 18,
+      "scale": 2
+    }
+  ],
+  "schemaContract": "COD_MONEDA_DEUDA",
+  "samples": {
+    "anyRows": true,
+    "positive": true,
+    "zero": true,
+    "negative": true,
+    "nullBalance": true,
+    "nullDue": false,
+    "multipleSymbols": true,
+    "rowsEqualDistinctInvoiceNumbers": false
+  },
+  "granularity": {
+    "repeatedInvoiceNumber": true,
+    "invoiceAcrossCustomers": true,
+    "invoiceAcrossSectors": true,
+    "invoiceAcrossSymbols": true,
+    "invoiceAcrossCurrencyCodes": true,
+    "repeatedCandidateKey": true,
+    "identicalVisibleRows": false,
+    "businessKeyProven": false
+  },
+  "dueDate": {
+    "scanComplete": true,
+    "distinctValuesCapped": false,
+    "validDDMMYYYYPresent": true,
+    "invalidPresent": false,
+    "nullOrBlankPresent": false,
+    "isoShapePresent": false,
+    "allNonBlankValidDDMMYYYY": true
+  },
+  "definition": {
+    "readable": true,
+    "opaque": "f601f893fcf33c007fe0b5bc39f62055c9a473da6b918a5b4573b03fe041eaf2",
+    "hasGrouping": false,
+    "hasUnion": false,
+    "mentionsNativeCurrencyKey": true,
+    "saldoExpressionUsesSum": false,
+    "businessMeaningNotEstablished": true
+  },
+  "currency": {
+    "nativeIdentifierExposed": true,
+    "symbolsAreNotProvenCurrencyKeys": true,
+    "conversionPerformed": false,
+    "sameSymbolMultipleCodes": false,
+    "sameCodeMultipleSymbols": false
+  },
+  "semanticLimits": [
+    "zero balance does not prove payment",
+    "negative balance does not prove credit/refund without business contract",
+    "observed uniqueness is not a documented invoice business key"
+  ],
+  "cleanup": {
+    "driverRestored": true,
+    "opened": 1,
+    "closed": 1,
+    "closeErrors": 0,
+    "allConnectionsClosed": true,
+    "postgresPoolClosed": true
+  },
+  "finishedAt": "2026-11-12T18:56:26.075Z"
+}

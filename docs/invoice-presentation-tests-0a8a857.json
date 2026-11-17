@@ -1,0 +1,30 @@
+{
+  "commit": "0a8a857582528262fedd883c79cd273fb5d3607f",
+  "node": "v22.23.5",
+  "startedAt": "2026-11-13T17:59:26.535Z",
+  "finishedAt": "2026-11-13T17:59:40.996Z",
+  "exitCode": 0,
+  "tests": [
+    "test/invoicePresentation.test.js",
+    "test/invoiceBalances.test.js",
+    "test/invoiceBalanceIntegrity.test.js",
+    "test/invoiceBalancesHttp.test.js",
+    "test/invoicePendingRouting.test.js",
+    "test/invoicePendingResultHttp.test.js",
+    "test/invoiceSettledIntent.test.js",
+    "test/invoicePlatePdf.test.js",
+    "test/invoiceAccess.test.js",
+    "test/invoiceNamedRequest.test.js",
+    "test/invoicePlateScope.test.js"
+  ],
+  "counts": [
+    "# tests 161",
+    "# pass 161",
+    "# fail 0",
+    "# cancelled 0",
+    "# skipped 0",
+    "# todo 0",
+    "# duration_ms 13913.887704"
+  ],
+  "environment": "Isolated git archive in existing Docker DEV, no service restart/build; real HTTP with synthetic Oracle and controlled SDK only. No external provider or Oracle calls."
+}

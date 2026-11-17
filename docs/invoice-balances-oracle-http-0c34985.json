@@ -1,0 +1,793 @@
+{
+  "suite": "invoice-balances-dev-helper",
+  "success": true,
+  "startedAt": "2026-11-12T19:23:35.758Z",
+  "noDeployment": true,
+  "profileCandidate": {
+    "commit": "91e24c4b6484af6ca40e2cce4b66424fa8df5fb9",
+    "target": "/tmp/invoice-balances-dev-91e24c4b6484af6ca40e2cce4b66424fa8df5fb9",
+    "sourceFiles": 339,
+    "manifestSha256": "049448498dbd6f8b37eeabf9f8825b57595fede0eb59b76328605e9f3bb40a7a"
+  },
+  "preflight": {
+    "suite": "invoice-balances-dev",
+    "commit": "91e24c4b6484af6ca40e2cce4b66424fa8df5fb9",
+    "mode": "--preflight",
+    "success": true,
+    "checks": [
+      {
+        "code": "SAFE_DEV_CONFIGURATION",
+        "passed": true
+      }
+    ],
+    "startedAt": "2026-11-12T19:23:40.926Z",
+    "providerCalls": 0,
+    "pdfDownloads": 0,
+    "cleanup": {
+      "driverRestored": true,
+      "opened": 0,
+      "closed": 0,
+      "closeErrors": 0,
+      "allConnectionsClosed": true,
+      "postgresPoolClosed": true
+    },
+    "finishedAt": "2026-11-12T19:23:40.927Z"
+  },
+  "profile": {
+    "suite": "invoice-balances-dev",
+    "commit": "91e24c4b6484af6ca40e2cce4b66424fa8df5fb9",
+    "mode": "--profile",
+    "success": true,
+    "checks": [
+      {
+        "code": "SAFE_DEV_CONFIGURATION",
+        "passed": true
+      },
+      {
+        "code": "OWNED_LOGIN_SESSION_REQUIRED",
+        "passed": true
+      },
+      {
+        "code": "SESSION_ID_RESOLVES_POSTGRES_ORACLE_PROXY_IDENTITY",
+        "passed": true
+      },
+      {
+        "code": "SERIES_DEBT_NATIVE_CURRENCY_SCHEMA",
+        "passed": true
+      },
+      {
+        "code": "NO_USER_CAN_CONSULT_ASSUMPTION",
+        "passed": true
+      }
+    ],
+    "startedAt": "2026-11-12T19:23:41.744Z",
+    "providerCalls": 0,
+    "pdfDownloads": 0,
+    "columns": [
+      "NRO_FACTURA",
+      "SERIE_FACTURA",
+      "SECTOR",
+      "VENCIMIENTO",
+      "COD_CLIENTE",
+      "NOM_CLIENTE",
+      "RAZON_SOCIAL",
+      "RUC",
+      "COD_MONEDA",
+      "SIMBOLO_MONEDA",
+      "DEUDA"
+    ],
+    "columnTypes": [
+      {
+        "name": "NRO_FACTURA",
+        "type": "VARCHAR2"
+      },
+      {
+        "name": "SERIE_FACTURA",
+        "type": "VARCHAR2"
+      },
+      {
+        "name": "SECTOR",
+        "type": "VARCHAR2"
+      },
+      {
+        "name": "VENCIMIENTO",
+        "type": "VARCHAR2"
+      },
+      {
+        "name": "COD_CLIENTE",
+        "type": "VARCHAR2"
+      },
+      {
+        "name": "NOM_CLIENTE",
+        "type": "VARCHAR2"
+      },
+      {
+        "name": "RAZON_SOCIAL",
+        "type": "VARCHAR2"
+      },
+      {
+        "name": "RUC",
+        "type": "VARCHAR2"
+      },
+      {
+        "name": "COD_MONEDA",
+        "type": "VARCHAR2"
+      },
+      {
+        "name": "SIMBOLO_MONEDA",
+        "type": "VARCHAR2"
+      },
+      {
+        "name": "DEUDA",
+        "type": "NUMBER",
+        "precision": 18,
+        "scale": 2
+      }
+    ],
+    "schemaContract": "SERIE_FACTURA_COD_MONEDA_DEUDA",
+    "granularity": {
+      "duplicateSeriesNumber": true,
+      "nullIdentity": false,
+      "blankIdentity": false,
+      "missingCurrency": false,
+      "sameNumberDifferentSeries": true,
+      "duplicateFullCandidate": true,
+      "uniquenessScope": "same authorized view, excluding negative debt, snapshot only; no arbitrary deduplication",
+      "seriesNumberUsable": false
+    },
+    "states": {
+      "pending": true,
+      "settled": true,
+      "negativeExcluded": true,
+      "unknown": true
+    },
+    "contract": {
+      "pending": "DEUDA>0",
+      "settled": "DEUDA=0",
+      "all": "DEUDA>=0 OR DEUDA IS NULL",
+      "negative": "always excluded",
+      "nullDebt": "unknown, never paid or zero; known subtotals must disclose incompleteness"
+    },
+    "cleanup": {
+      "driverRestored": true,
+      "opened": 1,
+      "closed": 1,
+      "closeErrors": 0,
+      "allConnectionsClosed": true,
+      "postgresPoolClosed": true
+    },
+    "finishedAt": "2026-11-12T19:23:44.673Z"
+  },
+  "validationCandidate": {
+    "commit": "0c34985c7699f1b43106233af67362b0fef77436",
+    "target": "/tmp/invoice-balances-dev-0c34985c7699f1b43106233af67362b0fef77436",
+    "sourceFiles": 339,
+    "manifestSha256": "46786eb286ecc6734bbe04a08d2ec92e1f13bde22c670dcee84b7e2291c6aab1"
+  },
+  "validation": {
+    "suite": "invoice-balances-dev",
+    "commit": "0c34985c7699f1b43106233af67362b0fef77436",
+    "mode": "--validate",
+    "success": true,
+    "checks": [
+      {
+        "code": "SAFE_DEV_CONFIGURATION",
+        "passed": true
+      },
+      {
+        "code": "OWNED_LOGIN_SESSION_REQUIRED",
+        "passed": true
+      },
+      {
+        "code": "SESSION_ID_RESOLVES_POSTGRES_ORACLE_PROXY_IDENTITY",
+        "passed": true
+      },
+      {
+        "code": "DETAIL_FIRST_ROWS_VS_NUMBERS_VS_CUSTOMERS",
+        "passed": true
+      },
+      {
+        "code": "DETAIL_FIRST_PAGINATION",
+        "passed": true
+      },
+      {
+        "code": "DETAIL_FIRST_EXACT_DECIMAL_ROWS_AND_INDEPENDENT_JS_AGING",
+        "passed": true
+      },
+      {
+        "code": "DETAIL_FIRST_NO_SYMBOL_BASED_MONETARY_TOTALS",
+        "passed": true
+      },
+      {
+        "code": "DETAIL_SECOND_ROWS_VS_NUMBERS_VS_CUSTOMERS",
+        "passed": true
+      },
+      {
+        "code": "DETAIL_SECOND_PAGINATION",
+        "passed": true
+      },
+      {
+        "code": "DETAIL_SECOND_EXACT_DECIMAL_ROWS_AND_INDEPENDENT_JS_AGING",
+        "passed": true
+      },
+      {
+        "code": "DETAIL_SECOND_NO_SYMBOL_BASED_MONETARY_TOTALS",
+        "passed": true
+      },
+      {
+        "code": "DUE_overdue_ROWS_VS_NUMBERS_VS_CUSTOMERS",
+        "passed": true
+      },
+      {
+        "code": "DUE_overdue_PAGINATION",
+        "passed": true
+      },
+      {
+        "code": "DUE_overdue_EXACT_DECIMAL_ROWS_AND_INDEPENDENT_JS_AGING",
+        "passed": true
+      },
+      {
+        "code": "DUE_overdue_NO_SYMBOL_BASED_MONETARY_TOTALS",
+        "passed": true
+      },
+      {
+        "code": "DUE_dueToday_ROWS_VS_NUMBERS_VS_CUSTOMERS",
+        "passed": true
+      },
+      {
+        "code": "DUE_dueToday_PAGINATION",
+        "passed": true
+      },
+      {
+        "code": "DUE_dueToday_EXACT_DECIMAL_ROWS_AND_INDEPENDENT_JS_AGING",
+        "passed": true
+      },
+      {
+        "code": "DUE_dueToday_NO_SYMBOL_BASED_MONETARY_TOTALS",
+        "passed": true
+      },
+      {
+        "code": "DUE_upcoming_ROWS_VS_NUMBERS_VS_CUSTOMERS",
+        "passed": true
+      },
+      {
+        "code": "DUE_upcoming_PAGINATION",
+        "passed": true
+      },
+      {
+        "code": "DUE_upcoming_EXACT_DECIMAL_ROWS_AND_INDEPENDENT_JS_AGING",
+        "passed": true
+      },
+      {
+        "code": "DUE_upcoming_NO_SYMBOL_BASED_MONETARY_TOTALS",
+        "passed": true
+      },
+      {
+        "code": "DUE_undated_ROWS_VS_NUMBERS_VS_CUSTOMERS",
+        "passed": true
+      },
+      {
+        "code": "DUE_undated_PAGINATION",
+        "passed": true
+      },
+      {
+        "code": "DUE_undated_EXACT_DECIMAL_ROWS_AND_INDEPENDENT_JS_AGING",
+        "passed": true
+      },
+      {
+        "code": "DUE_undated_NO_SYMBOL_BASED_MONETARY_TOTALS",
+        "passed": true
+      },
+      {
+        "code": "SIGN_pending_ROWS_VS_NUMBERS_VS_CUSTOMERS",
+        "passed": true
+      },
+      {
+        "code": "SIGN_pending_PAGINATION",
+        "passed": true
+      },
+      {
+        "code": "SIGN_pending_EXACT_DECIMAL_ROWS_AND_INDEPENDENT_JS_AGING",
+        "passed": true
+      },
+      {
+        "code": "SIGN_pending_NO_SYMBOL_BASED_MONETARY_TOTALS",
+        "passed": true
+      },
+      {
+        "code": "SIGN_settled_ROWS_VS_NUMBERS_VS_CUSTOMERS",
+        "passed": true
+      },
+      {
+        "code": "SIGN_settled_PAGINATION",
+        "passed": true
+      },
+      {
+        "code": "SIGN_settled_EXACT_DECIMAL_ROWS_AND_INDEPENDENT_JS_AGING",
+        "passed": true
+      },
+      {
+        "code": "SIGN_settled_NO_SYMBOL_BASED_MONETARY_TOTALS",
+        "passed": true
+      },
+      {
+        "code": "SIGN_all_ROWS_VS_NUMBERS_VS_CUSTOMERS",
+        "passed": true
+      },
+      {
+        "code": "SIGN_all_PAGINATION",
+        "passed": true
+      },
+      {
+        "code": "SIGN_all_EXACT_DECIMAL_ROWS_AND_INDEPENDENT_JS_AGING",
+        "passed": true
+      },
+      {
+        "code": "SIGN_all_NO_SYMBOL_BASED_MONETARY_TOTALS",
+        "passed": true
+      },
+      {
+        "code": "SIGN_unknown_ROWS_VS_NUMBERS_VS_CUSTOMERS",
+        "passed": true
+      },
+      {
+        "code": "SIGN_unknown_PAGINATION",
+        "passed": true
+      },
+      {
+        "code": "SIGN_unknown_EXACT_DECIMAL_ROWS_AND_INDEPENDENT_JS_AGING",
+        "passed": true
+      },
+      {
+        "code": "SIGN_unknown_NO_SYMBOL_BASED_MONETARY_TOTALS",
+        "passed": true
+      },
+      {
+        "code": "ASUNCION_TODAY_INCLUSIVE_ROWS_VS_NUMBERS_VS_CUSTOMERS",
+        "passed": true
+      },
+      {
+        "code": "ASUNCION_TODAY_INCLUSIVE_PAGINATION",
+        "passed": true
+      },
+      {
+        "code": "ASUNCION_TODAY_INCLUSIVE_EXACT_DECIMAL_ROWS_AND_INDEPENDENT_JS_AGING",
+        "passed": true
+      },
+      {
+        "code": "ASUNCION_TODAY_INCLUSIVE_NO_SYMBOL_BASED_MONETARY_TOTALS",
+        "passed": true
+      },
+      {
+        "code": "NEXT_SEVEN_DAYS_ROWS_VS_NUMBERS_VS_CUSTOMERS",
+        "passed": true
+      },
+      {
+        "code": "NEXT_SEVEN_DAYS_PAGINATION",
+        "passed": true
+      },
+      {
+        "code": "NEXT_SEVEN_DAYS_EXACT_DECIMAL_ROWS_AND_INDEPENDENT_JS_AGING",
+        "passed": true
+      },
+      {
+        "code": "NEXT_SEVEN_DAYS_NO_SYMBOL_BASED_MONETARY_TOTALS",
+        "passed": true
+      },
+      {
+        "code": "AGING_30_DAYS_ROWS_VS_NUMBERS_VS_CUSTOMERS",
+        "passed": true
+      },
+      {
+        "code": "AGING_30_DAYS_PAGINATION",
+        "passed": true
+      },
+      {
+        "code": "AGING_30_DAYS_EXACT_DECIMAL_ROWS_AND_INDEPENDENT_JS_AGING",
+        "passed": true
+      },
+      {
+        "code": "AGING_30_DAYS_NO_SYMBOL_BASED_MONETARY_TOTALS",
+        "passed": true
+      },
+      {
+        "code": "TOTALS_BLOCKED_WITHOUT_NATIVE_CURRENCY_AND_INVOICE_KEYS",
+        "passed": true
+      },
+      {
+        "code": "CUSTOMER_RANKING_BLOCKED_WITHOUT_NATIVE_CURRENCY_AND_INVOICE_KEYS",
+        "passed": true
+      },
+      {
+        "code": "BALANCE_ORDER_BLOCKED_WITHOUT_NATIVE_CURRENCY_AND_INVOICE_KEYS",
+        "passed": true
+      },
+      {
+        "code": "CUSTOMER_EXACT_ID_PRESENT",
+        "passed": true
+      },
+      {
+        "code": "CUSTOMER_ABSENCE",
+        "passed": true
+      },
+      {
+        "code": "FRESH_HTTP_SCOPE_ROWS_VS_NUMBERS_VS_CUSTOMERS",
+        "passed": true
+      },
+      {
+        "code": "FRESH_HTTP_SCOPE_PAGINATION",
+        "passed": true
+      },
+      {
+        "code": "FRESH_HTTP_SCOPE_EXACT_DECIMAL_ROWS_AND_INDEPENDENT_JS_AGING",
+        "passed": true
+      },
+      {
+        "code": "FRESH_HTTP_SCOPE_NO_SYMBOL_BASED_MONETARY_TOTALS",
+        "passed": true
+      },
+      {
+        "code": "NATIVE_CURRENCY_ROW_RANK_ROWS_VS_NUMBERS_VS_CUSTOMERS",
+        "passed": true
+      },
+      {
+        "code": "NATIVE_CURRENCY_ROW_RANK_PAGINATION",
+        "passed": true
+      },
+      {
+        "code": "NATIVE_CURRENCY_ROW_RANK_EXACT_DECIMAL_ROWS_AND_INDEPENDENT_JS_AGING",
+        "passed": true
+      },
+      {
+        "code": "NATIVE_CURRENCY_ROW_RANK_NO_SYMBOL_BASED_MONETARY_TOTALS",
+        "passed": true
+      },
+      {
+        "code": "REAL_FIELDS_PSEUDONYMIZED",
+        "passed": true
+      },
+      {
+        "code": "INVALID_SESSION_REJECTED_BEFORE_MODEL_OR_ORACLE",
+        "passed": true
+      },
+      {
+        "code": "MODEL_INPUT_NO_RAW_PII_1",
+        "passed": true
+      },
+      {
+        "code": "MODEL_INPUT_NO_RAW_PII_1",
+        "passed": true
+      },
+      {
+        "code": "MODEL_INPUT_NO_RAW_PII_1",
+        "passed": true
+      },
+      {
+        "code": "MODEL_INPUT_NO_RAW_PII_1",
+        "passed": true
+      },
+      {
+        "code": "HTTP_TOOL_USES_OWNED_SESSION_ID",
+        "passed": true
+      },
+      {
+        "code": "MODEL_INPUT_NO_RAW_PII_2",
+        "passed": true
+      },
+      {
+        "code": "MODEL_INPUT_NO_RAW_PII_2",
+        "passed": true
+      },
+      {
+        "code": "MODEL_INPUT_NO_RAW_PII_2",
+        "passed": true
+      },
+      {
+        "code": "MODEL_INPUT_NO_RAW_PII_2",
+        "passed": true
+      },
+      {
+        "code": "HTTP_TOOL_USES_OWNED_SESSION_ID",
+        "passed": true
+      },
+      {
+        "code": "REAL_HTTP_BALANCE_CONTRACT",
+        "passed": true
+      },
+      {
+        "code": "REAL_HTTP_HAS_AUTHORIZED_DETAIL",
+        "passed": true
+      },
+      {
+        "code": "AUTHORIZED_IDENTITIES_RESTORED_IN_FINAL_RESPONSE",
+        "passed": true
+      },
+      {
+        "code": "HISTORY_NO_RAW_PII",
+        "passed": true
+      },
+      {
+        "code": "HISTORY_NO_RAW_PII",
+        "passed": true
+      },
+      {
+        "code": "HISTORY_NO_RAW_PII",
+        "passed": true
+      },
+      {
+        "code": "HISTORY_NO_RAW_PII",
+        "passed": true
+      },
+      {
+        "code": "HTTP_TOOL_USES_OWNED_SESSION_ID",
+        "passed": true
+      },
+      {
+        "code": "REAL_HTTP_PAGINATION_WITHOUT_MODEL",
+        "passed": true
+      },
+      {
+        "code": "MODEL_INPUT_NO_RAW_PII_3",
+        "passed": true
+      },
+      {
+        "code": "MODEL_INPUT_NO_RAW_PII_3",
+        "passed": true
+      },
+      {
+        "code": "MODEL_INPUT_NO_RAW_PII_3",
+        "passed": true
+      },
+      {
+        "code": "MODEL_INPUT_NO_RAW_PII_3",
+        "passed": true
+      },
+      {
+        "code": "HTTP_TOOL_USES_OWNED_SESSION_ID",
+        "passed": true
+      },
+      {
+        "code": "HTTP_DEBT_STATE_settled",
+        "passed": true
+      },
+      {
+        "code": "MODEL_INPUT_NO_RAW_PII_4",
+        "passed": true
+      },
+      {
+        "code": "MODEL_INPUT_NO_RAW_PII_4",
+        "passed": true
+      },
+      {
+        "code": "MODEL_INPUT_NO_RAW_PII_4",
+        "passed": true
+      },
+      {
+        "code": "MODEL_INPUT_NO_RAW_PII_4",
+        "passed": true
+      },
+      {
+        "code": "HTTP_TOOL_USES_OWNED_SESSION_ID",
+        "passed": true
+      },
+      {
+        "code": "HTTP_DEBT_STATE_all",
+        "passed": true
+      },
+      {
+        "code": "MODEL_INPUT_NO_RAW_PII_5",
+        "passed": true
+      },
+      {
+        "code": "MODEL_INPUT_NO_RAW_PII_5",
+        "passed": true
+      },
+      {
+        "code": "MODEL_INPUT_NO_RAW_PII_5",
+        "passed": true
+      },
+      {
+        "code": "MODEL_INPUT_NO_RAW_PII_5",
+        "passed": true
+      },
+      {
+        "code": "HTTP_TOOL_USES_OWNED_SESSION_ID",
+        "passed": true
+      },
+      {
+        "code": "HTTP_DEBT_STATE_unknown",
+        "passed": true
+      },
+      {
+        "code": "MODEL_INPUT_NO_RAW_PII_6",
+        "passed": true
+      },
+      {
+        "code": "MODEL_INPUT_NO_RAW_PII_6",
+        "passed": true
+      },
+      {
+        "code": "MODEL_INPUT_NO_RAW_PII_6",
+        "passed": true
+      },
+      {
+        "code": "MODEL_INPUT_NO_RAW_PII_6",
+        "passed": true
+      },
+      {
+        "code": "HTTP_TOOL_USES_OWNED_SESSION_ID",
+        "passed": true
+      },
+      {
+        "code": "INJECTED_ORACLE_DENIAL_NO_DATA_OR_ACTIONS",
+        "passed": true
+      },
+      {
+        "code": "EXACT_SERIES_NUMBER_PAIRS_ROWS_VS_NUMBERS_VS_CUSTOMERS",
+        "passed": true
+      },
+      {
+        "code": "EXACT_SERIES_NUMBER_PAIRS_PAGINATION",
+        "passed": true
+      },
+      {
+        "code": "EXACT_SERIES_NUMBER_PAIRS_EXACT_DECIMAL_ROWS_AND_INDEPENDENT_JS_AGING",
+        "passed": true
+      },
+      {
+        "code": "EXACT_SERIES_NUMBER_PAIRS_NO_SYMBOL_BASED_MONETARY_TOTALS",
+        "passed": true
+      }
+    ],
+    "startedAt": "2026-11-12T19:34:26.751Z",
+    "providerCalls": 0,
+    "pdfDownloads": 0,
+    "reference": {
+      "asOfDate": "12/11/2026",
+      "timezone": "America/Asuncion",
+      "calendarArithmetic": "UTC calendar days after Asuncion date extraction"
+    },
+    "cases": [
+      {
+        "label": "DETAIL_FIRST",
+        "hasSample": true,
+        "passed": true
+      },
+      {
+        "label": "DETAIL_SECOND",
+        "hasSample": true,
+        "passed": true
+      },
+      {
+        "label": "DUE_overdue",
+        "hasSample": true,
+        "passed": true
+      },
+      {
+        "label": "DUE_dueToday",
+        "hasSample": false,
+        "passed": true
+      },
+      {
+        "label": "DUE_upcoming",
+        "hasSample": false,
+        "passed": true
+      },
+      {
+        "label": "DUE_undated",
+        "hasSample": false,
+        "passed": true
+      },
+      {
+        "label": "SIGN_pending",
+        "hasSample": true,
+        "passed": true
+      },
+      {
+        "label": "SIGN_settled",
+        "hasSample": true,
+        "passed": true
+      },
+      {
+        "label": "SIGN_all",
+        "hasSample": true,
+        "passed": true
+      },
+      {
+        "label": "SIGN_unknown",
+        "hasSample": true,
+        "passed": true
+      },
+      {
+        "label": "ASUNCION_TODAY_INCLUSIVE",
+        "hasSample": false,
+        "passed": true
+      },
+      {
+        "label": "NEXT_SEVEN_DAYS",
+        "hasSample": false,
+        "passed": true
+      },
+      {
+        "label": "AGING_30_DAYS",
+        "hasSample": true,
+        "passed": true
+      },
+      {
+        "label": "FRESH_HTTP_SCOPE",
+        "hasSample": true,
+        "passed": true
+      },
+      {
+        "label": "NATIVE_CURRENCY_ROW_RANK",
+        "hasSample": true,
+        "passed": true
+      },
+      {
+        "label": "EXACT_SERIES_NUMBER_PAIRS",
+        "hasSample": true,
+        "passed": true
+      }
+    ],
+    "http": {
+      "requests": 7,
+      "controlledSdkCalls": 6,
+      "realProviderCalls": 0,
+      "denialEvidence": "injected ORA-01031 on real proxy connection; not a real denied account",
+      "modelAndHistoryProtected": true,
+      "authorizedFinalIdentityRestored": true
+    },
+    "httpCleanup": {
+      "serverClosed": true,
+      "ownConversationCleared": true
+    },
+    "missingSamples": [
+      "DUE_dueToday",
+      "DUE_upcoming",
+      "DUE_undated",
+      "ASUNCION_TODAY_INCLUSIVE",
+      "NEXT_SEVEN_DAYS"
+    ],
+    "semanticReservations": [
+      "native currency code exposed; additive invoice grain missing so totals and grouped rankings blocked",
+      "invoice business key not proven; only rows and distinct series/number pairs counted, not business invoices",
+      "negative excluded; zero settled; null unknown",
+      "real permission-denied identity not supplied; injected denial only"
+    ],
+    "cleanup": {
+      "driverRestored": true,
+      "opened": 8,
+      "closed": 8,
+      "closeErrors": 0,
+      "allConnectionsClosed": true,
+      "postgresPoolClosed": true
+    },
+    "finishedAt": "2026-11-12T19:34:49.376Z"
+  },
+  "logout": true,
+  "finishedAt": "2026-11-12T19:34:49.473Z",
+  "logAudit": [
+    {
+      "service": "chatbot",
+      "lines": 0,
+      "safe": true,
+      "toolCalls": 0,
+      "toolResults": 0,
+      "permissionErrors": 0,
+      "permissionConsoleLines": 0,
+      "inspectorMetadataLines": 0,
+      "unknownRecords": 0,
+      "bedrockRequestEvents": 0,
+      "bedrockResponseEvents": 0,
+      "payloadsHidden": true,
+      "sessionsMasked": true
+    },
+    {
+      "service": "erp",
+      "lines": 2,
+      "safe": true,
+      "recognized": "ERP protected auth metadata"
+    }
+  ],
+  "deployedImageAndStartUnchanged": true
+}

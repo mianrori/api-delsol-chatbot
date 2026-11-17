@@ -1,0 +1,25 @@
+import vm from 'node:vm';import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';import {createRequire} from 'node:module';import express from 'express';
+import * as store from '../../src/state/conversation.store.js';import {protectPiiDeep} from '../../src/services/ai/pii.service.js';import {trimConversation} from '../../src/services/ai/conversation.service.js';
+const [domain,trimmed]=process.argv.slice(2),sessionId='CUSTOMER-CHOICE-HTTP',calls=[],logs=[];
+for(const k of ['log','info','warn','error','debug'])console[k]=(...args)=>logs.push(args);
+const search={sales:'search_customers',billing:'search_invoice_customers',balances:'search_invoice_balance_customers'}[domain],consumer={sales:'get_sales',billing:'get_invoices',balances:'get_invoice_balances'}[domain];
+let sends=0;
+const sdk={BedrockRuntimeClient:class{async send(command){sends++;const payload=JSON.stringify(command.input);assert.doesNotMatch(payload,/PRIVATE-CODE|PRIVATE-NAME|PRIVATE-TAX/);
+ const name=sends===1?search:consumer,input=sends===1?(domain==='sales'?{search:'Tienda'}:{query:'Tienda'}):protectPiiDeep(sessionId,{customerIds:['FORGED'],mode:'detail',debtStatus:'pending',page:1,rows:20});
+ return sends>2?{stopReason:'end_turn',output:{message:{role:'assistant',content:[{text:'Consulta completada.'}]}}}:{stopReason:'tool_use',output:{message:{role:'assistant',content:[{toolUse:{name,input,toolUseId:'choice-'+sends}}]}}};
+}},ConverseCommand:class{constructor(input){this.input=input;}}};
+const executor={async executeTool(req){assert.equal(req.context.sessionId,sessionId);calls.push(structuredClone(req));if(req.name===search)return {status:'AMBIGUOUS',hasMore:true,totalMatches:3,options:[1,2].map(i=>({... (domain==='sales'?{optionId:String(i),codCliente:'PRIVATE-CODE-'+i,name:'PRIVATE-NAME'}:{option:i,customerId:'PRIVATE-CODE-'+i,customerName:'PRIVATE-NAME'}),taxId:'PRIVATE-TAX'}))};assert.equal(req.name,consumer);assert.deepEqual(req.arguments.customerIds,['PRIVATE-CODE-2']);return {status:'OK_DETAIL_ONLY',mode:'detail',queryContext:req.arguments,data:[],page:1,rows:20,totalRows:0,totalPages:0,hasMore:false};}};
+const context=vm.createContext({console,process,structuredClone,Intl,Date,Map,Set,Number,String,Array,JSON,Math,RegExp,Object,Boolean,Error,AbortController});const synthetic=v=>new vm.SyntheticModule(Object.keys(v),function(){for(const[k,x]of Object.entries(v))this.setExport(k,x);},{context});
+async function load(path,overrides={}){const url=new URL(path,import.meta.url),m=new vm.SourceTextModule(await readFile(url,'utf8'),{context});await m.link(async spec=>synthetic(overrides[spec]??await import(spec.startsWith('.')?new URL(spec,url).href:spec.startsWith('node:')?spec:new URL('file://'+createRequire(url).resolve(spec)).href)));await m.evaluate();return m.namespace;}
+const chat=await load('../../src/services/ai/chat.service.js',{'@aws-sdk/client-bedrock-runtime':sdk,'./toolExecutor.service.js':executor});
+const sessions={async getValidOracleSession(id){assert.equal(id,sessionId);return {username:'SERVER-IDENTITY'};}};
+const controller=await load('../../src/controllers/chat.controller.js',{'../services/ai/chat.service.js':chat,'../services/sessions/oracleSession.service.js':sessions});const router=await load('../../src/routes/index.js',{'../controllers/chat.controller.js':controller});
+const app=express();app.use(express.json());app.use('/chatbot/api',router.router);const server=await new Promise(r=>{const s=app.listen(0,'127.0.0.1',()=>r(s));});
+const post=async message=>{const r=await fetch('http://127.0.0.1:'+server.address().port+'/chatbot/api/bot/chat',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({sessionId,message,username:'FORGED'})});assert.equal(r.status,200);return r.json();};
+try{
+ const first=await post('Busca el cliente Tienda');assert.equal(sends,1,'choice needs no model rewrite');assert.equal(calls.length,1);assert.match(first.response,/\| 1 \| PRIVATE-CODE-1 \| PRIVATE-NAME \|/);assert.match(first.response,/\| 2 \| PRIVATE-CODE-2 \| PRIVATE-NAME \|/);assert.match(first.response,/lista está limitada/);assert.doesNotMatch(first.response,/PRIVATE-TAX|FORGED|PII_/);assert.deepEqual(first.actions,{});
+ if(trimmed==='true'){let h=store.getConversation(sessionId);for(let i=0;i<14;i++)h=trimConversation([...h,{role:'user',content:[{text:'Tema neutral'}]},{role:'assistant',content:[{text:'Recibido'}]}],10);store.setConversation(sessionId,h);assert.ok(!JSON.stringify(h).includes('toolUse'));}
+ const second=await post('2');assert.equal(calls.length,2);assert.deepEqual(calls[1].arguments.customerIds,['PRIVATE-CODE-2']);assert.doesNotMatch(second.response,/PRIVATE-CODE|Código de cliente/);
+ assert.doesNotMatch(JSON.stringify(store.getConversation(sessionId)),/PRIVATE-CODE|PRIVATE-NAME|PRIVATE-TAX/);assert.doesNotMatch(JSON.stringify(logs),/PRIVATE-CODE|PRIVATE-NAME|PRIVATE-TAX/);
+ process.stdout.write('CUSTOMER_CHOICE_HTTP_PASS');
+}finally{store.clearConversation(sessionId);await new Promise(r=>server.close(r));}

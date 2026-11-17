@@ -1,0 +1,245 @@
+{
+  "suite": "invoice-balances-dev-helper",
+  "success": true,
+  "startedAt": "2026-11-12T19:49:40.932Z",
+  "noDeployment": true,
+  "profileCandidate": {
+    "commit": "c8bdb50ef88212c0a6fd44671133d16034ed3bc4",
+    "target": "/tmp/invoice-balances-dev-c8bdb50ef88212c0a6fd44671133d16034ed3bc4",
+    "sourceFiles": 340,
+    "manifestSha256": "72e56b091ce3384e5fdd21f364fec6c6fb9477b79a9ab7209276f2260d8be660"
+  },
+  "preflight": {
+    "suite": "invoice-balances-dev",
+    "commit": "c8bdb50ef88212c0a6fd44671133d16034ed3bc4",
+    "mode": "--preflight",
+    "success": true,
+    "checks": [
+      {
+        "code": "SAFE_DEV_CONFIGURATION",
+        "passed": true
+      }
+    ],
+    "startedAt": "2026-11-12T19:49:45.532Z",
+    "providerCalls": 0,
+    "pdfDownloads": 0,
+    "cleanup": {
+      "driverRestored": true,
+      "opened": 0,
+      "closed": 0,
+      "closeErrors": 0,
+      "allConnectionsClosed": true,
+      "postgresPoolClosed": true
+    },
+    "finishedAt": "2026-11-12T19:49:45.532Z"
+  },
+  "profile": {
+    "suite": "invoice-balances-dev",
+    "commit": "c8bdb50ef88212c0a6fd44671133d16034ed3bc4",
+    "mode": "--profile",
+    "success": true,
+    "checks": [
+      {
+        "code": "SAFE_DEV_CONFIGURATION",
+        "passed": true
+      },
+      {
+        "code": "OWNED_LOGIN_SESSION_REQUIRED",
+        "passed": true
+      },
+      {
+        "code": "SESSION_ID_RESOLVES_POSTGRES_ORACLE_PROXY_IDENTITY",
+        "passed": true
+      }
+    ],
+    "startedAt": "2026-11-12T19:49:46.203Z",
+    "providerCalls": 0,
+    "pdfDownloads": 0,
+    "scope": "affected duplicate integrity only; no schema/admin rescan",
+    "cleanup": {
+      "driverRestored": true,
+      "opened": 1,
+      "closed": 1,
+      "closeErrors": 0,
+      "allConnectionsClosed": true,
+      "postgresPoolClosed": true
+    },
+    "finishedAt": "2026-11-12T19:49:46.310Z"
+  },
+  "validationCandidate": {
+    "commit": "8420e8201e4f3e824cda42646d77772b246148eb",
+    "target": "/tmp/invoice-balances-dev-8420e8201e4f3e824cda42646d77772b246148eb",
+    "sourceFiles": 340,
+    "manifestSha256": "9f1dd2ed1b555c4d24f8b1e0a0d3d1dd325b4de22df01a28af848dc9b86ddeba"
+  },
+  "validation": {
+    "suite": "invoice-balances-dev",
+    "commit": "8420e8201e4f3e824cda42646d77772b246148eb",
+    "mode": "--validate",
+    "success": true,
+    "checks": [
+      {
+        "code": "SAFE_DEV_CONFIGURATION",
+        "passed": true
+      },
+      {
+        "code": "OWNED_LOGIN_SESSION_REQUIRED",
+        "passed": true
+      },
+      {
+        "code": "SESSION_ID_RESOLVES_POSTGRES_ORACLE_PROXY_IDENTITY",
+        "passed": true
+      },
+      {
+        "code": "CLEAN_false_SUMMARY_AVAILABLE",
+        "passed": true
+      },
+      {
+        "code": "CLEAN_false_INDEPENDENT_SUM_COUNTS_RANK_ORDER",
+        "passed": true
+      },
+      {
+        "code": "CLEAN_false_INVOICE_COUNT",
+        "passed": true
+      },
+      {
+        "code": "CLEAN_true_SUMMARY_AVAILABLE",
+        "passed": true
+      },
+      {
+        "code": "CLEAN_true_INDEPENDENT_SUM_COUNTS_RANK_ORDER",
+        "passed": true
+      },
+      {
+        "code": "CLEAN_true_INVOICE_COUNT",
+        "passed": true
+      },
+      {
+        "code": "CLEAN_CUSTOMER_PROFILE_AVAILABLE",
+        "passed": true
+      },
+      {
+        "code": "EQUAL_DUPLICATES_NO_CALCULATIONS",
+        "passed": true
+      },
+      {
+        "code": "EQUAL_DETAIL_PRESERVED_WITH_WARNING",
+        "passed": true
+      },
+      {
+        "code": "HTTP_clean_SUCCESS",
+        "passed": true
+      },
+      {
+        "code": "HTTP_clean_PRESENTATION",
+        "passed": true
+      },
+      {
+        "code": "HTTP_clean_HISTORY_IDENTIFIERS_PROTECTED",
+        "passed": true
+      },
+      {
+        "code": "HTTP_clean_HISTORY_IDENTIFIERS_PROTECTED",
+        "passed": true
+      },
+      {
+        "code": "HTTP_clean_HISTORY_IDENTIFIERS_PROTECTED",
+        "passed": true
+      },
+      {
+        "code": "HTTP_clean_HISTORY_IDENTIFIERS_PROTECTED",
+        "passed": true
+      },
+      {
+        "code": "HTTP_clean_HISTORY_IDENTIFIERS_PROTECTED",
+        "passed": true
+      },
+      {
+        "code": "HTTP_clean_HISTORY_IDENTIFIERS_PROTECTED",
+        "passed": true
+      },
+      {
+        "code": "HTTP_blocked_SUCCESS",
+        "passed": true
+      },
+      {
+        "code": "HTTP_blocked_PRESENTATION",
+        "passed": true
+      },
+      {
+        "code": "HTTP_blocked_HISTORY_IDENTIFIERS_PROTECTED",
+        "passed": true
+      },
+      {
+        "code": "HTTP_detail_SUCCESS",
+        "passed": true
+      },
+      {
+        "code": "HTTP_detail_PRESENTATION",
+        "passed": true
+      },
+      {
+        "code": "HTTP_detail_HISTORY_IDENTIFIERS_PROTECTED",
+        "passed": true
+      }
+    ],
+    "startedAt": "2026-11-12T19:50:41.789Z",
+    "providerCalls": 0,
+    "pdfDownloads": 0,
+    "samples": {
+      "cleanIdentities": true,
+      "cleanCustomerProfile": true,
+      "equalDebtDuplicates": true,
+      "differentDebtDuplicates": false
+    },
+    "http": {
+      "requests": 3,
+      "controlledSdkCalls": 3,
+      "realProviderCalls": 0
+    },
+    "httpCleanup": {
+      "serverClosed": true,
+      "ownConversationCleared": true
+    },
+    "reservations": [
+      "real denied identity remains unavailable",
+      "missing positive profiles are not evidence of resolution",
+      "no historical rows corrected; identity guard covers eligible siblings before effective debt/date filters"
+    ],
+    "cleanup": {
+      "driverRestored": true,
+      "opened": 4,
+      "closed": 4,
+      "closeErrors": 0,
+      "allConnectionsClosed": true,
+      "postgresPoolClosed": true
+    },
+    "finishedAt": "2026-11-12T19:50:50.254Z"
+  },
+  "logout": true,
+  "finishedAt": "2026-11-12T19:50:50.385Z",
+  "logAudit": [
+    {
+      "service": "chatbot",
+      "lines": 0,
+      "safe": true,
+      "toolCalls": 0,
+      "toolResults": 0,
+      "permissionErrors": 0,
+      "permissionConsoleLines": 0,
+      "inspectorMetadataLines": 0,
+      "unknownRecords": 0,
+      "bedrockRequestEvents": 0,
+      "bedrockResponseEvents": 0,
+      "payloadsHidden": true,
+      "sessionsMasked": true
+    },
+    {
+      "service": "erp",
+      "lines": 2,
+      "safe": true,
+      "recognized": "ERP protected auth metadata"
+    }
+  ],
+  "deployedImageAndStartUnchanged": true
+}

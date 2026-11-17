@@ -1,0 +1,205 @@
+{
+  "suite": "invoice-candidate-affected-helper",
+  "success": true,
+  "startedAt": "2026-11-12T12:35:03.883Z",
+  "phase": "COMPLETE",
+  "commit": "be559ef69a5e376c37fd479c36796b7f4023e831",
+  "harnessCommit": "be559ef69a5e376c37fd479c36796b7f4023e831",
+  "deployedState": {
+    "unchanged": true
+  },
+  "verifiedSourceFiles": 324,
+  "manifestSha256": "cd78a36974c22dee44d98659e1ce2474e0ff3b47b5f713b713b1232845446a8f",
+  "noTestsReexecuted": true,
+  "workerSha256": "3a992583a29cb71b40149d0d6368e17acd474444f81c868736a94d2beb0dd46e",
+  "worker": {
+    "suite": "invoice-candidate-affected-dev",
+    "commit": "be559ef69a5e376c37fd479c36796b7f4023e831",
+    "success": true,
+    "checks": [
+      {
+        "code": "SAFE_COMMITTED_DEV",
+        "passed": true
+      },
+      {
+        "code": "POSTGRES_SESSION_AND_INDEPENDENT_ORACLE_PROXY_IDENTITY_MATCH",
+        "passed": true
+      },
+      {
+        "code": "HTTP_CONTRACT_1",
+        "passed": true
+      },
+      {
+        "code": "AFFECTED_INITIAL_DENIAL_REPRODUCED",
+        "passed": true
+      },
+      {
+        "code": "INITIAL_RESTRICTED_EXISTENCE_DETECTED_WITHOUT_CUSTOMER_ROWS",
+        "passed": true
+      },
+      {
+        "code": "INITIAL_CONCEPT_ROLE_autonomous",
+        "passed": true
+      },
+      {
+        "code": "INITIAL_CUSTOMER_AND_2023_autonomous",
+        "passed": true
+      },
+      {
+        "code": "INITIAL_DENIAL_WITHOUT_DATA_autonomous",
+        "passed": true
+      },
+      {
+        "code": "REQUESTED_INITIAL_DENIAL_REAL_autonomous",
+        "passed": true
+      },
+      {
+        "code": "HTTP_CONTRACT_2",
+        "passed": true
+      },
+      {
+        "code": "DIRECT_PLATE_ONLY_TOOL_autonomous",
+        "passed": true
+      },
+      {
+        "code": "NORMALIZED_PLATE_AND_PAGE_autonomous",
+        "passed": true
+      },
+      {
+        "code": "AUTONOMOUS_REMOVES_CUSTOMER_CONCEPT_AND_ALL_PERIOD_FILTERS",
+        "passed": true
+      },
+      {
+        "code": "PLATE_autonomous_COUNTS_AND_PERMISSION_CLASS_MATCH_ORACLE",
+        "passed": true
+      },
+      {
+        "code": "PLATE_autonomous_FULL_AUTHORIZED_PAGE_MATCHES_ORACLE",
+        "passed": true
+      },
+      {
+        "code": "PLATE_autonomous_AUTHORIZED_PAGINATION",
+        "passed": true
+      },
+      {
+        "code": "PLATE_autonomous_CORRECT_DENIAL_ABSENCE_OR_PARTIAL_WORDING",
+        "passed": true
+      },
+      {
+        "code": "PLATE_autonomous_PRESENTATION_HAS_EVERY_AUTHORIZED_ROW",
+        "passed": true
+      },
+      {
+        "code": "PLATE_autonomous_ONLY_AUTHORIZED_PDF_LINKS_NO_DOWNLOAD",
+        "passed": true
+      },
+      {
+        "code": "PERSISTENT_SCOPE_MATCHES_FINAL_ARGS_autonomous",
+        "passed": true
+      },
+      {
+        "code": "OLD_NAMED_METADATA_RETIRED",
+        "passed": true
+      },
+      {
+        "code": "CANDIDATE_ACTUAL_PLATE_PROBE_EXECUTED",
+        "passed": true
+      },
+      {
+        "code": "MINIMAL_RESTRICTED_BIT_USES_NORMALIZED_EFFECTIVE_PLATE",
+        "passed": true
+      },
+      {
+        "code": "PROBE_RETURNS_NO_RESTRICTED_FIELDS_OR_COUNTS",
+        "passed": true
+      },
+      {
+        "code": "DETAIL_AND_PDFS_REQUIRE_AUTHORIZATION",
+        "passed": true
+      },
+      {
+        "code": "PROBE_NO_INHERITED_FILTERS",
+        "passed": true
+      },
+      {
+        "code": "TYPED_HTTP_PATH_NO_SDK_REAL_MODEL_OR_PROVIDER",
+        "passed": true
+      },
+      {
+        "code": "ALL_ORACLE_CONNECTIONS_CLOSED",
+        "passed": true
+      }
+    ],
+    "startedAt": "2026-11-12T12:35:11.287Z",
+    "scope": "original denial then autonomous ANX123 over isolated be559ef HTTP and affected session/proxy Oracle; deterministic typed route; SDK rejects invocation; no deployed-5400 claim",
+    "identity": {
+      "postgresOracleMatch": true,
+      "proxyPresent": true,
+      "accountPolicy": "affected user supplied via hidden login; no alternate account"
+    },
+    "sequences": [
+      {
+        "intent": "autonomous",
+        "initialDenied": true,
+        "trimmed": false,
+        "resultClass": "ABSENT",
+        "authorizedExists": false,
+        "restrictedExists": false,
+        "minimalProbeVerified": true
+      }
+    ],
+    "samples": {
+      "initialNamedScopeClass": "RESTRICTED",
+      "initialDeniedSampleAvailable": true,
+      "plateClassification": "ABSENT",
+      "missing": []
+    },
+    "initial": {
+      "denied": true,
+      "noDataOrLinks": true
+    },
+    "realClassificationsObserved": [
+      "ABSENT"
+    ],
+    "unobservedPermissionClasses": [
+      "RESTRICTED",
+      "MIXED"
+    ],
+    "serverClosed": true,
+    "connectionsClosed": true,
+    "httpConversationRequests": 2,
+    "controlledModelCalls": 0,
+    "realModelCalls": 0,
+    "providerCalls": 0,
+    "pdfDownloads": 0,
+    "caseResolved": false,
+    "driverRestored": true,
+    "finishedAt": "2026-11-12T12:35:15.362Z"
+  },
+  "logout": true,
+  "logAudit": [
+    {
+      "service": "chatbot",
+      "lines": 0,
+      "safe": true,
+      "toolCalls": 0,
+      "toolResults": 0,
+      "permissionErrors": 0,
+      "permissionConsoleLines": 0,
+      "inspectorMetadataLines": 0,
+      "unknownRecords": 0,
+      "bedrockRequestEvents": 0,
+      "bedrockResponseEvents": 0,
+      "payloadsHidden": true,
+      "sessionsMasked": true
+    },
+    {
+      "service": "erp",
+      "lines": 2,
+      "safe": true,
+      "recognized": "ERP protected auth metadata"
+    }
+  ],
+  "caseResolved": false,
+  "finishedAt": "2026-11-12T12:35:46.561Z"
+}

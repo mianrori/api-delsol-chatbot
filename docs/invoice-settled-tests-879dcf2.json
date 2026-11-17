@@ -1,0 +1,130 @@
+{
+  "commit": "879dcf27f65462d95e8729724749f9cf9ce82a38",
+  "node": "v22.23.5",
+  "exitCode": 0,
+  "tests": [
+    "test/invoiceSettledIntent.test.js",
+    "test/invoicePendingResultHttp.test.js",
+    "test/invoicePendingRouting.test.js",
+    "test/invoiceBalances.test.js",
+    "test/invoiceBalancesHttp.test.js",
+    "test/invoiceBalanceIntegrity.test.js",
+    "test/invoiceNamedRequest.test.js",
+    "test/searchSelection.test.js"
+  ],
+  "startedAt": "2026-11-13T14:42:45.289Z",
+  "finishedAt": "2026-11-13T14:42:59.397Z",
+  "realOracleCalls": 0,
+  "realProviderCalls": 0,
+  "noDeployment": true,
+  "summary": {
+    "tests": 118,
+    "passed": 118,
+    "failed": 0
+  },
+  "httpScenarios": [
+    {
+      "scenario": "literal",
+      "trimmed": false,
+      "passed": true
+    },
+    {
+      "scenario": "paid",
+      "trimmed": false,
+      "passed": true
+    },
+    {
+      "scenario": "without",
+      "trimmed": false,
+      "passed": true
+    },
+    {
+      "scenario": "followup",
+      "trimmed": false,
+      "passed": true
+    },
+    {
+      "scenario": "empty",
+      "trimmed": false,
+      "passed": true
+    },
+    {
+      "scenario": "denied",
+      "trimmed": false,
+      "passed": true
+    },
+    {
+      "scenario": "failed",
+      "trimmed": false,
+      "passed": true
+    },
+    {
+      "scenario": "guard",
+      "trimmed": false,
+      "passed": true
+    },
+    {
+      "scenario": "ambiguous",
+      "trimmed": false,
+      "passed": true
+    },
+    {
+      "scenario": "noContext",
+      "trimmed": false,
+      "passed": true
+    },
+    {
+      "scenario": "literal",
+      "trimmed": true,
+      "passed": true
+    },
+    {
+      "scenario": "paid",
+      "trimmed": true,
+      "passed": true
+    },
+    {
+      "scenario": "without",
+      "trimmed": true,
+      "passed": true
+    },
+    {
+      "scenario": "followup",
+      "trimmed": true,
+      "passed": true
+    },
+    {
+      "scenario": "empty",
+      "trimmed": true,
+      "passed": true
+    },
+    {
+      "scenario": "denied",
+      "trimmed": true,
+      "passed": true
+    },
+    {
+      "scenario": "failed",
+      "trimmed": true,
+      "passed": true
+    },
+    {
+      "scenario": "guard",
+      "trimmed": true,
+      "passed": true
+    },
+    {
+      "scenario": "ambiguous",
+      "trimmed": true,
+      "passed": true
+    },
+    {
+      "scenario": "noContext",
+      "trimmed": true,
+      "passed": true
+    }
+  ],
+  "testOutputSha256": "60fe32edc302d0d36542b7fe511c871f342748f5448e7d821ea1874a7f38fd18",
+  "globalSuiteNotRun": true,
+  "historicalFailuresUnchangedEvidenceOnly": "invoice-pending-test-comparison.json"
+}

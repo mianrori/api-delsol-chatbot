@@ -1,0 +1,22 @@
+{
+  "commit": "c57e8dea5206416b3056cfed6c33f78171c27540",
+  "node": "v22.23.5",
+  "startedAt": "2026-11-13T18:10:18.977Z",
+  "finishedAt": "2026-11-13T18:10:20.383Z",
+  "exitCode": 0,
+  "tests": [
+    "test/invoicePresentation.test.js",
+    "test/invoiceBalancesHttp.test.js",
+    "test/invoicePlatePdf.test.js"
+  ],
+  "counts": [
+    "# tests 46",
+    "# pass 46",
+    "# fail 0",
+    "# cancelled 0",
+    "# skipped 0",
+    "# todo 0",
+    "# duration_ms 786.901013"
+  ],
+  "environment": "Isolated git archive in existing Docker DEV, no service restart/build; real HTTP with synthetic Oracle and controlled SDK only. No external provider or Oracle calls."
+}

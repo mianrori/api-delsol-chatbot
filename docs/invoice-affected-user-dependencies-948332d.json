@@ -1,0 +1,410 @@
+{
+  "suite": "affected-user-live-helper",
+  "success": true,
+  "status": "dependencies_complete",
+  "baseCommit": "22f4b02c98003312bc1558746740cfc511e2dedd",
+  "startedAt": "2026-11-11T19:59:07.799Z",
+  "accountPolicy": "only the affected DEV user entered in the hidden login; no fallback account",
+  "modelPolicy": "existing 5400 process; no SDK substitution",
+  "helperCommit": "948332d8ae1f2c2fd03e49b4a0efb02fcae7dd02",
+  "deployedSource": {
+    "commit": "22f4b02c98003312bc1558746740cfc511e2dedd",
+    "sourceFiles": 319,
+    "manifestSha256": "d8be34ffd0c95a3495b4bc7c116e126e641d3076767b8265771edb4dcd595a87",
+    "imageId": "sha256:cfabf0fa3419b2834fa65185fe4283a465f95fc4b4624e47254e2a3cbf7e8774",
+    "startedAt": "2026-11-11T12:04:20.303914333Z",
+    "priorLifetimeErrorTextSeen": false
+  },
+  "diagnosticFiles": [
+    {
+      "file": "scripts/check-invoice-affected-user-live.mjs",
+      "sha256": "9acdea16d69ac80017f7945a02122386a176d32d4e02398241916cddffe052d9"
+    },
+    {
+      "file": "scripts/invoice-affected-inspector.mjs",
+      "sha256": "a6b55fbf0980f09ced185e37ee527afa4946f53f389f0aec09f5a3cf335a72a4"
+    },
+    {
+      "file": "scripts/invoice-affected-runtime-trace.mjs",
+      "sha256": "6c113f834bdad85373877905bc294aa5d26008d8600c1c831c7af26ecd02771c"
+    },
+    {
+      "file": "scripts/invoice-view-projection.mjs",
+      "sha256": "2f3398f7faa0862aaa585d314dd52968528b4a3c6f49b19007e1e0bf83aaf9af"
+    },
+    {
+      "file": "scripts/invoice-dependency-metadata.mjs",
+      "sha256": "04812e4a4e50855b262456ded6548bbb591a1a8920f625292bd344b6e1cdd4a6"
+    },
+    {
+      "file": "logs/invoice-affected-expected.json",
+      "sha256": "1497174c2af5e161e3337154cc8db8c121fe0b83786ff781c0da8e3089b0c414"
+    }
+  ],
+  "preflight": {
+    "suite": "affected-user-live-5400",
+    "baseCommit": "22f4b02c98003312bc1558746740cfc511e2dedd",
+    "success": true,
+    "status": "preflight",
+    "checks": [
+      {
+        "code": "SAFE_BASELINE_DEV",
+        "passed": true
+      },
+      {
+        "code": "RUNTIME_TRACE_MODULE_AVAILABLE",
+        "passed": true
+      }
+    ],
+    "startedAt": "2026-11-11T19:59:11.226Z",
+    "modelSubstituted": false,
+    "accountSubstituted": false,
+    "httpChatRequests": 0,
+    "conversationResets": 0,
+    "loadedModules": [
+      {
+        "path": "src/services/ai/chat.service.js",
+        "sha256": "e544093b6ec128a81fe2b0d418d96fd6710d70c782015e2dffbf6cf3cf05cce2"
+      },
+      {
+        "path": "src/services/ai/searchSelection.service.js",
+        "sha256": "0da01be80ac2012335096da246831eb47e637f3c8ec565e50aa0390d64cd59c3"
+      },
+      {
+        "path": "src/services/ai/invoiceNamedRequest.service.js",
+        "sha256": "d22d4796a867db3c3fce4b48b14f2559aab170aa91eacabd5d9969dbccf8f411"
+      },
+      {
+        "path": "src/services/ai/invoicePlateRequest.service.js",
+        "sha256": "f0ef9c0b3637321028a674d513fcb421ec3e40a1fed5aa908eb62707dfe12120"
+      },
+      {
+        "path": "src/repositories/invoices/invoices.repository.js",
+        "sha256": "0c5430a3edccbc1f8ac669fa1b291da4278e928269099ad7cac7b801bf91655d"
+      },
+      {
+        "path": "src/repositories/invoices/invoiceCustomers.repository.js",
+        "sha256": "31e2f52fd7f441d28f6b0400c4525739b0356a63550cb4d94c25437b2b378b74"
+      },
+      {
+        "path": "src/services/invoices/searchInvoiceCustomers.service.js",
+        "sha256": "9065997d3c9ba518ec7c52fb68078542b7f0c84011c8d7b464a5fe17b6e66b01"
+      },
+      {
+        "path": "src/services/invoices/invoices.service.js",
+        "sha256": "b88c34e765db49e8d688c4bf1cfb97a25845fac4ac5b961f360d1006f232b67e"
+      },
+      {
+        "path": "src/services/sessions/oracleSession.service.js",
+        "sha256": "8be29c83faedcbbd40597533b88639f6c2d07a480c4402381f86659efd2e925a"
+      },
+      {
+        "path": "src/controllers/chat.controller.js",
+        "sha256": "67e9ff964adc97ec47d79481dd026e0b4d836f20759ad65ad93fb3b4302acd55"
+      }
+    ],
+    "loadedCodeMatchesBaseline": true,
+    "inspectorClosedOrPreviousStatePreserved": true,
+    "independentConnectionsClosed": true,
+    "finishedAt": "2026-11-11T19:59:11.753Z",
+    "pdfDownloads": 0
+  },
+  "worker": {
+    "suite": "affected-user-live-5400",
+    "baseCommit": "22f4b02c98003312bc1558746740cfc511e2dedd",
+    "success": true,
+    "status": "dependencies_complete",
+    "checks": [
+      {
+        "code": "SAFE_BASELINE_DEV",
+        "passed": true
+      },
+      {
+        "code": "RUNTIME_TRACE_MODULE_AVAILABLE",
+        "passed": true
+      },
+      {
+        "code": "OWNED_LOGIN_SESSION_REQUIRED",
+        "passed": true
+      },
+      {
+        "code": "INDEPENDENT_ORACLE_USES_SAME_POSTGRES_SESSION_IDENTITY",
+        "passed": true
+      }
+    ],
+    "startedAt": "2026-11-11T19:59:12.042Z",
+    "modelSubstituted": false,
+    "accountSubstituted": false,
+    "httpChatRequests": 0,
+    "conversationResets": 0,
+    "loadedModules": [
+      {
+        "path": "src/services/ai/chat.service.js",
+        "sha256": "e544093b6ec128a81fe2b0d418d96fd6710d70c782015e2dffbf6cf3cf05cce2"
+      },
+      {
+        "path": "src/services/ai/searchSelection.service.js",
+        "sha256": "0da01be80ac2012335096da246831eb47e637f3c8ec565e50aa0390d64cd59c3"
+      },
+      {
+        "path": "src/services/ai/invoiceNamedRequest.service.js",
+        "sha256": "d22d4796a867db3c3fce4b48b14f2559aab170aa91eacabd5d9969dbccf8f411"
+      },
+      {
+        "path": "src/services/ai/invoicePlateRequest.service.js",
+        "sha256": "f0ef9c0b3637321028a674d513fcb421ec3e40a1fed5aa908eb62707dfe12120"
+      },
+      {
+        "path": "src/repositories/invoices/invoices.repository.js",
+        "sha256": "0c5430a3edccbc1f8ac669fa1b291da4278e928269099ad7cac7b801bf91655d"
+      },
+      {
+        "path": "src/repositories/invoices/invoiceCustomers.repository.js",
+        "sha256": "31e2f52fd7f441d28f6b0400c4525739b0356a63550cb4d94c25437b2b378b74"
+      },
+      {
+        "path": "src/services/invoices/searchInvoiceCustomers.service.js",
+        "sha256": "9065997d3c9ba518ec7c52fb68078542b7f0c84011c8d7b464a5fe17b6e66b01"
+      },
+      {
+        "path": "src/services/invoices/invoices.service.js",
+        "sha256": "b88c34e765db49e8d688c4bf1cfb97a25845fac4ac5b961f360d1006f232b67e"
+      },
+      {
+        "path": "src/services/sessions/oracleSession.service.js",
+        "sha256": "8be29c83faedcbbd40597533b88639f6c2d07a480c4402381f86659efd2e925a"
+      },
+      {
+        "path": "src/controllers/chat.controller.js",
+        "sha256": "67e9ff964adc97ec47d79481dd026e0b4d836f20759ad65ad93fb3b4302acd55"
+      }
+    ],
+    "loadedCodeMatchesBaseline": true,
+    "identity": {
+      "targetOpaque": "885e8a8081a8160193d5424faa1faf05f6b7fd5ae47d6e55482394f210753190",
+      "oracleSessionMatches": true,
+      "proxyPresent": true
+    },
+    "dependencyMetadata": {
+      "status": "metadata_inspected",
+      "metadataOnly": true,
+      "noReferencedFunctionsExecuted": true,
+      "noBaseTableDataRead": true,
+      "objects": [
+        {
+          "label": "requested_view",
+          "type": "VIEW",
+          "depth": 0,
+          "definitionReadable": true,
+          "dependencies": [
+            {
+              "label": "object_37b90c205cace07f",
+              "type": "TABLE"
+            },
+            {
+              "label": "object_9239090e6ea3387f",
+              "type": "TABLE"
+            },
+            {
+              "label": "object_e76bb07cf6942dd6",
+              "type": "TABLE"
+            },
+            {
+              "label": "object_429bc960fcb08273",
+              "type": "TABLE"
+            },
+            {
+              "label": "object_f07116b35829c82f",
+              "type": "TABLE"
+            },
+            {
+              "label": "object_eee6893db29ee3b9",
+              "type": "TABLE"
+            },
+            {
+              "label": "object_31baa9cd2f32e944",
+              "type": "TABLE"
+            },
+            {
+              "label": "object_afc03539b6e2ad6e",
+              "type": "TABLE"
+            },
+            {
+              "label": "object_718dd8d2f597c3f3",
+              "type": "TABLE"
+            },
+            {
+              "label": "object_d547dd967c661486",
+              "type": "TABLE"
+            }
+          ],
+          "definitionOpaque": "5f1374d992593cb8d19216a106ae214b34017813c7a0eb4239b792e8103f0528",
+          "signals": {
+            "builtinCalls": [
+              "NVL",
+              "TRIM",
+              "UPPER",
+              "DECODE",
+              "TO_CHAR",
+              "ROUND",
+              "REPLACE",
+              "LOWER"
+            ],
+            "unclassifiedCallCount": 1,
+            "referencesUser": true,
+            "referencesPermission": true,
+            "containsNull": false,
+            "returnsNull": false,
+            "containsPredicate": true,
+            "containsDynamicSql": false,
+            "wrapped": false
+          },
+          "definitionShape": {
+            "shape": "SELECT identifier.identifier identifier, (SELECT NVL(identifier.identifier, '<literal>') || '<literal>' || NVL(identifier.identifier, '<literal>') FROM identifier identifier WHERE identifier.identifier = identifier.identifier AND identifier.identifier = identifier.identifier AND identifier.identifier = identifier.identifier AND identifier.identifier BETWEEN identifier.identifier AND identifier.identifier) || '<literal>' || identifier(identifier.identifier, <NUMBER>, '<literal>') identifier, TRIM(UPPER(identifier.identifier)) identifier, TRIM(UPPER(identifier.identifier)) identifier, identifier.identifier identifier, DECODE(NVL(identifier.identifier, '<literal>'), '<literal>', '<literal>', '<literal>') identifier, identifier.identifier || '<literal>' || identifier.identifier identifier, TO_CHAR(identifier.identifier, '<literal>') identifier, identifier.identifier identifier, identifier.identifier identifier, identifier.identifier identifier, identifier.identifier, TRIM(UPPER(identifier.identifier)) identifier, TRIM(UPPER(identifier.identifier)) identifier, identifier.identifier, identifier.identifier identifier, TRIM(UPPER(identifier.identifier)) identifier, identifier.identifier identifier, identifier.identifier identifier, ROUND((identifier.identifier + identifier.identifier) / identifier.identifier, identifier.identifier) identifier, identifier.identifier, CASE WHEN identifier.identifier > <NUMBER> THEN identifier.identifier ELSE <NUMBER> END identifier, CASE WHEN identifier.identifier = <NUMBER> THEN identifier.identifier ELSE <NUMBER> END identifier, CASE WHEN identifier.identifier > <NUMBER> THEN identifier.identifier ELSE <NUMBER> END identifier, ROUND(identifier.identifier + identifier.identifier, identifier.identifier) identifier, TRIM(UPPER(REPLACE(REPLACE(LOWER(identifier.identifier), '<literal>', '<literal>'), '<literal>', '<literal>'))) MATRICULA, CASE WHEN identifier.identifier NOT IN ('<literal>', '<literal>') AND EXISTS (SELECT * FROM identifier identifier WHERE identifier.identifier = USER AND identifier.identifier IN ('<literal>', '<literal>', '<literal>')) THEN '<literal>' ELSE '<literal>' END USER_CAN_CONSULT FROM identifier identifier INNER JOIN identifier identifier ON identifier.identifier = identifier.identifier AND identifier.identifier = identifier.identifier AND identifier.identifier = identifier.identifier AND identifier.identifier = identifier.identifier INNER JOIN identifier identifier ON identifier.identifier = identifier.identifier INNER JOIN identifier identifier ON identifier.identifier = identifier.identifier AND identifier.identifier = identifier.identifier INNER JOIN identifier identifier ON identifier.identifier = identifier.identifier AND identifier.identifier = identifier.identifier INNER JOIN identifier identifier ON identifier.identifier = identifier.identifier AND identifier.identifier = identifier.identifier INNER JOIN identifier identifier ON identifier.identifier = identifier.identifier INNER JOIN identifier identifier ON identifier.identifier = identifier.identifier AND identifier.identifier = identifier.identifier ORDER BY identifier.identifier identifier",
+            "truncated": false
+          },
+          "plate": {
+            "shape": "TRIM(UPPER(REPLACE(REPLACE(LOWER(identifier.identifier), '<literal>', '<literal>'), '<literal>', '<literal>'))) MATRICULA",
+            "truncated": false
+          },
+          "permission": {
+            "shape": "CASE WHEN identifier.identifier NOT IN ('<literal>', '<literal>') AND EXISTS (SELECT * FROM identifier identifier WHERE identifier.identifier = USER AND identifier.identifier IN ('<literal>', '<literal>', '<literal>')) THEN '<literal>' ELSE '<literal>' END USER_CAN_CONSULT",
+            "truncated": false
+          },
+          "projectionParsed": true,
+          "visiblePolicies": [],
+          "emptyPolicyCatalogDoesNotProveNoPolicy": true
+        },
+        {
+          "label": "object_37b90c205cace07f",
+          "type": "TABLE",
+          "depth": 1,
+          "definitionReadable": false,
+          "dependencies": [],
+          "visiblePolicies": [],
+          "emptyPolicyCatalogDoesNotProveNoPolicy": true
+        },
+        {
+          "label": "object_9239090e6ea3387f",
+          "type": "TABLE",
+          "depth": 1,
+          "definitionReadable": false,
+          "dependencies": [],
+          "visiblePolicies": [],
+          "emptyPolicyCatalogDoesNotProveNoPolicy": true
+        },
+        {
+          "label": "object_e76bb07cf6942dd6",
+          "type": "TABLE",
+          "depth": 1,
+          "definitionReadable": false,
+          "dependencies": [],
+          "visiblePolicies": [],
+          "emptyPolicyCatalogDoesNotProveNoPolicy": true
+        },
+        {
+          "label": "object_429bc960fcb08273",
+          "type": "TABLE",
+          "depth": 1,
+          "definitionReadable": false,
+          "dependencies": [],
+          "visiblePolicies": [],
+          "emptyPolicyCatalogDoesNotProveNoPolicy": true
+        },
+        {
+          "label": "object_f07116b35829c82f",
+          "type": "TABLE",
+          "depth": 1,
+          "definitionReadable": false,
+          "dependencies": [],
+          "visiblePolicies": [],
+          "emptyPolicyCatalogDoesNotProveNoPolicy": true
+        },
+        {
+          "label": "object_eee6893db29ee3b9",
+          "type": "TABLE",
+          "depth": 1,
+          "definitionReadable": false,
+          "dependencies": [],
+          "visiblePolicies": [],
+          "emptyPolicyCatalogDoesNotProveNoPolicy": true
+        },
+        {
+          "label": "object_31baa9cd2f32e944",
+          "type": "TABLE",
+          "depth": 1,
+          "definitionReadable": false,
+          "dependencies": [],
+          "visiblePolicies": [],
+          "emptyPolicyCatalogDoesNotProveNoPolicy": true
+        },
+        {
+          "label": "object_afc03539b6e2ad6e",
+          "type": "TABLE",
+          "depth": 1,
+          "definitionReadable": false,
+          "dependencies": [],
+          "visiblePolicies": [],
+          "emptyPolicyCatalogDoesNotProveNoPolicy": true
+        },
+        {
+          "label": "object_718dd8d2f597c3f3",
+          "type": "TABLE",
+          "depth": 1,
+          "definitionReadable": false,
+          "dependencies": [],
+          "visiblePolicies": [],
+          "emptyPolicyCatalogDoesNotProveNoPolicy": true
+        },
+        {
+          "label": "object_d547dd967c661486",
+          "type": "TABLE",
+          "depth": 1,
+          "definitionReadable": false,
+          "dependencies": [],
+          "visiblePolicies": [],
+          "emptyPolicyCatalogDoesNotProveNoPolicy": true
+        }
+      ],
+      "blockers": [],
+      "limits": {
+        "maxObjects": 30,
+        "maxDepth": 5,
+        "maxSourceLines": 6000
+      },
+      "caseResolved": false,
+      "catalogVisibilityNotCompletenessProof": true
+    },
+    "caseResolved": false,
+    "inspectorClosedOrPreviousStatePreserved": true,
+    "independentConnectionsClosed": true,
+    "finishedAt": "2026-11-11T19:59:14.597Z",
+    "pdfDownloads": 0
+  },
+  "caseResolved": false,
+  "logout": true,
+  "finishedAt": "2026-11-11T19:59:44.505Z",
+  "logAudit": [
+    {
+      "service": "chatbot",
+      "lines": 10,
+      "safe": true,
+      "toolCalls": 0,
+      "toolResults": 0,
+      "permissionErrors": 0,
+      "permissionConsoleLines": 0,
+      "inspectorMetadataLines": 10,
+      "unknownRecords": 0,
+      "bedrockRequestEvents": 0,
+      "bedrockResponseEvents": 0,
+      "payloadsHidden": true,
+      "sessionsMasked": true
+    },
+    {
+      "service": "erp",
+      "lines": 2,
+      "safe": true,
+      "recognized": "ERP protected auth metadata"
+    }
+  ]
+}
